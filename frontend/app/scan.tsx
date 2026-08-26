@@ -1,8 +1,6 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Linking,
-  Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -32,8 +30,14 @@ export default function Scan() {
   const [permission, requestPermission] = useCameraPermissions();
   const [manual, setManual] = useState("");
   const [scanning, setScanning] = useState(true);
-  const [showCamera, setShowCamera] = useState(true);
   const lastScan = useRef<string>("");
+
+  // Auto-request camera permission on mount so the scanner opens immediately.
+  useEffect(() => {
+    if (permission && !permission.granted && permission.canAskAgain) {
+      requestPermission();
+    }
+  }, [permission?.granted, permission?.canAskAgain]);
 
   const proceed = useCallback(
     (partNumber: string) => {
@@ -69,10 +73,16 @@ export default function Scan() {
   );
 
   const renderCameraArea = () => {
-    // Permission not yet determined -> pre-permission explanation
+    // Permission object still loading
     if (!permission) {
-      return <View style={styles.cameraFallback} />;
+      return (
+        <View style={styles.cameraFallback}>
+          <Ionicons name="camera-outline" size={48} color={colors.info} />
+          <Text style={styles.permSub}>Camera તૈયાર થઈ રહ્યો છે…</Text>
+        </View>
+      );
     }
+    // Denied / blocked
     if (!permission.granted) {
       return (
         <View style={styles.cameraFallback}>
@@ -94,27 +104,18 @@ export default function Scan() {
         </View>
       );
     }
-    if (Platform.OS === "web") {
-      return (
-        <View style={styles.cameraFallback}>
-          <Ionicons name="scan-outline" size={48} color={colors.info} />
-          <Text style={styles.permSub}>Web preview પર camera scan limited છે — manual entry વાપરો</Text>
-        </View>
-      );
-    }
+    // Granted -> live camera scanner (native + web)
     return (
       <View style={styles.cameraWrap}>
-        {showCamera ? (
-          <CameraView
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            barcodeScannerSettings={{
-              barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "code93", "upc_a", "upc_e", "codabar", "itf14", "datamatrix", "pdf417", "aztec"],
-            }}
-            onBarcodeScanned={scanning ? onBarcode : undefined}
-          />
-        ) : null}
-        <View style={styles.overlay}>
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          barcodeScannerSettings={{
+            barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "code93", "upc_a", "upc_e", "codabar", "itf14", "datamatrix", "pdf417", "aztec"],
+          }}
+          onBarcodeScanned={scanning ? onBarcode : undefined}
+        />
+        <View style={[styles.overlay, { pointerEvents: "none" }]}>
           <View style={[styles.bracket, { borderColor: meta.color }]} />
           <Text style={styles.scanHint}>Part number barcode/QR camera સામે રાખો</Text>
         </View>
@@ -163,9 +164,10 @@ export default function Scan() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
-  cameraWrap: { flex: 1, backgroundColor: "#000" },
+  cameraWrap: { flex: 1, minHeight: 300, backgroundColor: "#000" },
   cameraFallback: {
     flex: 1,
+    minHeight: 300,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.md,
