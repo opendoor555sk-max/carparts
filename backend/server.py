@@ -710,8 +710,13 @@ async def buying_trip_scan(body: AiResearchIn, user=Depends(require("buying_trip
 # ---------------- AI Research (Gemini) ----------------
 GEMINI_SYSTEM = (
     "You are an automotive parts identification expert specializing in Indian salvage/scrap "
-    "electrical auto parts (Hyundai, Kia, Maruti Suzuki, Tata, Mahindra). Given a part number, "
+    "electrical auto parts (Hyundai, Kia, Maruti Suzuki, Tata, Mahindra). Given an OEM part number, "
     "identify the part using your knowledge and typical OEM cataloging patterns. "
+    "IMPORTANT numbering knowledge: Hyundai/Kia OEM part numbers are usually 10 alphanumeric chars "
+    "(e.g. 954A0-CCAF0). The first 2-3 digits indicate the system group: 91/95/96 = electrical/body "
+    "(95xxx often = BCM / smart junction / body control, 96xxx = infotainment/audio, 93xxx = switches). "
+    "The part number alone rarely pins the EXACT vehicle trim/variant/fuel-type, so DO NOT invent a "
+    "specific model/variant/fuel unless you are genuinely confident. "
     "Cross-check plausibility across multiple reasoning sources. Be honest about uncertainty — "
     "Indian salvage part-number data is often incomplete/paywalled, so if unsure, lower the confidence "
     "and set verification to 'Requires Verification'. If plausible details conflict, flag conflict=true. "

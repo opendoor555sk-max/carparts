@@ -18,6 +18,7 @@ import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { Button, Field, Header, StatusChip } from "@/src/components/ui";
+import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing, statusColor } from "@/src/theme";
 
 type ScanResult = {
@@ -43,7 +44,7 @@ export default function BuyingTrip() {
 
   const doScan = useCallback(
     async (pn: string) => {
-      const partNumber = pn.trim();
+      const partNumber = extractPartNumber(pn);
       if (!partNumber) return;
       try {
         const res = await api.post<ScanResult>("/buying-trip/scan", { part_number: partNumber });

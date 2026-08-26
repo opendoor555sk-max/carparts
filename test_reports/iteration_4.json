@@ -1,0 +1,22 @@
+{
+  "summary": "Part-number extraction fix RE-VERIFIED end-to-end via web (Expo web preview) at 390x844 mobile viewport. ALL 4 acceptance criteria PASS. Login abdul/Salam@123 OK. (1) SEARCH module -> manual input filled with FULL raw coded string '>06VTELEP954A0CCAF0SP954SVAFEKCCN0131T230101I202A2006017CB' -> tap SEARCH-Continue -> router.replace navigated to /part/954A0CCAF0 (extractPartNumber correctly mined the 10-char OEM number via the P<digit+9alnum>(?=[A-Z]) rule). Part detail hero shows 'PART NUMBER 954A0CCAF0' with NEW PART badge; raw payload does NOT appear anywhere on page. (2) SEARCH -> short typed '39100-2B000' -> navigates to /part/39100-2B000 unchanged (length<16 short-circuit works). (3) On /part/954A0CCAF0 the AI RESEARCH (Gemini) card is rendered with Confidence meter '95%', Name='Integrated Body Control Unit (IBU)', Category='Electrical/Body Control Module', Verified/Pending chips + Approve/Reject buttons for admin — plausible module name, structured. (4) Buying Trip -> typed same raw string in trip-input, submitted -> result card testID='trip-result-954A0CCAF0' rendered with 'OK TO BUY' banner and part_number '954A0CCAF0' (not the raw string). Header counter shows '1 scanned'. No red screen, no red console errors during any flow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_4.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "extractPartNumber() (/app/frontend/src/utils/barcode.ts) is correct: length<16 short-circuit preserves typed numbers; regex 1 (P + digit + 9 alnum + lookahead letter) catches the standard Hyundai/Kia salvage-label P-field encoding; regex 2 (digit + 4 alnum + letter + 4 alnum) is a safe fallback; final else returns original so admin can correct manually (no silent wrong guess).",
+    "Wired into scan.web.tsx.proceed(), scan.tsx.proceed(), and buying-trip.tsx.doScan() — all three entry points (web/native scan + trip) run the SAME extraction, ensuring consistent behavior across camera and manual paths."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100% (4/4)"},
+  "seed_data_creation": "None. Part 954A0CCAF0 remains as NEW PART (unsaved) — expected since Save is not part of this fix's acceptance criteria.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Barcode->part-number extraction fix verified. testIDs used: login-username, login-password, login-submit, module-search, manual-part-input, scan-continue, trip-input, trip-result-<pn>. Raw string '>06VTELEP954A0CCAF0SP954SVAFEKCCN0131T230101I202A2006017CB' correctly maps to '954A0CCAF0' everywhere; short '39100-2B000' preserved; AI card renders IBU/95%."
+}

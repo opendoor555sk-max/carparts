@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
 import { Button, Field, Header } from "@/src/components/ui";
+import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 const MODE_META: Record<string, { title: string; color: string; verb: string }> = {
@@ -41,7 +42,7 @@ export default function Scan() {
 
   const proceed = useCallback(
     (partNumber: string) => {
-      const pn = partNumber.trim();
+      const pn = extractPartNumber(partNumber);
       if (!pn) return;
       const c = encodeURIComponent(company as string);
       switch (mode) {

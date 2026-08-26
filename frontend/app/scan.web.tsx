@@ -9,6 +9,7 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 
 import { Button, Field, Header } from "@/src/components/ui";
+import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 const MODE_META: Record<string, { title: string; color: string }> = {
@@ -33,7 +34,7 @@ export default function ScanWeb() {
 
   const proceed = useCallback(
     (partNumber: string) => {
-      const pn = partNumber.trim();
+      const pn = extractPartNumber(partNumber);
       if (!pn || doneRef.current) return;
       doneRef.current = true;
       try {
