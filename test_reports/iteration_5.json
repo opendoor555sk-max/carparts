@@ -1,0 +1,31 @@
+{
+  "summary": "Edit-before-approve / edit-before-add feature FULLY VERIFIED end-to-end. Backend: 6/6 new pytest cases pass in /app/backend/tests/test_edit_approve.py (approve-with-edits overrides AI, approve-without-edits uses AI, new-part POST with details persists as Unverified, duplicate part rejected 400, PATCH updates existing part, reject sets Rejected & creates NO Verified part). Frontend (Expo web, 390x844): all 4 flows PASS with admin abdul/Salam@123 -> (F1) New part MANUAL-TEST-<ts> tap 'Add Details & Save NEW PART' -> modal opens -> filled name/category -> save-edit -> DETAILS card shows 'Test BCM Widget NEW'. (F2) AI edit-approve on 95400-2B000: 'Review, Edit & Approve' opens pre-filled modal, changed NAME to unique 'ADMIN-EDITED-Mirror-<n>' + vehicles 'Hyundai Creta, Kia Seltos', tap 'Approve & Save Verified' -> DETAILS card shows edited name + both vehicles + 'Verified' badge (values from admin edits, NOT raw AI). (F3) Edit-part: 'Edit Details' -> variant 'EDITED-VARIANT-DSL-AT' -> Save Changes -> card reflects new variant. (F4) Reject: 'Reject' -> AI approval_status becomes 'Rejected'; no verified part created. Backend approve endpoint correctly merges admin edits on top of AI result via PartEditIn(exclude_none=True). MINOR UX: the 'save-edit' button sits below the modal's scrollable content (Modal ScrollView maxHeight:420 + button below) — on a 390x844 viewport it lies just below the visible area; Playwright reported 'outside of the viewport' on direct .click() and needed a JS scrollIntoView. A real user can still scroll the modal, but consider bumping ScrollView maxHeight or moving Save inside the scroll region so it is always visible on small screens.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Edit modal Save button", "issue": "'save-edit' button can render below the visible area on 390x844 because ScrollView maxHeight=420 caps the fields and the button sits outside the scroll region. Consider increasing maxHeight or making the whole modal scrollable so the primary action is always reachable without scrolling the modal. Reference: /app/frontend/app/part/[pn].tsx:440,461", "testID": "save-edit", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_5.json",
+    "/app/backend/tests/test_edit_approve.py",
+    "/app/test_reports/pytest/edit_approve_results.xml"
+  ],
+  "action_items": [
+    "(Optional/LOW) In /app/frontend/app/part/[pn].tsx move the Save button INSIDE the ScrollView OR raise maxHeight so the primary CTA is visible without extra scroll on 390x844 devices."
+  ],
+  "critical_code_review_comments": [
+    "server.py:812 approve_ai correctly uses PartEditIn.dict(exclude_none=True) so partial edits fall back to AI values while any provided field overrides. company fallback (e.get('company') or r.get('company') or doc.company) is sound; None or empty string both defer.",
+    "server.py:537 update_part filters None so PATCH is safe for partial edits. server.py:507 create_part 400s on duplicate part_number — matches UI expectation.",
+    "Frontend saveEdit() builds vehicles via split(',').map(trim).filter(Boolean) — trims stray spaces; matches backend expected list[str]."
+  ],
+  "updated_files": ["/app/backend/tests/test_edit_approve.py"],
+  "success_rate": {"backend": "100% (6/6 new tests)", "frontend": "100% (4/4 flows)"},
+  "seed_data_creation": "Test-only parts created during runs: MANUAL_*, AI_EDIT_*, AI_NOEDIT_*, DUP_*, PATCH_*, REJ_*, MANUAL-TEST-<ts>, and the edit-approved 95400-2B000 (now Verified with admin-edited name+vehicles).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "TestIDs used in frontend flows: add-new-part, edit-part, ai-edit-approve, ai-reject, run-ai, rerun-ai, edit-name, edit-category, edit-company, edit-vehicles, edit-variant, edit-year, edit-technical, save-edit, close-edit-modal. Note: 'save-edit' may need JS scrollIntoView on 390x844 due to modal ScrollView maxHeight=420."
+}

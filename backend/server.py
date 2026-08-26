@@ -288,6 +288,19 @@ class AiResearchIn(BaseModel):
     company: Optional[str] = "All"
 
 
+class PartEditIn(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    company: Optional[str] = None
+    compatible_vehicles: Optional[List[str]] = None
+    variant: Optional[str] = None
+    year: Optional[str] = None
+    old_number: Optional[str] = None
+    new_number: Optional[str] = None
+    sticker_color: Optional[str] = None
+    technical_info: Optional[str] = None
+
+
 # ---------------- Startup ----------------
 @app.on_event("startup")
 async def startup():
@@ -717,6 +730,11 @@ GEMINI_SYSTEM = (
     "(95xxx often = BCM / smart junction / body control, 96xxx = infotainment/audio, 93xxx = switches). "
     "The part number alone rarely pins the EXACT vehicle trim/variant/fuel-type, so DO NOT invent a "
     "specific model/variant/fuel unless you are genuinely confident. "
+    "If you cannot determine the EXACT single vehicle model with high certainty, you MUST: set "
+    "verification='Requires Verification', set confidence to 60 or lower, and list ALL plausible "
+    "candidate vehicles (platform-sharing models across Hyundai AND Kia) in compatible_vehicles "
+    "instead of guessing just one. Only use verification='Verified' and confidence>85 when you are "
+    "truly certain of the exact part and its primary vehicle. "
     "Cross-check plausibility across multiple reasoning sources. Be honest about uncertainty — "
     "Indian salvage part-number data is often incomplete/paywalled, so if unsure, lower the confidence "
     "and set verification to 'Requires Verification'. If plausible details conflict, flag conflict=true. "
@@ -791,21 +809,31 @@ async def list_ai_research(status: Optional[str] = None, part_number: Optional[s
 
 
 @api.post("/ai/research/{research_id}/approve")
-async def approve_ai(research_id: str, user=Depends(require("ai_approve"))):
+async def approve_ai(research_id: str, edits: Optional[PartEditIn] = None, user=Depends(require("ai_approve"))):
     doc = await db.ai_research.find_one({"id": research_id})
     if not doc:
         raise HTTPException(404, "Research not found")
     r = doc["result"]
     pn = doc["part_number"]
+    # Admin-edited values take precedence over the raw AI suggestion.
+    e = edits.dict(exclude_none=True) if edits else {}
     part_updates = {
-        "name": r.get("name", ""), "category": r.get("category", ""),
-        "company": r.get("company") or doc.get("company", "All"),
-        "compatible_vehicles": r.get("compatible_vehicles", []),
-        "variant": r.get("variant", ""), "year": r.get("year", ""),
-        "technical_info": r.get("technical_info", ""),
+        "name": e.get("name", r.get("name", "")),
+        "category": e.get("category", r.get("category", "")),
+        "company": e.get("company") or r.get("company") or doc.get("company", "All"),
+        "compatible_vehicles": e.get("compatible_vehicles", r.get("compatible_vehicles", [])),
+        "variant": e.get("variant", r.get("variant", "")),
+        "year": e.get("year", r.get("year", "")),
+        "technical_info": e.get("technical_info", r.get("technical_info", "")),
         "verification_status": "Verified", "source": "AI (Admin approved)",
         "ai_sources": doc.get("sources", []),
     }
+    if e.get("old_number") is not None:
+        part_updates["old_number"] = e["old_number"]
+    if e.get("new_number") is not None:
+        part_updates["new_number"] = e["new_number"]
+    if e.get("sticker_color") is not None:
+        part_updates["sticker_color"] = e["sticker_color"]
     existing = await db.parts.find_one({"part_number": pn})
     if existing:
         await db.parts.update_one({"part_number": pn}, {"$set": part_updates})
@@ -816,7 +844,7 @@ async def approve_ai(research_id: str, user=Depends(require("ai_approve"))):
         await db.parts.insert_one(newp)
     await db.ai_research.update_one({"id": research_id},
                                     {"$set": {"approval_status": "Approved", "approved_by": user["username"],
-                                              "approved_at": now_iso()}})
+                                              "approved_at": now_iso(), "final_result": part_updates}})
     return {"ok": True, "part_number": pn}
 
 

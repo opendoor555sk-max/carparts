@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +19,7 @@ import { useToast } from "@/src/context/ToastContext";
 import {
   Button,
   Card,
+  Field,
   Header,
   Loading,
   Meter,
@@ -24,6 +28,20 @@ import {
   LimitBar,
 } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
+
+type EditMode = "ai-approve" | "edit-part" | "new-part";
+type EditData = {
+  name: string;
+  category: string;
+  company: string;
+  compatible_vehicles: string;
+  variant: string;
+  year: string;
+  technical_info: string;
+};
+const EMPTY_EDIT: EditData = {
+  name: "", category: "", company: "All", compatible_vehicles: "", variant: "", year: "", technical_info: "",
+};
 
 export default function PartDetail() {
   const { pn } = useLocalSearchParams<{ pn: string }>();
@@ -38,6 +56,10 @@ export default function PartDetail() {
   const [loading, setLoading] = useState(true);
   const [aiResult, setAiResult] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+  const [editMode, setEditMode] = useState<EditMode>("edit-part");
+  const [editData, setEditData] = useState<EditData>(EMPTY_EDIT);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -79,15 +101,69 @@ export default function PartDetail() {
     }
   };
 
-  const approveAI = async () => {
+  const openEdit = (mode: EditMode) => {
+    setEditMode(mode);
+    if (mode === "ai-approve" && aiResult?.result) {
+      const r = aiResult.result;
+      setEditData({
+        name: r.name || "",
+        category: r.category || "",
+        company: r.company || aiResult.company || "All",
+        compatible_vehicles: (r.compatible_vehicles || []).join(", "),
+        variant: r.variant || "",
+        year: r.year || "",
+        technical_info: r.technical_info || "",
+      });
+    } else if (mode === "edit-part" && part) {
+      setEditData({
+        name: part.name || "",
+        category: part.category || "",
+        company: part.company || "All",
+        compatible_vehicles: (part.compatible_vehicles || []).join(", "),
+        variant: part.variant || "",
+        year: part.year || "",
+        technical_info: part.technical_info || "",
+      });
+    } else {
+      setEditData({ ...EMPTY_EDIT, company: data?.part?.company || "All" });
+    }
+    setEditModal(true);
+  };
+
+  const saveEdit = async () => {
+    setSavingEdit(true);
+    const payload = {
+      name: editData.name,
+      category: editData.category,
+      company: editData.company,
+      compatible_vehicles: editData.compatible_vehicles
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      variant: editData.variant,
+      year: editData.year,
+      technical_info: editData.technical_info,
+    };
     try {
-      await api.post(`/ai/research/${aiResult.id}/approve`);
-      show("Approved & saved as Verified", "success");
+      if (editMode === "ai-approve") {
+        await api.post(`/ai/research/${aiResult.id}/approve`, payload);
+        show("Edited & saved as Verified", "success");
+      } else if (editMode === "edit-part") {
+        await api.patch(`/parts/${encodeURIComponent(partNumber)}`, payload);
+        show("Part details updated", "success");
+      } else {
+        await api.post("/parts", { part_number: partNumber, source: "Manual", ...payload });
+        show("NEW PART saved (Unverified)", "success");
+      }
+      setEditModal(false);
       load();
     } catch (e: any) {
-      show(e?.message || "Approve failed", "error");
+      show(e?.message || "Save failed", "error");
+    } finally {
+      setSavingEdit(false);
     }
   };
+
   const rejectAI = async () => {
     try {
       await api.post(`/ai/research/${aiResult.id}/reject`);
@@ -102,16 +178,6 @@ export default function PartDetail() {
     try {
       await api.post("/known-parts", { part_number: partNumber, company: data?.part?.company || "All" });
       show("Saved as Known Part", "success");
-      load();
-    } catch (e: any) {
-      show(e?.message || "Failed", "error");
-    }
-  };
-
-  const addNewPart = async () => {
-    try {
-      await api.post("/parts", { part_number: partNumber, company: "All", source: "Manual" });
-      show("NEW PART saved (Unverified)", "success");
       load();
     } catch (e: any) {
       show(e?.message || "Failed", "error");
@@ -178,6 +244,16 @@ export default function PartDetail() {
               <Ionicons name="git-branch" size={13} color={colors.info} />
               <Text style={styles.source}>Source: {p.source || "Manual"}</Text>
             </View>
+            {can("manage_parts") ? (
+              <Button
+                title="Edit Details"
+                onPress={() => openEdit("edit-part")}
+                icon="create"
+                variant="secondary"
+                testID="edit-part"
+                style={{ marginTop: spacing.md }}
+              />
+            ) : null}
           </Card>
         ) : (
           <Card testID="new-part-card">
@@ -186,7 +262,7 @@ export default function PartDetail() {
               આ part number library માં નથી. Save કરો — details AI research પછી Admin approve થાય તો Verified બને.
             </Text>
             {can("manage_parts") ? (
-              <Button title="Save NEW PART (Unverified)" onPress={addNewPart} icon="add" testID="add-new-part" style={{ marginTop: spacing.md }} />
+              <Button title="Add Details & Save NEW PART" onPress={() => openEdit("new-part")} icon="add" testID="add-new-part" style={{ marginTop: spacing.md }} />
             ) : null}
           </Card>
         )}
@@ -266,9 +342,9 @@ export default function PartDetail() {
               {aiResult.result?.notes ? <Text style={styles.dim}>{aiResult.result.notes}</Text> : null}
 
               {aiResult.approval_status === "Pending" && can("ai_approve") ? (
-                <View style={styles.approveRow}>
-                  <Button title="Approve" onPress={approveAI} icon="checkmark" testID="ai-approve" style={{ flex: 1 }} />
-                  <Button title="Reject" onPress={rejectAI} variant="danger" icon="close" testID="ai-reject" style={{ flex: 1 }} />
+                <View style={{ gap: spacing.sm }}>
+                  <Button title="Review, Edit & Approve" onPress={() => openEdit("ai-approve")} icon="create" testID="ai-edit-approve" />
+                  <Button title="Reject" onPress={rejectAI} variant="danger" icon="close" testID="ai-reject" />
                 </View>
               ) : aiResult.approval_status === "Pending" ? (
                 <View style={styles.pendingNote}>
@@ -338,6 +414,62 @@ export default function PartDetail() {
           ) : null}
         </View>
       </View>
+
+      {/* Edit / Approve details modal */}
+      <Modal visible={editModal} transparent animationType="slide" onRequestClose={() => setEditModal(false)}>
+        <View style={styles.modalWrap}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={styles.modal}>
+              <View style={styles.modalHead}>
+                <Text style={styles.modalTitle}>
+                  {editMode === "ai-approve" ? "Review & Approve" : editMode === "edit-part" ? "Edit Details" : "Add Part Details"}
+                </Text>
+                <Pressable onPress={() => setEditModal(false)} testID="close-edit-modal">
+                  <Ionicons name="close" size={24} color={colors.onSurface} />
+                </Pressable>
+              </View>
+              <Text style={styles.modalPn}>{partNumber}</Text>
+              {editMode === "ai-approve" ? (
+                <View style={styles.aiNote}>
+                  <Ionicons name="information-circle" size={14} color={colors.brand} />
+                  <Text style={styles.aiNoteText}>
+                    AI નું suggestion છે — ખોટું હોય તો correct કરો, પછી Verified save થશે.
+                  </Text>
+                </View>
+              ) : null}
+              <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 460 }}>
+                <Field label="NAME" value={editData.name} onChangeText={(t) => setEditData((d) => ({ ...d, name: t }))} testID="edit-name" />
+                <Field label="CATEGORY" value={editData.category} onChangeText={(t) => setEditData((d) => ({ ...d, category: t }))} testID="edit-category" />
+                <Field label="COMPANY" value={editData.company} onChangeText={(t) => setEditData((d) => ({ ...d, company: t }))} testID="edit-company" />
+                <Field
+                  label="COMPATIBLE VEHICLES (comma separated)"
+                  value={editData.compatible_vehicles}
+                  onChangeText={(t) => setEditData((d) => ({ ...d, compatible_vehicles: t }))}
+                  placeholder="Hyundai Creta, Kia Seltos"
+                  testID="edit-vehicles"
+                />
+                <Field label="VARIANT" value={editData.variant} onChangeText={(t) => setEditData((d) => ({ ...d, variant: t }))} testID="edit-variant" />
+                <Field label="YEAR" value={editData.year} onChangeText={(t) => setEditData((d) => ({ ...d, year: t }))} testID="edit-year" />
+                <Field
+                  label="TECHNICAL INFO"
+                  value={editData.technical_info}
+                  onChangeText={(t) => setEditData((d) => ({ ...d, technical_info: t }))}
+                  multiline
+                  testID="edit-technical"
+                />
+                <Button
+                  title={editMode === "ai-approve" ? "Approve & Save Verified" : editMode === "edit-part" ? "Save Changes" : "Save Part"}
+                  onPress={saveEdit}
+                  loading={savingEdit}
+                  icon="checkmark"
+                  testID="save-edit"
+                  style={{ marginTop: spacing.md, marginBottom: spacing.md }}
+                />
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -406,4 +538,26 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   actionRow: { flexDirection: "row", gap: spacing.sm },
+  modalWrap: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
+  modal: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  modalTitle: { color: colors.onSurface, fontSize: font.xl, fontWeight: "800" },
+  modalPn: { color: colors.brand, fontSize: font.lg, fontWeight: "800", marginTop: 2, marginBottom: spacing.md },
+  aiNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.brandFaint,
+    borderRadius: radius.sm,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  aiNoteText: { color: colors.onBrandFaint, fontSize: font.sm, flex: 1 },
 });
