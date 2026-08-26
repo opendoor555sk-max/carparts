@@ -1,0 +1,185 @@
+{
+  "app_name": "Kabadi Market Hisab",
+  "personality": "7 Dark-First Utility DARK",
+  "personality_one_liner": "A high-contrast, tactical command center built for rapid scanning, severe inventory limits, and heavy field operations in harsh warehouse environments.",
+  "color": {
+    "surface": "#121212",
+    "onSurface": "#FFFFFF",
+    "surfaceSecondary": "#1E1E1E",
+    "onSurfaceSecondary": "#E0E0E0",
+    "surfaceTertiary": "#2C2C2C",
+    "onSurfaceTertiary": "#BDBDBD",
+    "surfaceInverse": "#F5F5F5",
+    "onSurfaceInverse": "#121212",
+    "brand": "#FF8A00",
+    "brandPrimary": "#FF8A00",
+    "onBrandPrimary": "#000000",
+    "brandSecondary": "#CC6E00",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#4D2900",
+    "onBrandTertiary": "#FFB84D",
+    "success": "#34C759",
+    "onSuccess": "#000000",
+    "warning": "#FFCC00",
+    "onWarning": "#000000",
+    "error": "#FF3B30",
+    "onError": "#FFFFFF",
+    "info": "#9E9E9E",
+    "onInfo": "#000000",
+    "border": "#333333",
+    "borderStrong": "#4F4F4F",
+    "divider": "#2A2A2A"
+  },
+  "typography": {
+    "displayFontFamily": "Barlow Condensed",
+    "textFontFamily": "IBM Plex Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Dense tactical layout. Prioritize glanceability over whitespace. Use tight groupings for related metrics.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "0",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": false,
+    "do's": [],
+    "dont's": [
+      "No glassmorphism. This is a severe utilitarian environment. Use flat surfaces with precise borders."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Login",
+      "purpose": "Secure gateway with password + biometric auth for staff/admin.",
+      "states": {
+        "loading": "Centered brand-colored activity indicator.",
+        "empty": "N/A",
+        "error": "Solid red (#FF3B30) banner below inputs with 'Retry'."
+      },
+      "layout": "Centered industrial login block on surfaceSecondary. Large thumb-friendly inputs. Primary CTA locked to keyboard top or bottom. Face/Touch ID prompt immediately available."
+    },
+    {
+      "name": "Home Dashboard",
+      "purpose": "Main command center giving immediate access to company gate filters and the 5 primary modules.",
+      "states": {
+        "loading": "Skeleton grids for module tiles.",
+        "empty": "N/A",
+        "error": "Error boundary with bold text and reload CTA."
+      },
+      "layout": "Top sticky row: Company gate toggle (Hyundai/Maruti/Tata/Mahindra/All) using horizontally scrollable chips. Below: 5 large modular tiles (Search, Buy, Sell, Requirement, Buying Trip) arranged in a tactical grid (2 columns, last one spans full width). Offline sync indicator pill fixed at top right."
+    },
+    {
+      "name": "Universal Scanner",
+      "purpose": "High-throughput barcode/QR/photo scanning interface with live overlays.",
+      "states": {
+        "loading": "Camera initializing state with centered bracket.",
+        "empty": "N/A",
+        "error": "Camera permission error with large settings CTA."
+      },
+      "layout": "Full-screen camera view. Central high-contrast targeting bracket. Bottom drawer handles scanner history or manual entry toggle. Live status overlay floats at bottom showing last scanned result (e.g., 'IN STOCK', 'KNOWN PART') with strong haptics."
+    },
+    {
+      "name": "Search Result / Part Master",
+      "purpose": "Dense informational breakdown of a scanned part, including AI confidence and technical limits.",
+      "states": {
+        "loading": "Skeleton layout matching the complex technical grid.",
+        "empty": "Illustration of empty shelf + 'Part Not Found' + 'Add New Part' CTA.",
+        "error": "Warning banner indicating corrupted part data or network failure."
+      },
+      "layout": "Top section: 6-side photo gallery (horizontal scroll). Mid section: Part Number in Barlow Condensed (huge), Status chips (IN STOCK/REQUIREMENT). AI Research Result card: Confidence meter (horizontal bar), Conflict Warning (if Gemini data mismatches). Admin-only price row (toggled via icon). Bottom sticky CTA: 'Proceed to Buy/Sell'."
+    },
+    {
+      "name": "Buy Flow (Purchase Limit)",
+      "purpose": "Strict buying interface enforcing admin purchase limits via visual meters.",
+      "states": {
+        "loading": "Calculating limit overlay.",
+        "empty": "N/A",
+        "error": "Limit exceeded error with DO NOT BUY banner."
+      },
+      "layout": "Persistent Purchase Limit meter at the top (Stacked horizontal bar: Existing Stock [Grey] + Current Purchase [Amber] + Allowed Limit [Border line]). If purchase exceeds limit, the entire screen border turns solid red, and a massive 'DO NOT BUY' banner locks the primary CTA."
+    },
+    {
+      "name": "Category Master",
+      "purpose": "Hierarchical catalog of 73 items across 5 groups.",
+      "states": {
+        "loading": "List skeletons.",
+        "empty": "No categories found.",
+        "error": "Failed to load master list."
+      },
+      "layout": "SectionList pattern. 5 collapsible groups. Each row has a high-contrast label and a tight bounding box. Use sharp dividers instead of cards. Fast alphabetical scroll index on the right edge."
+    }
+  ],
+  "images": {
+    "hyundai_logo": {
+      "url": "https://images.pexels.com/photos/14992320/pexels-photo-14992320.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Hyundai Veloster rear emblem"
+    },
+    "tata_logo": {
+      "url": "https://images.pexels.com/photos/6107344/pexels-photo-6107344.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Tata Motors emblem on truck"
+    },
+    "maruti_logo": {
+      "url": "https://images.unsplash.com/photo-1663852408695-f57f4d75a536?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTJ8MHwxfHNlYXJjaHwxfHxNYXJ1dGklMjBTdXp1a2klMjBsb2dvJTIwcG5nfGVufDB8fHx8MTc4NzczMjczNnww&ixlib=rb-4.1.0&q=85",
+      "alt": "Maruti Suzuki car"
+    },
+    "mahindra_logo": {
+      "url": "https://images.pexels.com/photos/12937789/pexels-photo-12937789.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Mahindra SUV"
+    },
+    "part_alternator": {
+      "url": "https://images.unsplash.com/photo-1663642775693-6628f65358be?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjd8MHwxfHNlYXJjaHwxfHxjYXIlMjBhbHRlcm5hdG9yJTIwYXV0byUyMHBhcnR8ZW58MHx8fHwxNzg3NzMyNzM1fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Detailed car alternator part"
+    }
+  },
+  "haptics": {
+    "scanner_success": "notification_success",
+    "scanner_fail": "notification_error",
+    "limit_exceeded_warning": "impact_heavy",
+    "tab_switch": "impact_light",
+    "module_tile_press": "impact_medium"
+  },
+  "instructions_to_main_agent": [
+    "Adhere strictly to the 'Dark-First Utility DARK' personality. Do not use glassmorphism, blur, or soft shadows. Use hard borders, high-contrast dividers, and flat surfaces.",
+    "BANNED COLORS: Strictly NO blue, indigo, violet, or purple. For Info/Known parts, use the defined `info` token (#9E9E9E Silver).",
+    "Typography: Use `Barlow Condensed` for all part numbers, metrics, scores, and limits to pack data densely. Use `IBM Plex Sans` for body text, which handles the Gujarati script gracefully on Android while maintaining an industrial B2B look.",
+    "Purchase Limit Engine: Implement a horizontal stacked progress bar. Existing stock is dark grey (`surfaceTertiary`), Current purchase is `brandPrimary` (amber). If Allowed Limit is exceeded, trigger the DO-NOT-BUY state: disable the Buy CTA, show a full-width `error` (#FF3B30) banner, and trigger heavy haptics.",
+    "Scanner Overlay: Ensure oversized touch targets ('gloved hands' principle). Provide immediate visual and haptic feedback on scan. Do not rely solely on color; use bold text ('IN STOCK', 'DO NOT BUY').",
+    "AI Research Result Card: Display Gemini AI confidence using a horizontal progress bar. If there's an 'Information Conflict', show a prominent `warning` (#FFCC00) chip alongside Admin Approve/Reject buttons.",
+    "Company Gate: Use a horizontal scrollable chip row for brand filtering (Hyundai/Maruti/Tata/Mahindra/All) at the top of the Home Dashboard. Ensure the active chip is `brandPrimary`.",
+    "Offline-First: Show a persistent offline sync indicator pill at the top of the Home Dashboard. All lists must support background sync without blocking the UI.",
+    "Ensure the layout relies on spacing, 1pt structural borders (`borderStrong`), and tonal shifts instead of shadows.",
+    "Component detail: Buttons should be flat, pill-shaped or rounded (`md`), using `brandPrimary` with `onBrandPrimary` (black text) for maximum contrast. No gradients."
+  ]
+}

@@ -1,0 +1,189 @@
+import { useCallback, useRef, useState } from "react";
+import {
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+
+import { Button, Field, Header } from "@/src/components/ui";
+import { colors, font, radius, spacing } from "@/src/theme";
+
+const MODE_META: Record<string, { title: string; color: string; verb: string }> = {
+  search: { title: "SEARCH", color: colors.info, verb: "શોધો" },
+  buy: { title: "BUY", color: colors.success, verb: "ખરીદો" },
+  sell: { title: "SELL", color: colors.brand, verb: "વેચો" },
+  requirement: { title: "REQUIREMENT", color: colors.warning, verb: "જરૂરિયાત" },
+};
+
+export default function Scan() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { mode = "search", company = "All" } = useLocalSearchParams<{ mode: string; company: string }>();
+  const meta = MODE_META[mode as string] || MODE_META.search;
+
+  const [permission, requestPermission] = useCameraPermissions();
+  const [manual, setManual] = useState("");
+  const [scanning, setScanning] = useState(true);
+  const [showCamera, setShowCamera] = useState(true);
+  const lastScan = useRef<string>("");
+
+  const proceed = useCallback(
+    (partNumber: string) => {
+      const pn = partNumber.trim();
+      if (!pn) return;
+      const c = encodeURIComponent(company as string);
+      switch (mode) {
+        case "buy":
+          router.replace(`/buy?pn=${encodeURIComponent(pn)}&company=${c}` as any);
+          break;
+        case "sell":
+          router.replace(`/sell?pn=${encodeURIComponent(pn)}` as any);
+          break;
+        case "requirement":
+          router.replace(`/requirement-new?pn=${encodeURIComponent(pn)}&company=${c}` as any);
+          break;
+        default:
+          router.replace(`/part/${encodeURIComponent(pn)}` as any);
+      }
+    },
+    [mode, company, router],
+  );
+
+  const onBarcode = useCallback(
+    ({ data }: { data: string }) => {
+      if (!scanning || !data || data === lastScan.current) return;
+      lastScan.current = data;
+      setScanning(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      proceed(data);
+    },
+    [scanning, proceed],
+  );
+
+  const renderCameraArea = () => {
+    // Permission not yet determined -> pre-permission explanation
+    if (!permission) {
+      return <View style={styles.cameraFallback} />;
+    }
+    if (!permission.granted) {
+      return (
+        <View style={styles.cameraFallback}>
+          <Ionicons name="camera-outline" size={48} color={colors.brand} />
+          <Text style={styles.permTitle}>Barcode / QR scan માટે camera જોઈએ</Text>
+          <Text style={styles.permSub}>Part number automatically capture કરવા camera allow કરો</Text>
+          {permission.canAskAgain ? (
+            <Button title="Camera Allow કરો" onPress={requestPermission} icon="camera" testID="grant-camera" />
+          ) : (
+            <Button
+              title="Settings ખોલો"
+              onPress={() => Linking.openSettings()}
+              variant="secondary"
+              icon="settings"
+              testID="open-settings"
+            />
+          )}
+          <Text style={styles.orText}>અથવા નીચે manual entry વાપરો</Text>
+        </View>
+      );
+    }
+    if (Platform.OS === "web") {
+      return (
+        <View style={styles.cameraFallback}>
+          <Ionicons name="scan-outline" size={48} color={colors.info} />
+          <Text style={styles.permSub}>Web preview પર camera scan limited છે — manual entry વાપરો</Text>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.cameraWrap}>
+        {showCamera ? (
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            barcodeScannerSettings={{
+              barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "code93", "upc_a", "upc_e", "codabar", "itf14", "datamatrix", "pdf417", "aztec"],
+            }}
+            onBarcodeScanned={scanning ? onBarcode : undefined}
+          />
+        ) : null}
+        <View style={styles.overlay}>
+          <View style={[styles.bracket, { borderColor: meta.color }]} />
+          <Text style={styles.scanHint}>Part number barcode/QR camera સામે રાખો</Text>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.flex}>
+      <Header
+        title={`${meta.title} — Scan`}
+        subtitle={`Company: ${company}`}
+        onBack={() => router.back()}
+      />
+      <View style={{ flex: 1 }}>
+        {renderCameraArea()}
+
+        <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg }]}>
+          <Text style={styles.manualLabel}>MANUAL PART NUMBER</Text>
+          <View style={styles.manualRow}>
+            <View style={{ flex: 1 }}>
+              <Field
+                value={manual}
+                onChangeText={setManual}
+                placeholder="e.g. 39100-2B000"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                onSubmitEditing={() => proceed(manual)}
+                returnKeyType="go"
+                testID="manual-part-input"
+              />
+            </View>
+          </View>
+          <Button
+            title={`${meta.title} — Continue`}
+            onPress={() => proceed(manual)}
+            icon="arrow-forward"
+            disabled={!manual.trim()}
+            testID="scan-continue"
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.surface },
+  cameraWrap: { flex: 1, backgroundColor: "#000" },
+  cameraFallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.md,
+    padding: spacing.xl,
+  },
+  overlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: spacing.xl },
+  bracket: { width: 240, height: 160, borderWidth: 3, borderRadius: radius.md, backgroundColor: "transparent" },
+  scanHint: { color: "#fff", fontSize: font.base, fontWeight: "700", textAlign: "center", paddingHorizontal: spacing.xl },
+  permTitle: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800", textAlign: "center" },
+  permSub: { color: colors.info, fontSize: font.base, textAlign: "center", marginBottom: spacing.sm },
+  orText: { color: colors.info, fontSize: font.sm, marginTop: spacing.md },
+  bottom: {
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.xs,
+  },
+  manualLabel: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1, marginBottom: spacing.xs },
+  manualRow: { flexDirection: "row", gap: spacing.sm },
+});

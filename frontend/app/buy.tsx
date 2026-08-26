@@ -1,0 +1,288 @@
+import { useCallback, useEffect, useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+
+import { api } from "@/src/api/client";
+import { useAuth } from "@/src/context/AuthContext";
+import { useToast } from "@/src/context/ToastContext";
+import { Button, Card, Field, Header, LimitBar, Loading, StatusChip } from "@/src/components/ui";
+import { colors, font, radius, spacing } from "@/src/theme";
+
+const CONDITIONS = ["Working", "Testing", "Repairable", "Damaged", "Incomplete", "Scrap", "Unknown"];
+
+export default function Buy() {
+  const { pn, company = "All" } = useLocalSearchParams<{ pn: string; company: string }>();
+  const partNumber = decodeURIComponent(pn as string);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { can } = useAuth();
+  const { show } = useToast();
+
+  const [info, setInfo] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [condition, setCondition] = useState("Working");
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("");
+  const [rack, setRack] = useState("");
+  const [shelf, setShelf] = useState("");
+  const [box, setBox] = useState("");
+  const [position, setPosition] = useState("");
+  const [price, setPrice] = useState("");
+  const [override, setOverride] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await api.get(`/search?q=${encodeURIComponent(partNumber)}`);
+      setInfo(res);
+      if (res.part?.name) setName(res.part.name);
+      if (res.part?.category) setCategory(res.part.category);
+    } catch (e: any) {
+      show(e?.message || "Load failed", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [partNumber]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const limit = info?.limit;
+  const isStop = limit?.limit_enabled && limit?.remaining !== null && limit?.remaining <= 0;
+  const isWarn = limit?.status === "WARNING";
+
+  const submit = async () => {
+    if (isStop && !override) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      show("Limit reached — Override toggle કરો (Admin)", "error");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await api.post("/buy", {
+        part_number: partNumber,
+        company,
+        name,
+        category,
+        condition,
+        location: { rack, shelf, box, position },
+        price: price ? parseFloat(price) : null,
+        override,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      show(`Bought — stock updated`, "success");
+      router.replace(`/part/${encodeURIComponent(partNumber)}` as any);
+    } catch (e: any) {
+      const d = e?.detail;
+      if (d?.code === "LIMIT_REACHED") {
+        show("DO NOT BUY — limit reached", "error");
+        setInfo((prev: any) => ({ ...prev, limit: d.limit }));
+      } else {
+        show(e?.message || "Buy failed", "error");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.flex}>
+        <Header title="Buy" onBack={() => router.back()} />
+        <Loading text="Calculating limit…" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.flex, isStop && !override && styles.stopBorder]}>
+      <Header title="BUY — ખરીદો" subtitle={partNumber} onBack={() => router.back()} />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 100, gap: spacing.md }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Limit meter */}
+          <Card testID="buy-limit-card">
+            <View style={styles.rowBetween}>
+              <Text style={styles.cardTitle}>PURCHASE LIMIT</Text>
+              <StatusChip status={info?.status} />
+            </View>
+            <LimitBar existing={limit?.existing_stock ?? 0} allowed={limit?.allowed_limit ?? null} />
+            {limit?.limit_enabled ? (
+              <Text style={styles.remainText}>
+                Remaining allowed:{" "}
+                <Text style={{ color: isStop ? colors.error : colors.brand, fontWeight: "800" }}>
+                  {limit.remaining}
+                </Text>
+              </Text>
+            ) : null}
+          </Card>
+
+          {isStop && !override ? (
+            <View style={styles.doNotBuy} testID="do-not-buy">
+              <Ionicons name="hand-left" size={22} color={colors.onError} />
+              <Text style={styles.doNotBuyText}>DO NOT BUY</Text>
+              <Text style={styles.doNotBuySub}>Purchase limit પૂરી થઈ ગઈ છે</Text>
+            </View>
+          ) : isWarn ? (
+            <View style={styles.warnBanner}>
+              <Ionicons name="warning" size={18} color={colors.onWarning} />
+              <Text style={styles.warnText}>WARNING — limit નજીક છે</Text>
+            </View>
+          ) : null}
+
+          {/* Condition */}
+          <Card>
+            <Text style={styles.cardTitle}>CONDITION</Text>
+            <View style={styles.condGrid}>
+              {CONDITIONS.map((c) => (
+                <Pressable
+                  key={c}
+                  onPress={() => setCondition(c)}
+                  style={[
+                    styles.condChip,
+                    { backgroundColor: condition === c ? colors.brand : colors.surface, borderColor: condition === c ? colors.brand : colors.border },
+                  ]}
+                  testID={`buy-cond-${c}`}
+                >
+                  <Text style={{ color: condition === c ? colors.onBrand : colors.onSurface2, fontWeight: "700", fontSize: font.sm }}>
+                    {c}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </Card>
+
+          {/* Part info (for new) */}
+          {!info?.part ? (
+            <Card>
+              <Text style={styles.cardTitle}>NEW PART INFO</Text>
+              <Field label="Name" value={name} onChangeText={setName} placeholder="Part name" testID="buy-name" />
+              <Field label="Category" value={category} onChangeText={setCategory} placeholder="Category" testID="buy-category" />
+            </Card>
+          ) : null}
+
+          {/* Location */}
+          <Card>
+            <Text style={styles.cardTitle}>LOCATION (Rack → Shelf → Box → Position)</Text>
+            <View style={styles.locGrid}>
+              <View style={styles.locItem}>
+                <Field label="Rack" value={rack} onChangeText={setRack} placeholder="R1" testID="loc-rack" />
+              </View>
+              <View style={styles.locItem}>
+                <Field label="Shelf" value={shelf} onChangeText={setShelf} placeholder="S2" testID="loc-shelf" />
+              </View>
+              <View style={styles.locItem}>
+                <Field label="Box" value={box} onChangeText={setBox} placeholder="B3" testID="loc-box" />
+              </View>
+              <View style={styles.locItem}>
+                <Field label="Position" value={position} onChangeText={setPosition} placeholder="P4" testID="loc-position" />
+              </View>
+            </View>
+          </Card>
+
+          {/* Admin-only price */}
+          {can("view_price") ? (
+            <Card>
+              <View style={styles.rowBetween}>
+                <Text style={styles.cardTitle}>PURCHASE PRICE</Text>
+                <View style={styles.adminTag}>
+                  <Ionicons name="lock-closed" size={11} color={colors.brand} />
+                  <Text style={styles.adminTagText}>Admin only</Text>
+                </View>
+              </View>
+              <Field
+                value={price}
+                onChangeText={setPrice}
+                placeholder="₹ 0"
+                keyboardType="numeric"
+                testID="buy-price"
+              />
+            </Card>
+          ) : null}
+
+          {/* Override */}
+          {can("manage_limits") ? (
+            <Card>
+              <View style={styles.rowBetween}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.overrideTitle}>Admin Override</Text>
+                  <Text style={styles.dim}>Limit ignore કરીને buy કરો</Text>
+                </View>
+                <Switch
+                  value={override}
+                  onValueChange={setOverride}
+                  trackColor={{ true: colors.brand, false: colors.surface3 }}
+                  thumbColor={colors.onSurface}
+                  testID="override-switch"
+                />
+              </View>
+            </Card>
+          ) : null}
+        </ScrollView>
+
+        <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
+          <Button
+            title={isStop && !override ? "BLOCKED — Limit Reached" : "Confirm Buy (Stock +1)"}
+            onPress={submit}
+            loading={submitting}
+            disabled={isStop && !override}
+            variant={isStop && !override ? "danger" : "primary"}
+            icon="checkmark-circle"
+            testID="confirm-buy"
+          />
+        </View>
+      </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.surface },
+  stopBorder: { borderWidth: 3, borderColor: colors.error },
+  cardTitle: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1, marginBottom: spacing.md },
+  rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  remainText: { color: colors.onSurface2, fontSize: font.base, marginTop: spacing.md },
+  doNotBuy: {
+    alignItems: "center",
+    gap: spacing.xs,
+    backgroundColor: colors.error,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+  },
+  doNotBuyText: { color: colors.onError, fontSize: font.xxl, fontWeight: "800", letterSpacing: 1 },
+  doNotBuySub: { color: colors.onError, fontSize: font.base },
+  warnBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.warning,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  warnText: { color: colors.onWarning, fontWeight: "800", fontSize: font.base },
+  condGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  condChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.pill, borderWidth: 1 },
+  locGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  locItem: { width: "48%" },
+  adminTag: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.brandFaint, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  adminTagText: { color: colors.brand, fontSize: font.sm - 1, fontWeight: "700" },
+  overrideTitle: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
+  dim: { color: colors.info, fontSize: font.sm },
+  bar: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.md },
+});
