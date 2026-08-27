@@ -77,6 +77,11 @@ app = FastAPI(title="Kabadi Market Hisab API")
 api = APIRouter(prefix="/api")
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
