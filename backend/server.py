@@ -722,26 +722,25 @@ async def buying_trip_scan(body: AiResearchIn, user=Depends(require("buying_trip
 
 # ---------------- AI Research (Gemini) ----------------
 GEMINI_SYSTEM = (
-    "You are an automotive parts identification expert specializing in Indian salvage/scrap "
-    "electrical auto parts (Hyundai, Kia, Maruti Suzuki, Tata, Mahindra). Given an OEM part number, "
-    "identify the part using your knowledge and typical OEM cataloging patterns. "
+    "You are a precise Automobile Spare Parts Database Engine for Indian vehicles "
+    "(Hyundai, Kia, Maruti Suzuki, Tata, Mahindra). Given an OEM part number or barcode, identify it. "
     "IMPORTANT numbering knowledge: Hyundai/Kia OEM part numbers are usually 10 alphanumeric chars "
     "(e.g. 954A0-CCAF0). The first 2-3 digits indicate the system group: 91/95/96 = electrical/body "
-    "(95xxx often = BCM / smart junction / body control, 96xxx = infotainment/audio, 93xxx = switches). "
-    "The part number alone rarely pins the EXACT vehicle trim/variant/fuel-type, so DO NOT invent a "
-    "specific model/variant/fuel unless you are genuinely confident. "
-    "If you cannot determine the EXACT single vehicle model with high certainty, you MUST: set "
-    "verification='Requires Verification', set confidence to 60 or lower, and list ALL plausible "
-    "candidate vehicles (platform-sharing models across Hyundai AND Kia) in compatible_vehicles "
-    "instead of guessing just one. Only use verification='Verified' and confidence>85 when you are "
-    "truly certain of the exact part and its primary vehicle. "
-    "Cross-check plausibility across multiple reasoning sources. Be honest about uncertainty — "
-    "Indian salvage part-number data is often incomplete/paywalled, so if unsure, lower the confidence "
-    "and set verification to 'Requires Verification'. If plausible details conflict, flag conflict=true. "
+    "(95xxx often = BCM / IBU / smart junction, 96xxx = infotainment/audio, 93xxx = switches). "
+    "STRICT RULES: "
+    "1. NEVER invent or guess a part number. "
+    "2. You do NOT have live internet access — answer ONLY from reliable knowledge. If you do not "
+    "recognise the part number, set status='NOT_FOUND' and confidence=0. "
+    "3. The part number alone rarely pins the EXACT trim/variant/fuel. If you are not highly certain of "
+    "a single exact model, you MUST list ALL plausible platform-sharing models (across Hyundai AND Kia) "
+    "in compatible_models and compatible_vehicles, set confidence<=60. Do NOT claim one model as certain. "
+    "4. cross_reference = other OEM numbers (old/new/superseded or sibling-brand equivalents) if known. "
     "Return ONLY strict minified JSON, no markdown, no commentary, with exactly these keys: "
-    '{"name":string,"category":string,"company":string,"compatible_vehicles":[string],'
-    '"variant":string,"year":string,"technical_info":string,"confidence":number(0-100),'
-    '"verification":"Verified"|"Requires Verification","conflict":boolean,"sources":[string],"notes":string}'
+    '{"name":string,"category":string,"company":string,"manufacturer":string,"car_model":string,'
+    '"variant":string,"model_years":string,"year":string,"compatible_vehicles":[string],'
+    '"compatible_models":[{"company":string,"car_name":string,"variant":string,"model_years":string}],'
+    '"cross_reference":[string],"technical_info":string,"confidence":number(0-100),'
+    '"conflict":boolean,"sources":[string],"notes":string,"status":"SUCCESS"|"NOT_FOUND"}'
 )
 
 
@@ -773,6 +772,43 @@ async def ai_research(body: AiResearchIn, user=Depends(get_current_user)):
     pn = body.part_number.strip()
     if not pn:
         raise HTTPException(400, "Part number required")
+
+    # STEP 1 — DB-FIRST: if this part is already Verified in YOUR library, that is the
+    # authoritative 100% answer. Return it instantly without calling AI.
+    verified = await db.parts.find_one(
+        {"part_number": pn, "verification_status": "Verified"}, {"_id": 0})
+    if verified:
+        result = {
+            "name": verified.get("name", ""),
+            "category": verified.get("category", ""),
+            "company": verified.get("company", "All"),
+            "manufacturer": verified.get("company", ""),
+            "car_model": (verified.get("compatible_vehicles") or [""])[0],
+            "variant": verified.get("variant", ""),
+            "model_years": verified.get("year", ""),
+            "year": verified.get("year", ""),
+            "compatible_vehicles": verified.get("compatible_vehicles", []),
+            "compatible_models": [],
+            "cross_reference": [x for x in [verified.get("old_number"), verified.get("new_number")] if x],
+            "technical_info": verified.get("technical_info", ""),
+            "confidence": 100,
+            "conflict": False,
+            "sources": verified.get("ai_sources") or ["Your Verified Library"],
+            "notes": "Match found in your verified parts library (Admin approved).",
+            "status": "SUCCESS",
+        }
+        doc = {
+            "id": new_id(), "part_number": pn, "company": verified.get("company", "All"),
+            "result": result, "confidence": 100, "conflict": False,
+            "verification": "Verified", "sources": result["sources"],
+            "approval_status": "Approved", "from_database": True,
+            "created_at": now_iso(), "by": user["username"],
+        }
+        await db.ai_research.insert_one(dict(doc))
+        doc.pop("_id", None)
+        return doc
+
+    # STEP 2 — Unknown part: AI enrichment (still Requires Verification until Admin approves).
     if not EMERGENT_LLM_KEY:
         raise HTTPException(503, "AI key not configured")
     try:
@@ -786,11 +822,18 @@ async def ai_research(body: AiResearchIn, user=Depends(get_current_user)):
     # AI can NEVER self-mark Verified — the model has no live internet and may hallucinate.
     # Every AI suggestion stays "Requires Verification" until the Admin reviews & approves.
     verification = "Requires Verification"
+    # Backward-compat: keep compatible_vehicles populated even if model returned compatible_models.
+    if not data.get("compatible_vehicles") and data.get("compatible_models"):
+        data["compatible_vehicles"] = [
+            " ".join([m.get("company", ""), m.get("car_name", ""), m.get("variant", "")]).strip()
+            for m in data.get("compatible_models", [])
+        ]
     doc = {
         "id": new_id(), "part_number": pn, "company": body.company or "All",
         "result": data, "confidence": confidence, "conflict": conflict,
         "verification": verification, "sources": data.get("sources", []),
-        "approval_status": "Pending", "created_at": now_iso(), "by": user["username"],
+        "approval_status": "Pending", "from_database": False,
+        "created_at": now_iso(), "by": user["username"],
     }
     await db.ai_research.insert_one(dict(doc))
     doc.pop("_id", None)

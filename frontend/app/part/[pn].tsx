@@ -325,7 +325,20 @@ export default function PartDetail() {
               <Row label="Category" value={aiResult.result?.category} />
               <Row label="Vehicles" value={(aiResult.result?.compatible_vehicles || []).join(", ")} />
               <Row label="Variant" value={aiResult.result?.variant} />
-              <Row label="Year" value={aiResult.result?.year} />
+              <Row label="Year" value={aiResult.result?.year || aiResult.result?.model_years} />
+              <Row label="Cross-ref" value={(aiResult.result?.cross_reference || []).join(", ")} />
+              {aiResult.result?.status === "NOT_FOUND" ? (
+                <View style={styles.notFound}>
+                  <Ionicons name="help-circle" size={14} color={colors.warning} />
+                  <Text style={styles.notFoundText}>AI ને આ part number ઓળખાયો નહીં — manually details add કરો</Text>
+                </View>
+              ) : null}
+              {aiResult.from_database ? (
+                <View style={styles.dbTag}>
+                  <Ionicons name="shield-checkmark" size={13} color={colors.success} />
+                  <Text style={styles.dbTagText}>તમારી Verified Library માંથી (100%)</Text>
+                </View>
+              ) : null}
               {aiResult.result?.technical_info ? (
                 <Text style={styles.tech}>{aiResult.result.technical_info}</Text>
               ) : null}
@@ -560,4 +573,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   aiNoteText: { color: colors.onBrandFaint, fontSize: font.sm, flex: 1 },
+  notFound: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: "#3a3300", borderRadius: radius.sm, padding: spacing.sm, marginTop: spacing.xs },
+  notFoundText: { color: colors.warning, fontSize: font.sm, flex: 1 },
+  dbTag: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.sm },
+  dbTagText: { color: colors.success, fontSize: font.sm, fontWeight: "700" },
 });

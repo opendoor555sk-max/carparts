@@ -1,0 +1,29 @@
+{
+  "summary": "DB-FIRST engine + honest AI labeling FULLY VERIFIED end-to-end. Backend 3/3 new pytest cases in /app/backend/tests/test_db_first.py PASS (10.09s): (A) POST /api/ai/research with a fresh part number -> from_database=false, verification='Requires Verification', approval_status='Pending', result has status/cross_reference/confidence keys and compatible_models/vehicles fallback; (B) POST /api/ai/research/{id}/approve with edits {compatible_vehicles:['Hyundai Creta'], ...} -> GET /api/parts/{pn} shows verification_status='Verified' with the exact admin-edited vehicles=['Hyundai Creta'] and edited name/variant; (C) POST /api/ai/research again on same PN -> from_database=true, verification='Verified', confidence=100, approval_status='Approved', result.status='SUCCESS', result.compatible_vehicles=['Hyundai Creta'] — returned in <5s under a 30s timeout that would trip if AI were called, confirming it did NOT invoke Gemini. Frontend (Expo web, 390x844) admin login abdul/Salam@123 + fresh PN UI-DBF-<ts>: (1) tapping 'Run AI Research' rendered AI card with YELLOW 'Requires Verification' chip (NOT green Verified) + 'Pending' chip + Confidence meter + Cross-ref row (empty for random PN) + 'Review, Edit & Approve' + 'Reject' buttons; (2) after tap Review-Edit-Approve, modal opens pre-filled, changed compatible_vehicles to 'Hyundai Creta', tapped Save -> toast 'AI research complete', AI card re-renders with 'Verified' + 'Approved' chips, Confidence 100%, Vehicles='Hyundai Creta', DB-tag 'તમારી Verified Library માંથી (100%)' — matching backend Behavior C; (3) tapping 'Re-run AI' returned instantly with Verified/Approved/100%/DB-tag still shown. No backend errors, no frontend red screen, no react-native issues detected in this flow. Two pre-existing dev-only warnings observed (harmless): props.pointerEvents deprecated, Animated useNativeDriver JS fallback (already noted in iter 3). No new issues to fix.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_db_first.py",
+    "/app/test_reports/pytest/db_first_results.xml",
+    "/app/test_reports/iteration_6.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py:770-809 DB-FIRST path: db.parts.find_one({part_number, verification_status:'Verified'}) is the first thing checked; if hit, returns a fabricated result with confidence=100 and from_database=true WITHOUT calling Gemini — verified by 30s-timeout test C completing in ~1s.",
+    "server.py:822-824 AI branch hard-codes verification='Requires Verification' and approval_status='Pending' — model can never self-mark Verified. Correct honest labeling.",
+    "server.py:854-891 approve_ai merges PartEditIn(exclude_none=True) on top of AI result — admin edits override AI values. compatible_vehicles list preserved exactly as edited.",
+    "part/[pn].tsx:307-323 StatusChip(aiResult.verification) drives the yellow 'Requires Verification' chip; Meter uses aiResult.confidence with proper color thresholds; from_database branch (lines 336-341) shows the Verified Library badge only when server says so.",
+    "part/[pn].tsx:329 Cross-ref Row is unconditionally rendered from result.cross_reference — will populate for real OEM part numbers; in this run the PN was synthetic so Gemini returned []."
+  ],
+  "updated_files": ["/app/backend/tests/test_db_first.py"],
+  "success_rate": {"backend": "100% (3/3 new tests)", "frontend": "100% (behaviors A/B/C visible end-to-end)"},
+  "seed_data_creation": "One new part per run: UI-DBF-<ts> (from UI, ends up Verified with vehicles=['Hyundai Creta']) and DBF-<uuid> (from pytest, ends up Verified with vehicles=['Hyundai Creta']).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "TestIDs used: login-username, login-password, login-submit, run-ai, rerun-ai, ai-edit-approve, ai-reject, edit-vehicles, save-edit. To exercise DB-first correctly always use a FRESH part number per run (Behavior A must go through Gemini first). test_db_first.py::TestDbFirstEngine is order-dependent (A->B->C) since it stores pn/rid as class attrs — pytest-xdist runs it in a single worker, do not parallelize its 3 tests."
+}
