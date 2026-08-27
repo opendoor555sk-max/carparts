@@ -783,9 +783,9 @@ async def ai_research(body: AiResearchIn, user=Depends(get_current_user)):
         raise HTTPException(502, f"AI research failed: {e}")
     conflict = bool(data.get("conflict"))
     confidence = int(data.get("confidence", 0) or 0)
-    verification = data.get("verification", "Requires Verification")
-    if conflict:
-        verification = "Requires Verification"
+    # AI can NEVER self-mark Verified — the model has no live internet and may hallucinate.
+    # Every AI suggestion stays "Requires Verification" until the Admin reviews & approves.
+    verification = "Requires Verification"
     doc = {
         "id": new_id(), "part_number": pn, "company": body.company or "All",
         "result": data, "confidence": confidence, "conflict": conflict,
