@@ -87,10 +87,10 @@ def new_id() -> str:
 
 # ---------------- Permissions ----------------
 ALL_PERMISSIONS = [
-    "search", "buy", "sell", "requirement", "buying_trip", "manage_parts",
+    "search", "buy", "sell", "requirement", "manage_parts",
     "view_price", "manage_limits", "manage_users", "ai_approve", "view_stats"
 ]
-STAFF_DEFAULT = ["search", "buy", "sell", "requirement", "buying_trip", "manage_parts"]
+STAFF_DEFAULT = ["search", "buy", "sell", "requirement", "manage_parts"]
 
 COMPANIES = ["Hyundai+Kia", "Maruti", "Tata", "Mahindra", "All"]
 

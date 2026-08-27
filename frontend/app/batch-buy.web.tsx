@@ -29,14 +29,22 @@ export default function BatchBuyWeb() {
   const last = useRef<{ c: string; at: number }>({ c: "", at: 0 });
 
   useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") return;
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         setGps(`${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`);
+        sub = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, distanceInterval: 3, timeInterval: 4000 },
+          (l) => setGps(`${l.coords.latitude.toFixed(5)}, ${l.coords.longitude.toFixed(5)}`),
+        );
       } catch {}
     })();
+    return () => {
+      if (sub) sub.remove();
+    };
   }, []);
 
   const addOne = useCallback(
@@ -117,6 +125,12 @@ export default function BatchBuyWeb() {
         </View>
         <Pressable style={styles.addBtn} onPress={() => { addOne(manual); setManual(""); }} testID="batch-add"><Ionicons name="add" size={24} color={colors.onBrand} /></Pressable>
       </View>
+      <View style={styles.gpsStrip}>
+        <Ionicons name="location" size={16} color={gps ? colors.success : colors.warning} />
+        <Text style={[styles.gpsStripText, { color: gps ? colors.success : colors.warning }]} numberOfLines={1}>
+          {gps ? `Live GPS: ${gps}` : "GPS મેળવી રહ્યા છીએ…"}
+        </Text>
+      </View>
       <FlatList
         data={counts}
         keyExtractor={(c) => c.pn}
@@ -124,7 +138,7 @@ export default function BatchBuyWeb() {
         ListEmptyComponent={<Text style={styles.empty}>હજી કંઈ scan નથી થયું</Text>}
         renderItem={({ item }) => (
           <View style={styles.row} testID={`batch-${item.pn}`}>
-            <Text style={styles.pn}>{item.pn}</Text>
+            <Text style={styles.pn} numberOfLines={2}>{item.pn}</Text>
             <View style={styles.qtyBadge}><Text style={styles.qtyText}>x{item.qty}</Text></View>
           </View>
         )}
@@ -145,9 +159,11 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: "row", gap: spacing.sm, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider },
   addBtn: { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" },
   empty: { color: colors.info, textAlign: "center", marginTop: spacing.xl },
-  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg },
-  pn: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
-  qtyBadge: { backgroundColor: colors.success, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 4 },
-  qtyText: { color: colors.onSuccess, fontWeight: "800", fontSize: font.base },
+  gpsStrip: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.surface2, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  gpsStripText: { fontSize: font.base, fontWeight: "700", flex: 1 },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.lg },
+  pn: { color: colors.onSurface, fontSize: 40, lineHeight: 46, fontWeight: "900", letterSpacing: 1, flex: 1 },
+  qtyBadge: { backgroundColor: colors.success, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, minWidth: 64, alignItems: "center" },
+  qtyText: { color: colors.onSuccess, fontWeight: "900", fontSize: 30 },
   bar: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.md },
 });
