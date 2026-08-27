@@ -313,6 +313,12 @@ export default function PartDetail() {
                     <Text style={styles.conflictText}>Information Conflict</Text>
                   </View>
                 ) : null}
+                {aiResult.grounded ? (
+                  <View style={styles.grounded}>
+                    <Ionicons name="globe" size={13} color={colors.onSuccess} />
+                    <Text style={styles.groundedText}>Live Google sources</Text>
+                  </View>
+                ) : null}
               </View>
               <Meter
                 value={aiResult.confidence || 0}
@@ -577,4 +583,6 @@ const styles = StyleSheet.create({
   notFoundText: { color: colors.warning, fontSize: font.sm, flex: 1 },
   dbTag: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.sm },
   dbTagText: { color: colors.success, fontSize: font.sm, fontWeight: "700" },
+  grounded: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.success, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  groundedText: { color: colors.onSuccess, fontWeight: "800", fontSize: font.sm },
 });

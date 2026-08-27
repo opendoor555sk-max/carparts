@@ -34,6 +34,8 @@ JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ISSUER = os.environ.get('JWT_ISSUER', 'kabadi-api')
 ACCESS_MINUTES = int(os.environ.get('ACCESS_MINUTES', '720'))
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.7-flash')
 
 # ---------------- Object storage ----------------
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
@@ -744,14 +746,61 @@ GEMINI_SYSTEM = (
 )
 
 
+def _google_generate(prompt: str, system: str, use_search: bool):
+    url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+           f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}")
+    body: Dict[str, Any] = {
+        "systemInstruction": {"parts": [{"text": system}]},
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.2},
+    }
+    if use_search:
+        body["tools"] = [{"google_search": {}}]
+    return requests.post(url, json=body, timeout=70)
+
+
 async def run_gemini(part_number: str, company: str) -> dict:
+    prompt = (f"Identify this Indian auto electrical spare part. OEM part number: {part_number}. "
+              f"Company gate hint: {company}. Search reliable sources, cross-check, then return the "
+              f"strict JSON only (no markdown).")
+
+    # Preferred path — user's own Gemini key with LIVE Google Search grounding.
+    if GEMINI_API_KEY:
+        for use_search in (True, False):
+            for attempt in range(3):
+                resp = await run_in_threadpool(_google_generate, prompt, GEMINI_SYSTEM, use_search)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    cand = (data.get("candidates") or [{}])[0]
+                    text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
+                    sources = []
+                    for ch in cand.get("groundingMetadata", {}).get("groundingChunks", []):
+                        w = ch.get("web", {})
+                        title = w.get("title") or w.get("uri")
+                        if title:
+                            sources.append(title)
+                    if text.strip():
+                        return {"text": text, "sources": sources, "grounded": bool(use_search and sources)}
+                if resp.status_code == 429 and use_search:
+                    logger.warning("Gemini grounding quota exhausted — retrying without Google Search")
+                    break  # skip retries, drop to non-grounded generation
+                if resp.status_code in (500, 503):
+                    logger.warning(f"Gemini {resp.status_code} (attempt {attempt + 1}) — retrying")
+                    await asyncio.sleep(1.5 * (attempt + 1))
+                    continue
+                # other hard error — stop trying Google
+                logger.warning(f"Gemini error {resp.status_code}: {resp.text[:150]}")
+                break
+        logger.warning("Gemini (user key) unavailable — falling back to Emergent key")
+
+    # Fallback — Emergent universal key (no live internet) so the user always gets a result.
+    if not EMERGENT_LLM_KEY:
+        raise Exception("No AI provider available")
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"ai-{new_id()}",
                    system_message=GEMINI_SYSTEM).with_model("gemini", "gemini-3-flash-preview")
-    prompt = (f"Identify this auto electrical part. Part number: {part_number}. "
-              f"Company gate hint: {company}. Return the strict JSON only.")
     text = await chat.send_message(UserMessage(text=prompt))
-    return text
+    return {"text": text, "sources": [], "grounded": False}
 
 
 def parse_json_block(text: str) -> dict:
@@ -809,17 +858,21 @@ async def ai_research(body: AiResearchIn, user=Depends(get_current_user)):
         return doc
 
     # STEP 2 — Unknown part: AI enrichment (still Requires Verification until Admin approves).
-    if not EMERGENT_LLM_KEY:
+    if not (GEMINI_API_KEY or EMERGENT_LLM_KEY):
         raise HTTPException(503, "AI key not configured")
     try:
-        raw = await run_gemini(pn, body.company or "All")
-        data = parse_json_block(raw)
+        res = await run_gemini(pn, body.company or "All")
+        data = parse_json_block(res["text"])
     except Exception as e:
         logger.error(f"AI research failed: {e}")
         raise HTTPException(502, f"AI research failed: {e}")
+    grounded = bool(res.get("grounded"))
+    # Prefer real Google-Search source URLs when grounding actually returned them.
+    if res.get("sources"):
+        data["sources"] = res["sources"]
     conflict = bool(data.get("conflict"))
     confidence = int(data.get("confidence", 0) or 0)
-    # AI can NEVER self-mark Verified — the model has no live internet and may hallucinate.
+    # AI can NEVER self-mark Verified — the model may hallucinate.
     # Every AI suggestion stays "Requires Verification" until the Admin reviews & approves.
     verification = "Requires Verification"
     # Backward-compat: keep compatible_vehicles populated even if model returned compatible_models.
@@ -832,7 +885,7 @@ async def ai_research(body: AiResearchIn, user=Depends(get_current_user)):
         "id": new_id(), "part_number": pn, "company": body.company or "All",
         "result": data, "confidence": confidence, "conflict": conflict,
         "verification": verification, "sources": data.get("sources", []),
-        "approval_status": "Pending", "from_database": False,
+        "approval_status": "Pending", "from_database": False, "grounded": grounded,
         "created_at": now_iso(), "by": user["username"],
     }
     await db.ai_research.insert_one(dict(doc))

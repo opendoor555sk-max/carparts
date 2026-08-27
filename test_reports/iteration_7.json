@@ -1,0 +1,30 @@
+{
+  "summary": "Gemini API key provider swap FULLY VERIFIED end-to-end. Backend 7/7 tests PASS in 22.51s (/app/backend/tests/test_gemini_swap.py). (A) POST /api/ai/research with fresh PN 95400-<uuid> Hyundai+Kia -> HTTP 200, verification='Requires Verification' (NOT Verified), approval_status='Pending', from_database=false, grounded=bool, confidence=int, result.status in {SUCCESS, NOT_FOUND}, result.compatible_vehicles=list, result.cross_reference=list. Direct curl smoke returned confidence=85 SUCCESS with rich structured data (name='Integrated Body Control Unit', 3 compatible_vehicles, 3 cross_references, 2 sources) proving Gemini gemini-3.7-flash non-grounded fallback works even without billing. (B) POST /api/ai/research/{id}/approve with edits {name:'Test BCM', compatible_vehicles:['Hyundai Creta'], variant:'BS6', year:'2020', category:'Electrical/Body Control'} -> ok, GET /api/parts/{pn} confirms verification_status='Verified', name='Test BCM', compatible_vehicles=['Hyundai Creta']. (C) Re-POST /api/ai/research same PN under 15s timeout -> returned in <10s with from_database=true, verification='Verified', confidence=100, approval_status='Approved', result.status='SUCCESS', result.compatible_vehicles=['Hyundai Creta'] — proving DB-FIRST short-circuits Gemini. Honest labeling contract holds: AI branch NEVER self-marks Verified. Core endpoints unaffected: /api/categories total=73, /api/buy increments stock to 1, /api/sell decrements to 0, /api/stats returns total_parts. Frontend (Expo web, 390x844, admin abdul/Salam@123): tapped module-search, searched fresh PN 95400-UI599, tapped Run AI Research, waited ~35s, AI card rendered with YELLOW 'Requires Verification' chip + 'Pending' chip + Confidence meter + explanation text + 'Review, Edit & Approve' + 'Reject' + 'Re-run AI' buttons — Gemini honestly returned status=NOT_FOUND / confidence=0 for the synthetic PN (per contract this is a PASS, not a failure). No red screen, no 5xx, no new react-native issues. Two pre-existing dev-only warnings persist (harmless, already noted iter 3/6): props.pointerEvents deprecated. GEMINI_API_KEY + GEMINI_MODEL=gemini-3.7-flash swap is production-ready.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_gemini_swap.py",
+    "/app/test_reports/pytest/gemini_swap_results.xml",
+    "/app/test_reports/iteration_7.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py:819-893 ai_research: DB-FIRST branch (lines 827-858) short-circuits Gemini when part already Verified — verified by 15s-timeout test C completing in <10s.",
+    "server.py:875-877 AI branch hard-codes verification='Requires Verification' — model can never self-mark Verified. Correct honest labeling.",
+    "server.py:869-872 grounded flag + sources come from run_gemini() return; if Google Search grounding is disabled (billing off) code still produces valid JSON via non-grounded gemini-3.7-flash fallback — confirmed by curl seeing confidence=85 with sources array.",
+    "server.py:879-883 compatible_vehicles fallback: when Gemini returns compatible_models instead, code synthesizes vehicle strings — ensures frontend AI card always has a Vehicles row.",
+    "server.py:861-868 If both GEMINI_API_KEY and EMERGENT_LLM_KEY missing -> 503 (not 500). Gemini errors caught and returned as 502 (not 500) — clean error contract.",
+    "part/[pn].tsx:307-323 AI card StatusChip(aiResult.verification) drives yellow 'Requires Verification'; from_database branch shows 'Verified Library' badge only when server sets it; buttons Review-Edit-Approve/Reject rendered only when approval_status='Pending'."
+  ],
+  "updated_files": ["/app/backend/tests/test_gemini_swap.py"],
+  "success_rate": {"backend": "100% (7/7 tests, 22.51s)", "frontend": "100% (AI card contract fully rendered)"},
+  "seed_data_creation": "Per run: one Verified part 95400-<uuid> (name='Test BCM', vehicles=['Hyundai Creta']) via pytest, and one Unverified part 95400-UI<n> via UI (NOT_FOUND path, not approved).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Gemini key swap validated. gemini-3.7-flash non-grounded fallback works even when Google Search grounding returns 429 (billing off). For DB-FIRST tests always use a fresh PN so test A goes through Gemini before test C validates DB short-circuit. TestGeminiAIResearch is order-dependent (1->2->3) — pytest-xdist LoadScopeScheduling keeps them on one worker. TestIDs used in UI: login-username, login-password, login-submit, module-search, run-ai."
+}
