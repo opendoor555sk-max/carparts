@@ -14,7 +14,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Scan part barcodes and QR codes",
         "NSFaceIDUsageDescription": "Unlock your account securely",
-        "NSPhotoLibraryUsageDescription": "Attach part photos from your gallery"
+        "NSPhotoLibraryUsageDescription": "Attach part photos from your gallery",
+        "NSLocationWhenInUseUsageDescription": "Tag purchase location on stock"
       }
     },
     "android": {
@@ -24,7 +25,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.emergent.partnumberfirst.eepol0",
-      "permissions": ["CAMERA", "USE_BIOMETRIC", "USE_FINGERPRINT"]
+      "permissions": ["CAMERA", "USE_BIOMETRIC", "USE_FINGERPRINT", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +38,13 @@
         "expo-camera",
         {
           "cameraPermission": "Scan part barcodes and QR codes"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Attach part photos from your gallery",
+          "cameraPermission": "Take part photos with the camera"
         }
       ],
       [

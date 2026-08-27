@@ -78,7 +78,7 @@ export default function ScanWeb() {
       BarcodeFormat.UPC_E,
       BarcodeFormat.ITF,
     ]);
-    const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 50 });
+    const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 25 });
     readerRef.current = reader;
 
     (async () => {

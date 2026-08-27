@@ -1,0 +1,42 @@
+{
+  "summary": "All 5 review items PASSED end-to-end. Backend pytest 8/8 in /app/backend/tests/test_new_features.py (new_features_results.xml): (a) purchase-limit enforcement returns 409 LIMIT_REACHED with detail.code=LIMIT_REACHED and detail.message containing 'DO NOT BUY'; override=true bypasses; (b) batch-buy simulation (3 x /api/buy with override=false) all return 409, stock_count stays at 1; (c) POST /api/auth/change-password → wrong current=400 (Gujarati 'વર્તમાન password ખોટો છે'), short new (<6)=422, same-as-old=422, valid change + revert to Salam@123 works and login succeeds with new & old (reverted); (d) POST /api/upload returns {path,url:/api/files/...}; (e) POST /api/buy with photos:[path] & location.gps persists — GET /api/parts/{pn} returns unit.location.gps and unit.photos containing the uploaded path. Frontend (Expo web, 390x844, admin abdul/Salam@123): (1) Admin tab → ACCOUNT → 'Password બદલો' link (testID=admin-link-change-password) navigates to /change-password; cp-current/cp-new/cp-confirm/cp-save all render; submitting wrong current pw triggers Gujarati toast (backend 400) verified visually. (2) Set part-limit=1 via API then open /buy?pn=<pn>: DO NOT BUY banner ([data-testid=do-not-buy]) visible, confirm-buy label = 'BLOCKED — Limit Reached', aria-disabled=true. (3) /batch-buy header subtitle correctly shows 'GPS…' marker (GPS status displayed). Adding the limited PN via batch-manual+batch-add → server 409 (console error), row NOT added to list, Total remains 0 (frontend correctly ignores 409 and does not increment), server-side stock_count stayed at 1. Fresh PN still adds successfully. (4) /buy PART PHOTOS card visible with buy-take-photo, buy-pick-gallery, 0/6 counter; gps-synced row rendered (fetching text in headless — acceptable). (5) /part/<pn> STOCK UNITS row displays GPS coordinate '21.170200,72.831100' correctly after a buy with location.gps. Admin password unchanged post-test (login as Salam@123 returns 200). One benign console warning persists: 'props.pointerEvents is deprecated' from batch-buy web overlay (already reported in iteration_10).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "batch-buy.tsx / batch-buy.web.tsx overlay", "issue": "Deprecated `props.pointerEvents` still fires a RN warning on every mount. Move `pointerEvents:'none'` into the style object. Reference: /app/frontend/app/batch-buy.tsx:82 and /app/frontend/app/batch-buy.web.tsx:92. (Carried over from iteration_10 — not fixed yet.)"}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/new_features_results.xml",
+    "/app/test_reports/iteration_11.json"
+  ],
+  "action_items": [
+    "Optional: fix the deprecated pointerEvents prop warning on batch-buy screens (see iteration_10 action_items)."
+  ],
+  "critical_code_review_comments": [
+    "server.py:381-394 change-password: correctly returns 400 for wrong current with Gujarati message; 422 for short (<6) and same-as-old; hashes with hash_pw and writes password_changed_at. Endpoint requires auth (get_current_user). Good.",
+    "server.py:729-733 buy limit check: raises 409 with detail={code,message,limit} — matches frontend expectation `e.detail.code === 'LIMIT_REACHED'` in buy.tsx:194.",
+    "server.py:734-740 buy: stores photos:[] and location dict on the stock unit — verified via GET /api/parts/{pn}.units[].location.gps and .photos.",
+    "server.py:847-854 /limits/part: 404 if part not found; expects Part master to already exist. Tests seed by doing a buy first (which auto-creates the part master).",
+    "buy.tsx:169-188 correctly sends photos.map(p=>p.path), location.gps and override — matches backend contract.",
+    "batch-buy.web.tsx:48 correctly sends override:false — verified server-side 409 blocks limited parts.",
+    "part/[pn].tsx:401-406 renders u.location.gps unit-by-unit — verified via UI ('21.170200,72.831100' present in body).",
+    "change-password.tsx:26-29 also has client-side validation (short<6, mismatch, same-as-old, empty current) — reduces server round-trips.",
+    "(tabs)/admin.tsx:122-132 correctly links to /change-password with testID='admin-link-change-password'."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/iteration_11.json",
+    "/app/test_reports/pytest/new_features_results.xml"
+  ],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (5/5 review items)"},
+  "seed_data_creation": "Created ephemeral parts prefixed TEST_LIMIT_*, TEST_BATCH_LIMIT_*, TEST_GPSPHOTO_* via pytest, and UILIM*, UIGPS*, UIBATCH*, UITEST* via UI tests. Uploaded one 1x1 test JPEG per upload-test. Not cleaned up (no delete endpoint exercised). abdul password unchanged (Salam@123).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All requested flows work. Reusable test file: /app/backend/tests/test_new_features.py (pytest -v). Login token stored on web at localStorage['kabadi.token'] (JSON-encoded string). Use /api/buy with override:true to auto-create a part master before applying a per-part limit via /api/limits/part. Web preview scanner is ZXing (no camera in headless) — batch-buy UI uses testIDs batch-manual + batch-add. Only outstanding item is the pointerEvents deprecation warning (iteration_10).",
+  "rca_of_issue": "N/A — all bug fixes verified. Purchase-limit bypass on batch was because /batch-buy previously hard-coded override:true; verified fix now sends override:false (batch-buy.web.tsx:48) and server responds 409, frontend does NOT append the row (Total stays 0). Photos + GPS end-to-end flow round-trips via /api/upload → /api/buy → /api/parts/{pn}."
+}

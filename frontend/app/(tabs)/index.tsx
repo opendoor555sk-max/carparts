@@ -35,7 +35,7 @@ const MODULES: Module[] = [
   { key: "buy", title: "BUY", gujarati: "ખરીદો", icon: "download", perm: "buy", route: "/scan?mode=buy", color: colors.success },
   { key: "sell", title: "SELL", gujarati: "વેચો", icon: "cash", perm: "sell", route: "/scan?mode=sell", color: colors.brand },
   { key: "requirement", title: "REQUIREMENT", gujarati: "જરૂરિયાત", icon: "add-circle", perm: "requirement", route: "/scan?mode=requirement", color: colors.warning },
-  { key: "trip", title: "BUYING TRIP", gujarati: "ખરીદી પ્રવાસ", icon: "car", perm: "buying_trip", route: "/buying-trip", wide: true, color: colors.brand },
+  { key: "batch", title: "MULTIPLE BUY", gujarati: "ઝડપી બેચ ખરીદી", icon: "layers", perm: "buy", route: "/batch-buy", wide: true, color: colors.success },
 ];
 
 export default function Home() {

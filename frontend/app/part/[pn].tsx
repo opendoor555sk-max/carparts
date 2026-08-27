@@ -10,10 +10,11 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { api } from "@/src/api/client";
+import { api, fileUrl } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import {
@@ -60,6 +61,7 @@ export default function PartDetail() {
   const [editMode, setEditMode] = useState<EditMode>("edit-part");
   const [editData, setEditData] = useState<EditData>(EMPTY_EDIT);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try {
@@ -68,6 +70,13 @@ export default function PartDetail() {
       if (res.part) {
         const full = await api.get(`/parts/${encodeURIComponent(partNumber)}`);
         setPart(full);
+        // resolve displayable URLs for all unit photos
+        const paths: string[] = [];
+        (full.units || []).forEach((u: any) => (u.photos || []).forEach((p: string) => paths.push(p)));
+        if (paths.length) {
+          const entries = await Promise.all(paths.map(async (p) => [p, await fileUrl(p)] as const));
+          setPhotoUrls(Object.fromEntries(entries));
+        }
       } else {
         setPart(null);
       }
@@ -383,11 +392,28 @@ export default function PartDetail() {
             {part.units.map((u: any) => (
               <View key={u.id} style={styles.unitRow}>
                 <StatusChip status={u.condition} />
-                <Text style={styles.unitLoc}>
-                  {[u.location?.rack, u.location?.shelf, u.location?.box, u.location?.position]
-                    .filter(Boolean)
-                    .join(" → ") || "No location"}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.unitLoc}>
+                    {[u.location?.rack, u.location?.shelf, u.location?.box, u.location?.position]
+                      .filter(Boolean)
+                      .join(" → ") || "No location"}
+                  </Text>
+                  {u.location?.gps ? (
+                    <View style={styles.unitGps}>
+                      <Ionicons name="location" size={12} color={colors.success} />
+                      <Text style={styles.unitGpsText} selectable>{u.location.gps}</Text>
+                    </View>
+                  ) : null}
+                  {u.photos?.length ? (
+                    <View style={styles.unitPhotos}>
+                      {u.photos.map((p: string) =>
+                        photoUrls[p] ? (
+                          <Image key={p} source={{ uri: photoUrls[p] }} style={styles.unitThumb} contentFit="cover" />
+                        ) : null,
+                      )}
+                    </View>
+                  ) : null}
+                </View>
               </View>
             ))}
           </Card>
@@ -544,7 +570,11 @@ const styles = StyleSheet.create({
   pendingNote: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   pendingText: { color: colors.warning, fontSize: font.sm, flex: 1 },
   unitRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.divider },
-  unitLoc: { color: colors.onSurface3, fontSize: font.base, flex: 1 },
+  unitLoc: { color: colors.onSurface3, fontSize: font.base },
+  unitGps: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
+  unitGpsText: { color: colors.success, fontSize: font.sm - 1, fontWeight: "700" },
+  unitPhotos: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 },
+  unitThumb: { width: 54, height: 54, borderRadius: radius.sm, backgroundColor: colors.surface3 },
   actionBar: {
     position: "absolute",
     bottom: 0,

@@ -193,6 +193,11 @@ class ApiSettingsIn(BaseModel):
     google_cx: Optional[str] = None
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class UserCreate(BaseModel):
     name: str
     username: str
@@ -371,6 +376,22 @@ async def me(user=Depends(get_current_user)):
 @api.get("/auth/settings")
 async def get_settings(user=Depends(get_current_user)):
     return {"google_cx": user.get("google_cx", ""), "has_google_key": bool(user.get("google_api_key"))}
+
+
+@api.post("/auth/change-password")
+async def change_password(body: ChangePasswordIn, user=Depends(get_current_user)):
+    if not verify_pw(body.current_password, user["password_hash"]):
+        raise HTTPException(400, "વર્તમાન password ખોટો છે")
+    new_pw = body.new_password
+    if len(new_pw) < 6:
+        raise HTTPException(422, "નવો password ઓછામાં ઓછો 6 અક્ષર હોવો જોઈએ")
+    if new_pw == body.current_password:
+        raise HTTPException(422, "નવો password જૂના કરતાં અલગ હોવો જોઈએ")
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"password_hash": hash_pw(new_pw), "password_changed_at": now_iso()}},
+    )
+    return {"ok": True}
 
 
 @api.post("/auth/settings")

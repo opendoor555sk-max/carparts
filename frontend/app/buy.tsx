@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -10,11 +12,14 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import * as Location from "expo-location";
+import * as ImagePicker from "expo-image-picker";
 
-import { api } from "@/src/api/client";
+import { api, fileUrl, uploadImage } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { Button, Card, Field, Header, LimitBar, Loading, StatusChip } from "@/src/components/ui";
@@ -34,6 +39,18 @@ export default function Buy() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [gps, setGps] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setGps(`${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`);
+      } catch {}
+    })();
+  }, []);
 
   const [condition, setCondition] = useState("Working");
   const [name, setName] = useState("");
@@ -46,6 +63,63 @@ export default function Buy() {
   const [position, setPosition] = useState("");
   const [price, setPrice] = useState("");
   const [override, setOverride] = useState(false);
+  const [photos, setPhotos] = useState<{ path: string; display: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const doUpload = async (uri: string) => {
+    setUploading(true);
+    try {
+      const { path } = await uploadImage(uri);
+      const display = await fileUrl(path);
+      setPhotos((prev) => [...prev, { path, display }]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      show("Photo upload નિષ્ફળ", "error");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const takePhoto = async () => {
+    if (photos.length >= 6) return show("વધુમાં વધુ 6 photos", "info");
+    let perm = await ImagePicker.getCameraPermissionsAsync();
+    if (!perm.granted && perm.canAskAgain) perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Camera જોઈએ", "Part ના photo લેવા camera allow કરો.", [
+        { text: "રદ કરો", style: "cancel" },
+        { text: "Settings ખોલો", onPress: () => Linking.openSettings() },
+      ]);
+      return;
+    }
+    const res = await ImagePicker.launchCameraAsync({ quality: 0.6 });
+    if (!res.canceled && res.assets?.[0]?.uri) await doUpload(res.assets[0].uri);
+  };
+
+  const pickGallery = async () => {
+    if (photos.length >= 6) return show("વધુમાં વધુ 6 photos", "info");
+    let perm = await ImagePicker.getMediaLibraryPermissionsAsync();
+    if (!perm.granted && perm.canAskAgain) perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Gallery જોઈએ", "Gallery માંથી photo add કરવા permission allow કરો.", [
+        { text: "રદ કરો", style: "cancel" },
+        { text: "Settings ખોલો", onPress: () => Linking.openSettings() },
+      ]);
+      return;
+    }
+    const remaining = 6 - photos.length;
+    const res = await ImagePicker.launchImageLibraryAsync({
+      quality: 0.6,
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+    });
+    if (!res.canceled) {
+      for (const a of res.assets || []) {
+        if (a.uri) await doUpload(a.uri);
+      }
+    }
+  };
+
+  const removePhoto = (path: string) => setPhotos((prev) => prev.filter((p) => p.path !== path));
 
   const load = useCallback(async () => {
     try {
@@ -107,8 +181,9 @@ export default function Buy() {
         compatible_vehicles: vehicles.split(",").map((s) => s.trim()).filter(Boolean),
         variant,
         condition,
-        location: { rack, shelf, box, position },
+        location: { rack, shelf, box, position, gps },
         price: price ? parseFloat(price) : null,
+        photos: photos.map((p) => p.path),
         override,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -246,6 +321,43 @@ export default function Buy() {
                 <Field label="Position" value={position} onChangeText={setPosition} placeholder="P4" testID="loc-position" />
               </View>
             </View>
+            <View style={styles.gpsRow} testID="gps-synced">
+              <Ionicons name={gps ? "location" : "location-outline"} size={14} color={gps ? colors.success : colors.info} />
+              <Text style={[styles.gpsText, { color: gps ? colors.success : colors.info }]}>
+                {gps ? `GPS synced: ${gps}` : "GPS location fetching…"}
+              </Text>
+            </View>
+          </Card>
+
+          {/* Part Photos (6-side) */}
+          <Card testID="buy-photos-card">
+            <View style={styles.rowBetween}>
+              <Text style={styles.cardTitle}>PART PHOTOS (6 બાજુ)</Text>
+              <Text style={styles.photoCount}>{photos.length}/6</Text>
+            </View>
+            <View style={styles.photoGrid}>
+              {photos.map((p) => (
+                <View key={p.path} style={styles.thumbWrap}>
+                  <Image source={{ uri: p.display }} style={styles.thumb} contentFit="cover" />
+                  <Pressable style={styles.thumbDel} onPress={() => removePhoto(p.path)} testID={`del-photo-${p.path}`}>
+                    <Ionicons name="close" size={14} color={colors.onError} />
+                  </Pressable>
+                </View>
+              ))}
+              {photos.length < 6 ? (
+                <Pressable style={styles.addPhoto} onPress={takePhoto} disabled={uploading} testID="buy-take-photo">
+                  <Ionicons name={uploading ? "hourglass" : "camera"} size={22} color={colors.brand} />
+                  <Text style={styles.addPhotoText}>Camera</Text>
+                </Pressable>
+              ) : null}
+              {photos.length < 6 ? (
+                <Pressable style={styles.addPhoto} onPress={pickGallery} disabled={uploading} testID="buy-pick-gallery">
+                  <Ionicons name="images" size={22} color={colors.brand} />
+                  <Text style={styles.addPhotoText}>Gallery</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            <Text style={styles.photoHint}>Front, Back, Left, Right, Top, Bottom — દરેક બાજુના photo add કરો</Text>
           </Card>
 
           {/* Admin-only price */}
@@ -339,4 +451,14 @@ const styles = StyleSheet.create({
   bar: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.md },
   compatHint: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.xs },
   compatHintText: { color: colors.info, fontSize: font.sm, flex: 1 },
+  gpsRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.sm },
+  gpsText: { fontSize: font.sm, fontWeight: "700" },
+  photoCount: { color: colors.info, fontSize: font.sm, fontWeight: "800" },
+  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  thumbWrap: { width: 72, height: 72, borderRadius: radius.sm, overflow: "hidden", position: "relative" },
+  thumb: { width: "100%", height: "100%", backgroundColor: colors.surface3 },
+  thumbDel: { position: "absolute", top: 2, right: 2, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.error, alignItems: "center", justifyContent: "center" },
+  addPhoto: { width: 72, height: 72, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.brandFaint, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 2 },
+  addPhotoText: { color: colors.brand, fontSize: font.sm - 1, fontWeight: "700" },
+  photoHint: { color: colors.info, fontSize: font.sm, marginTop: spacing.sm },
 });

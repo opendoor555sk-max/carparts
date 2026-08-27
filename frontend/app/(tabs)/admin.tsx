@@ -119,6 +119,22 @@ export default function Admin() {
               })}
             </View>
 
+            <Text style={[styles.section, { marginTop: spacing.xl }]}>ACCOUNT</Text>
+            <Pressable
+              style={styles.link}
+              onPress={() => router.push("/change-password" as any)}
+              testID="admin-link-change-password"
+            >
+              <View style={styles.linkIcon}>
+                <Ionicons name="key" size={22} color={colors.brand} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.linkTitle}>Password બદલો</Text>
+                <Text style={styles.linkSub}>તમારો login password change કરો</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.info} />
+            </Pressable>
+
             {!isAdmin ? (
               <View style={styles.note}>
                 <Ionicons name="information-circle" size={16} color={colors.info} />

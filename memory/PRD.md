@@ -65,11 +65,16 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 
 ## Backlog / Remaining
 - P1: True offline-first local queue + auto-sync on reconnect (currently online-first with sync indicator).
-- P1: 6-side photo capture + upload wired to camera/gallery (endpoints ready; UI capture pending).
 - P2: Duplicate protection UI feedback; sticker-color guided ID; old/new number auto-link.
 - P2: Hourly cloud backup + versioning + recovery; 360° video (future).
-- P2: GPS purchase location (deferred — manual text chosen).
+- P2: Scanner UI: Torch/flashlight toggle, tap-to-focus (vibrate-on-scan already done via Haptics).
 
-## Next Tasks
-- Add photo capture (6-side) in Add Part / Buy using expo-camera + gallery.
-- Implement offline scan queue for Buying Trip with auto-sync.
+## Updates (2026-06 — batch buy + photos + password)
+- Multiple/Batch Buy FIXED: was hardcoding override:true (bypassed limits). Now sends override:false → per-part purchase limit enforced; blocked parts show error + not counted. GPS auto-synced and sent with each batch buy; header shows GPS status.
+- 6-side Part Photos: Buy screen camera/gallery capture (expo-image-picker), upload to object storage, up to 6, thumbnails + remove. Photos shown on part detail stock units.
+- GPS shown on part detail stock unit rows.
+- Change Password: self-service /change-password screen (Admin Panel → ACCOUNT), backend POST /api/auth/change-password (verifies current, min 6 chars). Verified/tested (iteration 11, 8/8 pytest + frontend).
+- Removed leftover buying-trip.tsx route (module fully gone).
+
+## Confirmed limit rule
+- Purchase limit = per part number max units (option a). Already enforced by compute_limit + per-part limit endpoint.
