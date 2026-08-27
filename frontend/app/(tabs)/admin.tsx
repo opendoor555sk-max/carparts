@@ -60,7 +60,7 @@ export default function Admin() {
     { title: "AI Approvals", sub: "Gemini research pending approval", icon: "sparkles", route: "/ai-approvals", perm: "ai_approve" },
     { title: "Google Search Setup", sub: "Your own API key — free 100/day", icon: "key", route: "/settings", perm: "search" },
     { title: "Purchase Limits", sub: "Global + per-part limits", icon: "speedometer", route: "/limits", perm: "manage_limits" },
-    { title: "Manage Users", sub: "Staff & permissions", icon: "people", route: "/users", perm: "manage_users" },
+    { title: "Manage Users", sub: "બધા users નો username + password બદલો", icon: "people", route: "/users", perm: "manage_users" },
     { title: "Demand & Search", sub: "High-demand detection", icon: "trending-up", route: "/demand", perm: "view_stats" },
   ];
 
@@ -146,8 +146,8 @@ export default function Admin() {
                 <Ionicons name="key" size={22} color={colors.brand} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.linkTitle}>Password બદલો</Text>
-                <Text style={styles.linkSub}>તમારો login password change કરો</Text>
+                <Text style={styles.linkTitle}>મારો પોતાનો Password</Text>
+                <Text style={styles.linkSub}>ફક્ત તમારો login password બદલો</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.info} />
             </Pressable>

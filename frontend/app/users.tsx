@@ -219,7 +219,7 @@ export default function Users() {
                 </Pressable>
                 <Pressable style={styles.pwBtn} onPress={() => openEdit(u)} testID={`edit-${u.username}`}>
                   <Ionicons name="create-outline" size={16} color={colors.brand} />
-                  <Text style={styles.pwBtnText}>Edit</Text>
+                  <Text style={styles.pwBtnText}>બદલો</Text>
                 </Pressable>
               </View>
 
@@ -307,19 +307,20 @@ export default function Users() {
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
             <View style={styles.modal}>
               <View style={styles.modalHead}>
-                <Text style={styles.modalTitle}>Edit {editUser?.name}</Text>
+                <Text style={styles.modalTitle}>Username / Password બદલો</Text>
                 <Pressable onPress={() => setEditUser(null)} testID="close-edit-modal">
                   <Ionicons name="close" size={24} color={colors.onSurface} />
                 </Pressable>
               </View>
               <ScrollView keyboardShouldPersistTaps="handled">
+                <Text style={styles.editWho}>{editUser?.name} (@{editUser?.username})</Text>
                 <Field label="Name" value={eName} onChangeText={setEName} testID="edit-name" />
-                <Field label="Username" value={eUsername} onChangeText={setEUsername} autoCapitalize="none" testID="edit-username" />
+                <Field label="Username (login નામ)" value={eUsername} onChangeText={setEUsername} autoCapitalize="none" testID="edit-username" />
                 <Field
                   label="New Password (ખાલી રાખો તો બદલાશે નહીં)"
                   value={ePassword}
                   onChangeText={setEPassword}
-                  placeholder="Reset password"
+                  placeholder="નવો password"
                   autoCapitalize="none"
                   testID="edit-password"
                 />
@@ -366,6 +367,7 @@ const styles = StyleSheet.create({
   pwText: { color: colors.onSurface2, fontSize: font.base, fontWeight: "700", letterSpacing: 1 },
   pwBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 8 },
   pwBtnText: { color: colors.brand, fontSize: font.sm, fontWeight: "700" },
+  editWho: { color: colors.info, fontSize: font.base, fontWeight: "700", marginBottom: spacing.md },
   removeBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs, marginTop: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.error },
   removeText: { color: colors.error, fontSize: font.base, fontWeight: "700" },
   confirmWrap: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center", padding: spacing.xl },
