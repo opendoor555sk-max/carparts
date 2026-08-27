@@ -10,6 +10,7 @@ from typing import List, Optional, Dict, Any
 import jwt
 import bcrypt
 import requests
+from cryptography.fernet import Fernet
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Header
 from fastapi.responses import Response
 from fastapi.concurrency import run_in_threadpool
@@ -142,6 +143,23 @@ def verify_pw(pw: str, hashed: str) -> bool:
         return False
 
 
+# Reversible encryption for admin-viewable passwords (internal single-shop tool).
+# NOTE: bcrypt hash is used for login; this encrypted copy exists ONLY so the
+# admin can reveal a staff password on demand. Key lives in backend/.env.
+_fernet = Fernet(os.environ["FERNET_KEY"].encode())
+
+
+def encrypt_pw(pw: str) -> str:
+    return _fernet.encrypt(pw.encode()).decode()
+
+
+def decrypt_pw(token: str) -> Optional[str]:
+    try:
+        return _fernet.decrypt(token.encode()).decode()
+    except Exception:
+        return None
+
+
 def make_token(user: dict) -> str:
     now = datetime.now(timezone.utc)
     claims = {
@@ -182,6 +200,12 @@ def require(permission: str):
     return dep
 
 
+async def require_admin(user=Depends(get_current_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(403, "ફક્ત Admin આ કરી શકે")
+    return user
+
+
 # ---------------- Models ----------------
 class LoginIn(BaseModel):
     username: str
@@ -207,6 +231,8 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    username: Optional[str] = None
     permissions: Optional[List[str]] = None
     disabled: Optional[bool] = None
     password: Optional[str] = None
@@ -334,10 +360,15 @@ async def startup():
             "name": os.environ.get("ADMIN_NAME", "Abdul Salam"),
             "username": admin_username,
             "password_hash": hash_pw(os.environ.get("ADMIN_PASSWORD", "Salam@123")),
+            "password_enc": encrypt_pw(os.environ.get("ADMIN_PASSWORD", "Salam@123")),
             "role": "admin", "permissions": ALL_PERMISSIONS, "disabled": False,
             "created_at": now_iso(),
         })
         logger.info("Seeded main admin user")
+    elif not existing.get("password_enc"):
+        # backfill encrypted copy for the seeded admin so it can be revealed
+        await db.users.update_one({"id": existing["id"]},
+                                  {"$set": {"password_enc": encrypt_pw(os.environ.get("ADMIN_PASSWORD", "Salam@123"))}})
     # settings
     if not await db.settings.find_one({"key": "purchase_limit"}):
         await db.settings.insert_one({"key": "purchase_limit", "global_enabled": False, "global_default": None})
@@ -389,7 +420,7 @@ async def change_password(body: ChangePasswordIn, user=Depends(get_current_user)
         raise HTTPException(422, "નવો password જૂના કરતાં અલગ હોવો જોઈએ")
     await db.users.update_one(
         {"id": user["id"]},
-        {"$set": {"password_hash": hash_pw(new_pw), "password_changed_at": now_iso()}},
+        {"$set": {"password_hash": hash_pw(new_pw), "password_enc": encrypt_pw(new_pw), "password_changed_at": now_iso()}},
     )
     return {"ok": True}
 
@@ -517,6 +548,7 @@ async def create_user(body: UserCreate, user=Depends(require("manage_users"))):
     doc = {
         "id": new_id(), "name": body.name, "username": body.username.lower().strip(),
         "password_hash": hash_pw(body.password),
+        "password_enc": encrypt_pw(body.password),
         "role": "admin" if body.role == "admin" else "staff",
         "permissions": body.permissions if body.permissions is not None else STAFF_DEFAULT,
         "disabled": False, "created_at": now_iso(),
@@ -531,16 +563,40 @@ async def update_user(user_id: str, body: UserUpdate, user=Depends(require("mana
     if not target:
         raise HTTPException(404, "User not found")
     updates = {}
+    if body.name is not None and body.name.strip():
+        updates["name"] = body.name.strip()
+    if body.username is not None and body.username.strip():
+        new_un = body.username.lower().strip()
+        clash = await db.users.find_one({"username": new_un, "id": {"$ne": user_id}})
+        if clash:
+            raise HTTPException(400, "Username already exists")
+        updates["username"] = new_un
     if body.permissions is not None:
         updates["permissions"] = body.permissions
     if body.disabled is not None:
         updates["disabled"] = body.disabled
     if body.password:
+        if len(body.password) < 6:
+            raise HTTPException(422, "Password ઓછામાં ઓછો 6 અક્ષર")
         updates["password_hash"] = hash_pw(body.password)
+        updates["password_enc"] = encrypt_pw(body.password)
     if updates:
         await db.users.update_one({"id": user_id}, {"$set": updates})
     fresh = await db.users.find_one({"id": user_id}, {"_id": 0})
     return public_user(fresh)
+
+
+@api.get("/admin/users/{user_id}/password")
+async def view_user_password(user_id: str, user=Depends(require_admin)):
+    target = await db.users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(404, "User not found")
+    enc = target.get("password_enc")
+    pw = decrypt_pw(enc) if enc else None
+    if not pw:
+        raise HTTPException(404, detail={"code": "NO_STORED_PW",
+                                         "message": "આ user નો password જૂનો છે — reset કરો પછી દેખાશે"})
+    return {"username": target["username"], "password": pw}
 
 
 @api.get("/permissions")
@@ -780,6 +836,107 @@ async def inventory(condition: Optional[str] = None, q: Optional[str] = None, us
         u["part_name"] = p.get("name", "") if p else ""
         u["company"] = p.get("company", "") if p else ""
     return units
+
+
+# ---------------- Stock adjust / delete (Admin only) ----------------
+class StockAdjustIn(BaseModel):
+    part_number: str
+    delta: int = 0
+    condition: Optional[str] = None
+    location: Optional[Dict[str, Any]] = None
+
+
+@api.post("/stock/adjust")
+async def stock_adjust(body: StockAdjustIn, user=Depends(require_admin)):
+    pn = body.part_number.strip()
+    part = await db.parts.find_one({"part_number": pn})
+    if not part:
+        raise HTTPException(404, "Part મળ્યો નથી")
+    delta = int(body.delta)
+    added, removed = 0, 0
+    if delta > 0:
+        for _ in range(delta):
+            unit = {"id": new_id(), "part_number": pn, "condition": body.condition or "Unknown",
+                    "location": body.location or {}, "photos": [], "barcode": "",
+                    "sold": False, "created_at": now_iso(), "added_by": user["username"], "adjusted": True}
+            await db.stock.insert_one(dict(unit))
+            added += 1
+        await db.transactions.insert_one({"id": new_id(), "type": "adjust_add", "part_number": pn,
+                                          "quantity": added, "by": user["username"], "at": now_iso()})
+    elif delta < 0:
+        units = await db.stock.find({"part_number": pn, "sold": {"$ne": True}}).sort("created_at", -1).to_list(-delta)
+        for u in units:
+            await db.stock.update_one({"id": u["id"]}, {"$set": {"sold": True, "sold_at": now_iso(),
+                                                                 "sold_by": user["username"], "removed_reason": "adjust"}})
+            removed += 1
+        await db.transactions.insert_one({"id": new_id(), "type": "adjust_remove", "part_number": pn,
+                                          "quantity": removed, "by": user["username"], "at": now_iso()})
+    remaining = await db.stock.count_documents({"part_number": pn, "sold": {"$ne": True}})
+    return {"ok": True, "added": added, "removed": removed, "remaining_stock": remaining}
+
+
+@api.delete("/stock/unit/{unit_id}")
+async def delete_unit(unit_id: str, user=Depends(require_admin)):
+    unit = await db.stock.find_one({"id": unit_id})
+    if not unit:
+        raise HTTPException(404, "Unit મળ્યું નથી")
+    await db.stock.delete_one({"id": unit_id})
+    await db.transactions.insert_one({"id": new_id(), "type": "delete_unit", "part_number": unit["part_number"],
+                                      "unit_id": unit_id, "by": user["username"], "at": now_iso()})
+    remaining = await db.stock.count_documents({"part_number": unit["part_number"], "sold": {"$ne": True}})
+    return {"ok": True, "remaining_stock": remaining}
+
+
+# ---------------- Physical stock verification (Admin only) ----------------
+async def _expected_stock() -> Dict[str, int]:
+    units = await db.stock.find({"sold": {"$ne": True}}, {"_id": 0, "part_number": 1}).to_list(10000)
+    counts: Dict[str, int] = {}
+    for u in units:
+        counts[u["part_number"]] = counts.get(u["part_number"], 0) + 1
+    return counts
+
+
+@api.get("/stock/verification")
+async def verification_list(user=Depends(require_admin)):
+    counts = await _expected_stock()
+    out = []
+    for pn, qty in counts.items():
+        p = await db.parts.find_one({"part_number": pn}, {"_id": 0, "name": 1, "company": 1})
+        out.append({"part_number": pn, "expected": qty,
+                    "part_name": (p or {}).get("name", ""), "company": (p or {}).get("company", "")})
+    out.sort(key=lambda x: x["part_number"])
+    last = await db.verifications.find_one({}, {"_id": 0}, sort=[("at", -1)])
+    return {"items": out, "last": last}
+
+
+class VerifyCount(BaseModel):
+    part_number: str
+    counted: int
+
+
+class VerifyIn(BaseModel):
+    counts: List[VerifyCount]
+
+
+@api.post("/stock/verify")
+async def verify_stock(body: VerifyIn, user=Depends(require_admin)):
+    expected = await _expected_stock()
+    counted_map = {c.part_number.strip(): int(c.counted) for c in body.counts}
+    discrepancies = []
+    for pn in set(expected) | set(counted_map):
+        exp = expected.get(pn, 0)
+        got = counted_map.get(pn, 0)
+        if exp != got:
+            p = await db.parts.find_one({"part_number": pn}, {"_id": 0, "name": 1})
+            discrepancies.append({"part_number": pn, "part_name": (p or {}).get("name", ""),
+                                  "expected": exp, "counted": got, "diff": got - exp,
+                                  "status": "MISSING" if got < exp else "EXTRA"})
+    total = len(set(expected) | set(counted_map))
+    report = {"id": new_id(), "at": now_iso(), "by": user["username"], "total_parts": total,
+              "ok_count": total - len(discrepancies), "discrepancies": discrepancies}
+    await db.verifications.insert_one(dict(report))
+    report.pop("_id", None)
+    return report
 
 
 # ---------------- Known parts ----------------

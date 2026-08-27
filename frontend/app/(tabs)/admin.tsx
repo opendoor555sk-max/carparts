@@ -119,6 +119,23 @@ export default function Admin() {
               })}
             </View>
 
+            {isAdmin ? (
+              <Pressable
+                style={[styles.link, { marginTop: spacing.md }]}
+                onPress={() => router.push("/stock-verify" as any)}
+                testID="admin-link-stock-verify"
+              >
+                <View style={styles.linkIcon}>
+                  <Ionicons name="clipboard" size={22} color={colors.brand} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.linkTitle}>Stock Verification</Text>
+                  <Text style={styles.linkSub}>ફિઝિકલ સ્ટોક ગણી ગાયબ part શોધો</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.info} />
+              </Pressable>
+            ) : null}
+
             <Text style={[styles.section, { marginTop: spacing.xl }]}>ACCOUNT</Text>
             <Pressable
               style={styles.link}

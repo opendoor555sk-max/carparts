@@ -37,6 +37,69 @@ export default function Users() {
   const [confirmRemove, setConfirmRemove] = useState<any>(null);
   const [removing, setRemoving] = useState(false);
 
+  // password reveal + edit
+  const [revealed, setRevealed] = useState<Record<string, string>>({});
+  const [editUser, setEditUser] = useState<any>(null);
+  const [eName, setEName] = useState("");
+  const [eUsername, setEUsername] = useState("");
+  const [ePassword, setEPassword] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const revealPw = async (u: any) => {
+    if (revealed[u.id]) {
+      setRevealed((r) => {
+        const c = { ...r };
+        delete c[u.id];
+        return c;
+      });
+      return;
+    }
+    try {
+      const res = await api.get<{ password: string }>(`/admin/users/${u.id}/password`);
+      setRevealed((r) => ({ ...r, [u.id]: res.password }));
+    } catch (e: any) {
+      show(e?.detail?.message || e?.message || "Password ન મળ્યો", "error");
+    }
+  };
+
+  const openEdit = (u: any) => {
+    setEditUser(u);
+    setEName(u.name);
+    setEUsername(u.username);
+    setEPassword("");
+  };
+
+  const saveEdit = async () => {
+    if (!editUser) return;
+    const body: any = {};
+    if (eName.trim() && eName.trim() !== editUser.name) body.name = eName.trim();
+    if (eUsername.trim() && eUsername.trim() !== editUser.username) body.username = eUsername.trim();
+    if (ePassword) {
+      if (ePassword.length < 6) return show("Password ઓછામાં ઓછો 6 અક્ષર", "error");
+      body.password = ePassword;
+    }
+    if (Object.keys(body).length === 0) {
+      setEditUser(null);
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await api.patch(`/admin/users/${editUser.id}`, body);
+      show("Updated ✓", "success");
+      setRevealed((r) => {
+        const c = { ...r };
+        delete c[editUser.id];
+        return c;
+      });
+      setEditUser(null);
+      load();
+    } catch (e: any) {
+      show(e?.message || "Failed", "error");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const load = useCallback(async () => {
     try {
       const [u, p] = await Promise.all([api.get("/admin/users"), api.get("/permissions")]);
@@ -141,6 +204,25 @@ export default function Users() {
                 </View>
                 <StatusChip status={u.role === "admin" ? "Verified" : u.disabled ? "Cancelled" : "Pending"} />
               </View>
+
+              {/* Password reveal + edit (Admin) */}
+              <View style={styles.pwRow}>
+                <View style={styles.pwBox}>
+                  <Ionicons name="key-outline" size={15} color={colors.info} />
+                  <Text style={styles.pwText} selectable>
+                    {revealed[u.id] ? revealed[u.id] : "••••••••"}
+                  </Text>
+                </View>
+                <Pressable style={styles.pwBtn} onPress={() => revealPw(u)} testID={`reveal-${u.username}`}>
+                  <Ionicons name={revealed[u.id] ? "eye-off" : "eye"} size={16} color={colors.brand} />
+                  <Text style={styles.pwBtnText}>{revealed[u.id] ? "છુપાવો" : "જુઓ"}</Text>
+                </Pressable>
+                <Pressable style={styles.pwBtn} onPress={() => openEdit(u)} testID={`edit-${u.username}`}>
+                  <Ionicons name="create-outline" size={16} color={colors.brand} />
+                  <Text style={styles.pwBtnText}>Edit</Text>
+                </Pressable>
+              </View>
+
               {u.role !== "admin" ? (
                 <>
                   <Text style={styles.permLabel}>PERMISSIONS (tap to toggle)</Text>
@@ -219,6 +301,35 @@ export default function Users() {
         </View>
       </Modal>
 
+      {/* Edit user modal */}
+      <Modal visible={!!editUser} transparent animationType="slide" onRequestClose={() => setEditUser(null)}>
+        <View style={styles.modalWrap}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={styles.modal}>
+              <View style={styles.modalHead}>
+                <Text style={styles.modalTitle}>Edit {editUser?.name}</Text>
+                <Pressable onPress={() => setEditUser(null)} testID="close-edit-modal">
+                  <Ionicons name="close" size={24} color={colors.onSurface} />
+                </Pressable>
+              </View>
+              <ScrollView keyboardShouldPersistTaps="handled">
+                <Field label="Name" value={eName} onChangeText={setEName} testID="edit-name" />
+                <Field label="Username" value={eUsername} onChangeText={setEUsername} autoCapitalize="none" testID="edit-username" />
+                <Field
+                  label="New Password (ખાલી રાખો તો બદલાશે નહીં)"
+                  value={ePassword}
+                  onChangeText={setEPassword}
+                  placeholder="Reset password"
+                  autoCapitalize="none"
+                  testID="edit-password"
+                />
+                <Button title="Save Changes" onPress={saveEdit} loading={savingEdit} icon="save" testID="save-edit" style={{ marginTop: spacing.lg }} />
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
       {/* Confirm remove */}
       <Modal visible={!!confirmRemove} transparent animationType="fade" onRequestClose={() => setConfirmRemove(null)}>
         <View style={styles.confirmWrap}>
@@ -250,6 +361,11 @@ const styles = StyleSheet.create({
   permChip: { paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.sm, borderWidth: 1 },
   label: { color: colors.onSurface2, fontSize: font.base, fontWeight: "600" },
   adminNote: { color: colors.brand, fontSize: font.sm, marginTop: spacing.sm, fontWeight: "700" },
+  pwRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md },
+  pwBox: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 8 },
+  pwText: { color: colors.onSurface2, fontSize: font.base, fontWeight: "700", letterSpacing: 1 },
+  pwBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 8 },
+  pwBtnText: { color: colors.brand, fontSize: font.sm, fontWeight: "700" },
   removeBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs, marginTop: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.error },
   removeText: { color: colors.error, fontSize: font.base, fontWeight: "700" },
   confirmWrap: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center", padding: spacing.xl },

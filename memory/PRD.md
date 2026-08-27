@@ -76,5 +76,10 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Change Password: self-service /change-password screen (Admin Panel → ACCOUNT), backend POST /api/auth/change-password (verifies current, min 6 chars). Verified/tested (iteration 11, 8/8 pytest + frontend).
 - Removed leftover buying-trip.tsx route (module fully gone).
 
-## Confirmed limit rule
-- Purchase limit = per part number max units (option a). Already enforced by compute_limit + per-part limit endpoint.
+## Updates (2026-06 — admin stock + password management)
+- Inventory adjust (Admin only): Inventory tab rows have ઘટાડો/વધારો/Delete; Part-details STOCK UNITS has +/- quantity + per-unit trash delete. Backend POST /api/stock/adjust, DELETE /api/stock/unit/{id} (require_admin).
+- Admin user management: reset/edit any user's name/username/password + VIEW password (reversible Fernet-encrypted copy at rest; bcrypt still used for login). GET /api/admin/users/{id}/password (admin only), PATCH /api/admin/users/{id} extended for name/username. Seeded admin password_enc backfilled at startup.
+- Physical Stock Verification (Admin): /stock-verify screen + Admin Panel link. GET /api/stock/verification (expected qty per part), POST /api/stock/verify (counts -> discrepancies MISSING/EXTRA, saved to db.verifications).
+- Verified iteration 12: backend 15/15 pytest + frontend E2E all PASS.
+- Confirmed purchase-limit rule = per part number (max units). Fixed deprecated pointerEvents prop across scan/batch-buy.
+

@@ -149,7 +149,7 @@ export default function ScanWeb() {
       <View style={{ flex: 1 }}>
         <View style={styles.cameraWrap}>
           {VideoEl}
-          <View style={[styles.overlay, { pointerEvents: "none" }]}>
+          <View style={styles.overlay} pointerEvents="none">
             <View style={[styles.bracket, { borderColor: meta.color }]} />
             <Text style={styles.scanHint}>
               {status === "denied"

@@ -1,0 +1,41 @@
+{
+  "summary": "All 5 review items PASSED end-to-end. Backend pytest 15/15 in /app/backend/tests/test_admin_stock_features.py (admin_stock_results.xml): (A) Stock adjust +3/-1 correct counts; DELETE /stock/unit removes a unit; staff gets 403 on both /stock/adjust and DELETE /stock/unit. (B) Admin can view own (returns Salam@123) & staff plaintext password via /admin/users/{id}/password; staff gets 403; PATCH /admin/users/{id} with password resets bcrypt+Fernet (new pw logs in & reveal shows new value); PATCH name+username also works. (C) /stock/verification lists parts with expected qty; /stock/verify detects MISSING (counted<expected, diff=-1) and EXTRA (verified via UI report card showing 95400BVHH0 +1 as Pending/EXTRA); staff gets 403. Regression: buy limit still enforced (override:false → 409 LIMIT_REACHED), GPS location.gps persisted on stock unit, change-password + revert works. Frontend (Expo web, 390x844, admin abdul): /inventory shows inc-<id>/dec-<id>/del-<id> on every row for admin — inc & dec taps succeed (no console errors, backend 200); /users shows reveal-abdul which flips '••••••••' → 'Salam@123' and edit-abdul opens the edit modal with save-edit button; Admin Panel → 'Stock Verification' (admin-link-stock-verify) navigates to /stock-verify, verify-submit is rendered, vok/vinc counters work, submitting produces the REPORT card with totals (Total parts=15, બરાબર=0, તફાવત=15) and lists both Cancelled (MISSING, diff=-N) and Pending (EXTRA, +1) discrepancy rows correctly; /part/<pn> renders pd-inc, pd-dec and pd-del-<id> — inc/dec taps succeed. Auth restored (abdul=Salam@123). Only pre-existing benign warning is the deprecated `props.pointerEvents` from batch-buy overlay (carried over from iteration_10/11).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "batch-buy.tsx / batch-buy.web.tsx overlay", "issue": "Deprecated `props.pointerEvents` still fires a RN warning on every mount. Move `pointerEvents:'none'` into the style object. Reference: /app/frontend/app/batch-buy.tsx and /app/frontend/app/batch-buy.web.tsx. (Carried over from iteration_10/11 — not fixed yet.)"}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_stock_features.py",
+    "/app/test_reports/pytest/admin_stock_results.xml",
+    "/app/test_reports/iteration_12.json"
+  ],
+  "action_items": [
+    "Optional low-priority: fix the deprecated pointerEvents prop warning in batch-buy screens (carried over from iteration_10)."
+  ],
+  "critical_code_review_comments": [
+    "server.py:849-887 /stock/adjust & DELETE /stock/unit correctly gated by require_admin; increases insert new stock docs with adjusted:true; decreases soft-mark sold with removed_reason:'adjust'; DELETE hard-removes and logs a transaction. Good.",
+    "server.py:589-599 GET /admin/users/{id}/password uses require_admin (staff → 403), decrypts Fernet copy stored at create/update time, returns {username,password}. Returns 404 with NO_STORED_PW when a legacy user has no password_enc. Good.",
+    "server.py:544-586 create_user & update_user both write password_hash (bcrypt for login) AND password_enc (Fernet, admin-viewable). PATCH password enforces min 6 chars. Startup backfills password_enc for the seeded admin if missing (lines 368-371).",
+    "server.py:899-939 verification list computes expected from unsold stock; /stock/verify detects both MISSING and EXTRA (set union), persists a report doc with id/by/at.",
+    "inventory.tsx:63-98 adjust() & confirmDelete() correctly call /stock/adjust and DELETE /stock/unit; admin bar hidden for staff (isAdmin check).",
+    "users.tsx:48-101 revealPw toggles fetch/hide, saveEdit only sends changed fields (patch), client-side min-6 check for password. Good.",
+    "stock-verify.tsx:47-58 submits full counts list (all rows, defaulting 0), report state gates rendering. testIDs match spec (vinc/vdec/vok/verify-submit/verify-report).",
+    "(tabs)/admin.tsx:122-137 admin-link-stock-verify is admin-gated via isAdmin — non-admin never sees it."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_stock_features.py",
+    "/app/test_reports/pytest/admin_stock_results.xml",
+    "/app/test_reports/iteration_12.json"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100% (5/5 review items)"},
+  "seed_data_creation": "Created ephemeral: 1 TEST part 'TESTADJ*' via /api/parts (units zeroed in teardown but part master remains — no delete endpoint), 1 TEST staff 'teststaff<hex>' (soft-deleted in teardown), 1 TESTLIM* part (kept for regression). Frontend UI test also added +1/-1 to first existing inventory unit — net zero. abdul password unchanged (Salam@123 verified).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Reusable pytest file: /app/backend/tests/test_admin_stock_features.py (pytest -v). All new admin endpoints exercised: /stock/adjust, /stock/unit/{id} DELETE, /admin/users/{id}/password, /admin/users/{id} PATCH password/name/username, /stock/verification, /stock/verify. Login token stored on web at localStorage['kabadi.token'] (JSON-encoded string). Deprecated pointerEvents warning is a pre-existing carryover — not blocking. To re-run only regression: `pytest backend/tests/test_admin_stock_features.py::TestRegressionBuyLimitAndGps -v`.",
+  "rca_of_issue": "N/A — all requested features work end-to-end. Physical stock verification correctly handles the union of expected & counted maps so parts NOT present in system but counted physically appear as EXTRA (diff>0) and system parts not counted appear as MISSING (diff<0). Fernet round-trip verified (encrypt on create/update, decrypt on view). Admin gating via require_admin dependency returns 403 with Gujarati message 'ફક્ત Admin આ કરી શકે' — staff token correctly blocked on all 4 admin-only endpoints."
+}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -11,6 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -62,6 +64,37 @@ export default function PartDetail() {
   const [editData, setEditData] = useState<EditData>(EMPTY_EDIT);
   const [savingEdit, setSavingEdit] = useState(false);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const isAdmin = user?.role === "admin";
+
+  const adjustStock = async (delta: number) => {
+    try {
+      await api.post("/stock/adjust", { part_number: partNumber, delta });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      load();
+    } catch (e: any) {
+      show(e?.message || "નિષ્ફળ", "error");
+    }
+  };
+
+  const deleteUnit = (unitId: string) => {
+    Alert.alert("Unit delete કરવું?", "આ એક physical unit કાયમ કાઢી નાખાશે.", [
+      { text: "રદ કરો", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await api.del(`/stock/unit/${unitId}`);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            show("Unit deleted", "success");
+            load();
+          } catch (e: any) {
+            show(e?.message || "નિષ્ફળ", "error");
+          }
+        },
+      },
+    ]);
+  };
 
   const load = useCallback(async () => {
     try {
@@ -388,7 +421,20 @@ export default function PartDetail() {
         {/* Units */}
         {part?.units?.length ? (
           <Card>
-            <Text style={styles.cardTitle}>STOCK UNITS ({part.units.length})</Text>
+            <View style={styles.stockHead}>
+              <Text style={styles.cardTitle}>STOCK UNITS ({part.units.length})</Text>
+              {isAdmin ? (
+                <View style={styles.qtyCtrl}>
+                  <Pressable style={styles.qtyBtn} onPress={() => adjustStock(-1)} testID="pd-dec">
+                    <Ionicons name="remove" size={18} color={colors.warning} />
+                  </Pressable>
+                  <Text style={styles.qtyVal}>{part.units.length}</Text>
+                  <Pressable style={styles.qtyBtn} onPress={() => adjustStock(1)} testID="pd-inc">
+                    <Ionicons name="add" size={18} color={colors.success} />
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
             {part.units.map((u: any) => (
               <View key={u.id} style={styles.unitRow}>
                 <StatusChip status={u.condition} />
@@ -414,6 +460,11 @@ export default function PartDetail() {
                     </View>
                   ) : null}
                 </View>
+                {isAdmin ? (
+                  <Pressable onPress={() => deleteUnit(u.id)} hitSlop={10} testID={`pd-del-${u.id}`}>
+                    <Ionicons name="trash-outline" size={18} color={colors.error} />
+                  </Pressable>
+                ) : null}
               </View>
             ))}
           </Card>
@@ -575,6 +626,10 @@ const styles = StyleSheet.create({
   unitGpsText: { color: colors.success, fontSize: font.sm - 1, fontWeight: "700" },
   unitPhotos: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 },
   unitThumb: { width: 54, height: 54, borderRadius: radius.sm, backgroundColor: colors.surface3 },
+  stockHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.xs },
+  qtyCtrl: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  qtyBtn: { width: 34, height: 34, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
+  qtyVal: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800", minWidth: 24, textAlign: "center" },
   actionBar: {
     position: "absolute",
     bottom: 0,

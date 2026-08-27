@@ -116,7 +116,7 @@ export default function Scan() {
           }}
           onBarcodeScanned={scanning ? onBarcode : undefined}
         />
-        <View style={[styles.overlay, { pointerEvents: "none" }]}>
+        <View style={styles.overlay} pointerEvents="none">
           <View style={[styles.bracket, { borderColor: meta.color }]} />
           <Text style={styles.scanHint}>Part number barcode/QR camera સામે રાખો</Text>
         </View>
