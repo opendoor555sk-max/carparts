@@ -154,7 +154,8 @@ def make_token(user: dict) -> str:
 def public_user(u: dict) -> dict:
     perms = ALL_PERMISSIONS if u["role"] == "admin" else u.get("permissions", [])
     return {"id": u["id"], "name": u["name"], "username": u["username"], "role": u["role"],
-            "permissions": perms, "disabled": u.get("disabled", False)}
+            "permissions": perms, "disabled": u.get("disabled", False),
+            "has_google_key": bool(u.get("google_api_key") and u.get("google_cx"))}
 
 
 async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
@@ -185,6 +186,11 @@ def require(permission: str):
 class LoginIn(BaseModel):
     username: str
     password: str
+
+
+class ApiSettingsIn(BaseModel):
+    google_api_key: Optional[str] = None
+    google_cx: Optional[str] = None
 
 
 class UserCreate(BaseModel):
@@ -360,6 +366,108 @@ async def login(body: LoginIn):
 @api.get("/auth/me")
 async def me(user=Depends(get_current_user)):
     return public_user(user)
+
+
+@api.get("/auth/settings")
+async def get_settings(user=Depends(get_current_user)):
+    return {"google_cx": user.get("google_cx", ""), "has_google_key": bool(user.get("google_api_key"))}
+
+
+@api.post("/auth/settings")
+async def save_settings(body: ApiSettingsIn, user=Depends(get_current_user)):
+    updates = {}
+    if body.google_api_key is not None:
+        updates["google_api_key"] = body.google_api_key.strip()
+    if body.google_cx is not None:
+        updates["google_cx"] = body.google_cx.strip()
+    if updates:
+        await db.users.update_one({"id": user["id"]}, {"$set": updates})
+    fresh = await db.users.find_one({"id": user["id"]})
+    return {"ok": True, "google_cx": fresh.get("google_cx", ""), "has_google_key": bool(fresh.get("google_api_key"))}
+
+
+# ---------------- BYO-Key Google Custom Search + keyword autofill ----------------
+_CS_MODELS = ["Grand i10 Nios", "Grand i10", "Creta", "Seltos", "Venue", "Verna", "Alcazar",
+              "Carens", "Sonet", "i20", "i10", "Aura", "Nios", "Exter", "Tucson", "Kona", "Elantra",
+              "Santro", "Xcent", "Rio", "Carnival", "EV6", "Nexon", "Harrier", "Safari", "Tiago",
+              "Tigor", "Altroz", "Punch", "Curvv", "Scorpio N", "Scorpio", "XUV700", "XUV300", "XUV400",
+              "Thar", "Bolero", "Marazzo", "Swift", "Baleno", "Brezza", "Ertiga", "Dzire", "Wagon R",
+              "Alto K10", "Alto", "Celerio", "Ciaz", "Fronx", "Jimny", "XL6", "Grand Vitara", "Ignis"]
+_CS_BRANDS = ["Hyundai Mobis", "Hyundai", "Kia", "Maruti Suzuki", "Maruti", "Suzuki", "Tata", "Mahindra", "Mobis"]
+_CS_VARIANTS = ["Smart Key", "Push Button Start", "Push Button", "Keyless", "N-Line", "SX(O)", "SX",
+                "HTX", "HTK", "HTC", "GTX", "GTK", "VXI", "LXI", "ZXI", "ZDI", "VDI", "XZA", "XZ", "XM",
+                "XE", "Turbo", "Diesel", "Petrol", "CNG", "BS6", "Facelift", "Top", "Mid", "Base"]
+
+
+def _extract_matches(text: str, terms: list) -> list:
+    low = text.lower()
+    found = []
+    for t in terms:
+        if t.lower() in low and t not in found:
+            found.append(t)
+    return found
+
+
+@api.post("/search/web")
+async def web_search(body: AiResearchIn, user=Depends(require("search"))):
+    pn = body.part_number.strip()
+    if not pn:
+        raise HTTPException(400, "Part number required")
+
+    # CACHE — if this part is already verified in the master DB, reuse it (saves user quota).
+    verified = await db.parts.find_one({"part_number": pn, "verification_status": "Verified"}, {"_id": 0})
+    if verified:
+        return {
+            "cached": True,
+            "company": verified.get("company", ""),
+            "brands": [verified.get("company", "")] if verified.get("company") else [],
+            "models": verified.get("compatible_vehicles", []),
+            "variants": [verified.get("variant")] if verified.get("variant") else [],
+            "name": verified.get("name", ""),
+            "sources": verified.get("ai_sources", []),
+        }
+
+    key = user.get("google_api_key")
+    cx = user.get("google_cx")
+    if not key or not cx:
+        raise HTTPException(400, detail={"code": "NO_KEY",
+                                          "message": "પહેલા Settings માં તમારી Google API Key + Search Engine ID (CX) નાખો"})
+
+    def _google_cse():
+        return requests.get("https://www.googleapis.com/customsearch/v1",
+                            params={"key": key, "cx": cx,
+                                    "q": f'"{pn}" Hyundai Kia Maruti Tata Mahindra OEM part which car model variant',
+                                    "num": 10}, timeout=30)
+
+    try:
+        resp = await run_in_threadpool(_google_cse)
+    except Exception as e:
+        logger.warning(f"Google CSE call failed: {e}")
+        raise HTTPException(400, detail={"code": "SEARCH_ERR",
+                                          "message": "Google search failed — key/CX check કરો"})
+
+    if resp.status_code == 429 or resp.status_code == 403:
+        raise HTTPException(429, detail={"code": "QUOTA",
+                                          "message": "તમારી Google API limit પૂરી થઈ / key invalid — Google Console માં check કરો"})
+    if resp.status_code != 200:
+        raise HTTPException(400, detail={"code": "SEARCH_ERR",
+                                          "message": f"Google search error {resp.status_code} — key/CX check કરો"})
+
+    items = resp.json().get("items", [])
+    blob = " ".join(f"{it.get('title', '')} {it.get('snippet', '')}" for it in items)
+    sources = [it.get("title") or it.get("link") for it in items[:6]]
+    models = _extract_matches(blob, _CS_MODELS)
+    brands = _extract_matches(blob, _CS_BRANDS)
+    variants = _extract_matches(blob, _CS_VARIANTS)
+    company = brands[0] if brands else ""
+    # log the search (no stock change)
+    await db.search_history.update_one({"part_number": pn},
+                                       {"$inc": {"count": 1}, "$set": {"last_searched": now_iso()}},
+                                       upsert=True)
+    return {
+        "cached": False, "company": company, "brands": brands, "models": models,
+        "variants": variants, "name": "", "sources": sources, "result_count": len(items),
+    }
 
 
 # ---------------- Admin: users ----------------

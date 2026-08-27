@@ -58,6 +58,7 @@ export default function Admin() {
 
   const links: { title: string; sub: string; icon: keyof typeof Ionicons.glyphMap; route: string; perm: string }[] = [
     { title: "AI Approvals", sub: "Gemini research pending approval", icon: "sparkles", route: "/ai-approvals", perm: "ai_approve" },
+    { title: "Google Search Setup", sub: "Your own API key — free 100/day", icon: "key", route: "/settings", perm: "search" },
     { title: "Purchase Limits", sub: "Global + per-part limits", icon: "speedometer", route: "/limits", perm: "manage_limits" },
     { title: "Manage Users", sub: "Staff & permissions", icon: "people", route: "/users", perm: "manage_users" },
     { title: "Demand & Search", sub: "High-demand detection", icon: "trending-up", route: "/demand", perm: "view_stats" },

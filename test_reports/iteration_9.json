@@ -1,0 +1,43 @@
+{
+  "summary": "BYO-Key Google Custom Search — end-to-end verification. Backend pytest: 10/11 PASSED (/app/backend/tests/test_byo_key.py, byo_key_results.xml). Passed: (1) POST /api/auth/settings {google_api_key:'AIzaTESTKEY',google_cx:'testcx'} -> {ok:true, has_google_key:true, google_cx:'testcx'}; (2) GET /api/auth/me -> has_google_key=true; (3) GET /api/auth/settings echoes google_cx + has_google_key but does NOT expose raw google_api_key (asserted); (4) Clear key -> POST /api/search/web {part_number:'TESTPN1'} -> HTTP 400 with detail={code:'NO_KEY', message:'પહેલા Settings માં તમારી Google API Key + Search Engine ID (CX) નાખો'}; (5) Cache/DB-first: seeded verified part via /api/ai/research -> /approve with vehicles=['Hyundai Creta'], then /api/search/web with NO key -> 200 {cached:true, models:['Hyundai Creta']} — SUCCESS; (6) /api/buy tags created_by='abdul' + created_at ISO — verified via GET /api/parts/<pn>; (7) Regression: /api/categories total=73, login works, buy/sell increment & decrement stock. FAILED: bad-key friendly error path (test 8): backend correctly raises HTTPException(502) with structured detail but the k8s ingress/CDN intercepts 502 and returns an HTML 'Bad gateway' page, so the frontend CANNOT read the friendly JSON message. Root cause: server.py:445 (raises 502 for network errors) and server.py:451 (SEARCH_ERR mapped to 502) — 5xx status codes are swallowed by the platform proxy. Frontend UI (Expo web 390x844, admin abdul/Salam@123): Login OK -> Admin tab -> 'Google Search Setup' link present (testID admin-link-Google Search Setup) -> /settings screen renders with google-api-key, google-cx, save-settings testIDs; entered AIzaTESTKEY_UI + ui-testcx -> Save -> 'Google API settings saved' toast + 'Google key configured ✓' shown. Cleared key via backend, then Home -> module-buy -> manual-part-input='BYO-UI-TEST1' -> scan-continue -> Buy form loaded; google-autofill button present in 'PART & COMPATIBILITY' card; tapped it with no key set -> friendly Gujarati error toast shown AND app routed to /settings (no crash) — MATCHES REQUIREMENT. Cleanup done: admin ends with has_google_key=false (verified via /api/auth/me).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/search/web (bad-key path)", "issue": "Returns HTTPException(502) with structured detail, but k8s ingress replaces 5xx bodies with generic HTML 'Bad gateway' page. Frontend loses the friendly {code:'SEARCH_ERR'|'QUOTA', message:...} JSON and cannot show the Gujarati toast for a bad Google key. Fix: map bad-key / non-200 Google responses to HTTP 400/422 (client error), not 502; only true unreachable-network failures should be 502. server.py:445 and server.py:451.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Buy -> Google Autofill with bad key set", "issue": "Because backend returns 502 (see backend critical), and ingress rewrites body to HTML, the client sees a non-JSON error and shows a generic 'Search failed' toast instead of the friendly QUOTA/SEARCH_ERR Gujarati message. NO_KEY path (400) works correctly because ingress does not intercept 4xx.", "affected_testIDs": ["google-autofill"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_byo_key.py",
+    "/app/test_reports/pytest/byo_key_results.xml",
+    "/app/test_reports/iteration_9.json"
+  ],
+  "action_items": [
+    "In server.py, change HTTPException(502, ...) for bad-key / non-200 Google responses to HTTPException(400) or 422 with the same structured detail body. Rationale: k8s/CDN swallows 5xx bodies and replaces with HTML. Keep 429 for QUOTA (429 is not touched by ingress). Lines: server.py:445 (network exception) and server.py:451 (SEARCH_ERR).",
+    "OPTIONAL: In frontend api client, when a non-JSON body is received on an error, surface a generic Gujarati fallback like 'Google search failed — key/CX check કરો' so users still get Gujarati even if backend returns HTML."
+  ],
+  "critical_code_review_comments": [
+    "server.py:373 GET /api/auth/settings correctly returns only google_cx + has_google_key, never the raw google_api_key — validated in test_settings_raw_key_not_returned.",
+    "server.py:158 public_user computes has_google_key from both google_api_key AND google_cx presence — correct: partial config counts as not-configured.",
+    "server.py:417-428 DB-FIRST cache path in /api/search/web works BEFORE the key check, so verified parts return without needing the user's Google key — validated with cached=true + models=['Hyundai Creta'].",
+    "server.py:432 NO_KEY branch raises 400 with structured Gujarati detail — passes the ingress and reaches the frontend as JSON. ",
+    "server.py:445 & 451 BUG: bad-key / non-200 Google responses raise 502 — ingress replaces body with HTML; frontend cannot show friendly message. Should be 4xx.",
+    "settings.tsx:26-31 loads /auth/settings on mount — good; secure key input uses secureTextEntry.",
+    "buy.tsx:73-92 googleAutofill correctly routes to /settings on NO_KEY error code — verified in UI test.",
+    "admin.tsx:61 'Google Search Setup' admin link testID 'admin-link-Google Search Setup' matches spec exactly."
+  ],
+  "updated_files": ["/app/backend/tests/test_byo_key.py", "/app/test_reports/iteration_9.json"],
+  "success_rate": {"backend": "91% (10/11) — 1 bad-key friendly-error test fails due to ingress 502 body-rewrite", "frontend": "100% (Settings save + Buy autofill NO_KEY routing verified)"},
+  "seed_data_creation": "Per-run parts prefixed TESTPN-CACHE-<uuid>, TESTPN-TAG-<uuid>, TESTPN-REG-<uuid> plus UI part BYO-UI-TEST1. Admin google key cleared at end (has_google_key=false confirmed via /api/auth/me).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "BYO-Key feature is functionally complete. The ONLY remaining issue is the bad-key error path returns HTTP 502 which the platform proxy rewrites into an HTML error page — the frontend loses the friendly Gujarati JSON. Fix by mapping SEARCH_ERR / network exceptions to 400/422 in server.py:445 and 451. Test file /app/backend/tests/test_byo_key.py is fully reusable — it covers Settings save/echo/secrecy, NO_KEY 400 JSON, bad-key friendly path (currently fails), cache/DB-first without a key, /buy tagging, and regression (categories=73, login, buy/sell). Admin credentials abdul/Salam@123. Base URL from EXPO_PUBLIC_BACKEND_URL.",
+  "rca_of_issue": "Bad-key friendly error is technically implemented in server.py (raises HTTPException(502, detail={code:'SEARCH_ERR', message:'...'})). However, the emergent preview proxy intercepts ALL 5xx responses and replaces the response body with a generic Cloudflare-style HTML 'Bad gateway' page BEFORE it reaches the client. Reproduction: (1) POST /api/auth/settings {google_api_key:'BADKEY',google_cx:'badcx'}; (2) POST /api/search/web {part_number:'X'}; (3) client receives 502 with Content-Type text/html and body '<!DOCTYPE html>...preview.emergentagent.com | 502: Bad gateway...'. Backend log confirms FastAPI itself returned the 502 with structured detail. Mitigation: use client-error status codes (400/422) for user-actionable errors (bad key, non-200 Google response) so the ingress does not swallow the JSON body. Keep 429 for QUOTA (unaffected) and reserve 5xx only for true server bugs/unreachable network."
+}

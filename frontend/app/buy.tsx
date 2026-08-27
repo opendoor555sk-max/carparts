@@ -33,6 +33,7 @@ export default function Buy() {
   const [info, setInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   const [condition, setCondition] = useState("Working");
   const [name, setName] = useState("");
@@ -68,6 +69,27 @@ export default function Buy() {
   const limit = info?.limit;
   const isStop = limit?.limit_enabled && limit?.remaining !== null && limit?.remaining <= 0;
   const isWarn = limit?.status === "WARNING";
+
+  const googleAutofill = async () => {
+    setSearching(true);
+    try {
+      const r = await api.post("/search/web", { part_number: partNumber, company });
+      if (r.name) setName(r.name);
+      if (r.models?.length) setVehicles(r.models.join(", "));
+      if (r.variants?.length) setVariant(r.variants.join(", "));
+      show(r.cached ? "Library માંથી autofill (100% verified)" : `Autofilled — ${r.result_count || 0} web results`, "success");
+    } catch (e: any) {
+      const d = e?.detail;
+      if (d?.code === "NO_KEY") {
+        show("Google key નથી — Settings માં નાખો", "error");
+        router.push("/settings" as any);
+      } else {
+        show(d?.message || e?.message || "Search failed", "error");
+      }
+    } finally {
+      setSearching(false);
+    }
+  };
 
   const submit = async () => {
     if (isStop && !override) {
@@ -180,6 +202,15 @@ export default function Buy() {
               <Text style={styles.cardTitle}>PART & COMPATIBILITY</Text>
               {info?.part ? <StatusChip status={info.part.verification_status} /> : null}
             </View>
+            <Button
+              title="🔍 Google Autofill (your key)"
+              onPress={googleAutofill}
+              loading={searching}
+              variant="secondary"
+              icon="search"
+              testID="google-autofill"
+              style={{ marginBottom: spacing.md }}
+            />
             <Field label="Name" value={name} onChangeText={setName} placeholder="Part name" testID="buy-name" />
             <Field label="Category" value={category} onChangeText={setCategory} placeholder="Category" testID="buy-category" />
             <Field
