@@ -52,6 +52,7 @@ export const api = {
   post: <T = any>(path: string, body?: any, auth = true) =>
     request<T>("POST", path, body, auth),
   patch: <T = any>(path: string, body?: any) => request<T>("PATCH", path, body),
+  del: <T = any>(path: string) => request<T>("DELETE", path),
   base: BASE,
   getToken,
 };

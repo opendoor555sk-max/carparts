@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -34,6 +34,8 @@ export default function Users() {
   const [password, setPassword] = useState("");
   const [perms, setPerms] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<any>(null);
+  const [removing, setRemoving] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -86,6 +88,21 @@ export default function Users() {
       load();
     } catch (e: any) {
       show(e?.message || "Failed", "error");
+    }
+  };
+
+  const removeUser = async () => {
+    if (!confirmRemove) return;
+    setRemoving(true);
+    try {
+      await api.del(`/admin/users/${confirmRemove.id}`);
+      show(`${confirmRemove.name} removed`, "success");
+      setConfirmRemove(null);
+      load();
+    } catch (e: any) {
+      show(e?.message || "Failed", "error");
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -152,6 +169,10 @@ export default function Users() {
                       testID={`disable-${u.username}`}
                     />
                   </View>
+                  <Pressable style={styles.removeBtn} onPress={() => setConfirmRemove(u)} testID={`remove-${u.username}`}>
+                    <Ionicons name="trash" size={16} color={colors.error} />
+                    <Text style={styles.removeText}>Remove user</Text>
+                  </Pressable>
                 </>
               ) : (
                 <Text style={styles.adminNote}>Main Admin — all permissions</Text>
@@ -197,6 +218,23 @@ export default function Users() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* Confirm remove */}
+      <Modal visible={!!confirmRemove} transparent animationType="fade" onRequestClose={() => setConfirmRemove(null)}>
+        <View style={styles.confirmWrap}>
+          <View style={styles.confirmBox}>
+            <Ionicons name="warning" size={40} color={colors.error} />
+            <Text style={styles.confirmTitle}>User remove કરવો છે?</Text>
+            <Text style={styles.confirmSub}>
+              {confirmRemove?.name} (@{confirmRemove?.username}) ને remove કરાશે. એ login નહીં કરી શકે.
+            </Text>
+            <View style={styles.confirmRow}>
+              <Button title="Cancel" onPress={() => setConfirmRemove(null)} variant="secondary" style={{ flex: 1 }} testID="cancel-remove" />
+              <Button title="Remove" onPress={removeUser} loading={removing} variant="danger" style={{ flex: 1 }} testID="confirm-remove" />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -212,6 +250,13 @@ const styles = StyleSheet.create({
   permChip: { paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.sm, borderWidth: 1 },
   label: { color: colors.onSurface2, fontSize: font.base, fontWeight: "600" },
   adminNote: { color: colors.brand, fontSize: font.sm, marginTop: spacing.sm, fontWeight: "700" },
+  removeBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs, marginTop: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.error },
+  removeText: { color: colors.error, fontSize: font.base, fontWeight: "700" },
+  confirmWrap: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center", padding: spacing.xl },
+  confirmBox: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.xl, alignItems: "center", gap: spacing.sm, width: "100%" },
+  confirmTitle: { color: colors.onSurface, fontSize: font.xl, fontWeight: "800", marginTop: spacing.sm },
+  confirmSub: { color: colors.info, fontSize: font.base, textAlign: "center", lineHeight: 20 },
+  confirmRow: { flexDirection: "row", gap: spacing.md, marginTop: spacing.md, width: "100%" },
   modalWrap: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
   modal: { backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, maxHeight: "88%", borderWidth: 1, borderColor: colors.border },
   modalHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.lg },

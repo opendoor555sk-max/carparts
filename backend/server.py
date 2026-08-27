@@ -361,8 +361,20 @@ async def me(user=Depends(get_current_user)):
 # ---------------- Admin: users ----------------
 @api.get("/admin/users")
 async def list_users(user=Depends(require("manage_users"))):
-    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(500)
+    users = await db.users.find({"deleted_at": {"$exists": False}}, {"_id": 0, "password_hash": 0}).to_list(500)
     return [{**u, "permissions": ALL_PERMISSIONS if u["role"] == "admin" else u.get("permissions", [])} for u in users]
+
+
+@api.delete("/admin/users/{user_id}")
+async def remove_user(user_id: str, user=Depends(require("manage_users"))):
+    target = await db.users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(404, "User not found")
+    if target["role"] == "admin":
+        raise HTTPException(400, "Main Admin ને remove ન કરાય")
+    # Soft delete — never destroy data.
+    await db.users.update_one({"id": user_id}, {"$set": {"deleted_at": now_iso(), "disabled": True}})
+    return {"ok": True}
 
 
 @api.post("/admin/users")
