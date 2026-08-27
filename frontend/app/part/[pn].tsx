@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -22,6 +21,7 @@ import { useToast } from "@/src/context/ToastContext";
 import {
   Button,
   Card,
+  ConfirmModal,
   Field,
   Header,
   Loading,
@@ -65,6 +65,8 @@ export default function PartDetail() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const isAdmin = user?.role === "admin";
+  const [pendingUnit, setPendingUnit] = useState<string | null>(null);
+  const [deletingUnit, setDeletingUnit] = useState(false);
 
   const adjustStock = async (delta: number) => {
     try {
@@ -76,24 +78,22 @@ export default function PartDetail() {
     }
   };
 
-  const deleteUnit = (unitId: string) => {
-    Alert.alert("Unit delete કરવું?", "આ એક physical unit કાયમ કાઢી નાખાશે.", [
-      { text: "રદ કરો", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.del(`/stock/unit/${unitId}`);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            show("Unit deleted", "success");
-            load();
-          } catch (e: any) {
-            show(e?.message || "નિષ્ફળ", "error");
-          }
-        },
-      },
-    ]);
+  const deleteUnit = (unitId: string) => setPendingUnit(unitId);
+
+  const performDeleteUnit = async () => {
+    if (!pendingUnit) return;
+    setDeletingUnit(true);
+    try {
+      await api.del(`/stock/unit/${pendingUnit}`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      show("Unit deleted", "success");
+      setPendingUnit(null);
+      load();
+    } catch (e: any) {
+      show(e?.message || "નિષ્ફળ", "error");
+    } finally {
+      setDeletingUnit(false);
+    }
   };
 
   const load = useCallback(async () => {
@@ -510,6 +510,17 @@ export default function PartDetail() {
           ) : null}
         </View>
       </View>
+
+      <ConfirmModal
+        visible={!!pendingUnit}
+        title="Unit delete કરવું?"
+        message="આ એક physical unit કાયમ કાઢી નાખાશે."
+        confirmText="Delete"
+        danger
+        loading={deletingUnit}
+        onConfirm={performDeleteUnit}
+        onCancel={() => setPendingUnit(null)}
+      />
 
       {/* Edit / Approve details modal */}
       <Modal visible={editModal} transparent animationType="slide" onRequestClose={() => setEditModal(false)}>

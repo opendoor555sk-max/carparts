@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,7 +7,7 @@ import * as Haptics from "expo-haptics";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
-import { EmptyState, FilterChip, Header, Loading } from "@/src/components/ui";
+import { ConfirmModal, EmptyState, FilterChip, Header, Loading } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type Txn = {
@@ -30,6 +30,7 @@ export default function History() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,32 +57,20 @@ export default function History() {
   const toggleAll = () =>
     setSelected(allSelected ? {} : Object.fromEntries(txns.map((t) => [t.id, true])));
 
-  const doDelete = () => {
+  const doDelete = async () => {
     if (selectedIds.length === 0) return;
-    Alert.alert(
-      `${selectedIds.length} entry delete કરવી?`,
-      `${tab === "buy" ? "ખરીદ" : "વેચાણ"} ની આ entries અને એનો stock કાયમ કાઢી નાખાશે.`,
-      [
-        { text: "રદ કરો", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            setDeleting(true);
-            try {
-              const res = await api.post("/transactions/delete", { ids: selectedIds, remove_stock: true });
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              show(`${res.deleted} entries + ${res.removed_units} stock deleted`, "success");
-              load();
-            } catch (e: any) {
-              show(e?.message || "નિષ્ફળ", "error");
-            } finally {
-              setDeleting(false);
-            }
-          },
-        },
-      ],
-    );
+    setDeleting(true);
+    try {
+      const res = await api.post("/transactions/delete", { ids: selectedIds, remove_stock: true });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      show(`${res.deleted} entries + ${res.removed_units} stock deleted`, "success");
+      setConfirmOpen(false);
+      load();
+    } catch (e: any) {
+      show(e?.message || "નિષ્ફળ", "error");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -143,7 +132,7 @@ export default function History() {
 
       {selectedIds.length > 0 ? (
         <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
-          <Pressable style={styles.delBtn} onPress={doDelete} disabled={deleting} testID="bulk-delete">
+          <Pressable style={styles.delBtn} onPress={() => setConfirmOpen(true)} disabled={deleting} testID="bulk-delete">
             <Ionicons name="trash" size={20} color={colors.onError} />
             <Text style={styles.delText}>
               {deleting ? "Delete થાય છે…" : `${selectedIds.length} entry Delete કરો`}
@@ -151,6 +140,17 @@ export default function History() {
           </Pressable>
         </View>
       ) : null}
+
+      <ConfirmModal
+        visible={confirmOpen}
+        title={`${selectedIds.length} entry delete કરવી?`}
+        message={`${tab === "buy" ? "ખરીદ" : "વેચાણ"} ની આ entries અને એનો stock કાયમ કાઢી નાખાશે.`}
+        confirmText="Delete"
+        danger
+        loading={deleting}
+        onConfirm={doDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </View>
   );
 }

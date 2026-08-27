@@ -89,3 +89,8 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Backup & Restore (/backup, Admin): GET /api/backup/export (JSON), GET /api/backup/excel (xlsx), POST /api/backup/import (upsert restore). Frontend expo-file-system/legacy + expo-sharing (native)/blob download (web) + expo-document-picker import. Data in secure cloud MongoDB.
 - Verified iteration 13: backend 14/14 pytest + frontend E2E PASS.
 - APK: via Emergent Publish button (Deploy -> Generate Android build) — final step.
+
+## Bug fix (2026-06 — delete not working on mobile browser)
+- ROOT CAUSE: Alert.alert confirm buttons don't fire callbacks on React Native Web (mobile Chrome) — so Delete/Restore actions never executed. Adjust +/- worked but per-unit rows made it look static.
+- FIX: Added cross-platform <ConfirmModal> in src/components/ui.tsx (Modal-based). Replaced ALL Alert.alert confirms with ConfirmModal in inventory.tsx, part/[pn].tsx, history.tsx, backup.tsx.
+- Verified on web: inventory unit delete (confirm modal shows, row removed, toast), part-detail quantity +/- reflects (STOCK UNITS 2->3), counter updates. History bulk delete + backup import use same ConfirmModal.

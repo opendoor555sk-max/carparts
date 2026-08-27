@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,7 +9,7 @@ import * as DocumentPicker from "expo-document-picker";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
-import { Button, Card, Header } from "@/src/components/ui";
+import { Button, Card, ConfirmModal, Header } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 function webDownload(data: Blob | string, filename: string, mime: string) {
@@ -27,6 +27,7 @@ export default function Backup() {
   const insets = useSafeAreaInsets();
   const { show } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
+  const [pendingImport, setPendingImport] = useState<any | null>(null);
 
   const stamp = () => new Date().toISOString().slice(0, 10);
 
@@ -87,30 +88,24 @@ export default function Backup() {
       }
       const parsed = JSON.parse(content);
       const collections = parsed.collections || parsed;
-      Alert.alert(
-        "Restore કરવું?",
-        "આ backup ના data ને app માં પાછો ઉમેરાશે (merge/restore). ચાલુ રાખવું?",
-        [
-          { text: "રદ કરો", style: "cancel" },
-          {
-            text: "Restore",
-            onPress: async () => {
-              setBusy("import");
-              try {
-                const res = await api.post("/backup/import", { collections });
-                const total = Object.values(res.imported || {}).reduce((a: number, b: any) => a + b, 0);
-                show(`${total} records restore થયા ✓`, "success");
-              } catch (e: any) {
-                show(e?.message || "Import નિષ્ફળ", "error");
-              } finally {
-                setBusy(null);
-              }
-            },
-          },
-        ],
-      );
+      setPendingImport(collections);
     } catch {
       show("File વાંચવામાં ભૂલ — યોગ્ય backup file પસંદ કરો", "error");
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!pendingImport) return;
+    setBusy("import");
+    try {
+      const res = await api.post("/backup/import", { collections: pendingImport });
+      const total = Object.values(res.imported || {}).reduce((a: number, b: any) => a + b, 0);
+      show(`${total} records restore થયા ✓`, "success");
+      setPendingImport(null);
+    } catch (e: any) {
+      show(e?.message || "Import નિષ્ફળ", "error");
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -162,6 +157,16 @@ export default function Backup() {
           />
         </Card>
       </ScrollView>
+
+      <ConfirmModal
+        visible={!!pendingImport}
+        title="Restore કરવું?"
+        message="આ backup ના data ને app માં પાછો ઉમેરાશે (merge/restore). ચાલુ રાખવું?"
+        confirmText="Restore"
+        loading={busy === "import"}
+        onConfirm={confirmImport}
+        onCancel={() => setPendingImport(null)}
+      />
     </View>
   );
 }

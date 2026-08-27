@@ -1,6 +1,7 @@
 import React from "react";
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -276,6 +277,60 @@ export function EmptyState({
     </View>
   );
 }
+
+// Cross-platform confirm dialog — RN Web Alert buttons are unreliable, so use a Modal everywhere.
+export function ConfirmModal({
+  visible,
+  title,
+  message,
+  confirmText = "Confirm",
+  cancelText = "રદ કરો",
+  danger = false,
+  loading = false,
+  onConfirm,
+  onCancel,
+}: {
+  visible: boolean;
+  title: string;
+  message?: string;
+  confirmText?: string;
+  cancelText?: string;
+  danger?: boolean;
+  loading?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={cstyles.wrap}>
+        <View style={cstyles.box}>
+          <Ionicons name={danger ? "warning" : "help-circle"} size={40} color={danger ? colors.error : colors.brand} />
+          <Text style={cstyles.title}>{title}</Text>
+          {message ? <Text style={cstyles.msg}>{message}</Text> : null}
+          <View style={cstyles.row}>
+            <Button title={cancelText} onPress={onCancel} variant="secondary" style={{ flex: 1 }} testID="confirm-cancel" />
+            <Button
+              title={confirmText}
+              onPress={onConfirm}
+              loading={loading}
+              variant={danger ? "danger" : "primary"}
+              style={{ flex: 1 }}
+              testID="confirm-ok"
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const cstyles = StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center", padding: spacing.xl },
+  box: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.xl, alignItems: "center", gap: spacing.sm, width: "100%" },
+  title: { color: colors.onSurface, fontSize: font.xl, fontWeight: "800", marginTop: spacing.sm, textAlign: "center" },
+  msg: { color: colors.info, fontSize: font.base, textAlign: "center", lineHeight: 20 },
+  row: { flexDirection: "row", gap: spacing.md, marginTop: spacing.lg, width: "100%" },
+});
 
 const styles = StyleSheet.create({
   header: {

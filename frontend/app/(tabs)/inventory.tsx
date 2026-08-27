@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import {
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -16,7 +15,7 @@ import * as Haptics from "expo-haptics";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
-import { Header, StatusChip, Loading, EmptyState, FilterChip } from "@/src/components/ui";
+import { ConfirmModal, Header, StatusChip, Loading, EmptyState, FilterChip } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type Unit = {
@@ -40,6 +39,7 @@ export default function Inventory() {
   const [refreshing, setRefreshing] = useState(false);
   const [cond, setCond] = useState("All");
   const [busy, setBusy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Unit | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -74,28 +74,22 @@ export default function Inventory() {
     }
   };
 
-  const confirmDelete = (u: Unit) => {
-    Alert.alert("Unit delete કરવું?", `${u.part_number} નું આ એક unit કાયમ કાઢી નાખાશે.`, [
-      { text: "રદ કરો", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          if (busy) return;
-          setBusy(true);
-          try {
-            await api.del(`/stock/unit/${u.id}`);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            show("Unit deleted", "success");
-            await load();
-          } catch (e: any) {
-            show(e?.message || "નિષ્ફળ", "error");
-          } finally {
-            setBusy(false);
-          }
-        },
-      },
-    ]);
+  const confirmDelete = (u: Unit) => setPendingDelete(u);
+
+  const performDelete = async () => {
+    if (!pendingDelete) return;
+    setBusy(true);
+    try {
+      await api.del(`/stock/unit/${pendingDelete.id}`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      show("Unit deleted", "success");
+      setPendingDelete(null);
+      await load();
+    } catch (e: any) {
+      show(e?.message || "નિષ્ફળ", "error");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const locStr = (l: Record<string, string>) => {
@@ -181,6 +175,17 @@ export default function Inventory() {
           )}
         />
       )}
+
+      <ConfirmModal
+        visible={!!pendingDelete}
+        title="Unit delete કરવું?"
+        message={pendingDelete ? `${pendingDelete.part_number} નું આ એક unit કાયમ કાઢી નાખાશે.` : ""}
+        confirmText="Delete"
+        danger
+        loading={busy}
+        onConfirm={performDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </View>
   );
 }
