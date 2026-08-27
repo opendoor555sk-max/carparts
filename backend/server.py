@@ -36,6 +36,7 @@ ACCESS_MINUTES = int(os.environ.get('ACCESS_MINUTES', '720'))
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.7-flash')
+GEMINI_GROUNDING = os.environ.get('GEMINI_GROUNDING', 'false').lower() == 'true'
 
 # ---------------- Object storage ----------------
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
@@ -776,9 +777,11 @@ async def run_gemini(part_number: str, company: str) -> dict:
               f"Company gate hint: {company}. Search reliable sources, cross-check, then return the "
               f"strict JSON only (no markdown).")
 
-    # Preferred path — user's own Gemini key with LIVE Google Search grounding.
+    # Preferred path — user's own Gemini key (gemini-3.7-flash). Google Search grounding
+    # is only attempted when GEMINI_GROUNDING is on (needs billing); otherwise free mode.
     if GEMINI_API_KEY:
-        for use_search in (True, False):
+        search_modes = [True, False] if GEMINI_GROUNDING else [False]
+        for use_search in search_modes:
             for attempt in range(3):
                 resp = await run_in_threadpool(_google_generate, prompt, GEMINI_SYSTEM, use_search)
                 if resp.status_code == 200:
