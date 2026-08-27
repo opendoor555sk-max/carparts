@@ -29,21 +29,26 @@ export default function BatchBuyWeb() {
   const last = useRef<{ c: string; at: number }>({ c: "", at: 0 });
 
   useEffect(() => {
-    let sub: Location.LocationSubscription | null = null;
+    let timer: any = null;
+    let active = true;
+    const fetchOnce = async () => {
+      try {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        if (active) setGps(`${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`);
+      } catch {}
+    };
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") return;
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        setGps(`${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`);
-        sub = await Location.watchPositionAsync(
-          { accuracy: Location.Accuracy.High, distanceInterval: 3, timeInterval: 4000 },
-          (l) => setGps(`${l.coords.latitude.toFixed(5)}, ${l.coords.longitude.toFixed(5)}`),
-        );
+        await fetchOnce();
+        // web: poll instead of watchPositionAsync (subscription.remove() is unsupported on web)
+        timer = setInterval(fetchOnce, 6000);
       } catch {}
     })();
     return () => {
-      if (sub) sub.remove();
+      active = false;
+      if (timer) clearInterval(timer);
     };
   }, []);
 

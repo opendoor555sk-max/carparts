@@ -43,7 +43,9 @@ export default function BatchBuy() {
       } catch {}
     })();
     return () => {
-      if (sub) sub.remove();
+      try {
+        if (sub) sub.remove();
+      } catch {}
     };
   }, []);
 
