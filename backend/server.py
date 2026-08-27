@@ -37,6 +37,7 @@ EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.7-flash')
 GEMINI_GROUNDING = os.environ.get('GEMINI_GROUNDING', 'false').lower() == 'true'
+TAVILY_API_KEY = os.environ.get('TAVILY_API_KEY')
 
 # ---------------- Object storage ----------------
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
@@ -761,8 +762,10 @@ GEMINI_SYSTEM = (
     "(95xxx often = BCM / IBU / smart junction, 96xxx = infotainment/audio, 93xxx = switches). "
     "STRICT RULES: "
     "1. NEVER invent or guess a part number. "
-    "2. You do NOT have live internet access — answer ONLY from reliable knowledge. If you do not "
-    "recognise the part number, set status='NOT_FOUND' and confidence=0. "
+    "2. You ARE given REAL web search results with each request — treat them as the PRIMARY source "
+    "of truth, cross-check them, and base your answer on them. If the web results (and your knowledge) "
+    "still cannot identify the part, set status='NOT_FOUND' and confidence=0. Put the source URLs/titles "
+    "you relied on into the sources array. "
     "3. The part number alone rarely pins the EXACT trim/variant/fuel. If you are not highly certain of "
     "a single exact model, you MUST list ALL plausible platform-sharing models (across Hyundai AND Kia) "
     "in compatible_models and compatible_vehicles, set confidence<=60. Do NOT claim one model as certain. "
@@ -776,63 +779,55 @@ GEMINI_SYSTEM = (
 )
 
 
-def _google_generate(prompt: str, system: str, use_search: bool):
-    url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
-           f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}")
-    body: Dict[str, Any] = {
-        "systemInstruction": {"parts": [{"text": system}]},
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2},
-    }
-    if use_search:
-        body["tools"] = [{"google_search": {}}]
-    return requests.post(url, json=body, timeout=70)
+def tavily_search(query: str) -> dict:
+    headers = {"Content-Type": "application/json"}
+    if TAVILY_API_KEY:
+        headers["Authorization"] = f"Bearer {TAVILY_API_KEY}"
+    else:
+        headers["X-Tavily-Access-Mode"] = "keyless"
+    body = {"query": query, "search_depth": "advanced", "max_results": 6, "include_answer": True}
+    r = requests.post("https://api.tavily.com/search", json=body, headers=headers, timeout=45)
+    r.raise_for_status()
+    return r.json()
 
 
 async def run_gemini(part_number: str, company: str) -> dict:
-    prompt = (f"Identify this Indian auto electrical spare part. OEM part number: {part_number}. "
-              f"Company gate hint: {company}. Search reliable sources, cross-check, then return the "
-              f"strict JSON only (no markdown).")
+    # STEP 1 — Real web search (Tavily) for card-free Google-style grounding.
+    web_context = ""
+    sources: List[str] = []
+    web_answer = ""
+    try:
+        query = (f'"{part_number}" Hyundai Kia OEM part number — which exact car model and variant '
+                 f'(Creta Seltos Verna Alcazar Carens Venue etc), smart key or body control module')
+        tv = await run_in_threadpool(tavily_search, query)
+        web_answer = tv.get("answer") or ""
+        for res in (tv.get("results") or [])[:6]:
+            title = res.get("title", "")
+            content = (res.get("content") or "")[:450]
+            url = res.get("url", "")
+            web_context += f"- {title}: {content} (URL: {url})\n"
+            if url:
+                sources.append(title or url)
+    except Exception as e:
+        logger.warning(f"Tavily search failed: {e}")
 
-    # Preferred path — user's own Gemini key (gemini-3.7-flash). Google Search grounding
-    # is only attempted when GEMINI_GROUNDING is on (needs billing); otherwise free mode.
-    if GEMINI_API_KEY:
-        search_modes = [True, False] if GEMINI_GROUNDING else [False]
-        for use_search in search_modes:
-            for attempt in range(3):
-                resp = await run_in_threadpool(_google_generate, prompt, GEMINI_SYSTEM, use_search)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    cand = (data.get("candidates") or [{}])[0]
-                    text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
-                    sources = []
-                    for ch in cand.get("groundingMetadata", {}).get("groundingChunks", []):
-                        w = ch.get("web", {})
-                        title = w.get("title") or w.get("uri")
-                        if title:
-                            sources.append(title)
-                    if text.strip():
-                        return {"text": text, "sources": sources, "grounded": bool(use_search and sources)}
-                if resp.status_code == 429 and use_search:
-                    logger.warning("Gemini grounding quota exhausted — retrying without Google Search")
-                    break  # skip retries, drop to non-grounded generation
-                if resp.status_code in (500, 503):
-                    logger.warning(f"Gemini {resp.status_code} (attempt {attempt + 1}) — retrying")
-                    await asyncio.sleep(1.5 * (attempt + 1))
-                    continue
-                # other hard error — stop trying Google
-                logger.warning(f"Gemini error {resp.status_code}: {resp.text[:150]}")
-                break
-        logger.warning("Gemini (user key) unavailable — falling back to Emergent key")
+    prompt = (
+        f"OEM auto electrical part number: {part_number}. Company gate hint: {company}.\n\n"
+        f"REAL WEB SEARCH RESULTS (treat as the PRIMARY evidence — cross-check and rely on these):\n"
+        f"{web_context or '(no web results found)'}\n"
+        f"Web summary: {web_answer}\n\n"
+        f"Using MAINLY the web results above, identify the part. If the web results clearly name the "
+        f"vehicle(s), list ALL of them in compatible_vehicles. Return the strict JSON only (no markdown)."
+    )
 
-    # Fallback — Emergent universal key (no live internet) so the user always gets a result.
+    # STEP 2 — LLM extraction/formatting via Emergent key (free, reliable). Tavily gives the accuracy.
     if not EMERGENT_LLM_KEY:
         raise Exception("No AI provider available")
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"ai-{new_id()}",
                    system_message=GEMINI_SYSTEM).with_model("gemini", "gemini-3-flash-preview")
     text = await chat.send_message(UserMessage(text=prompt))
-    return {"text": text, "sources": [], "grounded": False}
+    return {"text": text, "sources": sources, "grounded": bool(sources)}
 
 
 def parse_json_block(text: str) -> dict:

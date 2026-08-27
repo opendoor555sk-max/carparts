@@ -316,7 +316,7 @@ export default function PartDetail() {
                 {aiResult.grounded ? (
                   <View style={styles.grounded}>
                     <Ionicons name="globe" size={13} color={colors.onSuccess} />
-                    <Text style={styles.groundedText}>Live Google sources</Text>
+                    <Text style={styles.groundedText}>Live web sources</Text>
                   </View>
                 ) : null}
               </View>
