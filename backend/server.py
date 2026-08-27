@@ -73,7 +73,7 @@ def get_object(path: str):
 
 
 # ---------------- App ----------------
-app = FastAPI(title="Kabadi Market Hisab API")
+app = FastAPI(title="Auto Parts Store API")
 api = APIRouter(prefix="/api")
 
 
@@ -391,7 +391,7 @@ async def shutdown():
 # ---------------- Auth routes ----------------
 @api.get("/")
 async def root():
-    return {"app": "Kabadi Market Hisab", "status": "ok"}
+    return {"app": "Auto Parts Store", "status": "ok"}
 
 
 @api.post("/auth/login")

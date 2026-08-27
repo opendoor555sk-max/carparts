@@ -77,7 +77,7 @@ export default function Login() {
           <View style={styles.logoBox}>
             <Ionicons name="hardware-chip" size={40} color={colors.brand} />
           </View>
-          <Text style={styles.title}>કબાડી માર્કેટ હિસાબ</Text>
+          <Text style={styles.title}>Auto Parts Store</Text>
           <Text style={styles.subtitle}>Auto Electrical Scrap Parts ERP</Text>
         </View>
 
