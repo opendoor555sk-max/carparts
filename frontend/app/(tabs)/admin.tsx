@@ -136,6 +136,40 @@ export default function Admin() {
               </Pressable>
             ) : null}
 
+            {isAdmin ? (
+              <Pressable
+                style={[styles.link, { marginTop: spacing.md }]}
+                onPress={() => router.push("/history" as any)}
+                testID="admin-link-history"
+              >
+                <View style={styles.linkIcon}>
+                  <Ionicons name="receipt" size={22} color={colors.brand} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.linkTitle}>ખરીદ / વેચાણ History</Text>
+                  <Text style={styles.linkSub}>Entries એકસાથે select કરી delete કરો</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.info} />
+              </Pressable>
+            ) : null}
+
+            {isAdmin ? (
+              <Pressable
+                style={[styles.link, { marginTop: spacing.md }]}
+                onPress={() => router.push("/backup" as any)}
+                testID="admin-link-backup"
+              >
+                <View style={styles.linkIcon}>
+                  <Ionicons name="cloud-download" size={22} color={colors.brand} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.linkTitle}>Backup & Restore</Text>
+                  <Text style={styles.linkSub}>Data export (Excel/JSON) અને import</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.info} />
+              </Pressable>
+            ) : null}
+
             <Text style={[styles.section, { marginTop: spacing.xl }]}>ACCOUNT</Text>
             <Pressable
               style={styles.link}

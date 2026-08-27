@@ -83,3 +83,9 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Verified iteration 12: backend 15/15 pytest + frontend E2E all PASS.
 - Confirmed purchase-limit rule = per part number (max units). Fixed deprecated pointerEvents prop across scan/batch-buy.
 
+
+## Updates (2026-06 — history delete + backup)
+- ખરીદ/વેચાણ History (/history, Admin): GET /api/transactions?type=buy|sell + POST /api/transactions/delete (multi-select bulk delete; deleting buy OR sell entry also hard-deletes its stock unit). Admin-only.
+- Backup & Restore (/backup, Admin): GET /api/backup/export (JSON), GET /api/backup/excel (xlsx), POST /api/backup/import (upsert restore). Frontend expo-file-system/legacy + expo-sharing (native)/blob download (web) + expo-document-picker import. Data in secure cloud MongoDB.
+- Verified iteration 13: backend 14/14 pytest + frontend E2E PASS.
+- APK: via Emergent Publish button (Deploy -> Generate Android build) — final step.

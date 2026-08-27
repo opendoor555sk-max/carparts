@@ -1342,6 +1342,114 @@ async def files(path: str, token: Optional[str] = None, authorization: Optional[
     return Response(content=content, media_type=ctype)
 
 
+# ---------------- Transactions history + bulk delete (Admin) ----------------
+@api.get("/transactions")
+async def list_transactions(type: Optional[str] = None, user=Depends(require_admin)):
+    q: Dict[str, Any] = {"type": {"$in": ["buy", "sell"]}}
+    if type in ("buy", "sell"):
+        q["type"] = type
+    txns = await db.transactions.find(q, {"_id": 0}).sort("at", -1).to_list(2000)
+    for t in txns:
+        p = await db.parts.find_one({"part_number": t.get("part_number")}, {"_id": 0, "name": 1})
+        t["part_name"] = (p or {}).get("name", "")
+    return txns
+
+
+class TxnDeleteIn(BaseModel):
+    ids: List[str]
+    remove_stock: bool = True
+
+
+@api.post("/transactions/delete")
+async def delete_transactions(body: TxnDeleteIn, user=Depends(require_admin)):
+    deleted_txn = 0
+    removed_units = 0
+    for tid in body.ids:
+        t = await db.transactions.find_one({"id": tid})
+        if not t:
+            continue
+        if body.remove_stock and t.get("unit_id"):
+            r = await db.stock.delete_one({"id": t["unit_id"]})
+            removed_units += r.deleted_count
+        await db.transactions.delete_one({"id": tid})
+        deleted_txn += 1
+    return {"ok": True, "deleted": deleted_txn, "removed_units": removed_units}
+
+
+# ---------------- Backup: export / import (Admin) ----------------
+BACKUP_COLLECTIONS = ["parts", "stock", "transactions", "users", "settings",
+                      "known_parts", "requirements", "verifications"]
+
+
+@api.get("/backup/export")
+async def backup_export(user=Depends(require_admin)):
+    data: Dict[str, Any] = {"app": APP_NAME, "exported_at": now_iso(), "collections": {}}
+    for col in BACKUP_COLLECTIONS:
+        docs = await db[col].find({}, {"_id": 0}).to_list(100000)
+        data["collections"][col] = docs
+    return data
+
+
+class BackupImportIn(BaseModel):
+    collections: Dict[str, List[Dict[str, Any]]]
+
+
+@api.post("/backup/import")
+async def backup_import(body: BackupImportIn, user=Depends(require_admin)):
+    summary = {}
+    for col, docs in body.collections.items():
+        if col not in BACKUP_COLLECTIONS:
+            continue
+        count = 0
+        for d in docs:
+            d.pop("_id", None)
+            key = d.get("id") or d.get("part_number") or d.get("username") or d.get("key")
+            if key is None:
+                await db[col].insert_one(dict(d))
+            else:
+                if d.get("id"):
+                    flt = {"id": d["id"]}
+                elif d.get("part_number"):
+                    flt = {"part_number": d["part_number"]}
+                elif d.get("username"):
+                    flt = {"username": d["username"]}
+                else:
+                    flt = {"key": d["key"]}
+                await db[col].update_one(flt, {"$set": d}, upsert=True)
+            count += 1
+        summary[col] = count
+    return {"ok": True, "imported": summary}
+
+
+@api.get("/backup/excel")
+async def backup_excel(user=Depends(require_admin)):
+    from openpyxl import Workbook
+    import io
+
+    wb = Workbook()
+    wb.remove(wb.active)
+    sheets = {
+        "Parts": ("parts", ["part_number", "name", "company", "category", "variant", "verification_status"]),
+        "Stock": ("stock", ["part_number", "condition", "sold", "added_by", "created_at"]),
+        "Transactions": ("transactions", ["type", "part_number", "price", "by", "at"]),
+        "Users": ("users", ["name", "username", "role", "disabled"]),
+    }
+    for sheet_name, (col, cols) in sheets.items():
+        ws = wb.create_sheet(sheet_name)
+        ws.append(cols)
+        docs = await db[col].find({}, {"_id": 0}).to_list(100000)
+        for d in docs:
+            ws.append([str(d.get(c, "")) for c in cols])
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=kabadi_backup.xlsx"},
+    )
+
+
 app.include_router(api)
 
 app.add_middleware(

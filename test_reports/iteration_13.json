@@ -1,0 +1,37 @@
+{
+  "summary": "All review items PASSED. Backend pytest 14/14 in /app/backend/tests/test_history_backup.py (history_backup_results.xml). Verified: (1) GET /api/transactions?type=buy|sell (admin only; staff→403), POST /api/transactions/delete deletes txn+stock unit (created fresh part TESTHIST*, /buy created 1 txn + 1 inventory unit, bulk-delete with remove_stock:true removed 1 txn + 1 unit, verified via /inventory count 1→0 and txn gone from history). (2) GET /api/backup/export returns collections{parts,stock,transactions,users,...}; staff→403. GET /api/backup/excel returns 12324-byte valid .xlsx (PK header). POST /api/backup/import upsert works (imported.parts>=1, part fetchable via /parts/{pn}); staff→403. (3) Regression: admin can still view own plaintext password (Salam@123 verified), PATCH admin/users/{id} name works, /stock/adjust still works, /buy limit path still routes through 409 branch. Frontend E2E on Expo web (390x844, admin abdul via token-injected localStorage): Admin Panel renders admin-link-history and admin-link-backup. /history renders both tab-buy (57 rows) and tab-sell tabs; every row has testID txn-<id>; tapping a row selects it (checkbox toggle) and bulk-delete button appears; select-all toggles all rows and bulk-delete shows correct count; clearing works. /backup renders export-excel, export-json, import-json buttons; export-json triggered a real browser download (kabadi_backup_2026-08-27.json, 86295 bytes); export-excel triggered kabadi_backup_2026-08-27.xlsx download (12324 bytes). No red-screen errors. Deprecated pointerEvents warning is a pre-existing carryover from batch-buy (iteration_10/11/12, not blocking). Test parts/txns created were cleaned up via /transactions/delete; abdul password unchanged (Salam@123).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "batch-buy.tsx / batch-buy.web.tsx overlay", "issue": "Deprecated `props.pointerEvents` still fires a RN warning on every mount. Move `pointerEvents:'none'` into the style object. Reference: /app/frontend/app/batch-buy.tsx and /app/frontend/app/batch-buy.web.tsx. Carried over from iteration_10/11/12 — not fixed yet, still low priority."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_history_backup.py",
+    "/app/test_reports/pytest/history_backup_results.xml",
+    "/app/test_reports/iteration_13.json"
+  ],
+  "action_items": [
+    "Optional low-priority: fix the deprecated pointerEvents prop warning in batch-buy screens (carried over from iteration_10)."
+  ],
+  "critical_code_review_comments": [
+    "history.tsx correctly wires tab-buy/tab-sell FilterChip, select-all Pressable, txn-<id> per-row Pressable with visual checkbox, and a bottom bulk-delete Pressable that appears only when selectedIds.length>0. Alert.alert confirms before POST /transactions/delete {ids, remove_stock:true} then reloads. Good.",
+    "backup.tsx correctly uses api.get('/backup/export') → JSON.stringify → webDownload() blob path on web; getToken()+fetch for /backup/excel to preserve auth header. Native paths use expo-file-system/legacy + expo-sharing (NATIVE-ONLY, not testable on web). runImport uses expo-document-picker (NATIVE-ONLY on real devices; on web fetch(asset.uri).text() reads picked file). All 3 buttons have testIDs.",
+    "(tabs)/admin.tsx correctly gates admin-link-history and admin-link-backup behind isAdmin, and passes correct testIDs. Staff will not see these buttons.",
+    "server.py implements /transactions?type=... with require_admin, /transactions/delete deletes both txn docs AND stock units by unit_id lookup, /backup/export dumps all named collections, /backup/excel uses openpyxl to return xlsx bytes with proper media type, /backup/import performs upsert-by-key per collection. All admin-gated."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_history_backup.py",
+    "/app/test_reports/pytest/history_backup_results.xml",
+    "/app/test_reports/iteration_13.json"
+  ],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% (3/3 review items — history flow, backup screen, web JSON+Excel export)"},
+  "seed_data_creation": "Created ephemeral: TESTHIST<ts> part+buy (deleted via /transactions/delete in test itself), TESTBK<ts> part (upserted via /backup/import — remains as a part row, no delete endpoint), TESTLIMR<ts> and TESTADJR<ts> parts + txns (leftover txns+units cleaned up post-run via /transactions/delete). abdul password confirmed still Salam@123 (login returns 200).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Reusable pytest: /app/backend/tests/test_history_backup.py — covers /transactions list, /transactions/delete (with stock removal verification via /inventory), /backup/export (JSON + staff 403), /backup/excel (xlsx PK header), /backup/import upsert, plus regression for admin password view, PATCH admin/users/{id} name, /stock/adjust. Web UI test injects token into localStorage['kabadi.token'] as JSON-encoded string and navigates directly to /admin, /history, /backup. Web download flow verified with page.expect_download(). Native-only paths (expo-sharing, expo-document-picker) not testable on web — main agent should validate on device build.",
+  "rca_of_issue": "N/A — all requested features work end-to-end. bulk-delete correctly cascades: the /transactions/delete endpoint looks up unit_id from each txn and removes the corresponding stock doc, so inventory count actually drops. On web, backup.tsx branches to Platform.OS==='web' which uses a blob URL + <a download> trick — works reliably (both JSON and XLSX downloads captured in Playwright)."
+}
