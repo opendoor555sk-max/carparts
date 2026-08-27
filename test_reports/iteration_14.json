@@ -1,0 +1,32 @@
+{
+  "summary": "All 4 review items PASSED on Expo web (390x844, admin abdul). PRIMARY BUG FIX VERIFIED: /batch-buy renders cleanly, batch-manual/batch-add/batch-done testIDs present, GPS strip text shows ('GPS મેળવી રહ્યા છીએ…' / 'Live GPS'). Added TESTMB999 via batch-manual+batch-add, tapped batch-done → navigated to /inventory. Zero uncaught pageerrors and ZERO 'removeSubscription is not a function' errors after unmount (previously the reported crash). The web polling cleanup (clearInterval) is working. REGRESSION 1 (Inventory ConfirmModal): del-<id> opens ConfirmModal with confirm-ok+confirm-cancel; cancel closes; confirm-ok deletes unit and inventory refreshes (verified via API count 1→0 for TESTMB999). REGRESSION 2 (Part detail pd-inc/pd-dec): counter went 1 → 2 → 1 live in both UI text and API on /part/TESTPD888. Note: pd-inc/pd-dec button occupies the same Y-band as the sticky bottom actionBar goto-sell button on short units lists — a plain click without scrollIntoView occasionally lands on Sell (navigates away). Users on real devices scroll the STOCK UNITS card into view above the sticky bar, so this is a minor Playwright-viewport quirk, but worth adding paddingBottom to ScrollView equal to actionBar height (already has 120 — actually sufficient on real content, edge case only with 1 unit). REGRESSION 3 (History bulk delete ConfirmModal): txn-<id> selects, bulk-delete pill appears, tapping opens ConfirmModal (confirm-ok/confirm-cancel both present), cancel closes without deleting. Full cleanup: deleted 2 test txns (TESTMB999, TESTPD888) + 1 stock unit via /transactions/delete; abdul login still 200 with Salam@123. Deprecated `props.pointerEvents` warning still logged from batch-buy overlay — unchanged since iteration_10, low priority.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/part/[pn]", "issues": ["When STOCK UNITS card has 1 unit, the pd-inc/pd-dec Pressables render at a Y-coordinate that can be visually overlapped by the sticky actionBar (goto-sell). A tap without scrolling can hit the Sell button instead of pd-inc. Suggest either raising the ScrollView paddingBottom to insets.bottom + actionBar_estimated_height (currently 120px, likely ok in practice) or verifying zIndex — verified on 390x844 mobile viewport with 1 unit."]}
+    ],
+    "react_native_issues": [
+      {"component": "batch-buy.web.tsx / batch-buy.tsx overlay", "issue": "Deprecated `props.pointerEvents` still fires an RN warning on mount ('props.pointerEvents is deprecated. Use style.pointerEvents'). Move `pointerEvents:'none'` into the style object on the overlay View. Reference: /app/frontend/app/batch-buy.web.tsx:122 and /app/frontend/app/batch-buy.tsx (same overlay pattern). Carried over from iteration_10/11/12/13 — still not fixed, still low priority."}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_14.json"],
+  "action_items": [
+    "Optional low-priority: fix the deprecated `props.pointerEvents` warning in both batch-buy screens (carry-over from iteration_10).",
+    "Optional: raise the /part/[pn] ScrollView paddingBottom slightly or lower actionBar zIndex so pd-inc/pd-dec are never overlapped by the sticky Sell button on very short unit lists (1 unit edge case)."
+  ],
+  "critical_code_review_comments": [
+    "batch-buy.web.tsx effect cleanup is correctly implemented: local `let active = true; let timer = null;` captured in closure; return function clears interval and flips `active=false` so any in-flight getCurrentPositionAsync won't setState after unmount. No subscription.remove() called on web, so the previous 'removeSubscription is not a function' crash is architecturally impossible now.",
+    "batch-buy.tsx (native) retains watchPositionAsync with try/catch around subscription.remove(), which is safe.",
+    "ConfirmModal in src/components/ui.tsx uses testID='confirm-ok' and 'confirm-cancel' consistently — verified used by inventory (pendingDelete/performDelete), part/[pn] (pendingUnit/performDeleteUnit), and history (bulk-delete). Good cross-platform replacement for Alert.alert.",
+    "Bug RCA (previous): removeSubscription arose because expo-location on web emits a listener object without a .remove() implementation compatible with LocationEventEmitter's expected shape. Polling via setInterval + clearInterval sidesteps EventEmitter entirely."
+  ],
+  "updated_files": ["/app/test_reports/iteration_14.json"],
+  "success_rate": {"backend": "N/A (frontend-only review)", "frontend": "100% (4/4 review items — Multiple Buy no-crash + unmount, inventory ConfirmModal, part-detail counter, history bulk-delete ConfirmModal)"},
+  "seed_data_creation": "Created TESTMB999 (via batch-buy manual add) and TESTPD888 (via /api/buy) — both cleaned up via /api/transactions/delete with remove_stock:true (200 ok, deleted:2, removed_units:1, leftover:0). abdul password unchanged (login 200).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Auth flow on web: use UI login (2 input fields → 'Sign In' text-button); token is stored under localStorage['kabadi.token'] as JSON-encoded string, and user under localStorage['kabadi.user']. Use page.request.fetch (not urllib/requests from playwright container — Cloudflare 1010 blocks non-browser). All 4 ConfirmModal-based flows (inventory del-<id>, part-detail pd-del-<id>, history bulk-delete, backup restore) share testIDs confirm-ok / confirm-cancel. For /part/[pn] Pressable tests, prefer element.focus()+keyboard.Enter or explicit scrollIntoView before .click(), because the sticky actionBar (goto-buy/goto-sell) is absolutely positioned over the bottom of the ScrollView.",
+  "rca_of_issue": "N/A — reported bug is fixed. /batch-buy on web no longer crashes because it now uses Location.getCurrentPositionAsync polled every 6s and cleared via clearInterval in the effect cleanup, instead of Location.watchPositionAsync whose returned subscription lacks a compatible .remove() on the web LocationEventEmitter shim. Verified: 0 pageerrors after navigating batch-done → /inventory (which unmounts the batch-buy screen and triggers cleanup)."
+}

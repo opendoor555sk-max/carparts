@@ -243,7 +243,7 @@ export default function PartDetail() {
     <View style={styles.flex}>
       <Header title={status || "Part"} subtitle="Part Master" onBack={() => router.back()} />
       <ScrollView
-        contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 120, gap: spacing.md }}
+        contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 180, gap: spacing.md }}
       >
         {/* Part number hero */}
         <Card testID="part-hero">
