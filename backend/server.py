@@ -236,6 +236,8 @@ class BuyIn(BaseModel):
     company: Optional[str] = "All"
     name: Optional[str] = ""
     category: Optional[str] = ""
+    compatible_vehicles: Optional[List[str]] = []
+    variant: Optional[str] = ""
     condition: str = "Unknown"
     location: Optional[Dict[str, str]] = {}
     price: Optional[float] = None
@@ -572,13 +574,28 @@ async def buy(body: BuyIn, user=Depends(require("buy"))):
         part = {
             "id": new_id(), "part_number": pn, "company": body.company or "All",
             "name": body.name or "", "category": body.category or "",
-            "compatible_vehicles": [], "variant": "", "year": "", "old_number": "",
-            "new_number": "", "barcode": body.barcode or "", "sticker_color": "",
-            "technical_info": "", "photos": [], "source": "Buy",
+            "compatible_vehicles": body.compatible_vehicles or [], "variant": body.variant or "",
+            "year": "", "old_number": "", "new_number": "", "barcode": body.barcode or "",
+            "sticker_color": "", "technical_info": "", "photos": [], "source": "Buy",
             "verification_status": "Unverified", "created_at": now_iso(),
             "created_by": user["username"], "purchase_limit": None, "limit_enabled": False,
         }
         await db.parts.insert_one(dict(part))
+    else:
+        # Auto-log compatibility under this part number WITHOUT overwriting existing data.
+        fill: Dict[str, Any] = {}
+        if body.name and not part.get("name"):
+            fill["name"] = body.name
+        if body.category and not part.get("category"):
+            fill["category"] = body.category
+        if body.company and body.company != "All" and (not part.get("company") or part.get("company") == "All"):
+            fill["company"] = body.company
+        if body.compatible_vehicles and not part.get("compatible_vehicles"):
+            fill["compatible_vehicles"] = body.compatible_vehicles
+        if body.variant and not part.get("variant"):
+            fill["variant"] = body.variant
+        if fill:
+            await db.parts.update_one({"part_number": pn}, {"$set": fill})
     # limit check
     limit = await compute_limit(pn)
     if limit["limit_enabled"] and limit["remaining"] is not None and limit["remaining"] <= 0 and not body.override:

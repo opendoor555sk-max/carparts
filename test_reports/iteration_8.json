@@ -1,0 +1,36 @@
+{
+  "summary": "Buy-form compatibility auto-log + fresh-data feature FULLY VERIFIED end-to-end. Backend 6/6 tests PASS in 2.02s (/app/backend/tests/test_compat_and_fresh.py). (A) POST /api/buy for new PN TEST-CMP-<uuid> with company='Hyundai+Kia', name='BCM', category='Electrical/Body Control', compatible_vehicles=['Hyundai Creta','Kia Seltos'], variant='HTC Diesel', condition='Working', location{rack,shelf} -> ok:true; GET /api/parts/{pn} returns company='Hyundai+Kia', compatible_vehicles=['Hyundai Creta','Kia Seltos'], variant='HTC Diesel', name='BCM', category='Electrical/Body Control', stock_count=1 — full auto-log confirmed. (B) NO-OVERWRITE verified: create PN with vehicles=['Hyundai Creta']/variant='SX'/company='Hyundai+Kia', then POST /api/buy again with vehicles=['Toyota Innova']/variant='GX'/company='Toyota' -> GET shows original ['Hyundai Creta'],'SX','Hyundai+Kia' preserved, stock_count=2. (C) Empty-compat buy still ok — part created with compatible_vehicles=[], stock=1. (D) Categories still 73. GET /api/parts and /api/inventory return list shape (200). (E) Sell decrements to 0. Frontend (Expo web, 390x844, admin abdul/Salam@123): login-submit -> module-buy -> scan (manual-part-input='FORM-CMP-UI1') -> scan-continue -> Buy form loaded with buy-compat-card whose title reads exactly 'PART & COMPATIBILITY'; all required testIDs present: buy-name, buy-category, buy-vehicles, buy-variant, buy-cond-Working, loc-rack, confirm-buy, buy-limit-card. Filled Name='Body Control Module', Category='Electrical/Body Control', Vehicles='Hyundai Venue', Variant='SX', Rack='R1', tapped Working then confirm-buy -> navigated to /part/FORM-CMP-UI1 and DETAILS card renders Name=Body Control Module, Category=Electrical/Body Control, Variant=SX, Compatible=Hyundai Venue, IN STOCK badge with 1 unit, Unverified chip. Buy form auto-fill on load (search.part -> name/category/variant/vehicles) code-verified in buy.tsx:53-56. Backend fill logic verified in server.py:585-598 (only-empty-fields-filled + first-buy-full-init). No red screen, no 5xx. Pre-existing dev-only warning persists (harmless): props.pointerEvents deprecated (already noted iter 3/6/7). Web-only QR camera decoder throws NotFoundException on empty webcam (expected behavior — no code visible; scanner falls back to manual input which is what user uses on web).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "part/[pn].tsx DETAILS card", "issues": ["Row label reads 'Compatible' (short) instead of 'Compatible vehicles' as the review request mentions. Minor labeling nit — content is correct. Reference: /app/frontend/app/part/[pn].tsx:234"]}
+    ],
+    "react_native_issues": [
+      {"component": "props.pointerEvents", "issue": "Dev-only web warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' — comes from a third-party RN-web component in the tree; harmless in production. Same as iter 3/6/7. Reference: unchanged, pre-existing."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_compat_and_fresh.py",
+    "/app/test_reports/pytest/compat_results.xml",
+    "/app/test_reports/iteration_8.json"
+  ],
+  "action_items": [
+    "OPTIONAL: rename DETAILS Row label from 'Compatible' to 'Compatible vehicles' in /app/frontend/app/part/[pn].tsx:234 for consistency with the review-request wording."
+  ],
+  "critical_code_review_comments": [
+    "server.py:571-598 Buy correctly initializes ALL compatibility fields (name, category, company, compatible_vehicles, variant) on FIRST buy (auto-create branch) and applies only-empty-fields-fill on subsequent buys — matches the no-overwrite contract for verified data.",
+    "server.py:591 company fill guard: `body.company != 'All' and (not part.company or part.company == 'All')` — smart, treats 'All' as unset so first non-generic company wins; verified test C.",
+    "buy.tsx:49-62 load() pre-fills form from /api/search?q=pn (part.name/category/variant/compatible_vehicles) — enables true auto-fill on scan/select as user requested.",
+    "buy.tsx:80-91 POST /api/buy correctly serializes vehicles CSV -> array via split+trim+filter — good defensive parsing.",
+    "buy.tsx:26 partNumber comes from URL param and is used verbatim in POST — matches user's Part-Number-first paradigm.",
+    "part/[pn].tsx:224-236 DETAILS card renders Company, Category, Variant and Compatible rows unconditionally — compatibility lookup is always visible on the part page."
+  ],
+  "updated_files": ["/app/backend/tests/test_compat_and_fresh.py"],
+  "success_rate": {"backend": "100% (6/6 tests, 2.02s)", "frontend": "100% (Buy compat card end-to-end verified with screenshot)"},
+  "seed_data_creation": "Per-run test parts prefixed TEST-CMP-, TEST-CMPX-, TEST-CMPE-, TEST-SEL- (pytest, uuid-suffixed) and one UI-created part FORM-CMP-UI1. Not cleaned up per instructions.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Buy-form compatibility feature stable. testIDs to reuse for future compat regressions: login-username/password/submit -> module-buy -> manual-part-input + scan-continue -> buy-compat-card, buy-name, buy-category, buy-vehicles (CSV), buy-variant, buy-cond-<Condition>, loc-rack/shelf/box/position, override-switch, confirm-buy, buy-limit-card. Part detail testIDs: part-hero, part-number, part-status, edit-part. Backend contract: /api/buy body may include name,category,company,compatible_vehicles[],variant,condition,location{},price,override; part-master is only filled where field is empty (no overwrite). Categories total remains 73. Admin abdul/Salam@123. base_url from EXPO_PUBLIC_BACKEND_URL."
+}

@@ -54,6 +54,15 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Admin Panel: stats, Users, Purchase Limits (global + per-part), AI Approvals, Demand & Search history.
 - Backend fully tested (24/24). Frontend critical flows verified.
 
+## Updates (2026-06 — iterations)
+- Barcode part-number extractor: pulls real Hyundai/Kia OEM number from coded barcode payloads (scan.tsx / scan.web.tsx / buying-trip). ZXing web scanner (fast, 50ms) + native expo-camera.
+- AI research engine reworked: DB-FIRST (verified library returns 100% instantly), then AI enrichment. AI NEVER self-marks Verified — only Admin approval does. Structured schema (compatible_models, cross_reference, status).
+- Edit-before-Approve / edit-before-add: admin can correct all AI/manual details before saving Verified (part detail modal).
+- Gemini provider: user's own gemini-3.7-flash key (free, non-grounded) primary with retry; Google Search grounding behind GEMINI_GROUNDING flag (needs billing); auto-fallback to Emergent key so AI never errors.
+- User management: admin can add / disable / toggle-permissions / REMOVE (soft-delete) staff; Main Admin protected.
+- Buy form: auto-fill + PART & COMPATIBILITY (company/vehicles/variant) auto-logged under the part number on purchase (no overwrite of existing verified data).
+- All demo/dummy data purged; only Main Admin + code-defined categories remain (fresh data).
+
 ## Backlog / Remaining
 - P1: True offline-first local queue + auto-sync on reconnect (currently online-first with sync indicator).
 - P1: 6-side photo capture + upload wired to camera/gallery (endpoints ready; UI capture pending).

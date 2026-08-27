@@ -37,6 +37,8 @@ export default function Buy() {
   const [condition, setCondition] = useState("Working");
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
+  const [vehicles, setVehicles] = useState("");
+  const [variant, setVariant] = useState("");
   const [rack, setRack] = useState("");
   const [shelf, setShelf] = useState("");
   const [box, setBox] = useState("");
@@ -50,6 +52,8 @@ export default function Buy() {
       setInfo(res);
       if (res.part?.name) setName(res.part.name);
       if (res.part?.category) setCategory(res.part.category);
+      if (res.part?.variant) setVariant(res.part.variant);
+      if (res.part?.compatible_vehicles?.length) setVehicles(res.part.compatible_vehicles.join(", "));
     } catch (e: any) {
       show(e?.message || "Load failed", "error");
     } finally {
@@ -73,11 +77,13 @@ export default function Buy() {
     }
     setSubmitting(true);
     try {
-      const res = await api.post("/buy", {
+      await api.post("/buy", {
         part_number: partNumber,
         company,
         name,
         category,
+        compatible_vehicles: vehicles.split(",").map((s) => s.trim()).filter(Boolean),
+        variant,
         condition,
         location: { rack, shelf, box, position },
         price: price ? parseFloat(price) : null,
@@ -168,14 +174,29 @@ export default function Buy() {
             </View>
           </Card>
 
-          {/* Part info (for new) */}
-          {!info?.part ? (
-            <Card>
-              <Text style={styles.cardTitle}>NEW PART INFO</Text>
-              <Field label="Name" value={name} onChangeText={setName} placeholder="Part name" testID="buy-name" />
-              <Field label="Category" value={category} onChangeText={setCategory} placeholder="Category" testID="buy-category" />
-            </Card>
-          ) : null}
+          {/* Part & compatibility (auto-filled, saved under the part number on purchase) */}
+          <Card testID="buy-compat-card">
+            <View style={styles.rowBetween}>
+              <Text style={styles.cardTitle}>PART & COMPATIBILITY</Text>
+              {info?.part ? <StatusChip status={info.part.verification_status} /> : null}
+            </View>
+            <Field label="Name" value={name} onChangeText={setName} placeholder="Part name" testID="buy-name" />
+            <Field label="Category" value={category} onChangeText={setCategory} placeholder="Category" testID="buy-category" />
+            <Field
+              label="Compatible Vehicles (comma separated)"
+              value={vehicles}
+              onChangeText={setVehicles}
+              placeholder="Hyundai Creta, Kia Seltos"
+              testID="buy-vehicles"
+            />
+            <Field label="Variant" value={variant} onChangeText={setVariant} placeholder="e.g. HTC Diesel" testID="buy-variant" />
+            <View style={styles.compatHint}>
+              <Ionicons name="save" size={13} color={colors.brand} />
+              <Text style={styles.compatHintText}>
+                Company ({company}) + આ details purchase સાથે part number હેઠળ auto-save થશે
+              </Text>
+            </View>
+          </Card>
 
           {/* Location */}
           <Card>
@@ -285,4 +306,6 @@ const styles = StyleSheet.create({
   overrideTitle: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
   dim: { color: colors.info, fontSize: font.sm },
   bar: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.md },
+  compatHint: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.xs },
+  compatHintText: { color: colors.info, fontSize: font.sm, flex: 1 },
 });
