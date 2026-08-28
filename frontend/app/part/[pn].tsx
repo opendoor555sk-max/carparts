@@ -274,6 +274,14 @@ export default function PartDetail() {
             testID="print-barcode"
             style={{ marginTop: spacing.md }}
           />
+          <Button
+            title="Print on A4 Sticker Sheet"
+            onPress={() => router.push(`/labels?pn=${encodeURIComponent(partNumber)}&company=${encodeURIComponent(p?.company || "")}&name=${encodeURIComponent(p?.name || "")}` as any)}
+            variant="secondary"
+            icon="pricetags"
+            testID="print-sheet"
+            style={{ marginTop: spacing.sm }}
+          />
         </Card>
 
         {/* Part master details */}

@@ -153,3 +153,10 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 
 ## Strict GPS Gate (2026-06 fork) — MANDATORY location
 - New src/components/LocationGate.tsx wraps the entire app in app/_layout.tsx. On NATIVE (phone): app is fully blocked unless device Location services are ON AND foreground permission granted; verifies with getCurrentPositionAsync. Blocking screen: Turn On GPS / Allow Location / Open Settings + Retry. Auto re-checks on AppState 'active'. WEB passes through (preview only; iframe blocks geolocation). app.json already has location perms. NOTE: only testable on a real phone / Expo Go, not web preview.
+
+## Sticker Sheet Printing — Module 3 (2026-06 fork) — A4 anti-wastage
+- New screen app/labels.tsx ("Sticker Sheet Print"): pick from 21 A4 layouts (chart 01P..110L with mm dims + rows×cols), enter Part Number + Line1/Line2, choose code (Barcode/QR/Both/Text), interactive grid to TAP a start block (cells before it skipped = anti-wastage), copies (blank=fill sheet), cut-guide toggle. Prints mm-precise A4 via expo-print.
+- New utils: src/utils/qr.ts (pure-JS QR -> scalable SVG via qrcode-generator@2.0.4) and src/utils/labelSheet.ts (SHEET_LAYOUTS master + generateSheetHtml with @page A4 margin:0, absolute mm cell positioning, grid auto-centered on A4).
+- Entry points: Home "STICKER PRINTING" tile + Part detail "Print on A4 Sticker Sheet" button (passes pn/company/name).
+- Verified on web preview: layout switch, start-cell coloring (cells<start dark, >=start orange), print action fires with no JS errors. Font/layout exact-photo-clone NOT done (per user OK with approximation). 40P layout is a chart anomaly (overflows A4) but included.
+- NEXT: Module 1+2 AI Universal Scanner (Gemini 3 Pro vision) — scan sticker -> capture text/fields/barcode-QR region -> editable template -> regenerate code on new part number. Needs integration playbook + confirm.
