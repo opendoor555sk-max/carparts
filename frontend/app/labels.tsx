@@ -32,8 +32,7 @@ export default function Labels() {
   const [line2, setLine2] = useState((params.name as string) || "");
   const [code, setCode] = useState<CodeType>("both");
   const [layoutCode, setLayoutCode] = useState("24L");
-  const [startCell, setStartCell] = useState(1);
-  const [copies, setCopies] = useState<string>("");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [showBorder, setShowBorder] = useState(true);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
@@ -65,13 +64,17 @@ export default function Labels() {
 
   const layout = useMemo(() => SHEET_LAYOUTS.find((l) => l.code === layoutCode)!, [layoutCode]);
 
-  const maxCopies = layout.total - startCell + 1;
-  const effectiveCopies = (() => {
-    const n = parseInt(copies, 10);
-    if (!copies || isNaN(n) || n <= 0) return maxCopies;
-    return Math.min(n, maxCopies);
-  })();
-  const endCell = startCell + effectiveCopies - 1;
+  const toggleCell = (num: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(num)) next.delete(num);
+      else next.add(num);
+      return next;
+    });
+  };
+  const selectAll = () => setSelected(new Set(Array.from({ length: layout.total }, (_, i) => i + 1)));
+  const clearAll = () => setSelected(new Set());
+  const selectedCount = selected.size;
 
   const previewSvg = useMemo(() => {
     const pn = partNumber.trim() || "PART-0000";
@@ -85,10 +88,14 @@ export default function Labels() {
       show("Enter a Part Number", "error");
       return;
     }
+    if (selectedCount === 0) {
+      show("Tap the blocks you want to print on", "error");
+      return;
+    }
     try {
       const html = generateSheetHtml(
         { partNumber: partNumber.trim(), line1: line1.trim(), line2: line2.trim(), code },
-        { layout, startCell, copies: effectiveCopies, showBorder },
+        { layout, cells: Array.from(selected), showBorder },
       );
       await printHtml(html);
     } catch (e: any) {
@@ -142,7 +149,7 @@ export default function Labels() {
               active={layoutCode === l.code}
               onPress={() => {
                 setLayoutCode(l.code);
-                setStartCell(1);
+                setSelected(new Set());
               }}
               testID={`layout-${l.code}`}
             />
@@ -153,23 +160,27 @@ export default function Labels() {
         </Text>
 
         {/* Interactive grid */}
-        <Text style={styles.flabel}>TAP A BLOCK TO SET START (skip used stickers)</Text>
+        <View style={styles.gridHead}>
+          <Text style={styles.flabel}>TAP ANY BLOCKS TO PRINT ({selectedCount} selected)</Text>
+          <View style={styles.gridActions}>
+            <Pressable style={styles.miniBtn} onPress={selectAll} testID="lbl-selectall">
+              <Text style={styles.miniText}>All</Text>
+            </Pressable>
+            <Pressable style={styles.miniBtn} onPress={clearAll} testID="lbl-clear">
+              <Text style={styles.miniText}>Clear</Text>
+            </Pressable>
+          </View>
+        </View>
         <View style={styles.gridCard}>
           <View style={[styles.grid, { width: cellW * layout.cols + 2 }]}>
             {Array.from({ length: layout.total }).map((_, i) => {
               const num = i + 1;
-              const used = num < startCell;
-              const filled = num >= startCell && num <= endCell;
+              const filled = selected.has(num);
               return (
                 <Pressable
                   key={i}
-                  onPress={() => setStartCell(num)}
-                  style={[
-                    styles.cell,
-                    { width: cellW, height: cellH },
-                    used && styles.cellUsed,
-                    filled && styles.cellFilled,
-                  ]}
+                  onPress={() => toggleCell(num)}
+                  style={[styles.cell, { width: cellW, height: cellH }, filled && styles.cellFilled]}
                   testID={`cell-${num}`}
                 >
                   <Text style={[styles.cellText, filled && styles.cellTextOn]}>{num}</Text>
@@ -178,26 +189,9 @@ export default function Labels() {
             })}
           </View>
           <View style={styles.legend}>
-            <View style={styles.legRow}><View style={[styles.dot, styles.cellUsed]} /><Text style={styles.legText}>Skipped (already used)</Text></View>
+            <View style={styles.legRow}><View style={[styles.dot, styles.cell]} /><Text style={styles.legText}>Empty (skip)</Text></View>
             <View style={styles.legRow}><View style={[styles.dot, styles.cellFilled]} /><Text style={styles.legText}>Will print</Text></View>
           </View>
-        </View>
-
-        <Text style={styles.flabel}>COPIES (blank = fill sheet)</Text>
-        <View style={styles.row}>
-          <TextInput
-            style={[styles.input, { flex: 1 }]}
-            value={copies}
-            onChangeText={setCopies}
-            placeholder={`Max ${maxCopies}`}
-            placeholderTextColor={colors.info}
-            keyboardType="number-pad"
-            testID="lbl-copies"
-          />
-          <Pressable style={styles.resetBtn} onPress={() => { setStartCell(1); setCopies(""); }} testID="lbl-reset">
-            <Ionicons name="refresh" size={16} color={colors.brand} />
-            <Text style={styles.resetText}>Reset</Text>
-          </Pressable>
         </View>
 
         <View style={styles.borderRow}>
@@ -205,7 +199,7 @@ export default function Labels() {
           <Switch value={showBorder} onValueChange={setShowBorder} trackColor={{ true: colors.brand }} testID="lbl-border" />
         </View>
 
-        <Text style={styles.dim}>Printing blocks {startCell} → {endCell} ({effectiveCopies} labels)</Text>
+        <Text style={styles.dim}>Printing {selectedCount} label{selectedCount === 1 ? "" : "s"} on selected blocks</Text>
 
         <Pressable style={styles.printBtn} onPress={onPrint} testID="lbl-print">
           <Ionicons name="print" size={20} color={colors.onBrand} />
@@ -247,6 +241,10 @@ const styles = StyleSheet.create({
   preview: { backgroundColor: "#fff", borderRadius: radius.sm, padding: spacing.md, alignItems: "center", justifyContent: "center" },
   dim: { color: colors.info, fontSize: font.sm, marginTop: 2 },
   gridCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, alignItems: "center", gap: spacing.sm },
+  gridHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.xs },
+  gridActions: { flexDirection: "row", gap: spacing.sm },
+  miniBtn: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: 6 },
+  miniText: { color: colors.brand, fontWeight: "800", fontSize: font.sm },
   grid: { flexDirection: "row", flexWrap: "wrap", alignSelf: "center" },
   cell: { borderWidth: 0.5, borderColor: colors.border, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
   cellUsed: { backgroundColor: "#3a2a10" },

@@ -51,8 +51,7 @@ export type LabelContent = {
 
 export type SheetOptions = {
   layout: SheetLayout;
-  startCell: number; // 1-based, first cell that gets printed
-  copies: number; // how many labels to print from startCell
+  cells: number[]; // 1-based cell indices to print on
   showBorder?: boolean; // dashed cut guides
 };
 
@@ -96,27 +95,26 @@ function escapeHtml(s: any): string {
 }
 
 export function generateSheetHtml(content: LabelContent, opts: SheetOptions): string {
-  const { layout, startCell, copies, showBorder } = opts;
+  const { layout, cells, showBorder } = opts;
   const { w, h, rows, cols, total } = layout;
   const gridW = cols * w;
   const gridH = rows * h;
   const leftM = Math.max(0, (A4_W - gridW) / 2);
   const topM = Math.max(0, (A4_H - gridH) / 2);
 
-  const start = Math.max(1, Math.min(startCell, total));
-  const end = Math.min(total, start + Math.max(0, copies) - 1);
+  const selected = new Set(cells);
 
-  let cells = "";
+  let out = "";
   for (let i = 0; i < total; i++) {
     const r = Math.floor(i / cols);
     const col = i % cols;
     const x = leftM + col * w;
     const y = topM + r * h;
     const num = i + 1;
-    const filled = num >= start && num <= end;
+    const filled = selected.has(num);
     const border = showBorder ? "border:0.2mm dashed #bbb;" : "";
     const inner = filled ? labelInner(content, w, h) : "";
-    cells += `<div style="position:absolute;left:${x}mm;top:${y}mm;width:${w}mm;height:${h}mm;box-sizing:border-box;overflow:hidden;${border}">${inner}</div>`;
+    out += `<div style="position:absolute;left:${x}mm;top:${y}mm;width:${w}mm;height:${h}mm;box-sizing:border-box;overflow:hidden;${border}">${inner}</div>`;
   }
 
   return `<html><head><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -126,5 +124,5 @@ export function generateSheetHtml(content: LabelContent, opts: SheetOptions): st
     .sheet { position:relative; width:${A4_W}mm; height:${A4_H}mm; }
     * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   </style></head>
-  <body><div class="sheet">${cells}</div></body></html>`;
+  <body><div class="sheet">${out}</div></body></html>`;
 }
