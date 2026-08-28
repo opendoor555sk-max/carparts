@@ -1752,35 +1752,20 @@ class StickerScanReq(BaseModel):
     image_base64: str  # raw base64 (no data: prefix)
 
 
-STICKER_SCAN_PROMPT = """You are an OCR + layout extraction engine for product stickers/labels (e.g. automotive ECU labels).
-Analyze the sticker in the image and return ONLY a strict JSON object (no markdown, no explanation) with this schema:
+STICKER_SCAN_PROMPT = """Read this product label/sticker image. Return ONLY strict JSON (no markdown) with this schema:
 {
-  "aspect": <number, sticker width divided by height, e.g. 1.45>,
-  "part_number": "<the single most important part number on the label, best guess>",
-  "lines": [
-    {
-      "text": "<exact text of this line>",
-      "x": <number 0-100, left edge % of the text block>,
-      "y": <number 0-100, top edge % of the text block>,
-      "size": <number 2-20, font height as % of sticker height>,
-      "bold": <true|false>,
-      "align": "left" | "center" | "right"
-    }
-  ],
-  "logos": [
-    { "label": "<brand name if known e.g. Hyundai>", "x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100> }
-  ],
-  "codes": [
-    { "type": "qr" | "barcode" | "datamatrix", "value": "<decoded value if readable else best guess or empty>", "x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100> }
-  ]
+  "aspect": <sticker width/height ratio, e.g. 1.6>,
+  "part_number": "<the single main part number, best guess>",
+  "lines": [ {"text": "<one text line>", "bold": <true|false>} ],
+  "logos": [ {"label": "<BRAND name only, e.g. Hyundai, Kia>", "x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>} ],
+  "codes": [ {"type": "qr"|"barcode"|"datamatrix", "x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>} ]
 }
 Rules:
-- Capture EVERY visible text line in reading order (top to bottom), however many there are.
-- x/y/w/h are percentages relative to the STICKER's bounding box (not the whole photo).
-- If the image is rotated/upside-down, read it in its correct upright orientation.
-- Include manufacturer logos as logo entries with their bounding box.
-- Detect any QR / barcode / datamatrix and its bounding box and type.
-- Return valid JSON only."""
+- "lines": every visible text line in top-to-bottom reading order. Just the text, no coordinates.
+- Read the label upright even if the photo is rotated/upside-down.
+- "logos": ONLY real manufacturer brand logos (Hyundai, Kia, Maruti, etc). IGNORE Pb, CE, E11, e-mark, recycling and connector symbols.
+- "codes": bounding box (% of sticker) and type of any QR / barcode / datamatrix. Empty list if none.
+- Be fast and concise. JSON only."""
 
 
 @api.post("/scan-sticker")
@@ -1796,7 +1781,7 @@ async def scan_sticker(req: StickerScanReq, user=Depends(get_current_user)):
             api_key=EMERGENT_LLM_KEY,
             session_id=f"sticker-{uuid.uuid4().hex[:8]}",
             system_message="You extract structured JSON from product label images. Output JSON only.",
-        ).with_model("gemini", "gemini-3.1-pro-preview")
+        ).with_model("gemini", "gemini-3.7-flash")
         msg = UserMessage(text=STICKER_SCAN_PROMPT, file_contents=[ImageContent(image_base64=b64)])
         raw = await chat.send_message(msg)
     except Exception as e:

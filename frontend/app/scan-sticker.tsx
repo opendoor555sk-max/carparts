@@ -18,12 +18,35 @@ import { colors, font, radius, spacing } from "@/src/theme";
 type ScanResult = {
   aspect: number;
   part_number: string;
-  lines: TplLine[];
+  lines: { text: string; bold?: boolean }[];
   logos: { label?: string; x: number; y: number; w: number; h: number }[];
-  codes: { type: string; value: string; x: number; y: number; w: number; h: number }[];
+  codes: { type: string; x: number; y: number; w: number; h: number }[];
 };
 
 const PREVIEW_W = 320;
+
+const KNOWN_BRANDS = ["hyundai", "kia", "maruti", "suzuki", "tata", "mahindra", "toyota", "honda", "nissan", "renault", "ford", "volkswagen", "skoda", "datsun", "chevrolet", "bosch", "continental", "delphi", "denso", "valeo", "mobis", "seoyon", "mobase"];
+
+// Build a clean, non-overlapping layout: text stacked in a left column,
+// code kept in a right column, logos as a small top strip.
+function normalizeLines(raw: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, topPad: number): TplLine[] {
+  const lines = raw.filter((l) => (l.text || "").trim());
+  if (!lines.length) return [];
+  const textFrac = hasCode ? 0.68 : 0.96; // leave room on the right for the code
+  const widthUnits = aspect * 100 * textFrac; // width in % of height
+  const bottomPad = 4;
+  const avail = Math.max(20, 100 - topPad - bottomPad);
+  const slot = avail / lines.length; // vertical slot per line
+  const out: TplLine[] = [];
+  lines.forEach((ln, i) => {
+    const len = Math.max(1, (ln.text || "").length);
+    const fitW = widthUnits / (len * 0.55);
+    const fs = Math.max(2.2, Math.min(slot * 0.8, fitW, 9));
+    const y = topPad + i * slot + (slot - fs) / 2;
+    out.push({ text: ln.text, x: 3, y, size: fs, bold: ln.bold, align: "left" });
+  });
+  return out;
+}
 
 export default function ScanSticker() {
   const router = useRouter();
@@ -41,37 +64,68 @@ export default function ScanSticker() {
   const processImage = async (asset: ImagePicker.ImagePickerAsset) => {
     setBusy(true);
     try {
-      const res = await api.post<ScanResult>("/scan-sticker", { image_base64: asset.base64 });
+      // downscale before upload => faster + cheaper AI
+      let sendB64 = asset.base64!;
+      try {
+        const rs = ImageManipulator.manipulate(asset.uri);
+        rs.resize({ width: 1100 });
+        const rimg = await rs.renderAsync();
+        const rout = await rimg.saveAsync({ format: SaveFormat.JPEG, base64: true });
+        if (rout.base64) sendB64 = rout.base64;
+      } catch {}
+
+      const res = await api.post<ScanResult>("/scan-sticker", { image_base64: sendB64 });
       const imgW = asset.width || 1000;
       const imgH = asset.height || 1000;
 
-      // crop logos from the original image using detected bounding boxes
+      const first = (res.codes || [])[0];
+      const ct: "qr" | "barcode" = first?.type === "barcode" ? "barcode" : "qr";
+      const pn = res.part_number || "";
+      const aspect = res.aspect || 1.4;
+      const hasCode = !!first;
+      // deterministic right-column placement so code never overlaps text
+      const ch = 34;
+      const cw = Math.min(40, ch / aspect);
+      const code: StickerTemplate["code"] = {
+        type: ct,
+        value: pn,
+        x: 100 - cw - 3,
+        y: (100 - ch) / 2,
+        w: cw,
+        h: ch,
+      };
+
+      // only crop real brand logos (skip Pb / CE / E11 / connectors junk)
+      const brandLogos = (res.logos || []).filter((lg) => {
+        const lbl = (lg.label || "").toLowerCase();
+        return KNOWN_BRANDS.some((b) => lbl.includes(b));
+      });
       const logos: StickerTemplate["logos"] = [];
-      for (const lg of (res.logos || []).slice(0, 6)) {
+      const logoH = 10;
+      const logoW = Math.min(16, logoH / aspect * 1.8);
+      let li = 0;
+      for (const lg of brandLogos.slice(0, 4)) {
         try {
           const ox = Math.max(0, Math.round((lg.x / 100) * imgW));
           const oy = Math.max(0, Math.round((lg.y / 100) * imgH));
-          const cw = Math.min(imgW - ox, Math.round((lg.w / 100) * imgW));
-          const ch = Math.min(imgH - oy, Math.round((lg.h / 100) * imgH));
-          if (cw < 4 || ch < 4) continue;
+          const cwp = Math.min(imgW - ox, Math.round((lg.w / 100) * imgW));
+          const chp = Math.min(imgH - oy, Math.round((lg.h / 100) * imgH));
+          if (cwp < 4 || chp < 4) continue;
           const ctx = ImageManipulator.manipulate(asset.uri);
-          ctx.crop({ originX: ox, originY: oy, width: cw, height: ch });
+          ctx.crop({ originX: ox, originY: oy, width: cwp, height: chp });
           const rendered = await ctx.renderAsync();
           const out = await rendered.saveAsync({ format: SaveFormat.PNG, base64: true });
-          logos.push({ dataUrl: `data:image/png;base64,${out.base64}`, x: lg.x, y: lg.y, w: lg.w, h: lg.h });
+          // place in a clean top header row (left side)
+          logos.push({ dataUrl: `data:image/png;base64,${out.base64}`, x: 3 + li * (logoW + 2), y: 2, w: logoW, h: logoH });
+          li += 1;
         } catch {
           // skip a logo that fails to crop
         }
       }
 
-      const first = (res.codes || [])[0];
-      const ct: "qr" | "barcode" = first?.type === "barcode" ? "barcode" : "qr";
-      const pn = res.part_number || "";
-      const code: StickerTemplate["code"] = first
-        ? { type: ct, value: pn, x: first.x, y: first.y, w: first.w, h: first.h }
-        : { type: "qr", value: pn, x: 68, y: 55, w: 26, h: 30 };
-
-      setTpl({ aspect: res.aspect || 1.4, lines: res.lines || [], logos, code });
+      const topPad = logos.length ? 15 : 4;
+      const lines = normalizeLines(res.lines || [], aspect, hasCode, topPad);
+      setTpl({ aspect, lines, logos, code });
       setPartNumber(pn);
       setCodeType(ct);
       setSelected(new Set());
@@ -169,7 +223,7 @@ export default function ScanSticker() {
         {busy ? (
           <View style={styles.busy}>
             <ActivityIndicator size="large" color={colors.brand} />
-            <Text style={styles.dim}>Reading sticker with AI… (10–30s)</Text>
+            <Text style={styles.dim}>Reading sticker with AI… (a few seconds)</Text>
           </View>
         ) : null}
 
