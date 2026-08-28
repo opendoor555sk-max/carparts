@@ -150,3 +150,6 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 
 ## Demand & Search filters (2026-06 fork)
 - demand.tsx now has DATE (presets + custom From-To) + COMPANY (full master) + CATEGORY (full Category Master) filters, mirroring report.tsx. Backend /search-history extended with date_from/date_to/company/category params + joins parts to attach company/category/part_name. Verified via curl (no-filter returns items with company/category; Hyundai + old-date filters correctly return []). SEC-003 already fixed in /files (store ownership enforced).
+
+## Strict GPS Gate (2026-06 fork) — MANDATORY location
+- New src/components/LocationGate.tsx wraps the entire app in app/_layout.tsx. On NATIVE (phone): app is fully blocked unless device Location services are ON AND foreground permission granted; verifies with getCurrentPositionAsync. Blocking screen: Turn On GPS / Allow Location / Open Settings + Retry. Auto re-checks on AppState 'active'. WEB passes through (preview only; iframe blocks geolocation). app.json already has location perms. NOTE: only testable on a real phone / Expo Go, not web preview.

@@ -9,6 +9,7 @@ import { StatusBar } from "expo-status-bar";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider } from "@/src/context/AuthContext";
 import { ToastProvider } from "@/src/context/ToastContext";
+import { LocationGate } from "@/src/components/LocationGate";
 import { colors } from "@/src/theme";
 
 // Disable logbox errors etc so that users can see the app
@@ -41,13 +42,15 @@ export default function RootLayout() {
           <ToastProvider>
             <StatusBar style="light" />
             <View style={{ flex: 1, backgroundColor: colors.surface }}>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: colors.surface },
-                  animation: "slide_from_right",
-                }}
-              />
+              <LocationGate>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: colors.surface },
+                    animation: "slide_from_right",
+                  }}
+                />
+              </LocationGate>
             </View>
           </ToastProvider>
         </AuthProvider>
