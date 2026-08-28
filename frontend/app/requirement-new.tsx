@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Location from "expo-location";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
@@ -31,6 +32,25 @@ export default function RequirementNew() {
   const [quantity, setQuantity] = useState("1");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [gps, setGps] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const perm = await Location.getForegroundPermissionsAsync();
+        let granted = perm.granted;
+        if (!granted && perm.canAskAgain) {
+          granted = (await Location.requestForegroundPermissionsAsync()).granted;
+        }
+        if (granted) {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          setGps(`${loc.coords.latitude.toFixed(6)},${loc.coords.longitude.toFixed(6)}`);
+        }
+      } catch {
+        // location optional — ignore
+      }
+    })();
+  }, []);
 
   const submit = async () => {
     if (!partNumber.trim()) {
@@ -47,6 +67,7 @@ export default function RequirementNew() {
         priority,
         quantity: parseInt(quantity || "1", 10),
         note,
+        gps,
       });
       show("Requirement added", "success");
       router.replace("/(tabs)/requirements" as any);

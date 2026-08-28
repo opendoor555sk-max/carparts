@@ -131,3 +131,9 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Buy screen: added COMPANY chip selector (Maruti Suzuki/Hyundai/Honda/Nissan/Toyota/etc) -> saved to part -> reports group by company. Category field already present.
 - Signup: CONTACT NUMBER now compulsory (backend 422 without it; stored on store + owner user).
 - PENDING (next turn, budget): GPS+contact on inquiry/requirement admin-only tracking; Statistics cards clickable; Common Part Catalog (shared identity); Company picker on Sell too.
+
+## Track Inquiries + Clickable Stats (2026-08-28)
+- Requirement create captures GPS (expo-location) + by_contact (user contact). Admin sees a Call chip (tel:) + View-on-map link (maps.google) on each requirement; hidden for non-admin.
+- Admin STATISTICS cards now clickable -> navigate (Parts->/parts, In Stock->/report stock, Sold->/report sell, Pending Needs->requirements, AI Pending->/ai-approvals, Verified->/parts).
+- Buy has company picker; company flows to reports. Sell/Stock inherit company from the part (set at buy) so reports already group.
+- PENDING: Common Part Catalog (shared part identity across stores + per-store limits move) — dedicated next turn.

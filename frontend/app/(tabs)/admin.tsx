@@ -46,14 +46,14 @@ export default function Admin() {
   const isAdmin = user?.role === "admin";
   const isSuperAdmin = user?.role === "super_admin";
 
-  const statCards: { label: string; value: number; color: string; icon: keyof typeof Ionicons.glyphMap }[] = stats
+  const statCards: { label: string; value: number; color: string; icon: keyof typeof Ionicons.glyphMap; route: string }[] = stats
     ? [
-        { label: "Parts", value: stats.total_parts, color: colors.brand, icon: "documents" },
-        { label: "In Stock", value: stats.in_stock_units, color: colors.success, icon: "cube" },
-        { label: "Sold", value: stats.sold_units, color: colors.info, icon: "cash" },
-        { label: "Pending Needs", value: stats.pending_requirements, color: colors.warning, icon: "list" },
-        { label: "AI Pending", value: stats.pending_ai, color: colors.warning, icon: "sparkles" },
-        { label: "Verified", value: stats.verified_parts, color: colors.success, icon: "shield-checkmark" },
+        { label: "Parts", value: stats.total_parts, color: colors.brand, icon: "documents", route: "/parts" },
+        { label: "In Stock", value: stats.in_stock_units, color: colors.success, icon: "cube", route: "/report?mode=stock" },
+        { label: "Sold", value: stats.sold_units, color: colors.info, icon: "cash", route: "/report?mode=sell" },
+        { label: "Pending Needs", value: stats.pending_requirements, color: colors.warning, icon: "list", route: "/(tabs)/requirements" },
+        { label: "AI Pending", value: stats.pending_ai, color: colors.warning, icon: "sparkles", route: "/ai-approvals" },
+        { label: "Verified", value: stats.verified_parts, color: colors.success, icon: "shield-checkmark", route: "/parts" },
       ]
     : [];
 
@@ -86,11 +86,11 @@ export default function Admin() {
                 <Text style={styles.section}>STATISTICS</Text>
                 <View style={styles.statGrid}>
                   {statCards.map((s) => (
-                    <View key={s.label} style={styles.statCard} testID={`stat-${s.label}`}>
+                    <Pressable key={s.label} style={styles.statCard} onPress={() => router.push(s.route as any)} testID={`stat-${s.label}`}>
                       <Ionicons name={s.icon} size={20} color={s.color} />
                       <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
                       <Text style={styles.statLabel}>{s.label}</Text>
-                    </View>
+                    </Pressable>
                   ))}
                 </View>
               </>

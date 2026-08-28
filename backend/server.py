@@ -369,6 +369,7 @@ class RequirementIn(BaseModel):
     priority: str = "Medium"
     quantity: int = 1
     note: Optional[str] = ""
+    gps: Optional[str] = ""
 
 
 class RequirementUpdate(BaseModel):
@@ -1154,7 +1155,8 @@ async def add_requirement(body: RequirementIn, store_id: Optional[str] = None, u
     sid = resolve_store(user, store_id, require_write=True)
     doc = body.dict()
     doc["part_number"] = doc["part_number"].strip()
-    doc.update({"id": new_id(), "store_id": sid, "status": "Pending", "created_at": now_iso(), "by": user["username"]})
+    doc.update({"id": new_id(), "store_id": sid, "status": "Pending", "created_at": now_iso(),
+                "by": user["username"], "by_contact": user.get("contact", "")})
     await db.requirements.insert_one(dict(doc))
     doc.pop("_id", None)
     return doc

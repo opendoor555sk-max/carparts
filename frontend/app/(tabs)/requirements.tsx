@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Linking } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
@@ -28,6 +29,8 @@ type Req = {
   status: string;
   stock_count?: number;
   note?: string;
+  gps?: string;
+  by_contact?: string;
 };
 
 const STATUSES = ["All", "Pending", "Purchased", "Completed", "Cancelled"];
@@ -37,6 +40,7 @@ export default function Requirements() {
   const router = useRouter();
   const { show } = useToast();
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   const [reqs, setReqs] = useState<Req[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -137,6 +141,22 @@ export default function Requirements() {
                 <Text style={styles.meta}>
                   Qty: {item.quantity} • In stock: {item.stock_count ?? 0}
                 </Text>
+                {isAdmin && (item.by_contact || item.gps) ? (
+                  <View style={styles.trackRow}>
+                    {item.by_contact ? (
+                      <Pressable onPress={() => Linking.openURL(`tel:${item.by_contact}`)} testID={`req-call-${item.id}`} style={styles.trackChip}>
+                        <Ionicons name="call" size={12} color={colors.success} />
+                        <Text style={styles.trackText}>{item.by_contact}</Text>
+                      </Pressable>
+                    ) : null}
+                    {item.gps ? (
+                      <Pressable onPress={() => Linking.openURL(`https://maps.google.com/?q=${item.gps}`)} testID={`req-gps-${item.id}`} style={styles.trackChip}>
+                        <Ionicons name="location" size={12} color={colors.brand} />
+                        <Text style={styles.trackText}>View on map</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
               </View>
               <Pressable onPress={() => cycle(item)} testID={`req-cycle-${item.id}`}>
                 <StatusChip status={item.status} />
@@ -177,4 +197,7 @@ const styles = StyleSheet.create({
   pr: { fontSize: font.sm, fontWeight: "700" },
   name: { color: colors.onSurface3, fontSize: font.base, marginTop: 2 },
   meta: { color: colors.info, fontSize: font.sm, marginTop: spacing.xs },
+  trackRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
+  trackChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  trackText: { color: colors.onSurface3, fontSize: font.sm - 1, fontWeight: "700" },
 });
