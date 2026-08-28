@@ -195,3 +195,10 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - User chose Option A (real photo). Complaints fixed: (1) removed the app-generated QR entirely — the ORIGINAL code stays in the photo (copied), only the part number is overlaid (tpl.code=null; CODE TYPE UI removed). (2) print outline removed (scanner prints with showBorder:false). (3) rotation applied via crop+rotate.
 - Save Templates workflow (their real vision): backend store-scoped CRUD /api/sticker-templates (POST/GET/DELETE) storing {name,bg_data_url(base64),aspect,pn_box,part_number}. Frontend: "Save this sticker for reuse" button + "SAVED STICKERS" horizontal thumbnail row on scan-sticker.tsx; tap a saved thumb -> loads template (bg+pnBox), user types new part number -> prints. Delete via x on thumb. Backend CRUD verified via curl (save/list/delete ok).
 - NOTE: rotation/part_number_box come from gpt-4o-mini and are approximate; best results with a straight, flat, full-frame photo. Full flow native-only (image picker), screen renders on web.
+
+## Scanner REVERTED to clean-generate (B) — user liked the rebuilt version (2026-06 fork)
+- User confirmed the earlier "PREVIEW (rebuilt)" clean white sticker was what they wanted (only junk logo thumbnails were wrong). Reverted from image-overlay back to GENERATION: backend prompt returns {aspect, part_number, lines[{text,bold}], code{type}}. Frontend layoutLines() builds a clean, always-upright, non-overlapping white sticker (font shrinks to fit width; code in right column). NO photo pixels, NO logo crops (brand appears as a text line like "HYUNDAI KIA MOTORS"), so nothing tilts and no photo edges.
+- Editable: part number + every text line + QR/Barcode toggle. Print with showBorder:false (no outline). ~5s via gpt-4o-mini.
+- Save Templates now store JSON.stringify(StickerTemplate) in bg_data_url; openTemplate JSON.parses it back. CRUD unchanged.
+- labelSheet StickerTemplate = {aspect, lines:TplLine[], code:{type,value,box}|null}; templateInner renders typed lines + regenerated code on white cell.
+- NATIVE-only full flow; screen verified rendering on web with no errors.

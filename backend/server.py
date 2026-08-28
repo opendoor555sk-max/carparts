@@ -1752,19 +1752,16 @@ class StickerScanReq(BaseModel):
     image_base64: str  # raw base64 (no data: prefix)
 
 
-STICKER_SCAN_PROMPT = """Look at this product label/sticker photo. The label may be rotated or upside-down. Return ONLY strict JSON (no markdown):
+STICKER_SCAN_PROMPT = """Read this product label/sticker (it may be rotated/upside-down — read it UPRIGHT). Return ONLY strict JSON (no markdown):
 {
-  "rotation": <0|90|180|270 = degrees to rotate the CROPPED label clockwise so its text reads upright>,
-  "sticker": {"x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>},
-  "part_number": "<the main part number value, exact characters (e.g. 954A0-Q6040)>",
-  "part_number_box": {"x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>},
-  "code": {"type": "qr"|"barcode"|"datamatrix", "x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>}
+  "aspect": <sticker width/height ratio, e.g. 1.6>,
+  "part_number": "<the single main part number, exact characters>",
+  "lines": [ {"text": "<one text line>", "bold": <true|false>} ],
+  "code": {"type": "qr"|"barcode"|"datamatrix"}
 }
 Rules:
-- "sticker" = the label's rectangle as % of the WHOLE PHOTO (before rotation).
-- "part_number_box" and "code" = rectangles as % of the UPRIGHT label (after applying rotation). These locate ONLY the part number value text, and the main 2D/void code.
-- If there is no code, use "code": null.
-- part_number = the primary HKMC / P/N value the user will reprint.
+- "lines": EVERY visible text line in top-to-bottom reading order, exact text (include the HYUNDAI KIA MOTORS / brand line as text too). No coordinates.
+- "code": the type of the main 2D/1D code on the label. Use "qr" if unsure.
 - JSON only, no extra text."""
 
 
@@ -1805,10 +1802,9 @@ async def scan_sticker(req: StickerScanReq, user=Depends(get_current_user)):
     except Exception:
         raise HTTPException(502, "AI returned invalid JSON")
     # normalize
-    data.setdefault("rotation", 0)
-    data.setdefault("sticker", {"x": 0, "y": 0, "w": 100, "h": 100})
+    data.setdefault("aspect", 1.6)
     data.setdefault("part_number", "")
-    data.setdefault("part_number_box", None)
+    data.setdefault("lines", [])
     data.setdefault("code", None)
     return data
 

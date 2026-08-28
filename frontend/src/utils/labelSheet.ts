@@ -95,21 +95,19 @@ function escapeHtml(s: any): string {
 }
 
 export type Box = { x: number; y: number; w: number; h: number };
+export type TplLine = { text: string; x: number; y: number; size: number; bold?: boolean };
 export type StickerTemplate = {
-  bgDataUrl: string; // the real cropped, upright sticker image
-  aspect: number; // width / height of the sticker
-  pnBox: Box | null; // where to overlay the new part number
-  pnText: string;
+  aspect: number;
+  lines: TplLine[];
   code: { type: "qr" | "barcode"; value: string; box: Box } | null;
 };
 
-// Overlays the NEW part number + NEW code on top of the ORIGINAL sticker image.
+// Builds a CLEAN white sticker: typed text lines + a regenerated code. No photo pixels.
 function templateInner(tpl: StickerTemplate, hMm: number): string {
-  let out = `<img src="${tpl.bgDataUrl}" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:fill"/>`;
-  if (tpl.pnBox && tpl.pnText) {
-    const b = tpl.pnBox;
-    const fs = Math.max(1, (b.h / 100) * hMm * 0.72); // mm
-    out += `<div style="position:absolute;left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%;background:#fff;display:flex;align-items:center;justify-content:flex-start;overflow:hidden"><span style="font-size:${fs.toFixed(2)}mm;font-weight:800;white-space:nowrap;color:#000;font-family:Arial,Helvetica,sans-serif">${escapeHtml(tpl.pnText)}</span></div>`;
+  let out = "";
+  for (const ln of tpl.lines) {
+    const fs = Math.max(0.8, (ln.size / 100) * hMm); // mm
+    out += `<div style="position:absolute;left:${ln.x}%;top:${ln.y}%;font-size:${fs.toFixed(2)}mm;font-weight:${ln.bold ? 800 : 500};white-space:nowrap;line-height:1;color:#000;font-family:Arial,Helvetica,sans-serif">${escapeHtml(ln.text)}</div>`;
   }
   if (tpl.code && tpl.code.value) {
     const b = tpl.code.box;
@@ -117,7 +115,7 @@ function templateInner(tpl: StickerTemplate, hMm: number): string {
       ? qrSvg(tpl.code.value, { margin: 1 })
       : barcodeSvg(tpl.code.value, { height: 60, moduleWidth: 2, showText: false });
     const pa = tpl.code.type === "qr" ? "" : 'preserveAspectRatio="none"';
-    out += `<div style="position:absolute;left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%;background:#fff;display:flex;align-items:center;justify-content:center;padding:1px">${svg.replace("<svg ", `<svg ${pa} style="width:100%;height:100%" `)}</div>`;
+    out += `<div style="position:absolute;left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%;display:flex;align-items:center;justify-content:center">${svg.replace("<svg ", `<svg ${pa} style="width:100%;height:100%" `)}</div>`;
   }
   return out;
 }
