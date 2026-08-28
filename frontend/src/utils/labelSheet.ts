@@ -67,8 +67,10 @@ function labelInner(c: LabelContent, w: number, h: number): string {
   const wantQr = c.code === "qr" || c.code === "both";
   const pn = (c.partNumber || "").trim();
 
+  // QR is a FIXED 10mm x 10mm square (capped to fit tiny cells) for reliable scanning.
+  const qmm = Math.min(10, h - 1, w - 1);
   const qrBlock = wantQr
-    ? `<div style="flex:0 0 auto;display:flex;align-items:center;justify-content:center">${qrSvg(pn, { margin: 1 }).replace("<svg ", `<svg style="height:${(h * 0.5).toFixed(1)}mm;width:auto" `)}</div>`
+    ? `<div style="flex:0 0 auto;display:flex;align-items:center;justify-content:center">${qrSvg(pn, { margin: 1 }).replace("<svg ", `<svg style="height:${qmm.toFixed(1)}mm;width:${qmm.toFixed(1)}mm" `)}</div>`
     : "";
   const barBlock = wantBar
     ? `<div style="flex:0 0 auto;width:96%;display:flex;align-items:center;justify-content:center">${barcodeSvg(pn, { height: 60, moduleWidth: 2, showText: false }).replace("<svg ", `<svg preserveAspectRatio="none" style="width:100%;height:${Math.min(h * 0.32, 12)}mm" `)}</div>`
@@ -82,7 +84,7 @@ function labelInner(c: LabelContent, w: number, h: number): string {
   if (both) {
     // qr left, text+barcode right
     return `<div style="width:100%;height:100%;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:1mm;padding:0.8mm;box-sizing:border-box">
-      <div style="flex:0 0 auto;height:100%;display:flex;align-items:center">${qrSvg(pn, { margin: 1 }).replace("<svg ", `<svg style="height:${h * 0.7}mm;width:auto" `)}</div>
+      <div style="flex:0 0 auto;height:100%;display:flex;align-items:center">${qrSvg(pn, { margin: 1 }).replace("<svg ", `<svg style="height:${qmm.toFixed(1)}mm;width:${qmm.toFixed(1)}mm" `)}</div>
       <div style="flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.4mm;overflow:hidden">${l1}${pnBlock}${barBlock}${l2}</div>
     </div>`;
   }
@@ -106,7 +108,7 @@ export type StickerTemplate = {
 };
 
 // Builds a CLEAN white sticker: typed text lines + a regenerated code. No photo pixels.
-function templateInner(tpl: StickerTemplate, hMm: number): string {
+function templateInner(tpl: StickerTemplate, wMm: number, hMm: number): string {
   let out = "";
   if (tpl.logo && tpl.logo.dataUrl) {
     const b = tpl.logo.box;
@@ -117,12 +119,16 @@ function templateInner(tpl: StickerTemplate, hMm: number): string {
     out += `<div style="position:absolute;left:${ln.x}%;top:${ln.y}%;font-size:${fs.toFixed(2)}mm;font-weight:${ln.bold ? 800 : 500};white-space:nowrap;line-height:1;color:#000;font-family:Arial,Helvetica,sans-serif">${escapeHtml(ln.text)}</div>`;
   }
   if (tpl.code && tpl.code.value) {
-    const b = tpl.code.box;
-    const svg = tpl.code.type === "qr"
-      ? qrSvg(tpl.code.value, { margin: 1 })
-      : barcodeSvg(tpl.code.value, { height: 60, moduleWidth: 2, showText: false });
-    const pa = tpl.code.type === "qr" ? "" : 'preserveAspectRatio="none"';
-    out += `<div style="position:absolute;left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%;display:flex;align-items:center;justify-content:center">${svg.replace("<svg ", `<svg ${pa} style="width:100%;height:100%" `)}</div>`;
+    if (tpl.code.type === "qr") {
+      // FIXED 10mm x 10mm QR (capped to fit), right side, vertically centered.
+      const qmm = Math.min(10, hMm - 1, wMm - 2);
+      const svg = qrSvg(tpl.code.value, { margin: 1 });
+      out += `<div style="position:absolute;right:2mm;top:${((hMm - qmm) / 2).toFixed(2)}mm;width:${qmm.toFixed(2)}mm;height:${qmm.toFixed(2)}mm;display:flex;align-items:center;justify-content:center">${svg.replace("<svg ", `<svg style="width:100%;height:100%" `)}</div>`;
+    } else {
+      const b = tpl.code.box;
+      const svg = barcodeSvg(tpl.code.value, { height: 60, moduleWidth: 2, showText: false });
+      out += `<div style="position:absolute;left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%;display:flex;align-items:center;justify-content:center">${svg.replace("<svg ", `<svg preserveAspectRatio="none" style="width:100%;height:100%" `)}</div>`;
+    }
   }
   return out;
 }
@@ -161,5 +167,5 @@ export function generateSheetHtml(content: LabelContent, opts: SheetOptions): st
 }
 
 export function generateRichStickerSheetHtml(tpl: StickerTemplate, opts: SheetOptions): string {
-  return buildSheet(opts, (_w, h) => templateInner(tpl, h));
+  return buildSheet(opts, (w, h) => templateInner(tpl, w, h));
 }

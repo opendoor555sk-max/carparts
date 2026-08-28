@@ -239,9 +239,22 @@ export default function ScanSticker() {
                 <Image source={{ uri: tpl.logo.dataUrl }} resizeMode="contain" style={{ position: "absolute", left: (tpl.logo.box.x / 100) * PREVIEW_W, top: (tpl.logo.box.y / 100) * previewH, width: (tpl.logo.box.w / 100) * PREVIEW_W, height: (tpl.logo.box.h / 100) * previewH }} />
               ) : null}
               {tpl.code && codeSvg ? (
-                <View style={{ position: "absolute", left: (tpl.code.box.x / 100) * PREVIEW_W, top: (tpl.code.box.y / 100) * previewH, width: (tpl.code.box.w / 100) * PREVIEW_W, height: (tpl.code.box.h / 100) * previewH }}>
-                  <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio={codeType === "qr" ? "xMidYMid meet" : "none"} />
-                </View>
+                codeType === "qr" ? (
+                  (() => {
+                    const qpx = Math.min(previewH - 4, (10 / layout.h) * previewH);
+                    const left = PREVIEW_W - qpx - (2 / layout.w) * PREVIEW_W;
+                    const top = (previewH - qpx) / 2;
+                    return (
+                      <View style={{ position: "absolute", left, top, width: qpx, height: qpx }}>
+                        <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
+                      </View>
+                    );
+                  })()
+                ) : (
+                  <View style={{ position: "absolute", left: (tpl.code.box.x / 100) * PREVIEW_W, top: (tpl.code.box.y / 100) * previewH, width: (tpl.code.box.w / 100) * PREVIEW_W, height: (tpl.code.box.h / 100) * previewH }}>
+                    <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio="none" />
+                  </View>
+                )
               ) : null}
               {tpl.lines.map((ln, i) => (
                 <Text key={i} numberOfLines={1} style={{ position: "absolute", left: (ln.x / 100) * PREVIEW_W, top: (ln.y / 100) * previewH, fontSize: Math.max(6, (ln.size / 100) * previewH), fontWeight: ln.bold ? "800" : "500", color: "#000" }}>{ln.text}</Text>
