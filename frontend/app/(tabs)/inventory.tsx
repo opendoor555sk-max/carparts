@@ -16,7 +16,7 @@ import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { ConfirmModal, Header, StatusChip, Loading, EmptyState, FilterChip } from "@/src/components/ui";
-import { printInventory } from "@/src/utils/print";
+import { printInventory, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type Unit = {
@@ -106,7 +106,7 @@ export default function Inventory() {
         right={
           units.length ? (
             <Pressable
-              onPress={() => printInventory(user?.store_name || "", units)}
+              onPress={async () => printInventory(await brandingFromUser(user), units)}
               hitSlop={12}
               testID="print-inventory"
             >

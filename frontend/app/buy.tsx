@@ -23,7 +23,7 @@ import { api, fileUrl, uploadImage } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { Button, Card, Field, Header, LimitBar, Loading, StatusChip } from "@/src/components/ui";
-import { printReceipt } from "@/src/utils/print";
+import { printReceipt, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 const CONDITIONS = ["Working", "Testing", "Repairable", "Damaged", "Incomplete", "Scrap", "Unknown"];
@@ -404,8 +404,8 @@ export default function Buy() {
         <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
           <Button
             title="Print Slip"
-            onPress={() =>
-              printReceipt(user?.store_name || "", "BUY", {
+            onPress={async () =>
+              printReceipt(await brandingFromUser(user), "BUY", {
                 part_number: partNumber,
                 name,
                 condition,

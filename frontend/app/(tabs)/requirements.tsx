@@ -15,7 +15,7 @@ import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { Header, StatusChip, Loading, EmptyState, FilterChip } from "@/src/components/ui";
-import { printRequirements } from "@/src/utils/print";
+import { printRequirements, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type Req = {
@@ -81,7 +81,7 @@ export default function Requirements() {
         right={
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
             {reqs.length ? (
-              <Pressable onPress={() => printRequirements(user?.store_name || "", reqs)} hitSlop={10} testID="print-requirements">
+              <Pressable onPress={async () => printRequirements(await brandingFromUser(user), reqs)} hitSlop={10} testID="print-requirements">
                 <Ionicons name="print" size={22} color={colors.brand} />
               </Pressable>
             ) : null}

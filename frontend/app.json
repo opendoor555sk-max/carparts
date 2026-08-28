@@ -25,7 +25,13 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.emergent.partnumberfirst.eepol0",
-      "permissions": ["CAMERA", "USE_BIOMETRIC", "USE_FINGERPRINT", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+      "permissions": [
+        "CAMERA",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -61,7 +67,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#000000"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true

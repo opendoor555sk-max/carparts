@@ -9,7 +9,7 @@ import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { Button, Card, Field, Header, Loading, StatusChip, EmptyState } from "@/src/components/ui";
-import { printReceipt } from "@/src/utils/print";
+import { printReceipt, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 export default function Sell() {
@@ -139,9 +139,9 @@ export default function Sell() {
           <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
             <Button
               title="Print Bill"
-              onPress={() => {
+              onPress={async () => {
                 const u = units.find((x: any) => x.id === selectedUnit) || units[0];
-                printReceipt(user?.store_name || "", "SELL", {
+                printReceipt(await brandingFromUser(user), "SELL", {
                   part_number: partNumber,
                   name: part?.name,
                   condition: u?.condition,

@@ -1,13 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { EmptyState, FilterChip, Header, Loading, StatusChip } from "@/src/components/ui";
-import { printReport } from "@/src/utils/print";
+import { printReport, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type Item = {
@@ -26,24 +27,18 @@ type Item = {
 type Mode = "buy" | "sell" | "stock";
 
 const RANGES = [
-  { key: "all", label: "બધું" },
-  { key: "month", label: "આ મહિનો" },
-  { key: "year", label: "આ વર્ષ" },
-  { key: "today", label: "આજ" },
+  { key: "all", label: "All" },
+  { key: "month", label: "This Month" },
+  { key: "year", label: "This Year" },
+  { key: "today", label: "Today" },
+  { key: "custom", label: "Custom" },
 ];
 
-function rangeDates(key: string): { from?: string; to?: string } {
-  const now = new Date();
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
-  if (key === "today") return { from: iso(now), to: iso(now) };
-  if (key === "month") return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(now) };
-  if (key === "year") return { from: iso(new Date(now.getFullYear(), 0, 1)), to: iso(now) };
-  return {};
-}
+const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 const TITLES: Record<Mode, string> = {
-  buy: "ખરીદેલો માલ (Purchases)",
-  sell: "વેચેલો માલ (Sales)",
+  buy: "Purchases",
+  sell: "Sales",
   stock: "Stock Report",
 };
 
@@ -60,11 +55,23 @@ export default function Report() {
   const [range, setRange] = useState("all");
   const [company, setCompany] = useState("All");
   const [category, setCategory] = useState("All");
+  const [customFrom, setCustomFrom] = useState(iso(new Date()));
+  const [customTo, setCustomTo] = useState(iso(new Date()));
+  const [picker, setPicker] = useState<null | "from" | "to">(null);
+
+  const resolveRange = useCallback((): { from?: string; to?: string } => {
+    const now = new Date();
+    if (range === "today") return { from: iso(now), to: iso(now) };
+    if (range === "month") return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(now) };
+    if (range === "year") return { from: iso(new Date(now.getFullYear(), 0, 1)), to: iso(now) };
+    if (range === "custom") return { from: customFrom, to: customTo };
+    return {};
+  }, [range, customFrom, customTo]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { from, to } = rangeDates(range);
+      const { from, to } = resolveRange();
       const params = new URLSearchParams();
       if (from) params.set("date_from", from);
       if (to) params.set("date_to", to);
@@ -82,7 +89,7 @@ export default function Report() {
     } finally {
       setLoading(false);
     }
-  }, [m, range, company, category, show]);
+  }, [m, resolveRange, company, category, show]);
 
   useFocusEffect(
     useCallback(() => {
@@ -90,7 +97,6 @@ export default function Report() {
     }, [load]),
   );
 
-  // distinct chips from data
   const companies = useMemo(() => {
     const s = new Set<string>();
     items.forEach((i) => s.add(i.company || "All"));
@@ -102,7 +108,6 @@ export default function Report() {
     return ["All", ...Array.from(s).sort()];
   }, [items]);
 
-  // group Company -> Category
   const sections = useMemo(() => {
     const g: Record<string, Record<string, Item[]>> = {};
     for (const it of items) {
@@ -123,10 +128,7 @@ export default function Report() {
     return rows;
   }, [items]);
 
-  const total = useMemo(
-    () => items.reduce((s, t) => s + (Number(t.price) || 0), 0),
-    [items],
-  );
+  const total = useMemo(() => items.reduce((s, t) => s + (Number(t.price) || 0), 0), [items]);
 
   return (
     <View style={styles.flex}>
@@ -137,7 +139,7 @@ export default function Report() {
         right={
           items.length ? (
             <Pressable
-              onPress={() => printReport(user?.store_name || "", TITLES[m], items, showPrice && m !== "stock")}
+              onPress={async () => printReport(await brandingFromUser(user), TITLES[m], items, showPrice && m !== "stock")}
               testID="print-report"
             >
               <Ionicons name="print" size={22} color={colors.brand} />
@@ -147,19 +149,61 @@ export default function Report() {
       />
 
       <View style={styles.filters}>
-        <Text style={styles.flabel}>તારીખ</Text>
+        <Text style={styles.flabel}>DATE</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {RANGES.map((r) => (
             <FilterChip key={r.key} label={r.label} active={range === r.key} onPress={() => setRange(r.key)} testID={`range-${r.key}`} />
           ))}
         </ScrollView>
-        <Text style={styles.flabel}>Company</Text>
+
+        {range === "custom" ? (
+          <View style={styles.customRow}>
+            {Platform.OS === "web" ? (
+              <>
+                <TextInput style={styles.dateInput} value={customFrom} onChangeText={setCustomFrom} placeholder="YYYY-MM-DD" placeholderTextColor={colors.info} testID="date-from" />
+                <Text style={styles.toSep}>to</Text>
+                <TextInput style={styles.dateInput} value={customTo} onChangeText={setCustomTo} placeholder="YYYY-MM-DD" placeholderTextColor={colors.info} testID="date-to" />
+                <Pressable style={styles.applyBtn} onPress={load} testID="apply-custom">
+                  <Text style={styles.applyText}>Apply</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable style={styles.dateBtn} onPress={() => setPicker("from")} testID="date-from">
+                  <Ionicons name="calendar" size={15} color={colors.brand} />
+                  <Text style={styles.dateBtnText}>{customFrom}</Text>
+                </Pressable>
+                <Text style={styles.toSep}>to</Text>
+                <Pressable style={styles.dateBtn} onPress={() => setPicker("to")} testID="date-to">
+                  <Ionicons name="calendar" size={15} color={colors.brand} />
+                  <Text style={styles.dateBtnText}>{customTo}</Text>
+                </Pressable>
+                <Pressable style={styles.applyBtn} onPress={load} testID="apply-custom">
+                  <Text style={styles.applyText}>Apply</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        ) : null}
+
+        {picker ? (
+          <DateTimePicker
+            value={new Date(picker === "from" ? customFrom : customTo)}
+            mode="date"
+            onChange={(_e, d) => {
+              setPicker(null);
+              if (d) (picker === "from" ? setCustomFrom : setCustomTo)(iso(d));
+            }}
+          />
+        ) : null}
+
+        <Text style={styles.flabel}>COMPANY</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {companies.map((c) => (
             <FilterChip key={c} label={c} active={company === c} onPress={() => setCompany(c)} testID={`co-${c}`} />
           ))}
         </ScrollView>
-        <Text style={styles.flabel}>Category</Text>
+        <Text style={styles.flabel}>CATEGORY</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {categories.map((c) => (
             <FilterChip key={c} label={c} active={category === c} onPress={() => setCategory(c)} testID={`cat-${c}`} />
@@ -170,12 +214,12 @@ export default function Report() {
       {loading ? (
         <Loading />
       ) : items.length === 0 ? (
-        <EmptyState icon="documents-outline" title="કંઈ મળ્યું નથી" subtitle="બીજી તારીખ/company/category અજમાવો" />
+        <EmptyState icon="documents-outline" title="Nothing found" subtitle="Try another date / company / category" />
       ) : (
         <>
           <View style={styles.summary}>
             <Text style={styles.summaryText}>{items.length} items</Text>
-            {showPrice && m !== "stock" ? <Text style={styles.summaryTotal}>Total ₹{total}</Text> : null}
+            {showPrice && m !== "stock" ? <Text style={styles.summaryTotal}>Total Rs.{total}</Text> : null}
           </View>
           <FlatList
             data={sections}
@@ -202,12 +246,12 @@ export default function Report() {
                     <Text style={styles.pn}>{it.part_number}</Text>
                     {it.part_name ? <Text style={styles.name}>{it.part_name}</Text> : null}
                     <Text style={styles.meta}>
-                      {(it.at || it.created_at) ? new Date(it.at || it.created_at || "").toLocaleDateString() : ""}
+                      {it.at || it.created_at ? new Date(it.at || it.created_at || "").toLocaleDateString() : ""}
                       {it.buyer ? `  •  ${it.buyer}` : ""}
                     </Text>
                   </View>
                   {it.condition ? <StatusChip status={it.condition} /> : null}
-                  {showPrice && it.price != null ? <Text style={styles.price}>₹{it.price}</Text> : null}
+                  {showPrice && it.price != null ? <Text style={styles.price}>Rs.{it.price}</Text> : null}
                 </View>
               );
             }}
@@ -223,6 +267,13 @@ const styles = StyleSheet.create({
   filters: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.divider },
   flabel: { color: colors.info, fontSize: font.sm - 1, fontWeight: "800", letterSpacing: 0.5, paddingHorizontal: spacing.lg, marginTop: spacing.xs },
   chipRow: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.xs },
+  customRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.xs },
+  dateBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  dateBtnText: { color: colors.onSurface, fontSize: font.sm, fontWeight: "700" },
+  dateInput: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.sm },
+  toSep: { color: colors.info, fontSize: font.sm },
+  applyBtn: { backgroundColor: colors.brand, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  applyText: { color: colors.onBrand, fontWeight: "800", fontSize: font.sm },
   summary: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   summaryText: { color: colors.info, fontSize: font.base, fontWeight: "700" },
   summaryTotal: { color: colors.success, fontSize: font.lg, fontWeight: "800" },
@@ -230,16 +281,7 @@ const styles = StyleSheet.create({
   coText: { color: colors.brand, fontSize: font.base, fontWeight: "800", letterSpacing: 0.5 },
   catText: { color: colors.onSurface3, fontSize: font.sm, fontWeight: "800", marginTop: spacing.xs, marginLeft: spacing.sm },
   catCount: { color: colors.info, fontWeight: "700" },
-  itemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    backgroundColor: colors.surface2,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
+  itemRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
   pn: { color: colors.onSurface, fontSize: font.base, fontWeight: "800", letterSpacing: 0.5 },
   name: { color: colors.onSurface3, fontSize: font.sm, marginTop: 1 },
   meta: { color: colors.info, fontSize: font.sm - 1, marginTop: 2 },

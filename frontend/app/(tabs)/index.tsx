@@ -17,7 +17,7 @@ import { FilterChip } from "@/src/components/ui";
 import { storage } from "@/src/utils/storage";
 import { colors, font, radius, spacing } from "@/src/theme";
 
-const COMPANIES = ["All", "Hyundai+Kia", "Maruti", "Tata", "Mahindra"];
+const COMPANIES = ["All", "Maruti Suzuki", "Hyundai", "Tata", "Mahindra", "Kia", "Toyota", "Honda", "Nissan", "Renault", "Ford", "Volkswagen", "Skoda", "MG", "Datsun", "Chevrolet"];
 
 type Module = {
   key: string;
@@ -72,7 +72,7 @@ export default function Home() {
     <View style={styles.flex}>
       <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.hello}>સ્વાગત છે,</Text>
+          <Text style={styles.hello}>Welcome,</Text>
           <Text style={styles.name}>{user?.name}</Text>
         </View>
         <View style={styles.syncPill} testID="sync-pill">
@@ -133,16 +133,16 @@ export default function Home() {
         <View style={styles.hintBox}>
           <Ionicons name="information-circle" size={18} color={colors.brand} />
           <Text style={styles.hintText}>
-            SEARCH, BUY, SELL કદી mix નહીં — દરેક અલગ module. Primary ID = Part Number.
+            SEARCH, BUY, SELL are never mixed — each is a separate module. Primary ID = Part Number.
           </Text>
         </View>
 
-        <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>REPORTS — રિપોર્ટ</Text>
+        <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>REPORTS</Text>
         <View style={{ gap: spacing.md }}>
           {[
-            { key: "buy", title: "ખરીદેલો માલ", sub: "બધી ખરીદી — તારીખ/company/category + Print", icon: "download" as const, color: colors.success },
-            { key: "sell", title: "વેચેલો માલ", sub: "બધું વેચાણ — તારીખ/company/category + Print", icon: "cash" as const, color: colors.brand },
-            { key: "stock", title: "Stock રિપોર્ટ", sub: "હાલનો સ્ટોક — company/category પ્રમાણે + Print", icon: "cube" as const, color: colors.info },
+            { key: "buy", title: "Purchases", sub: "All buys — date / company / category + Print", icon: "download" as const, color: colors.success },
+            { key: "sell", title: "Sales", sub: "All sales — date / company / category + Print", icon: "cash" as const, color: colors.brand },
+            { key: "stock", title: "Stock Report", sub: "Current stock by company / category + Print", icon: "cube" as const, color: colors.info },
           ].map((r) => (
             <Pressable
               key={r.key}

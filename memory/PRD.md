@@ -112,3 +112,9 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Filters: date range presets (all/month/year/today), Company chips, Category chips. Grouped Company -> Category -> Part Number, with date.
 - Print via printReport() (grouped HTML). Print also on Buy/Sell/Inventory/Needs/History.
 - Backend: /transactions and /inventory now accept date_from,date_to,company,category and return company+category (joined from parts). Store-scoped.
+
+## Branding + Date Picker + Companies + English (2026-08-28)
+- Store branding: stores collection gets gst/phone/address/logo_path. GET/POST /api/store/profile. public_user + _attach_store return store_gst/phone/address/logo. New /store-profile.tsx (Admin > Store Profile). print.ts header now shows logo+GST+phone+address (brandingFromUser(user)).
+- Report: custom from-to date range — native calendar (@react-native-community/datetimepicker) + web text inputs. All print funcs now take Branding object.
+- COMPANIES expanded to real English names incl Honda, Nissan, Toyota etc (backend + home).
+- English: report.tsx, store-profile.tsx, home REPORTS + welcome + hint, all print output. PENDING: older screens (buy/sell/inventory/admin/login) still have some Gujarati — convert next on user confirm.

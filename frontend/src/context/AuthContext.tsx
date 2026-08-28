@@ -12,6 +12,10 @@ export type User = {
   role: "admin" | "staff" | "super_admin";
   store_id?: string | null;
   store_name?: string;
+  store_gst?: string;
+  store_phone?: string;
+  store_address?: string;
+  store_logo?: string;
   permissions: string[];
   disabled?: boolean;
 };

@@ -96,7 +96,9 @@ ALL_PERMISSIONS = [
 ]
 STAFF_DEFAULT = ["search", "buy", "sell", "requirement", "manage_parts"]
 
-COMPANIES = ["Hyundai+Kia", "Maruti", "Tata", "Mahindra", "All"]
+COMPANIES = ["All", "Maruti Suzuki", "Hyundai", "Tata", "Mahindra", "Kia", "Toyota", "Honda",
+             "Nissan", "Renault", "Ford", "Volkswagen", "Skoda", "MG", "Datsun", "Chevrolet",
+             "Fiat", "Jeep", "Citroen", "Isuzu"]
 
 CATEGORY_MASTER = [
     {"group": "Control Modules", "items": [
@@ -178,8 +180,21 @@ def public_user(u: dict) -> dict:
     perms = ALL_PERMISSIONS if u["role"] in ("admin", "super_admin") else u.get("permissions", [])
     return {"id": u["id"], "name": u["name"], "username": u["username"], "role": u["role"],
             "store_id": u.get("store_id"), "store_name": u.get("store_name", ""),
+            "store_gst": u.get("store_gst", ""), "store_phone": u.get("store_phone", ""),
+            "store_address": u.get("store_address", ""), "store_logo": u.get("store_logo", ""),
             "permissions": perms, "disabled": u.get("disabled", False),
             "has_google_key": bool(u.get("google_api_key") and u.get("google_cx"))}
+
+
+async def _attach_store(user: dict) -> None:
+    if user.get("store_id"):
+        store = await db.stores.find_one({"id": user["store_id"]}, {"_id": 0})
+        if store:
+            user["store_name"] = store.get("name", "")
+            user["store_gst"] = store.get("gst", "")
+            user["store_phone"] = store.get("phone", "")
+            user["store_address"] = store.get("address", "")
+            user["store_logo"] = store.get("logo_path", "")
 
 
 async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
@@ -194,10 +209,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
     if not user or user.get("disabled"):
         raise HTTPException(401, "User not found or disabled")
-    # attach store name for convenience
-    if user.get("store_id") and not user.get("store_name"):
-        store = await db.stores.find_one({"id": user["store_id"]}, {"_id": 0, "name": 1})
-        user["store_name"] = (store or {}).get("name", "")
+    await _attach_store(user)
     return user
 
 
@@ -478,9 +490,7 @@ async def login(body: LoginIn):
         raise HTTPException(401, "ખોટું username અથવા password")
     if user.get("disabled"):
         raise HTTPException(403, "User disabled")
-    if user.get("store_id"):
-        store = await db.stores.find_one({"id": user["store_id"]}, {"_id": 0, "name": 1})
-        user["store_name"] = (store or {}).get("name", "")
+    await _attach_store(user)
     return {"access_token": make_token(user), "token_type": "bearer", "user": public_user(user)}
 
 
@@ -521,6 +531,30 @@ async def save_settings(body: ApiSettingsIn, user=Depends(get_current_user)):
         await db.users.update_one({"id": user["id"]}, {"$set": updates})
     fresh = await db.users.find_one({"id": user["id"]})
     return {"ok": True, "google_cx": fresh.get("google_cx", ""), "has_google_key": bool(fresh.get("google_api_key"))}
+
+
+class StoreProfileIn(BaseModel):
+    name: Optional[str] = None
+    gst: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    logo_path: Optional[str] = None
+
+
+@api.get("/store/profile")
+async def get_store_profile(user=Depends(require_admin)):
+    sid = resolve_store(user, None, require_write=True)
+    s = await db.stores.find_one({"id": sid}, {"_id": 0})
+    return s or {}
+
+
+@api.post("/store/profile")
+async def set_store_profile(body: StoreProfileIn, user=Depends(require_admin)):
+    sid = resolve_store(user, None, require_write=True)
+    upd = {k: v for k, v in body.dict().items() if v is not None}
+    if upd:
+        await db.stores.update_one({"id": sid}, {"$set": upd})
+    return await db.stores.find_one({"id": sid}, {"_id": 0})
 
 
 # ---------------- BYO-Key Google Custom Search + keyword autofill ----------------

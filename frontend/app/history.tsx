@@ -9,7 +9,7 @@ import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { ConfirmModal, EmptyState, FilterChip, Header, Loading } from "@/src/components/ui";
-import { printHistory } from "@/src/utils/print";
+import { printReport, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type Txn = {
@@ -85,7 +85,7 @@ export default function History() {
         right={
           txns.length > 0 ? (
             <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.lg }}>
-              <Pressable onPress={() => printHistory(user?.store_name || "", tab, txns)} testID="print-history">
+              <Pressable onPress={async () => printReport(await brandingFromUser(user), tab === "buy" ? "Purchase History" : "Sale History", txns, true)} testID="print-history">
                 <Ionicons name="print" size={22} color={colors.brand} />
               </Pressable>
               <Pressable onPress={toggleAll} testID="select-all">

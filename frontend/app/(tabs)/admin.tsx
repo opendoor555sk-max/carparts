@@ -188,6 +188,22 @@ export default function Admin() {
             ) : null}
 
             <Text style={[styles.section, { marginTop: spacing.xl }]}>ACCOUNT</Text>
+            {isAdmin ? (
+              <Pressable
+                style={[styles.link, { marginBottom: spacing.md }]}
+                onPress={() => router.push("/store-profile" as any)}
+                testID="admin-link-store-profile"
+              >
+                <View style={styles.linkIcon}>
+                  <Ionicons name="storefront" size={22} color={colors.brand} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.linkTitle}>Store Profile / Branding</Text>
+                  <Text style={styles.linkSub}>Logo, GST number, phone for receipts</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.info} />
+              </Pressable>
+            ) : null}
             <Pressable
               style={styles.link}
               onPress={() => router.push("/change-password" as any)}
