@@ -335,6 +335,51 @@ def sq(user: dict, extra: Optional[dict] = None, store_id_param: Optional[str] =
     return q
 
 
+# ---------------- Common Part Catalog (global, shared identity) ----------------
+# The IDENTITY of a part (part number, name, company, category, compatibility) is shared
+# GLOBALLY across all stores to build an ever-growing cross-referenced database.
+# Stock / purchases / sales / limits stay PRIVATE per store (in db.parts / db.stock).
+CATALOG_FIELDS = ["name", "company", "category", "compatible_vehicles",
+                  "variant", "year", "old_number", "new_number"]
+
+
+def _nonempty(v) -> bool:
+    if v is None:
+        return False
+    if isinstance(v, str):
+        s = v.strip()
+        return s != "" and s.lower() != "all"
+    if isinstance(v, list):
+        return len(v) > 0
+    return True
+
+
+async def upsert_catalog(part_number: str, src: dict, store_id: Optional[str] = None) -> None:
+    """Enrich the global catalog with a part's identity. Only fills fields that are
+    currently empty/missing globally, so one store never clobbers another's good data."""
+    pn = (part_number or "").strip()
+    if not pn:
+        return
+    existing = await db.catalog.find_one({"part_number": pn})
+    set_fields: Dict[str, Any] = {}
+    for f in CATALOG_FIELDS:
+        val = src.get(f)
+        if _nonempty(val) and (not existing or not _nonempty(existing.get(f))):
+            set_fields[f] = val.strip() if isinstance(val, str) else val
+    if existing:
+        if set_fields:
+            set_fields["updated_at"] = now_iso()
+            await db.catalog.update_one({"part_number": pn}, {"$set": set_fields})
+    else:
+        doc = {"part_number": pn, "created_at": now_iso(), "updated_at": now_iso(),
+               "first_store": store_id, **set_fields}
+        try:
+            await db.catalog.insert_one(doc)
+        except Exception:
+            if set_fields:
+                await db.catalog.update_one({"part_number": pn}, {"$set": set_fields})
+
+
 # ---------------- Models ----------------
 class LoginIn(BaseModel):
     username: str
@@ -497,6 +542,18 @@ async def startup():
         await db.parts.create_index([("store_id", 1), ("part_number", 1)], unique=True, sparse=True)
     except Exception as e:
         logger.warning(f"parts index create warning: {e}")
+
+    # Common Part Catalog: global shared identity keyed by part_number.
+    try:
+        await db.catalog.create_index("part_number", unique=True)
+    except Exception as e:
+        logger.warning(f"catalog index create warning: {e}")
+    # Backfill catalog from any existing per-store parts (idempotent enrich-only).
+    try:
+        async for p in db.parts.find({}, {"_id": 0}):
+            await upsert_catalog(p.get("part_number", ""), p, p.get("store_id"))
+    except Exception as e:
+        logger.warning(f"catalog backfill warning: {e}")
 
     # Super Admin (app developer / god-view). Existing 'abdul' is upgraded to super_admin.
     sa_username = os.environ.get("ADMIN_USERNAME", "abdul").lower()
@@ -897,17 +954,21 @@ async def part_status(store_id: Optional[str], part_number: str) -> dict:
     known = await db.known_parts.find_one({**base, "part_number": part_number}, {"_id": 0})
     requirement = await db.requirements.find_one(
         {**base, "part_number": part_number, "status": {"$in": ["Pending", "Purchased"]}}, {"_id": 0})
+    catalog = await db.catalog.find_one({"part_number": part_number}, {"_id": 0})
     if stock_count > 0:
         status = "IN STOCK"
     elif requirement:
         status = "REQUIREMENT"
     elif part or known:
         status = "KNOWN PART"
+    elif catalog:
+        status = "IN CATALOG"
     else:
         status = "NEW PART"
     return {
         "status": status, "part_number": part_number, "part": part,
         "stock_count": stock_count, "known": known, "requirement": requirement,
+        "catalog": catalog,
     }
 
 
@@ -963,6 +1024,7 @@ async def create_part(body: PartCreate, store_id: Optional[str] = None, user=Dep
     })
     await db.parts.insert_one(doc)
     doc.pop("_id", None)
+    await upsert_catalog(pn, doc, sid)
     return doc
 
 
@@ -989,7 +1051,18 @@ async def update_part(part_number: str, body: PartUpdate, store_id: Optional[str
     r = await db.parts.update_one(sq(user, {"part_number": part_number}, store_id), {"$set": updates})
     if r.matched_count == 0:
         raise HTTPException(404, "Part not found")
+    await upsert_catalog(part_number.strip(), updates, resolve_store(user, store_id))
     return await db.parts.find_one(sq(user, {"part_number": part_number}, store_id), {"_id": 0})
+
+
+@api.get("/catalog/{part_number}")
+async def get_catalog(part_number: str, user=Depends(get_current_user)):
+    """Global shared part identity (enrichment) — same across every store."""
+    pn = part_number.strip()
+    doc = await db.catalog.find_one({"part_number": pn}, {"_id": 0})
+    if not doc:
+        return {"found": False, "part_number": pn}
+    return {"found": True, **doc}
 
 
 # ---------------- Buy (increases stock) ----------------
@@ -1001,16 +1074,22 @@ async def buy(body: BuyIn, store_id: Optional[str] = None, user=Depends(require(
     sid = resolve_store(user, store_id, require_write=True)
     part = await db.parts.find_one({"store_id": sid, "part_number": pn}, {"_id": 0})
     if not part:
+        cat = await db.catalog.find_one({"part_number": pn}, {"_id": 0}) or {}
+        comp = body.company if _nonempty(body.company) else cat.get("company")
         part = {
-            "id": new_id(), "store_id": sid, "part_number": pn, "company": body.company or "All",
-            "name": body.name or "", "category": body.category or "",
-            "compatible_vehicles": body.compatible_vehicles or [], "variant": body.variant or "",
-            "year": "", "old_number": "", "new_number": "", "barcode": body.barcode or "",
+            "id": new_id(), "store_id": sid, "part_number": pn, "company": comp or "All",
+            "name": body.name or cat.get("name", "") or "",
+            "category": body.category or cat.get("category", "") or "",
+            "compatible_vehicles": body.compatible_vehicles or cat.get("compatible_vehicles", []) or [],
+            "variant": body.variant or cat.get("variant", "") or "",
+            "year": cat.get("year", "") or "", "old_number": cat.get("old_number", "") or "",
+            "new_number": cat.get("new_number", "") or "", "barcode": body.barcode or "",
             "sticker_color": "", "technical_info": "", "photos": [], "source": "Buy",
             "verification_status": "Unverified", "created_at": now_iso(),
             "created_by": user["username"], "purchase_limit": None, "limit_enabled": False,
         }
         await db.parts.insert_one(dict(part))
+        await upsert_catalog(pn, part, sid)
     else:
         fill: Dict[str, Any] = {}
         if body.name and not part.get("name"):
@@ -1025,6 +1104,7 @@ async def buy(body: BuyIn, store_id: Optional[str] = None, user=Depends(require(
             fill["variant"] = body.variant
         if fill:
             await db.parts.update_one({"store_id": sid, "part_number": pn}, {"$set": fill})
+        await upsert_catalog(pn, {**part, **fill}, sid)
     limit = await compute_limit(sid, pn)
     if limit["limit_enabled"] and limit["remaining"] is not None and limit["remaining"] <= 0 and not body.override:
         raise HTTPException(409, detail={"code": "LIMIT_REACHED", "message": "DO NOT BUY — purchase limit reached",

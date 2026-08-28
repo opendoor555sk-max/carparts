@@ -57,6 +57,7 @@ export const statusColor = (status: string): { bg: string; fg: string; border: s
     case "Scrap":
       return { bg: "#3a0f0d", fg: colors.error, border: colors.error };
     case "KNOWN PART":
+    case "IN CATALOG":
     case "Unverified":
     case "ALREADY IN STOCK":
     default:

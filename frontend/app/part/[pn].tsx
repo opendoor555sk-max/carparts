@@ -169,7 +169,16 @@ export default function PartDetail() {
         technical_info: part.technical_info || "",
       });
     } else {
-      setEditData({ ...EMPTY_EDIT, company: data?.part?.company || "All" });
+      const cat = data?.catalog;
+      setEditData({
+        ...EMPTY_EDIT,
+        name: cat?.name || "",
+        category: cat?.category || "",
+        company: cat?.company || data?.part?.company || "All",
+        compatible_vehicles: (cat?.compatible_vehicles || []).join(", "),
+        variant: cat?.variant || "",
+        year: cat?.year || "",
+      });
     }
     setEditModal(true);
   };
@@ -323,12 +332,27 @@ export default function PartDetail() {
           </Card>
         ) : (
           <Card testID="new-part-card">
-            <Text style={styles.cardTitle}>NEW PART</Text>
-            <Text style={styles.dim}>
-              This part number is not in the library. Save it — after AI research and Admin approval it becomes Verified.
-            </Text>
+            <Text style={styles.cardTitle}>{data?.catalog ? "NEW TO YOUR STORE" : "NEW PART"}</Text>
+            {data?.catalog ? (
+              <>
+                <View style={styles.catalogBanner}>
+                  <Ionicons name="globe" size={14} color={colors.brand} />
+                  <Text style={styles.catalogBannerText}>Found in Common Catalog — details shared across stores</Text>
+                </View>
+                <Row label="Name" value={data.catalog.name} />
+                <Row label="Company" value={data.catalog.company} />
+                <Row label="Category" value={data.catalog.category} />
+                <Row label="Variant" value={data.catalog.variant} />
+                <Row label="Compatible" value={(data.catalog.compatible_vehicles || []).join(", ")} />
+                <Text style={styles.dim}>Add it to your store — the catalog details are pre-filled.</Text>
+              </>
+            ) : (
+              <Text style={styles.dim}>
+                This part number is not in the library. Save it — after AI research and Admin approval it becomes Verified.
+              </Text>
+            )}
             {can("manage_parts") ? (
-              <Button title="Add Details & Save NEW PART" onPress={() => openEdit("new-part")} icon="add" testID="add-new-part" style={{ marginTop: spacing.md }} />
+              <Button title={data?.catalog ? "Add to My Store" : "Add Details & Save NEW PART"} onPress={() => openEdit("new-part")} icon="add" testID="add-new-part" style={{ marginTop: spacing.md }} />
             ) : null}
           </Card>
         )}
@@ -629,6 +653,8 @@ const styles = StyleSheet.create({
   sourceRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.md },
   source: { color: colors.info, fontSize: font.sm },
   dim: { color: colors.info, fontSize: font.base, lineHeight: 20 },
+  catalogBanner: { flexDirection: "row", alignItems: "center", gap: spacing.xs, backgroundColor: colors.brandFaint, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, marginBottom: spacing.sm },
+  catalogBannerText: { color: colors.brand, fontSize: font.sm - 1, fontWeight: "700", flex: 1 },
   stopBanner: {
     flexDirection: "row",
     alignItems: "center",

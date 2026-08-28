@@ -129,10 +129,16 @@ export default function Buy() {
     try {
       const res = await api.get(`/search?q=${encodeURIComponent(partNumber)}`);
       setInfo(res);
-      if (res.part?.name) setName(res.part.name);
-      if (res.part?.category) setCategory(res.part.category);
-      if (res.part?.variant) setVariant(res.part.variant);
-      if (res.part?.compatible_vehicles?.length) setVehicles(res.part.compatible_vehicles.join(", "));
+      // Prefer this store's own part; else enrich from the GLOBAL common catalog.
+      const src = res.part || res.catalog;
+      if (src) {
+        if (src.name) setName(src.name);
+        if (src.category) setCategory(src.category);
+        if (src.variant) setVariant(src.variant);
+        if (src.compatible_vehicles?.length) setVehicles(src.compatible_vehicles.join(", "));
+        if (src.company && src.company !== "All" && (company === "All" || !company)) setBuyCompany(src.company);
+      }
+      if (!res.part && res.catalog) show("Auto-filled from Common Catalog", "info");
     } catch (e: any) {
       show(e?.message || "Load failed", "error");
     } finally {

@@ -29,7 +29,8 @@ function layoutLines(raw: { text: string; bold?: boolean }[], aspect: number, ha
   const slot = Math.max(4, (100 - topPad - bottom) / lines.length);
   return lines.map((ln, i) => {
     const len = Math.max(1, (ln.text || "").length);
-    const fs = Math.max(2.2, Math.min(slot * 0.8, widthUnits / (len * 0.55), 9));
+    // +25% bigger fonts: taller vertical slot use, larger cap, tighter char-width estimate.
+    const fs = Math.max(2.75, Math.min(slot * 0.92, widthUnits / (len * 0.46), 11.25));
     return { text: ln.text, x: 3, y: topPad + i * slot + (slot - fs) / 2, size: fs, bold: ln.bold };
   });
 }

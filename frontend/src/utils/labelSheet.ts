@@ -61,7 +61,7 @@ const A4_W = 210;
 const A4_H = 297;
 
 function labelInner(c: LabelContent, w: number, h: number): string {
-  const fs = Math.max(1.6, Math.min(h * 0.16, 4.2)); // mm
+  const fs = Math.max(2.0, Math.min(h * 0.20, 5.25)); // mm (+25% bigger text)
   const small = fs * 0.75;
   const wantBar = c.code === "barcode" || c.code === "both";
   const wantQr = c.code === "qr" || c.code === "both";
