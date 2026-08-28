@@ -61,7 +61,7 @@ export default function Admin() {
     { title: "AI Approvals", sub: "Gemini research pending approval", icon: "sparkles", route: "/ai-approvals", perm: "ai_approve" },
     { title: "Google Search Setup", sub: "Your own API key — free 100/day", icon: "key", route: "/settings", perm: "search" },
     { title: "Purchase Limits", sub: "Global + per-part limits", icon: "speedometer", route: "/limits", perm: "manage_limits" },
-    { title: "Manage Users", sub: "બધા users નો username + password બદલો", icon: "people", route: "/users", perm: "manage_users" },
+    { title: "Manage Users", sub: "Change username + password for all users", icon: "people", route: "/users", perm: "manage_users" },
     { title: "Demand & Search", sub: "High-demand detection", icon: "trending-up", route: "/demand", perm: "view_stats" },
   ];
 
@@ -108,7 +108,7 @@ export default function Admin() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.linkTitle}>All Stores (Super Admin)</Text>
-                  <Text style={styles.linkSub}>બધા stores નો data જુઓ</Text>
+                  <Text style={styles.linkSub}>View data of all stores</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
@@ -147,7 +147,7 @@ export default function Admin() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.linkTitle}>Stock Verification</Text>
-                  <Text style={styles.linkSub}>ફિઝિકલ સ્ટોક ગણી ગાયબ part શોધો</Text>
+                  <Text style={styles.linkSub}>Count physical stock and find missing parts</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
@@ -163,8 +163,8 @@ export default function Admin() {
                   <Ionicons name="receipt" size={22} color={colors.brand} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.linkTitle}>ખરીદ / વેચાણ History</Text>
-                  <Text style={styles.linkSub}>Entries એકસાથે select કરી delete કરો</Text>
+                  <Text style={styles.linkTitle}>Purchase / Sale History</Text>
+                  <Text style={styles.linkSub}>Select multiple entries and delete</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
@@ -181,7 +181,7 @@ export default function Admin() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.linkTitle}>Backup & Restore</Text>
-                  <Text style={styles.linkSub}>Data export (Excel/JSON) અને import</Text>
+                  <Text style={styles.linkSub}>Data export (Excel/JSON) and import</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
@@ -213,8 +213,8 @@ export default function Admin() {
                 <Ionicons name="key" size={22} color={colors.brand} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.linkTitle}>મારો પોતાનો Password</Text>
-                <Text style={styles.linkSub}>ફક્ત તમારો login password બદલો</Text>
+                <Text style={styles.linkTitle}>My Own Password</Text>
+                <Text style={styles.linkSub}>Change only your login password</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.info} />
             </Pressable>
@@ -222,7 +222,7 @@ export default function Admin() {
             {!isAdmin ? (
               <View style={styles.note}>
                 <Ionicons name="information-circle" size={16} color={colors.info} />
-                <Text style={styles.noteText}>તમે staff છો — કેટલાક admin controls locked છે.</Text>
+                <Text style={styles.noteText}>You are staff — some admin controls are locked.</Text>
               </View>
             ) : null}
           </>

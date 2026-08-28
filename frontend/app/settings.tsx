@@ -32,7 +32,7 @@ export default function Settings() {
 
   const save = async () => {
     if (!apiKey.trim() && !hasKey) {
-      show("API Key નાખો", "error");
+      show("Enter API Key", "error");
       return;
     }
     setSaving(true);
@@ -59,14 +59,14 @@ export default function Settings() {
           <View style={styles.info}>
             <Ionicons name="key" size={18} color={colors.brand} />
             <Text style={styles.infoText}>
-              તમારી પોતાની Google key વાપરો → દરરોજ 100 free search, host credit ZERO. Key host પર secure save થાય.
+              Use your own Google key → 100 free searches per day, ZERO host credit. Key is stored securely on the host.
             </Text>
           </View>
 
           <Card>
             <Text style={styles.title}>YOUR GOOGLE CREDENTIALS</Text>
             <Field
-              label={hasKey ? "API KEY (saved — નવી નાખો તો બદલાશે)" : "GOOGLE API KEY"}
+              label={hasKey ? "API KEY (saved — enter a new one to change)" : "GOOGLE API KEY"}
               value={apiKey}
               onChangeText={setApiKey}
               placeholder={hasKey ? "•••••••• (already set)" : "AIza..."}
@@ -94,13 +94,13 @@ export default function Settings() {
           </Card>
 
           <Card>
-            <Text style={styles.title}>Key કેવી રીતે લેવી (free, card નહીં)</Text>
-            <Step n="1" t="console.cloud.google.com → નવું project બનાવો" />
-            <Step n="2" t="'Custom Search API' enable કરો → Credentials → API Key બનાવો" />
-            <Step n="3" t="programmablesearchengine.google.com → નવું search engine (Search entire web) → Search Engine ID (CX) મળશे" />
-            <Step n="4" t="ઉપર બંને paste કરી Save કરો" />
+            <Text style={styles.title}>How to get the key (free, no card)</Text>
+            <Step n="1" t="console.cloud.google.com → create a new project" />
+            <Step n="2" t="Enable 'Custom Search API' → Credentials → create an API Key" />
+            <Step n="3" t="programmablesearchengine.google.com → new search engine (Search entire web) → get Search Engine ID (CX)" />
+            <Step n="4" t="Paste both above and Save" />
             <Button
-              title="Google Console ખોલો"
+              title="Open Google Console"
               onPress={() => Linking.openURL("https://console.cloud.google.com/apis/library/customsearch.googleapis.com")}
               variant="secondary"
               icon="open"

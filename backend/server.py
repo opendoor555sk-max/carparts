@@ -182,6 +182,7 @@ def public_user(u: dict) -> dict:
             "store_id": u.get("store_id"), "store_name": u.get("store_name", ""),
             "store_gst": u.get("store_gst", ""), "store_phone": u.get("store_phone", ""),
             "store_address": u.get("store_address", ""), "store_logo": u.get("store_logo", ""),
+            "store_bank": u.get("store_bank", ""),
             "permissions": perms, "disabled": u.get("disabled", False),
             "has_google_key": bool(u.get("google_api_key") and u.get("google_cx"))}
 
@@ -195,6 +196,7 @@ async def _attach_store(user: dict) -> None:
             user["store_phone"] = store.get("phone", "")
             user["store_address"] = store.get("address", "")
             user["store_logo"] = store.get("logo_path", "")
+            user["store_bank"] = store.get("bank", "")
 
 
 async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
@@ -538,6 +540,7 @@ class StoreProfileIn(BaseModel):
     gst: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
+    bank: Optional[str] = None
     logo_path: Optional[str] = None
 
 

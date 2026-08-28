@@ -67,7 +67,7 @@ export default function BatchBuyWeb() {
         setTotal((t) => t + 1);
       } catch (e: any) {
         if (e?.detail?.code === "LIMIT_REACHED") {
-          show(`🚫 ${pn} — Limit પૂરી, DO NOT BUY`, "error");
+          show(`🚫 ${pn} — Limit reached, DO NOT BUY`, "error");
         } else {
           show(e?.detail?.message || e?.message || "Add failed", "error");
         }
@@ -121,7 +121,7 @@ export default function BatchBuyWeb() {
         {VideoEl}
         <View style={styles.overlay} pointerEvents="none">
           <View style={styles.bracket} />
-          <Text style={styles.hint}>Scan કરો → દરેક scan = +1 qty</Text>
+          <Text style={styles.hint}>Scan → each scan = +1 qty</Text>
         </View>
       </View>
       <View style={styles.inputRow}>
@@ -133,14 +133,14 @@ export default function BatchBuyWeb() {
       <View style={styles.gpsStrip}>
         <Ionicons name="location" size={16} color={gps ? colors.success : colors.warning} />
         <Text style={[styles.gpsStripText, { color: gps ? colors.success : colors.warning }]} numberOfLines={1}>
-          {gps ? `Live GPS: ${gps}` : "GPS મેળવી રહ્યા છીએ…"}
+          {gps ? `Live GPS: ${gps}` : "Getting GPS…"}
         </Text>
       </View>
       <FlatList
         data={counts}
         keyExtractor={(c) => c.pn}
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm, paddingBottom: insets.bottom + 90 }}
-        ListEmptyComponent={<Text style={styles.empty}>હજી કંઈ scan નથી થયું</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>Nothing scanned yet</Text>}
         renderItem={({ item }) => (
           <View style={styles.row} testID={`batch-${item.pn}`}>
             <Text style={styles.pn} numberOfLines={2}>{item.pn}</Text>

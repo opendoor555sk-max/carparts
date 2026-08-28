@@ -70,7 +70,7 @@ export default function BatchBuy() {
       } catch (e: any) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         if (e?.detail?.code === "LIMIT_REACHED") {
-          show(`🚫 ${pn} — Limit પૂરી, DO NOT BUY`, "error");
+          show(`🚫 ${pn} — Limit reached, DO NOT BUY`, "error");
         } else {
           show(e?.detail?.message || e?.message || "Add failed", "error");
         }
@@ -105,13 +105,13 @@ export default function BatchBuy() {
         ) : (
           <View style={styles.center}>
             <Ionicons name="camera" size={40} color={colors.brand} />
-            <Text style={styles.dim}>ઝડપી batch scanning માટે camera allow કરો</Text>
-            <Button title="Camera Allow કરો" onPress={requestPermission} icon="camera" testID="batch-grant" />
+            <Text style={styles.dim}>Allow camera for quick batch scanning</Text>
+            <Button title="Allow Camera" onPress={requestPermission} icon="camera" testID="batch-grant" />
           </View>
         )}
         <View style={styles.overlay} pointerEvents="none">
           <View style={styles.bracket} />
-          <Text style={styles.hint}>Scan કરો → દરેક scan = +1 qty</Text>
+          <Text style={styles.hint}>Scan → each scan = +1 qty</Text>
         </View>
       </View>
 
@@ -125,7 +125,7 @@ export default function BatchBuy() {
       <View style={styles.gpsStrip}>
         <Ionicons name="location" size={16} color={gps ? colors.success : colors.warning} />
         <Text style={[styles.gpsStripText, { color: gps ? colors.success : colors.warning }]} numberOfLines={1}>
-          {gps ? `Live GPS: ${gps}` : "GPS મેળવી રહ્યા છીએ…"}
+          {gps ? `Live GPS: ${gps}` : "Getting GPS…"}
         </Text>
       </View>
 
@@ -133,7 +133,7 @@ export default function BatchBuy() {
         data={counts}
         keyExtractor={(c) => c.pn}
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm, paddingBottom: insets.bottom + 90 }}
-        ListEmptyComponent={<Text style={styles.empty}>હજી કંઈ scan નથી થયું</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>Nothing scanned yet</Text>}
         renderItem={({ item }) => (
           <View style={styles.row} testID={`batch-${item.pn}`}>
             <Text style={styles.pn} numberOfLines={2}>{item.pn}</Text>

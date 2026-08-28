@@ -55,7 +55,7 @@ export default function AiApprovals() {
       {loading ? (
         <Loading />
       ) : items.length === 0 ? (
-        <EmptyState icon="sparkles" title="કોઈ pending AI research નથી" subtitle="Part detail માંથી AI research run કરો" />
+        <EmptyState icon="sparkles" title="No pending AI research" subtitle="Run AI research from a part detail" />
       ) : (
         <FlatList
           data={items}

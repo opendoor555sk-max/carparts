@@ -153,10 +153,10 @@ export default function ScanWeb() {
             <View style={[styles.bracket, { borderColor: meta.color }]} />
             <Text style={styles.scanHint}>
               {status === "denied"
-                ? "Camera permission આપો (browser lock icon → Camera → Allow)"
+                ? "Allow camera permission (browser lock icon → Camera → Allow)"
                 : status === "error"
-                  ? "આ browser માં camera scan support નથી — manual entry વાપરો"
-                  : "Barcode/QR ને bracket માં clear રાખો — auto scan થશે"}
+                  ? "This browser does not support camera scan — use manual entry"
+                  : "Keep the Barcode/QR clear inside the bracket — it will auto scan"}
             </Text>
           </View>
         </View>
@@ -164,7 +164,7 @@ export default function ScanWeb() {
         {status === "denied" ? (
           <View style={styles.permBar}>
             <Ionicons name="lock-closed" size={16} color={colors.warning} />
-            <Text style={styles.permText}>Camera blocked — browser settings માંથી allow કરો</Text>
+            <Text style={styles.permText}>Camera blocked — allow it from browser settings</Text>
             <Button title="Settings" onPress={() => Linking.openURL("app-settings:")} variant="ghost" testID="web-open-settings" />
           </View>
         ) : null}

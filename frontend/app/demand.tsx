@@ -37,7 +37,7 @@ export default function Demand() {
       {loading ? (
         <Loading />
       ) : history.length === 0 ? (
-        <EmptyState icon="trending-up" title="કોઈ search data નથી" subtitle="Search module વાપરો" />
+        <EmptyState icon="trending-up" title="No search data" subtitle="Use the Search module" />
       ) : (
         <FlatList
           data={history}

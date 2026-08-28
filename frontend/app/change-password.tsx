@@ -23,22 +23,22 @@ export default function ChangePassword() {
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
-    if (!current.trim()) return show("વર્તમાન password નાખો", "error");
-    if (next.length < 6) return show("નવો password ઓછામાં ઓછો 6 અક્ષર", "error");
-    if (next !== confirm) return show("Password મેળ ખાતા નથી", "error");
-    if (next === current) return show("નવો password જૂના કરતાં અલગ હોવો જોઈએ", "error");
+    if (!current.trim()) return show("Enter current password", "error");
+    if (next.length < 6) return show("New password must be at least 6 characters", "error");
+    if (next !== confirm) return show("Passwords do not match", "error");
+    if (next === current) return show("New password must be different from the old one", "error");
     setSaving(true);
     try {
       await api.post("/auth/change-password", { current_password: current, new_password: next });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      show("Password બદલાઈ ગયો ✓", "success");
+      show("Password changed ✓", "success");
       setCurrent("");
       setNext("");
       setConfirm("");
       router.back();
     } catch (e: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      show(e?.message || "Password બદલવામાં નિષ્ફળ", "error");
+      show(e?.message || "Failed to change password", "error");
     } finally {
       setSaving(false);
     }
@@ -46,7 +46,7 @@ export default function ChangePassword() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Password બદલો" subtitle={user?.username} onBack={() => router.back()} />
+      <Header title="Change Password" subtitle={user?.username} onBack={() => router.back()} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 40, gap: spacing.md }}
@@ -55,14 +55,14 @@ export default function ChangePassword() {
           <View style={styles.info}>
             <Ionicons name="lock-closed" size={18} color={colors.brand} />
             <Text style={styles.infoText}>
-              તમારો પોતાનો login password અહીં બદલો. બદલ્યા પછી નવો password યાદ રાખો.
+              Change your own login password here. Remember the new password after changing.
             </Text>
           </View>
 
           <Card>
             <Text style={styles.title}>PASSWORD</Text>
             <Field
-              label="વર્તમાન Password"
+              label="Current Password"
               value={current}
               onChangeText={setCurrent}
               placeholder="Current password"
@@ -72,7 +72,7 @@ export default function ChangePassword() {
               testID="cp-current"
             />
             <Field
-              label="નવો Password (ઓછામાં ઓછો 6 અક્ષર)"
+              label="New Password (at least 6 characters)"
               value={next}
               onChangeText={setNext}
               placeholder="New password"
@@ -82,7 +82,7 @@ export default function ChangePassword() {
               testID="cp-new"
             />
             <Field
-              label="નવો Password ફરી લખો"
+              label="Re-enter New Password"
               value={confirm}
               onChangeText={setConfirm}
               placeholder="Confirm new password"
@@ -91,7 +91,7 @@ export default function ChangePassword() {
               autoCorrect={false}
               testID="cp-confirm"
             />
-            <Button title="Password Update કરો" onPress={submit} loading={saving} icon="save" testID="cp-save" />
+            <Button title="Update Password" onPress={submit} loading={saving} icon="save" testID="cp-save" />
           </Card>
         </ScrollView>
       </KeyboardAvoidingView>

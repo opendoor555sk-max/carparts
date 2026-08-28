@@ -38,7 +38,7 @@ export default function PartsList() {
       {loading ? (
         <Loading />
       ) : parts.length === 0 ? (
-        <EmptyState icon="documents-outline" title="કોઈ part નથી" subtitle="આ category માં હજી part master નથી" />
+        <EmptyState icon="documents-outline" title="No parts" subtitle="No part master in this category yet" />
       ) : (
         <FlatList
           data={parts}

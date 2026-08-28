@@ -284,7 +284,7 @@ export function ConfirmModal({
   title,
   message,
   confirmText = "Confirm",
-  cancelText = "રદ કરો",
+  cancelText = "Cancel",
   danger = false,
   loading = false,
   onConfirm,

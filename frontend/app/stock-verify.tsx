@@ -52,7 +52,7 @@ export default function StockVerify() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setReport(res);
     } catch (e: any) {
-      show(e?.message || "નિષ્ફળ", "error");
+      show(e?.message || "Failed", "error");
     } finally {
       setSubmitting(false);
     }
@@ -60,17 +60,17 @@ export default function StockVerify() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Stock Verification" subtitle="ફિઝિકલ સ્ટોક ગણો" onBack={() => router.back()} />
+      <Header title="Stock Verification" subtitle="Count physical stock" onBack={() => router.back()} />
       {loading ? (
         <Loading />
       ) : items.length === 0 ? (
-        <EmptyState icon="cube-outline" title="કોઈ stock નથી" subtitle="Buy module થી stock add કરો" />
+        <EmptyState icon="cube-outline" title="No stock" subtitle="Add stock from the Buy module" />
       ) : (
         <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: insets.bottom + 120 }}>
           <View style={styles.info}>
             <Ionicons name="clipboard" size={18} color={colors.brand} />
             <Text style={styles.infoText}>
-              દરેક part ના ફિઝિકલ (હાથમાં) ગણેલા units નાખો. System ના stock સાથે compare થઈ કયો part ગાયબ છે એ બતાવશે.
+              Enter the physically counted (in-hand) units for each part. It compares with system stock and shows which part is missing.
             </Text>
           </View>
 
@@ -84,15 +84,15 @@ export default function StockVerify() {
                 </View>
                 <View style={styles.summaryBox}>
                   <Text style={[styles.summaryNum, { color: colors.success }]}>{report.ok_count}</Text>
-                  <Text style={styles.summaryLbl}>બરાબર</Text>
+                  <Text style={styles.summaryLbl}>OK</Text>
                 </View>
                 <View style={styles.summaryBox}>
                   <Text style={[styles.summaryNum, { color: colors.error }]}>{report.discrepancies.length}</Text>
-                  <Text style={styles.summaryLbl}>તફાવત</Text>
+                  <Text style={styles.summaryLbl}>Difference</Text>
                 </View>
               </View>
               {report.discrepancies.length === 0 ? (
-                <Text style={styles.allGood}>✅ બધો stock બરાબર મળ્યો!</Text>
+                <Text style={styles.allGood}>✅ All stock matched correctly!</Text>
               ) : (
                 report.discrepancies.map((d: any) => (
                   <View key={d.part_number} style={styles.discRow}>
@@ -100,14 +100,14 @@ export default function StockVerify() {
                       <Text style={styles.discPn}>{d.part_number}</Text>
                       {d.part_name ? <Text style={styles.discName}>{d.part_name}</Text> : null}
                       <Text style={styles.discDetail}>
-                        System: {d.expected}  •  ગણ્યા: {d.counted}  •  {d.diff > 0 ? `+${d.diff}` : d.diff}
+                        System: {d.expected}  •  Counted: {d.counted}  •  {d.diff > 0 ? `+${d.diff}` : d.diff}
                       </Text>
                     </View>
                     <StatusChip status={d.status === "MISSING" ? "Cancelled" : "Pending"} />
                   </View>
                 ))
               )}
-              <Button title="ફરી ગણો" variant="secondary" onPress={() => setReport(null)} style={{ marginTop: spacing.md }} testID="verify-again" />
+              <Button title="Count Again" variant="secondary" onPress={() => setReport(null)} style={{ marginTop: spacing.md }} testID="verify-again" />
             </Card>
           ) : (
             <>
@@ -141,7 +141,7 @@ export default function StockVerify() {
 
       {!loading && !report && items.length > 0 ? (
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + spacing.md }]}>
-          <Button title="Verify કરો & Report જુઓ" onPress={submit} loading={submitting} icon="checkmark-done" testID="verify-submit" />
+          <Button title="Verify & View Report" onPress={submit} loading={submitting} icon="checkmark-done" testID="verify-submit" />
         </View>
       ) : null}
     </View>

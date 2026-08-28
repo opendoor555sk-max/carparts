@@ -16,10 +16,10 @@ import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 const MODE_META: Record<string, { title: string; color: string; verb: string }> = {
-  search: { title: "SEARCH", color: colors.info, verb: "શોધો" },
-  buy: { title: "BUY", color: colors.success, verb: "ખરીદો" },
-  sell: { title: "SELL", color: colors.brand, verb: "વેચો" },
-  requirement: { title: "REQUIREMENT", color: colors.warning, verb: "જરૂરિયાત" },
+  search: { title: "SEARCH", color: colors.info, verb: "Search" },
+  buy: { title: "BUY", color: colors.success, verb: "Buy" },
+  sell: { title: "SELL", color: colors.brand, verb: "Sell" },
+  requirement: { title: "REQUIREMENT", color: colors.warning, verb: "Requirement" },
 };
 
 export default function Scan() {
@@ -79,7 +79,7 @@ export default function Scan() {
       return (
         <View style={styles.cameraFallback}>
           <Ionicons name="camera-outline" size={48} color={colors.info} />
-          <Text style={styles.permSub}>Camera તૈયાર થઈ રહ્યો છે…</Text>
+          <Text style={styles.permSub}>Camera is getting ready…</Text>
         </View>
       );
     }
@@ -88,20 +88,20 @@ export default function Scan() {
       return (
         <View style={styles.cameraFallback}>
           <Ionicons name="camera-outline" size={48} color={colors.brand} />
-          <Text style={styles.permTitle}>Barcode / QR scan માટે camera જોઈએ</Text>
-          <Text style={styles.permSub}>Part number automatically capture કરવા camera allow કરો</Text>
+          <Text style={styles.permTitle}>Camera is needed to scan Barcode / QR</Text>
+          <Text style={styles.permSub}>Allow camera to automatically capture the part number</Text>
           {permission.canAskAgain ? (
-            <Button title="Camera Allow કરો" onPress={requestPermission} icon="camera" testID="grant-camera" />
+            <Button title="Allow Camera" onPress={requestPermission} icon="camera" testID="grant-camera" />
           ) : (
             <Button
-              title="Settings ખોલો"
+              title="Open Settings"
               onPress={() => Linking.openSettings()}
               variant="secondary"
               icon="settings"
               testID="open-settings"
             />
           )}
-          <Text style={styles.orText}>અથવા નીચે manual entry વાપરો</Text>
+          <Text style={styles.orText}>or use manual entry below</Text>
         </View>
       );
     }
@@ -118,7 +118,7 @@ export default function Scan() {
         />
         <View style={styles.overlay} pointerEvents="none">
           <View style={[styles.bracket, { borderColor: meta.color }]} />
-          <Text style={styles.scanHint}>Part number barcode/QR camera સામે રાખો</Text>
+          <Text style={styles.scanHint}>Hold the part number barcode/QR in front of the camera</Text>
         </View>
       </View>
     );

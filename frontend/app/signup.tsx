@@ -31,11 +31,11 @@ export default function SignUp() {
   const onSubmit = async () => {
     setErr("");
     if (!storeName.trim() || !username.trim() || !password) {
-      setErr("Store name, username અને password જરૂરી છે");
+      setErr("Store name, username and password are required");
       return;
     }
     if (password.length < 6) {
-      setErr("Password ઓછામાં ઓછો 6 અક્ષર હોવો જોઈએ");
+      setErr("Password must be at least 6 characters");
       return;
     }
     setLoading(true);
@@ -64,27 +64,27 @@ export default function SignUp() {
           <View style={styles.logoBox}>
             <Ionicons name="storefront" size={38} color={colors.brand} />
           </View>
-          <Text style={styles.title}>નવું Store બનાવો</Text>
-          <Text style={styles.subtitle}>તમારું પોતાનું Auto Parts Store શરૂ કરો</Text>
+          <Text style={styles.title}>Create New Store</Text>
+          <Text style={styles.subtitle}>Start your own Auto Parts Store</Text>
         </View>
 
         <View style={styles.form}>
           <Field
-            label="STORE NAME (દુકાનનું નામ)"
+            label="STORE NAME"
             value={storeName}
             onChangeText={setStoreName}
             placeholder="e.g. Raja Auto Parts"
             testID="signup-store"
           />
           <Field
-            label="YOUR NAME (તમારું નામ)"
+            label="YOUR NAME"
             value={name}
             onChangeText={setName}
             placeholder="Owner name"
             testID="signup-name"
           />
           <Field
-            label="USERNAME (login માટે)"
+            label="USERNAME (for login)"
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
@@ -98,7 +98,7 @@ export default function SignUp() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPw}
-              placeholder="ઓછામાં ઓછો 6 અક્ષર"
+              placeholder="At least 6 characters"
               testID="signup-password"
               onSubmitEditing={onSubmit}
               returnKeyType="go"
@@ -126,7 +126,7 @@ export default function SignUp() {
         </View>
 
         <Pressable onPress={() => router.replace("/login")} style={styles.linkRow} testID="go-login">
-          <Text style={styles.linkText}>પહેલેથી account છે? </Text>
+          <Text style={styles.linkText}>Already have an account? </Text>
           <Text style={[styles.linkText, { color: colors.brand, fontWeight: "800" }]}>Sign In</Text>
         </Pressable>
       </ScrollView>

@@ -75,20 +75,20 @@ export default function Buy() {
       setPhotos((prev) => [...prev, { path, display }]);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
-      show("Photo upload નિષ્ફળ", "error");
+      show("Photo upload failed", "error");
     } finally {
       setUploading(false);
     }
   };
 
   const takePhoto = async () => {
-    if (photos.length >= 6) return show("વધુમાં વધુ 6 photos", "info");
+    if (photos.length >= 6) return show("Maximum 6 photos", "info");
     let perm = await ImagePicker.getCameraPermissionsAsync();
     if (!perm.granted && perm.canAskAgain) perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert("Camera જોઈએ", "Part ના photo લેવા camera allow કરો.", [
-        { text: "રદ કરો", style: "cancel" },
-        { text: "Settings ખોલો", onPress: () => Linking.openSettings() },
+      Alert.alert("Camera needed", "Allow camera to take part photos.", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Open Settings", onPress: () => Linking.openSettings() },
       ]);
       return;
     }
@@ -97,13 +97,13 @@ export default function Buy() {
   };
 
   const pickGallery = async () => {
-    if (photos.length >= 6) return show("વધુમાં વધુ 6 photos", "info");
+    if (photos.length >= 6) return show("Maximum 6 photos", "info");
     let perm = await ImagePicker.getMediaLibraryPermissionsAsync();
     if (!perm.granted && perm.canAskAgain) perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert("Gallery જોઈએ", "Gallery માંથી photo add કરવા permission allow કરો.", [
-        { text: "રદ કરો", style: "cancel" },
-        { text: "Settings ખોલો", onPress: () => Linking.openSettings() },
+      Alert.alert("Gallery needed", "Allow gallery to add photos.", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Open Settings", onPress: () => Linking.openSettings() },
       ]);
       return;
     }
@@ -152,11 +152,11 @@ export default function Buy() {
       if (r.name) setName(r.name);
       if (r.models?.length) setVehicles(r.models.join(", "));
       if (r.variants?.length) setVariant(r.variants.join(", "));
-      show(r.cached ? "Library માંથી autofill (100% verified)" : `Autofilled — ${r.result_count || 0} web results`, "success");
+      show(r.cached ? "Autofilled from library (100% verified)" : `Autofilled — ${r.result_count || 0} web results`, "success");
     } catch (e: any) {
       const d = e?.detail;
       if (d?.code === "NO_KEY") {
-        show("Google key નથી — Settings માં નાખો", "error");
+        show("No Google key — add it in Settings", "error");
         router.push("/settings" as any);
       } else {
         show(d?.message || e?.message || "Search failed", "error");
@@ -169,7 +169,7 @@ export default function Buy() {
   const submit = async () => {
     if (isStop && !override) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      show("Limit reached — Override toggle કરો (Admin)", "error");
+      show("Limit reached — toggle Override (Admin)", "error");
       return;
     }
     setSubmitting(true);
@@ -214,7 +214,7 @@ export default function Buy() {
 
   return (
     <View style={[styles.flex, isStop && !override && styles.stopBorder]}>
-      <Header title="BUY — ખરીદો" subtitle={partNumber} onBack={() => router.back()} />
+      <Header title="BUY" subtitle={partNumber} onBack={() => router.back()} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 100, gap: spacing.md }}
@@ -241,12 +241,12 @@ export default function Buy() {
             <View style={styles.doNotBuy} testID="do-not-buy">
               <Ionicons name="hand-left" size={22} color={colors.onError} />
               <Text style={styles.doNotBuyText}>DO NOT BUY</Text>
-              <Text style={styles.doNotBuySub}>Purchase limit પૂરી થઈ ગઈ છે</Text>
+              <Text style={styles.doNotBuySub}>Purchase limit reached</Text>
             </View>
           ) : isWarn ? (
             <View style={styles.warnBanner}>
               <Ionicons name="warning" size={18} color={colors.onWarning} />
-              <Text style={styles.warnText}>WARNING — limit નજીક છે</Text>
+              <Text style={styles.warnText}>WARNING — near limit</Text>
             </View>
           ) : null}
 
@@ -300,7 +300,7 @@ export default function Buy() {
             <View style={styles.compatHint}>
               <Ionicons name="save" size={13} color={colors.brand} />
               <Text style={styles.compatHintText}>
-                Company ({company}) + આ details purchase સાથે part number હેઠળ auto-save થશે
+                Company ({company}) + these details will auto-save under this part number with the purchase
               </Text>
             </View>
           </Card>
@@ -333,7 +333,7 @@ export default function Buy() {
           {/* Part Photos (6-side) */}
           <Card testID="buy-photos-card">
             <View style={styles.rowBetween}>
-              <Text style={styles.cardTitle}>PART PHOTOS (6 બાજુ)</Text>
+              <Text style={styles.cardTitle}>PART PHOTOS (6 sides)</Text>
               <Text style={styles.photoCount}>{photos.length}/6</Text>
             </View>
             <View style={styles.photoGrid}>
@@ -358,7 +358,7 @@ export default function Buy() {
                 </Pressable>
               ) : null}
             </View>
-            <Text style={styles.photoHint}>Front, Back, Left, Right, Top, Bottom — દરેક બાજુના photo add કરો</Text>
+            <Text style={styles.photoHint}>Front, Back, Left, Right, Top, Bottom — add a photo of each side</Text>
           </Card>
 
           {/* Admin-only price */}
@@ -387,7 +387,7 @@ export default function Buy() {
               <View style={styles.rowBetween}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.overrideTitle}>Admin Override</Text>
-                  <Text style={styles.dim}>Limit ignore કરીને buy કરો</Text>
+                  <Text style={styles.dim}>Buy ignoring the limit</Text>
                 </View>
                 <Switch
                   value={override}

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 
@@ -42,11 +42,11 @@ export default function Stores() {
 
   return (
     <View style={styles.flex}>
-      <Header title="All Stores" subtitle="Super Admin — બધા stores" onBack={() => router.back()} />
+      <Header title="All Stores" subtitle="Super Admin — all stores" onBack={() => router.back()} />
       {loading ? (
         <Loading />
       ) : stores.length === 0 ? (
-        <EmptyState icon="storefront-outline" title="કોઈ store નથી" subtitle="Sign Up થી પહેલું store બનશે" />
+        <EmptyState icon="storefront-outline" title="No stores" subtitle="The first store is created via Sign Up" />
       ) : (
         <FlatList
           data={stores}
@@ -63,7 +63,11 @@ export default function Stores() {
             />
           }
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <Pressable
+              style={styles.card}
+              onPress={() => router.push(`/store-detail?id=${item.id}&name=${encodeURIComponent(item.name)}` as any)}
+              testID={`store-${item.id}`}
+            >
               <View style={styles.rowTop}>
                 <View style={styles.iconBox}>
                   <Ionicons name="storefront" size={22} color={colors.brand} />
@@ -74,13 +78,14 @@ export default function Stores() {
                     {item.owner?.name || "-"} ({item.owner?.username || "-"})
                   </Text>
                 </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </View>
               <View style={styles.stats}>
                 <Stat label="Users" value={item.users} icon="people" />
                 <Stat label="Parts" value={item.parts} icon="documents" />
                 <Stat label="In Stock" value={item.in_stock} icon="cube" />
               </View>
-            </View>
+            </Pressable>
           )}
         />
       )}

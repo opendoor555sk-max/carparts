@@ -69,7 +69,7 @@ export default function Inventory() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await load();
     } catch (e: any) {
-      show(e?.message || "નિષ્ફળ", "error");
+      show(e?.message || "Failed", "error");
     } finally {
       setBusy(false);
     }
@@ -87,7 +87,7 @@ export default function Inventory() {
       setPendingDelete(null);
       await load();
     } catch (e: any) {
-      show(e?.message || "નિષ્ફળ", "error");
+      show(e?.message || "Failed", "error");
     } finally {
       setBusy(false);
     }
@@ -129,7 +129,7 @@ export default function Inventory() {
       {loading ? (
         <Loading />
       ) : units.length === 0 ? (
-        <EmptyState icon="cube-outline" title="કોઈ stock નથી" subtitle="Buy module થી stock add કરો" />
+        <EmptyState icon="cube-outline" title="No stock" subtitle="Add stock from the Buy module" />
       ) : (
         <FlatList
           data={units}
@@ -170,7 +170,7 @@ export default function Inventory() {
                     testID={`dec-${item.id}`}
                   >
                     <Ionicons name="remove" size={18} color={colors.warning} />
-                    <Text style={[styles.adminBtnText, { color: colors.warning }]}>ઘટાડો</Text>
+                    <Text style={[styles.adminBtnText, { color: colors.warning }]}>Reduce</Text>
                   </Pressable>
                   <Pressable
                     style={styles.adminBtn}
@@ -178,7 +178,7 @@ export default function Inventory() {
                     testID={`inc-${item.id}`}
                   >
                     <Ionicons name="add" size={18} color={colors.success} />
-                    <Text style={[styles.adminBtnText, { color: colors.success }]}>વધારો</Text>
+                    <Text style={[styles.adminBtnText, { color: colors.success }]}>Add</Text>
                   </Pressable>
                   <Pressable style={styles.adminBtn} onPress={() => confirmDelete(item)} testID={`del-${item.id}`}>
                     <Ionicons name="trash" size={16} color={colors.error} />
@@ -193,8 +193,8 @@ export default function Inventory() {
 
       <ConfirmModal
         visible={!!pendingDelete}
-        title="Unit delete કરવું?"
-        message={pendingDelete ? `${pendingDelete.part_number} નું આ એક unit કાયમ કાઢી નાખાશે.` : ""}
+        title="Delete this unit?"
+        message={pendingDelete ? `One unit of ${pendingDelete.part_number} will be permanently deleted.` : ""}
         confirmText="Delete"
         danger
         loading={busy}

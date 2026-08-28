@@ -1,12 +1,14 @@
 import * as Print from "expo-print";
 
 import { fileUrl } from "@/src/api/client";
+import { barcodeSvg } from "@/src/utils/barcode128";
 
 export type Branding = {
   name: string;
   gst?: string;
   phone?: string;
   address?: string;
+  bank?: string;
   logoUrl?: string;
 };
 
@@ -32,6 +34,7 @@ export async function brandingFromUser(user: any): Promise<Branding> {
     gst: user?.store_gst || "",
     phone: user?.store_phone || "",
     address: user?.store_address || "",
+    bank: user?.store_bank || "",
     logoUrl,
   };
 }
@@ -49,6 +52,7 @@ function header(b: Branding): string {
       <div style="font-size:22px;font-weight:800">${esc(b.name)}</div>
       ${contact ? `<div style="font-size:12px;color:#555;margin-top:2px">${contact}</div>` : ""}
       ${b.address ? `<div style="font-size:12px;color:#555">${esc(b.address)}</div>` : ""}
+      ${b.bank ? `<div style="font-size:12px;color:#555">Bank: ${esc(b.bank)}</div>` : ""}
     </div>
   </div>`;
 }
@@ -119,7 +123,16 @@ export async function printReceipt(b: Branding, kind: "BUY" | "SELL", data: Rece
     .filter(Boolean)
     .map((r: any) => `<tr><th style="width:35%">${esc(r[0])}</th><td>${esc(r[1])}</td></tr>`)
     .join("");
-  await printHtml(wrap(kind === "BUY" ? "Purchase Receipt" : "Sale Receipt", b, `<table>${rows}</table>`));
+  const barcode = `<div style="text-align:center;margin-top:16px">${barcodeSvg(data.part_number, { height: 60 })}</div>`;
+  await printHtml(wrap(kind === "BUY" ? "Purchase Receipt" : "Sale Receipt", b, `<table>${rows}</table>${barcode}`));
+}
+
+export async function printBarcodeLabel(b: Branding, partNumber: string, company?: string): Promise<void> {
+  const body = `<div style="text-align:center;padding:10px">
+    ${company ? `<div style="font-size:13px;font-weight:700;margin-bottom:6px">${esc(company)}</div>` : ""}
+    ${barcodeSvg(partNumber, { height: 90, moduleWidth: 2 })}
+  </div>`;
+  await printHtml(wrap("Barcode Label", b, body));
 }
 
 export async function printRequirements(b: Branding, reqs: any[]): Promise<void> {

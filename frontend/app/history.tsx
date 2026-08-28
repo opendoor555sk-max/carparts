@@ -70,7 +70,7 @@ export default function History() {
       setConfirmOpen(false);
       load();
     } catch (e: any) {
-      show(e?.message || "નિષ્ફળ", "error");
+      show(e?.message || "Failed", "error");
     } finally {
       setDeleting(false);
     }
@@ -79,8 +79,8 @@ export default function History() {
   return (
     <View style={styles.flex}>
       <Header
-        title="ખરીદ / વેચાણ History"
-        subtitle="Entries delete કરો (Admin)"
+        title="Purchase / Sale History"
+        subtitle="Delete entries (Admin)"
         onBack={() => router.back()}
         right={
           txns.length > 0 ? (
@@ -96,14 +96,14 @@ export default function History() {
         }
       />
       <View style={styles.tabs}>
-        <FilterChip label="ખરીદ (Buy)" active={tab === "buy"} onPress={() => setTab("buy")} testID="tab-buy" />
-        <FilterChip label="વેચાણ (Sell)" active={tab === "sell"} onPress={() => setTab("sell")} testID="tab-sell" />
+        <FilterChip label="Buy" active={tab === "buy"} onPress={() => setTab("buy")} testID="tab-buy" />
+        <FilterChip label="Sell" active={tab === "sell"} onPress={() => setTab("sell")} testID="tab-sell" />
       </View>
 
       {loading ? (
         <Loading />
       ) : txns.length === 0 ? (
-        <EmptyState icon="receipt-outline" title="કોઈ entry નથી" subtitle={tab === "buy" ? "કોઈ ખરીદી નથી" : "કોઈ વેચાણ નથી"} />
+        <EmptyState icon="receipt-outline" title="No entries" subtitle={tab === "buy" ? "No purchases" : "No sales"} />
       ) : (
         <FlatList
           data={txns}
@@ -143,7 +143,7 @@ export default function History() {
           <Pressable style={styles.delBtn} onPress={() => setConfirmOpen(true)} disabled={deleting} testID="bulk-delete">
             <Ionicons name="trash" size={20} color={colors.onError} />
             <Text style={styles.delText}>
-              {deleting ? "Delete થાય છે…" : `${selectedIds.length} entry Delete કરો`}
+              {deleting ? "Deleting…" : `Delete ${selectedIds.length} entries`}
             </Text>
           </Pressable>
         </View>
@@ -151,8 +151,8 @@ export default function History() {
 
       <ConfirmModal
         visible={confirmOpen}
-        title={`${selectedIds.length} entry delete કરવી?`}
-        message={`${tab === "buy" ? "ખરીદ" : "વેચાણ"} ની આ entries અને એનો stock કાયમ કાઢી નાખાશે.`}
+        title={`Delete ${selectedIds.length} entries?`}
+        message={`These ${tab === "buy" ? "purchase" : "sale"} entries and their stock will be permanently deleted.`}
         confirmText="Delete"
         danger
         loading={deleting}

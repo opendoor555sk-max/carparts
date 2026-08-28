@@ -58,7 +58,7 @@ export default function Users() {
       const res = await api.get<{ password: string }>(`/admin/users/${u.id}/password`);
       setRevealed((r) => ({ ...r, [u.id]: res.password }));
     } catch (e: any) {
-      show(e?.detail?.message || e?.message || "Password ન મળ્યો", "error");
+      show(e?.detail?.message || e?.message || "Password not found", "error");
     }
   };
 
@@ -75,7 +75,7 @@ export default function Users() {
     if (eName.trim() && eName.trim() !== editUser.name) body.name = eName.trim();
     if (eUsername.trim() && eUsername.trim() !== editUser.username) body.username = eUsername.trim();
     if (ePassword) {
-      if (ePassword.length < 6) return show("Password ઓછામાં ઓછો 6 અક્ષર", "error");
+      if (ePassword.length < 6) return show("Password must be at least 6 characters", "error");
       body.password = ePassword;
     }
     if (Object.keys(body).length === 0) {
@@ -126,7 +126,7 @@ export default function Users() {
 
   const create = async () => {
     if (!name.trim() || !username.trim() || !password) {
-      show("બધા fields ભરો", "error");
+      show("Fill all fields", "error");
       return;
     }
     setCreating(true);
@@ -215,11 +215,11 @@ export default function Users() {
                 </View>
                 <Pressable style={styles.pwBtn} onPress={() => revealPw(u)} testID={`reveal-${u.username}`}>
                   <Ionicons name={revealed[u.id] ? "eye-off" : "eye"} size={16} color={colors.brand} />
-                  <Text style={styles.pwBtnText}>{revealed[u.id] ? "છુપાવો" : "જુઓ"}</Text>
+                  <Text style={styles.pwBtnText}>{revealed[u.id] ? "Hide" : "View"}</Text>
                 </Pressable>
                 <Pressable style={styles.pwBtn} onPress={() => openEdit(u)} testID={`edit-${u.username}`}>
                   <Ionicons name="create-outline" size={16} color={colors.brand} />
-                  <Text style={styles.pwBtnText}>બદલો</Text>
+                  <Text style={styles.pwBtnText}>Change</Text>
                 </Pressable>
               </View>
 
@@ -307,7 +307,7 @@ export default function Users() {
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
             <View style={styles.modal}>
               <View style={styles.modalHead}>
-                <Text style={styles.modalTitle}>Username / Password બદલો</Text>
+                <Text style={styles.modalTitle}>Change Username / Password</Text>
                 <Pressable onPress={() => setEditUser(null)} testID="close-edit-modal">
                   <Ionicons name="close" size={24} color={colors.onSurface} />
                 </Pressable>
@@ -315,12 +315,12 @@ export default function Users() {
               <ScrollView keyboardShouldPersistTaps="handled">
                 <Text style={styles.editWho}>{editUser?.name} (@{editUser?.username})</Text>
                 <Field label="Name" value={eName} onChangeText={setEName} testID="edit-name" />
-                <Field label="Username (login નામ)" value={eUsername} onChangeText={setEUsername} autoCapitalize="none" testID="edit-username" />
+                <Field label="Username (login name)" value={eUsername} onChangeText={setEUsername} autoCapitalize="none" testID="edit-username" />
                 <Field
-                  label="New Password (ખાલી રાખો તો બદલાશે નહીં)"
+                  label="New Password (leave empty to keep unchanged)"
                   value={ePassword}
                   onChangeText={setEPassword}
-                  placeholder="નવો password"
+                  placeholder="new password"
                   autoCapitalize="none"
                   testID="edit-password"
                 />
@@ -336,9 +336,9 @@ export default function Users() {
         <View style={styles.confirmWrap}>
           <View style={styles.confirmBox}>
             <Ionicons name="warning" size={40} color={colors.error} />
-            <Text style={styles.confirmTitle}>User remove કરવો છે?</Text>
+            <Text style={styles.confirmTitle}>Remove this user?</Text>
             <Text style={styles.confirmSub}>
-              {confirmRemove?.name} (@{confirmRemove?.username}) ને remove કરાશે. એ login નહીં કરી શકે.
+              {confirmRemove?.name} (@{confirmRemove?.username}) will be removed. They will not be able to log in.
             </Text>
             <View style={styles.confirmRow}>
               <Button title="Cancel" onPress={() => setConfirmRemove(null)} variant="secondary" style={{ flex: 1 }} testID="cancel-remove" />

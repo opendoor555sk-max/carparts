@@ -16,6 +16,7 @@ export type User = {
   store_phone?: string;
   store_address?: string;
   store_logo?: string;
+  store_bank?: string;
   permissions: string[];
   disabled?: boolean;
 };
@@ -99,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const enrolled = await LocalAuthentication.isEnrolledAsync();
       if (!hasHardware || !enrolled) return false;
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Fingerprint થી unlock કરો",
+        promptMessage: "Unlock with Fingerprint",
         cancelLabel: "Cancel",
       });
       if (!result.success) return false;

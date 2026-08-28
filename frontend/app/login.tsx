@@ -44,7 +44,7 @@ export default function Login() {
   const onLogin = async () => {
     setErr("");
     if (!username.trim() || !password) {
-      setErr("Username અને password જરૂરી છે");
+      setErr("Username and password are required");
       return;
     }
     setLoading(true);
@@ -61,7 +61,7 @@ export default function Login() {
   const onBio = async () => {
     const ok = await biometricUnlock();
     if (ok) router.replace("/(tabs)");
-    else setErr("Biometric unlock નિષ્ફળ — password વાપરો");
+    else setErr("Biometric unlock failed — use password");
   };
 
   return (
@@ -130,7 +130,7 @@ export default function Login() {
 
           {bioAvailable ? (
             <Button
-              title="Fingerprint થી Unlock"
+              title="Unlock with Fingerprint"
               onPress={onBio}
               variant="secondary"
               icon="finger-print"
@@ -140,7 +140,7 @@ export default function Login() {
           ) : null}
 
           <Button
-            title="નવું Store બનાવો (Sign Up)"
+            title="Create New Store (Sign Up)"
             onPress={() => router.push("/signup" as any)}
             variant="secondary"
             icon="storefront"
@@ -149,7 +149,7 @@ export default function Login() {
           />
         </View>
 
-        <Text style={styles.footer}>ડાઉનલોડ કરનાર દરેક પોતાનું અલગ Store બનાવી શકે</Text>
+        <Text style={styles.footer}>Every person who downloads can create their own separate store</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

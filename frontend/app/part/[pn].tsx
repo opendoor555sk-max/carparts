@@ -18,6 +18,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, fileUrl } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { Barcode } from "@/src/components/Barcode";
+import { brandingFromUser, printBarcodeLabel } from "@/src/utils/print";
 import {
   Button,
   Card,
@@ -74,7 +76,7 @@ export default function PartDetail() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       load();
     } catch (e: any) {
-      show(e?.message || "નિષ્ફળ", "error");
+      show(e?.message || "Failed", "error");
     }
   };
 
@@ -90,7 +92,7 @@ export default function PartDetail() {
       setPendingUnit(null);
       load();
     } catch (e: any) {
-      show(e?.message || "નિષ્ફળ", "error");
+      show(e?.message || "Failed", "error");
     } finally {
       setDeletingUnit(false);
     }
@@ -260,6 +262,20 @@ export default function PartDetail() {
           </Text>
         </Card>
 
+        {/* Barcode */}
+        <Card testID="part-barcode">
+          <Text style={styles.cardTitle}>BARCODE</Text>
+          <Barcode value={partNumber} height={64} />
+          <Button
+            title="Print Barcode Label"
+            onPress={async () => printBarcodeLabel(await brandingFromUser(user), partNumber, p?.company)}
+            variant="secondary"
+            icon="print"
+            testID="print-barcode"
+            style={{ marginTop: spacing.md }}
+          />
+        </Card>
+
         {/* Part master details */}
         {p ? (
           <Card>
@@ -301,7 +317,7 @@ export default function PartDetail() {
           <Card testID="new-part-card">
             <Text style={styles.cardTitle}>NEW PART</Text>
             <Text style={styles.dim}>
-              આ part number library માં નથી. Save કરો — details AI research પછી Admin approve થાય તો Verified બને.
+              This part number is not in the library. Save it — after AI research and Admin approval it becomes Verified.
             </Text>
             {can("manage_parts") ? (
               <Button title="Add Details & Save NEW PART" onPress={() => openEdit("new-part")} icon="add" testID="add-new-part" style={{ marginTop: spacing.md }} />
@@ -332,7 +348,7 @@ export default function PartDetail() {
           {!aiResult ? (
             <>
               <Text style={styles.dim}>
-                Gemini part identify કરે → sources → confidence → Admin approval → Verified save.
+                Gemini identifies the part → sources → confidence → Admin approval → saved as Verified.
               </Text>
               <Button
                 title="Run AI Research"
@@ -378,13 +394,13 @@ export default function PartDetail() {
               {aiResult.result?.status === "NOT_FOUND" ? (
                 <View style={styles.notFound}>
                   <Ionicons name="help-circle" size={14} color={colors.warning} />
-                  <Text style={styles.notFoundText}>AI ને આ part number ઓળખાયો નહીં — manually details add કરો</Text>
+                  <Text style={styles.notFoundText}>AI could not identify this part number — add details manually</Text>
                 </View>
               ) : null}
               {aiResult.from_database ? (
                 <View style={styles.dbTag}>
                   <Ionicons name="shield-checkmark" size={13} color={colors.success} />
-                  <Text style={styles.dbTagText}>તમારી Verified Library માંથી (100%)</Text>
+                  <Text style={styles.dbTagText}>From your Verified Library (100%)</Text>
                 </View>
               ) : null}
               {aiResult.result?.technical_info ? (
@@ -410,7 +426,7 @@ export default function PartDetail() {
               ) : aiResult.approval_status === "Pending" ? (
                 <View style={styles.pendingNote}>
                   <Ionicons name="time" size={14} color={colors.warning} />
-                  <Text style={styles.pendingText}>Admin approval બાકી — verified તરીકે ન બતાવાય</Text>
+                  <Text style={styles.pendingText}>Awaiting Admin approval — not shown as verified</Text>
                 </View>
               ) : null}
               <Button title="Re-run AI" onPress={runAI} loading={aiLoading} variant="ghost" testID="rerun-ai" />
@@ -513,8 +529,8 @@ export default function PartDetail() {
 
       <ConfirmModal
         visible={!!pendingUnit}
-        title="Unit delete કરવું?"
-        message="આ એક physical unit કાયમ કાઢી નાખાશે."
+        title="Delete this unit?"
+        message="This one physical unit will be permanently deleted."
         confirmText="Delete"
         danger
         loading={deletingUnit}
@@ -540,7 +556,7 @@ export default function PartDetail() {
                 <View style={styles.aiNote}>
                   <Ionicons name="information-circle" size={14} color={colors.brand} />
                   <Text style={styles.aiNoteText}>
-                    AI નું suggestion છે — ખોટું હોય તો correct કરો, પછી Verified save થશે.
+                    This is an AI suggestion — if wrong, correct it, then it saves as Verified.
                   </Text>
                 </View>
               ) : null}

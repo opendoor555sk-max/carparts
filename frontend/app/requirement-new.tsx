@@ -34,7 +34,7 @@ export default function RequirementNew() {
 
   const submit = async () => {
     if (!partNumber.trim()) {
-      show("Part number જરૂરી છે", "error");
+      show("Part number required", "error");
       return;
     }
     setSubmitting(true);
@@ -61,7 +61,7 @@ export default function RequirementNew() {
 
   return (
     <View style={styles.flex}>
-      <Header title="New Requirement" subtitle="જરૂરિયાત ઉમેરો" onBack={() => router.back()} />
+      <Header title="New Requirement" subtitle="Add a requirement" onBack={() => router.back()} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 100, gap: spacing.md }}

@@ -53,7 +53,7 @@ export default function Sell() {
         buyer,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      show("Sold — stock ઘટ્યું", "success");
+      show("Sold — stock reduced", "success");
       router.replace(`/part/${encodeURIComponent(partNumber)}` as any);
     } catch (e: any) {
       const d = e?.detail;
@@ -77,12 +77,12 @@ export default function Sell() {
 
   return (
     <View style={styles.flex}>
-      <Header title="SELL — વેચો" subtitle={partNumber} onBack={() => router.back()} />
+      <Header title="SELL" subtitle={partNumber} onBack={() => router.back()} />
       {!hasStock ? (
         <EmptyState
           icon="close-circle-outline"
-          title="કોઈ stock નથી"
-          subtitle="આ part number stock માં નથી — sell ન થાય"
+          title="No stock"
+          subtitle="This part number is not in stock — cannot sell"
           action={<Button title="Back" onPress={() => router.back()} variant="secondary" testID="sell-back" />}
         />
       ) : (

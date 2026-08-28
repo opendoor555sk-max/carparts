@@ -51,7 +51,7 @@ export default function Limits() {
 
   const savePart = async () => {
     if (!partNumber.trim()) {
-      show("Part number જરૂરી", "error");
+      show("Part number required", "error");
       return;
     }
     setSavingPart(true);
@@ -77,7 +77,7 @@ export default function Limits() {
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 40, gap: spacing.md }} keyboardShouldPersistTaps="handled">
           <View style={styles.info}>
             <Ionicons name="information-circle" size={18} color={colors.brand} />
-            <Text style={styles.infoText}>કોઈ number hard-coded નથી. Admin જ set/change/disable/override કરે.</Text>
+            <Text style={styles.infoText}>No number is hard-coded. Only Admin can set/change/disable/override.</Text>
           </View>
 
           <Card>

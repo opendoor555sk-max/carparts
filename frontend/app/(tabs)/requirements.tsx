@@ -77,7 +77,7 @@ export default function Requirements() {
     <View style={styles.flex}>
       <Header
         title="Requirements"
-        subtitle="જરૂરિયાત list"
+        subtitle="Requirement list"
         right={
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
             {reqs.length ? (
@@ -109,7 +109,7 @@ export default function Requirements() {
       {loading ? (
         <Loading />
       ) : reqs.length === 0 ? (
-        <EmptyState icon="list-outline" title="કોઈ requirement નથી" subtitle="ઉપર + button થી add કરો" />
+        <EmptyState icon="list-outline" title="No requirements" subtitle="Add one with the + button above" />
       ) : (
         <FlatList
           data={reqs}

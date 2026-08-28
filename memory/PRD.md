@@ -118,3 +118,11 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Report: custom from-to date range — native calendar (@react-native-community/datetimepicker) + web text inputs. All print funcs now take Branding object.
 - COMPANIES expanded to real English names incl Honda, Nissan, Toyota etc (backend + home).
 - English: report.tsx, store-profile.tsx, home REPORTS + welcome + hint, all print output. PENDING: older screens (buy/sell/inventory/admin/login) still have some Gujarati — convert next on user confirm.
+
+## Bank + Barcode + Drill-down + Full English (2026-08-28)
+- Store branding now includes bank field; shown on printed receipts/reports header (logo/GST/phone/address/bank).
+- Barcode: Code128 generator src/utils/barcode128.ts + <Barcode> component (react-native-svg installed). Part detail shows barcode + "Print Barcode Label". Receipts now embed the part-number barcode.
+- Super-admin drill-down: /stores cards tappable -> /store-detail.tsx shows that store stats + Inventory/Purchases/Sales via ?store_id (super_admin only).
+- Report custom date picker: native calendar + web date fields.
+- FULL ENGLISH: all Gujarati removed from every screen (verified grep = NONE). Company list = real names (Honda, Nissan, Toyota, etc).
+- PENDING: Common Part Catalog (part identity shared across stores, buys/sales/stock private) — big backend refactor, needs focused turn + model confirm (verified/technical shared? default yes).

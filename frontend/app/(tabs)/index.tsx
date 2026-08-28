@@ -31,11 +31,11 @@ type Module = {
 };
 
 const MODULES: Module[] = [
-  { key: "search", title: "SEARCH", gujarati: "શોધો", icon: "search", perm: "search", route: "/scan?mode=search", color: colors.info },
-  { key: "buy", title: "BUY", gujarati: "ખરીદો", icon: "download", perm: "buy", route: "/scan?mode=buy", color: colors.success },
-  { key: "sell", title: "SELL", gujarati: "વેચો", icon: "cash", perm: "sell", route: "/scan?mode=sell", color: colors.brand },
-  { key: "requirement", title: "REQUIREMENT", gujarati: "જરૂરિયાત", icon: "add-circle", perm: "requirement", route: "/scan?mode=requirement", color: colors.warning },
-  { key: "batch", title: "MULTIPLE BUY", gujarati: "ઝડપી બેચ ખરીદી", icon: "layers", perm: "buy", route: "/batch-buy", wide: true, color: colors.success },
+  { key: "search", title: "SEARCH", gujarati: "Find part", icon: "search", perm: "search", route: "/scan?mode=search", color: colors.info },
+  { key: "buy", title: "BUY", gujarati: "Purchase", icon: "download", perm: "buy", route: "/scan?mode=buy", color: colors.success },
+  { key: "sell", title: "SELL", gujarati: "Sale", icon: "cash", perm: "sell", route: "/scan?mode=sell", color: colors.brand },
+  { key: "requirement", title: "REQUIREMENT", gujarati: "Inquiry / Need", icon: "add-circle", perm: "requirement", route: "/scan?mode=requirement", color: colors.warning },
+  { key: "batch", title: "MULTIPLE BUY", gujarati: "Quick batch buy", icon: "layers", perm: "buy", route: "/batch-buy", wide: true, color: colors.success },
 ];
 
 export default function Home() {
@@ -60,7 +60,7 @@ export default function Home() {
 
   const openModule = (m: Module) => {
     if (!can(m.perm)) {
-      show("આ module માટે permission નથી", "error");
+      show("No permission for this module", "error");
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
