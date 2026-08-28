@@ -106,3 +106,9 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Backend /health endpoint added (fixes K8s probe 404).
 - Tested: /app/test_reports/iteration_15.json (18/18 pass).
 - PENDING: Phase 2 (complete car parts catalog + Honda/Nissan companies), Phase 3 (monetization: subscription/ads).
+
+## Reports feature (COMPLETE, 2026-08-28)
+- New /report.tsx screen (mode=buy|sell|stock) — Home has "REPORTS" section with 3 buttons: ખરીદેલો માલ, વેચેલો માલ, Stock.
+- Filters: date range presets (all/month/year/today), Company chips, Category chips. Grouped Company -> Category -> Part Number, with date.
+- Print via printReport() (grouped HTML). Print also on Buy/Sell/Inventory/Needs/History.
+- Backend: /transactions and /inventory now accept date_from,date_to,company,category and return company+category (joined from parts). Store-scoped.

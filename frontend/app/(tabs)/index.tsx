@@ -136,6 +136,31 @@ export default function Home() {
             SEARCH, BUY, SELL કદી mix નહીં — દરેક અલગ module. Primary ID = Part Number.
           </Text>
         </View>
+
+        <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>REPORTS — રિપોર્ટ</Text>
+        <View style={{ gap: spacing.md }}>
+          {[
+            { key: "buy", title: "ખરીદેલો માલ", sub: "બધી ખરીદી — તારીખ/company/category + Print", icon: "download" as const, color: colors.success },
+            { key: "sell", title: "વેચેલો માલ", sub: "બધું વેચાણ — તારીખ/company/category + Print", icon: "cash" as const, color: colors.brand },
+            { key: "stock", title: "Stock રિપોર્ટ", sub: "હાલનો સ્ટોક — company/category પ્રમાણે + Print", icon: "cube" as const, color: colors.info },
+          ].map((r) => (
+            <Pressable
+              key={r.key}
+              style={styles.report}
+              onPress={() => router.push(`/report?mode=${r.key}` as any)}
+              testID={`report-${r.key}`}
+            >
+              <View style={[styles.reportIcon, { borderColor: r.color }]}>
+                <Ionicons name={r.icon} size={22} color={r.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.reportTitle}>{r.title}</Text>
+                <Text style={styles.reportSub}>{r.sub}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.info} />
+            </Pressable>
+          ))}
+        </View>
       </ScrollView>
     </View>
   );
@@ -204,4 +229,25 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   hintText: { color: colors.onSurface3, fontSize: font.sm, flex: 1, lineHeight: 18 },
+  report: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+  },
+  reportIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+  },
+  reportTitle: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
+  reportSub: { color: colors.info, fontSize: font.sm, marginTop: 2 },
 });

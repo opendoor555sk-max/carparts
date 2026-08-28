@@ -950,19 +950,35 @@ async def sell(body: SellIn, store_id: Optional[str] = None, user=Depends(requir
 # ---------------- Inventory ----------------
 @api.get("/inventory")
 async def inventory(condition: Optional[str] = None, q: Optional[str] = None, store_id: Optional[str] = None,
+                    company: Optional[str] = None, category: Optional[str] = None,
+                    date_from: Optional[str] = None, date_to: Optional[str] = None,
                     user=Depends(get_current_user)):
     query: Dict[str, Any] = sq(user, {"sold": {"$ne": True}}, store_id)
     if condition:
         query["condition"] = condition
     if q:
         query["part_number"] = {"$regex": q.strip()[:64], "$options": "i"}
-    units = await db.stock.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    if date_from or date_to:
+        rng: Dict[str, Any] = {}
+        if date_from:
+            rng["$gte"] = date_from
+        if date_to:
+            rng["$lte"] = date_to + "T23:59:59"
+        query["created_at"] = rng
+    units = await db.stock.find(query, {"_id": 0}).sort("created_at", -1).to_list(2000)
+    out = []
     for u in units:
         p = await db.parts.find_one({"store_id": u.get("store_id"), "part_number": u["part_number"]},
                                     {"_id": 0, "name": 1, "company": 1, "category": 1})
         u["part_name"] = p.get("name", "") if p else ""
-        u["company"] = p.get("company", "") if p else ""
-    return units
+        u["company"] = (p.get("company", "") if p else "") or "All"
+        u["category"] = (p.get("category", "") if p else "") or "Uncategorized"
+        if company and company != "All" and u["company"] != company:
+            continue
+        if category and u["category"] != category:
+            continue
+        out.append(u)
+    return out
 
 
 # ---------------- Stock adjust / delete (Admin only) ----------------
@@ -1464,16 +1480,34 @@ async def files(path: str, token: Optional[str] = None, authorization: Optional[
 
 # ---------------- Transactions history + bulk delete (Admin) ----------------
 @api.get("/transactions")
-async def list_transactions(type: Optional[str] = None, store_id: Optional[str] = None, user=Depends(require_admin)):
+async def list_transactions(type: Optional[str] = None, store_id: Optional[str] = None,
+                            date_from: Optional[str] = None, date_to: Optional[str] = None,
+                            company: Optional[str] = None, category: Optional[str] = None,
+                            user=Depends(require_admin)):
     q: Dict[str, Any] = sq(user, {"type": {"$in": ["buy", "sell"]}}, store_id)
     if type in ("buy", "sell"):
         q["type"] = type
-    txns = await db.transactions.find(q, {"_id": 0}).sort("at", -1).to_list(2000)
+    if date_from or date_to:
+        rng: Dict[str, Any] = {}
+        if date_from:
+            rng["$gte"] = date_from
+        if date_to:
+            rng["$lte"] = date_to + "T23:59:59"
+        q["at"] = rng
+    txns = await db.transactions.find(q, {"_id": 0}).sort("at", -1).to_list(5000)
+    out = []
     for t in txns:
         p = await db.parts.find_one({"store_id": t.get("store_id"), "part_number": t.get("part_number")},
-                                    {"_id": 0, "name": 1})
+                                    {"_id": 0, "name": 1, "company": 1, "category": 1})
         t["part_name"] = (p or {}).get("name", "")
-    return txns
+        t["company"] = (p or {}).get("company", "") or "All"
+        t["category"] = (p or {}).get("category", "") or "Uncategorized"
+        if company and company != "All" and t["company"] != company:
+            continue
+        if category and t["category"] != category:
+            continue
+        out.append(t)
+    return out
 
 
 class TxnDeleteIn(BaseModel):

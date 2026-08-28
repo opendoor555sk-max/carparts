@@ -108,3 +108,44 @@ export async function printHistory(store: string, kind: "buy" | "sell", txns: an
   const body = `<table><thead><tr><th>#</th><th>Part Number</th><th>Name</th><th>By</th><th>Buyer</th><th>Price</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table><div class="tot">Entries: ${txns.length} &nbsp; | &nbsp; Total ₹ ${total}</div>`;
   await printHtml(wrap(kind === "buy" ? "Purchase (ખરીદ) History" : "Sale (વેચાણ) History", store, body));
 }
+
+export async function printReport(
+  store: string,
+  title: string,
+  items: any[],
+  showPrice: boolean,
+): Promise<void> {
+  // group by Company -> Category
+  const groups: Record<string, Record<string, any[]>> = {};
+  for (const it of items) {
+    const co = it.company || "All";
+    const cat = it.category || "Uncategorized";
+    groups[co] = groups[co] || {};
+    groups[co][cat] = groups[co][cat] || [];
+    groups[co][cat].push(it);
+  }
+  let body = "";
+  let grand = 0;
+  for (const co of Object.keys(groups).sort()) {
+    body += `<h3 style="margin:16px 0 4px;font-size:15px;border-bottom:2px solid #333">${esc(co)}</h3>`;
+    for (const cat of Object.keys(groups[co]).sort()) {
+      const rows = groups[co][cat]
+        .map((it: any) => {
+          const price = Number(it.price) || 0;
+          grand += price;
+          return `<tr><td>${esc(it.part_number)}</td><td>${esc(it.part_name || "")}</td><td>${esc(
+            it.condition || "",
+          )}</td>${showPrice ? `<td>${it.price != null ? "₹ " + it.price : ""}</td>` : ""}<td>${esc(
+            it.at ? new Date(it.at).toLocaleDateString() : "",
+          )}</td></tr>`;
+        })
+        .join("");
+      body += `<div style="font-weight:bold;color:#555;margin:8px 0 2px">${esc(cat)} (${groups[co][cat].length})</div>
+        <table><thead><tr><th>Part Number</th><th>Name</th><th>Condition</th>${
+          showPrice ? "<th>Price</th>" : ""
+        }<th>Date</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+  }
+  body += `<div class="tot">Total items: ${items.length}${showPrice ? ` &nbsp; | &nbsp; Total ₹ ${grand}` : ""}</div>`;
+  await printHtml(wrap(title, store, body));
+}
