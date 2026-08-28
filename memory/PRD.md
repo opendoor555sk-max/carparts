@@ -202,3 +202,8 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Save Templates now store JSON.stringify(StickerTemplate) in bg_data_url; openTemplate JSON.parses it back. CRUD unchanged.
 - labelSheet StickerTemplate = {aspect, lines:TplLine[], code:{type,value,box}|null}; templateInner renders typed lines + regenerated code on white cell.
 - NATIVE-only full flow; screen verified rendering on web with no errors.
+
+## Company Logo Library + slot + margin fix (2026-06 fork)
+- Removed unreliable auto-crop logo (was rendering black-box junk). Added Logo Library: backend store-scoped CRUD /api/logos (POST/GET/DELETE) storing {id,name,data_url(base64),store_id}. Frontend scan-sticker: "COMPANY LOGO" row = Add (upload from gallery -> resize 300px -> save) + None + saved-logo thumbnail buttons; tap sets tpl.logo into a fixed top-left slot LOGO_BOX{x:3,y:2,w:34,h:15} and re-flows text below (topPad 20). Logo persists in saved templates (JSON.stringify).
+- Margin fix in labelSheet buildSheet: topM now capped to <= leftM (Math.min) so the grid sits near the top with a small margin instead of large vertical-centered top margin (user: excess top margin spoils pre-cut sheets). Scanner prints with showBorder:false (no outline).
+- testing_agent iteration_16: 7/7 backend PASS (scan-sticker shape, /api/logos CRUD, /api/sticker-templates CRUD, multi-tenant isolation, categories=22 groups, companies). Frontend logo/scan flow is native-only (image picker) — user tests on phone.

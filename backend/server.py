@@ -1757,11 +1757,13 @@ STICKER_SCAN_PROMPT = """Read this product label/sticker (it may be rotated/upsi
   "aspect": <sticker width/height ratio, e.g. 1.6>,
   "part_number": "<the single main part number, exact characters>",
   "lines": [ {"text": "<one text line>", "bold": <true|false>} ],
-  "code": {"type": "qr"|"barcode"|"datamatrix"}
+  "code": {"type": "qr"|"barcode"|"datamatrix"},
+  "logo": {"x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>}
 }
 Rules:
 - "lines": EVERY visible text line in top-to-bottom reading order, exact text (include the HYUNDAI KIA MOTORS / brand line as text too). No coordinates.
 - "code": the type of the main 2D/1D code on the label. Use "qr" if unsure.
+- "logo": bounding box (% of the UPRIGHT sticker) that tightly covers the manufacturer BRAND logo(s) at the top (e.g. the Hyundai + Kia logos together). null if there is no logo.
 - JSON only, no extra text."""
 
 
@@ -1806,6 +1808,7 @@ async def scan_sticker(req: StickerScanReq, user=Depends(get_current_user)):
     data.setdefault("part_number", "")
     data.setdefault("lines", [])
     data.setdefault("code", None)
+    data.setdefault("logo", None)
     return data
 
 
@@ -1844,6 +1847,33 @@ async def list_sticker_templates(store_id: Optional[str] = None, user=Depends(ge
 @api.delete("/sticker-templates/{tid}")
 async def delete_sticker_template(tid: str, user=Depends(get_current_user)):
     await db.sticker_templates.delete_one(sq(user, {"id": tid}))
+    return {"ok": True}
+
+
+# ---------------- Company Logo Library (store-scoped) ----------------
+class LogoReq(BaseModel):
+    name: str
+    data_url: str
+
+
+@api.post("/logos")
+async def save_logo(req: LogoReq, user=Depends(get_current_user)):
+    sid = resolve_store(user, None)
+    doc = {"id": uuid.uuid4().hex, "store_id": sid, "name": req.name or "Logo",
+           "data_url": req.data_url, "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.logos.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api.get("/logos")
+async def list_logos(store_id: Optional[str] = None, user=Depends(get_current_user)):
+    return await db.logos.find(sq(user, None, store_id), {"_id": 0}).sort("created_at", -1).to_list(100)
+
+
+@api.delete("/logos/{lid}")
+async def delete_logo(lid: str, user=Depends(get_current_user)):
+    await db.logos.delete_one(sq(user, {"id": lid}))
     return {"ok": True}
 
 

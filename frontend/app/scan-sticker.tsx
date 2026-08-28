@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { SvgXml } from "react-native-svg";
@@ -15,22 +15,22 @@ import { barcodeSvg } from "@/src/utils/barcode128";
 import { Box, SHEET_LAYOUTS, StickerTemplate, TplLine, generateRichStickerSheetHtml } from "@/src/utils/labelSheet";
 import { colors, font, radius, spacing } from "@/src/theme";
 
-type ScanResult = { aspect: number; part_number: string; lines: { text: string; bold?: boolean }[]; code: { type: string } | null };
+type ScanResult = { aspect: number; part_number: string; lines: { text: string; bold?: boolean }[]; code: { type: string } | null; logo: Box | null };
 
 const PREVIEW_W = 320;
 
 // Clean vertical layout: no overlap, font shrinks to fit width, code in right column.
-function layoutLines(raw: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean): TplLine[] {
+function layoutLines(raw: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, topPad: number): TplLine[] {
   const lines = raw.filter((l) => (l.text || "").trim());
   if (!lines.length) return [];
   const frac = hasCode ? 0.66 : 0.96;
   const widthUnits = aspect * 100 * frac;
-  const top = 4, bottom = 4;
-  const slot = Math.max(4, (100 - top - bottom) / lines.length);
+  const bottom = 4;
+  const slot = Math.max(4, (100 - topPad - bottom) / lines.length);
   return lines.map((ln, i) => {
     const len = Math.max(1, (ln.text || "").length);
     const fs = Math.max(2.2, Math.min(slot * 0.8, widthUnits / (len * 0.55), 9));
-    return { text: ln.text, x: 3, y: top + i * slot + (slot - fs) / 2, size: fs, bold: ln.bold };
+    return { text: ln.text, x: 3, y: topPad + i * slot + (slot - fs) / 2, size: fs, bold: ln.bold };
   });
 }
 
@@ -46,12 +46,42 @@ export default function ScanSticker() {
   const [layoutCode, setLayoutCode] = useState("24L");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [saved, setSaved] = useState<any[]>([]);
+  const [logos, setLogos] = useState<any[]>([]);
   const layout = useMemo(() => SHEET_LAYOUTS.find((l) => l.code === layoutCode)!, [layoutCode]);
 
   const loadSaved = useCallback(async () => {
     try { setSaved(await api.get<any[]>("/sticker-templates")); } catch {}
+    try { setLogos(await api.get<any[]>("/logos")); } catch {}
   }, []);
   useEffect(() => { loadSaved(); }, [loadSaved]);
+
+  const LOGO_BOX: Box = { x: 3, y: 2, w: 34, h: 15 };
+  const applyLogo = (dataUrl: string | null) =>
+    setTpl((prev) => {
+      if (!prev) return prev;
+      const logo = dataUrl ? { dataUrl, box: LOGO_BOX } : null;
+      const lines = layoutLines(prev.lines.map((l) => ({ text: l.text, bold: l.bold })), prev.aspect, !!prev.code, logo ? 20 : 4);
+      return { ...prev, logo, lines };
+    });
+
+  const addLogo = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return show("Gallery permission needed", "error");
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], base64: true, quality: 0.9 });
+    if (r.canceled || !r.assets?.[0]?.base64) return;
+    try {
+      const c = ImageManipulator.manipulate(r.assets[0].uri);
+      c.resize({ width: 300 });
+      const rr = await c.renderAsync();
+      const oo = await rr.saveAsync({ format: SaveFormat.PNG, base64: true });
+      const dataUrl = `data:image/png;base64,${oo.base64}`;
+      await api.post("/logos", { name: "Logo", data_url: dataUrl });
+      show("Logo saved", "success");
+      loadSaved();
+      applyLogo(dataUrl);
+    } catch (e: any) { show(e?.message || "Logo save failed", "error"); }
+  };
+  const deleteLogo = async (id: string) => { try { await api.del(`/logos/${id}`); loadSaved(); } catch {} };
 
   const codeBox = (aspect: number): Box => {
     const h = 34, w = Math.min(40, h / aspect);
@@ -75,7 +105,7 @@ export default function ScanSticker() {
       const ct: "qr" | "barcode" = res.code?.type === "barcode" ? "barcode" : "qr";
       const hasCode = !!res.code;
       const pn = res.part_number || "";
-      buildTpl(res.lines || [], aspect, hasCode, ct, pn);
+      buildTpl(res.lines || [], aspect, hasCode, ct, pn, null);
       setPartNumber(pn);
       setCodeType(ct);
       setSelected(new Set());
@@ -87,9 +117,9 @@ export default function ScanSticker() {
     }
   };
 
-  const buildTpl = (rawLines: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, ct: "qr" | "barcode", pn: string) => {
-    const lines = layoutLines(rawLines, aspect, hasCode);
-    setTpl({ aspect, lines, code: hasCode ? { type: ct, value: pn, box: codeBox(aspect) } : null });
+  const buildTpl = (rawLines: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, ct: "qr" | "barcode", pn: string, logo: StickerTemplate["logo"]) => {
+    const lines = layoutLines(rawLines, aspect, hasCode, logo ? 20 : 4);
+    setTpl({ aspect, lines, code: hasCode ? { type: ct, value: pn, box: codeBox(aspect) } : null, logo });
   };
 
   const pickGallery = async () => {
@@ -200,6 +230,9 @@ export default function ScanSticker() {
           <>
             <Text style={styles.section}>PREVIEW (clean generated)</Text>
             <View style={[styles.preview, { width: PREVIEW_W, height: previewH }]}>
+              {tpl.logo && tpl.logo.dataUrl ? (
+                <Image source={{ uri: tpl.logo.dataUrl }} resizeMode="contain" style={{ position: "absolute", left: (tpl.logo.box.x / 100) * PREVIEW_W, top: (tpl.logo.box.y / 100) * previewH, width: (tpl.logo.box.w / 100) * PREVIEW_W, height: (tpl.logo.box.h / 100) * previewH }} />
+              ) : null}
               {tpl.code && codeSvg ? (
                 <View style={{ position: "absolute", left: (tpl.code.box.x / 100) * PREVIEW_W, top: (tpl.code.box.y / 100) * previewH, width: (tpl.code.box.w / 100) * PREVIEW_W, height: (tpl.code.box.h / 100) * previewH }}>
                   <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio={codeType === "qr" ? "xMidYMid meet" : "none"} />
@@ -212,6 +245,28 @@ export default function ScanSticker() {
 
             <Text style={styles.section}>PART NUMBER</Text>
             <TextInput style={styles.input} value={partNumber} onChangeText={applyPn} autoCapitalize="characters" testID="scan-pn" />
+
+            <Text style={styles.flabel}>COMPANY LOGO (tap to set on sticker)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.savedRow}>
+              <Pressable style={styles.logoAdd} onPress={addLogo} testID="logo-add">
+                <Ionicons name="add" size={20} color={colors.brand} />
+                <Text style={styles.saveText}>Add</Text>
+              </Pressable>
+              <Pressable style={styles.logoAdd} onPress={() => applyLogo(null)} testID="logo-none">
+                <Ionicons name="ban" size={18} color={colors.info} />
+                <Text style={styles.savedName}>None</Text>
+              </Pressable>
+              {logos.map((lg) => (
+                <View key={lg.id} style={styles.logoCard}>
+                  <Pressable onPress={() => applyLogo(lg.data_url)} testID={`logo-${lg.id}`}>
+                    <Image source={{ uri: lg.data_url }} resizeMode="contain" style={styles.logoThumb} />
+                  </Pressable>
+                  <Pressable style={styles.savedDel} onPress={() => deleteLogo(lg.id)} testID={`logodel-${lg.id}`}>
+                    <Ionicons name="close-circle" size={18} color={colors.error} />
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
 
             <Text style={styles.flabel}>CODE TYPE</Text>
             <View style={styles.chipWrap}>
@@ -294,4 +349,7 @@ const styles = StyleSheet.create({
   savedInner: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: spacing.md, alignItems: "center", gap: 4 },
   savedName: { color: colors.onSurface, fontSize: font.sm - 1, fontWeight: "700" },
   savedDel: { position: "absolute", top: -6, right: -6, backgroundColor: colors.surface, borderRadius: 10 },
+  logoAdd: { width: 64, height: 56, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.sm, alignItems: "center", justifyContent: "center", gap: 2 },
+  logoCard: { width: 72 },
+  logoThumb: { width: 72, height: 56, borderRadius: radius.sm, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border },
 });

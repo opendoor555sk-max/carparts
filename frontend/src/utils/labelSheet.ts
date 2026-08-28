@@ -100,11 +100,16 @@ export type StickerTemplate = {
   aspect: number;
   lines: TplLine[];
   code: { type: "qr" | "barcode"; value: string; box: Box } | null;
+  logo?: { dataUrl: string; box: Box } | null;
 };
 
 // Builds a CLEAN white sticker: typed text lines + a regenerated code. No photo pixels.
 function templateInner(tpl: StickerTemplate, hMm: number): string {
   let out = "";
+  if (tpl.logo && tpl.logo.dataUrl) {
+    const b = tpl.logo.box;
+    out += `<img src="${tpl.logo.dataUrl}" style="position:absolute;left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%;object-fit:contain"/>`;
+  }
   for (const ln of tpl.lines) {
     const fs = Math.max(0.8, (ln.size / 100) * hMm); // mm
     out += `<div style="position:absolute;left:${ln.x}%;top:${ln.y}%;font-size:${fs.toFixed(2)}mm;font-weight:${ln.bold ? 800 : 500};white-space:nowrap;line-height:1;color:#000;font-family:Arial,Helvetica,sans-serif">${escapeHtml(ln.text)}</div>`;
@@ -123,7 +128,9 @@ function templateInner(tpl: StickerTemplate, hMm: number): string {
 function buildSheet(layout: SheetLayout, cells: number[], showBorder: boolean, innerFor: (w: number, h: number) => string): string {
   const { w, h, rows, cols, total } = layout;
   const leftM = Math.max(0, (A4_W - cols * w) / 2);
-  const topM = Math.max(0, (A4_H - rows * h) / 2);
+  // keep the top margin small (never larger than the side margin) so labels
+  // sit near the top and don't waste/mis-align on pre-cut sheets
+  const topM = Math.min(Math.max(0, (A4_H - rows * h) / 2), leftM);
   const selected = new Set(cells);
   let out = "";
   for (let i = 0; i < total; i++) {

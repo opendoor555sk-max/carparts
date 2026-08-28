@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="4" failures="0" skipped="0" tests="5" time="1.298" timestamp="2026-08-28T17:22:25.244717+00:00" hostname="agent-env-4a5a1f12-6f2e-48c3-9a2a-34d2a99bcc33"><testcase classname="tests.test_sticker_scanner.TestScanStickerAuth" name="test_no_token_returns_401_or_403" time="0.359" /><testcase classname="tests.test_sticker_scanner.TestStickerTemplateStoreIsolation" name="test_storeA_template_not_visible_to_storeB" time="0.347"><error message="failed on setup with &quot;KeyError: 'token'&quot;">backend/tests/test_sticker_scanner.py:65: in teststore1_token
+    return _login("teststore1", "Test@123")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/test_sticker_scanner.py:26: in _login
+    return r.json()["token"]
+           ^^^^^^^^^^^^^^^^^
+E   KeyError: 'token'</error></testcase><testcase classname="tests.test_sticker_scanner.TestStickerTemplateCRUD" name="test_create_list_delete" time="0.420"><error message="failed on setup with &quot;KeyError: 'token'&quot;">backend/tests/test_sticker_scanner.py:65: in teststore1_token
+    return _login("teststore1", "Test@123")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/test_sticker_scanner.py:26: in _login
+    return r.json()["token"]
+           ^^^^^^^^^^^^^^^^^
+E   KeyError: 'token'</error></testcase><testcase classname="tests.test_sticker_scanner.TestStickerTemplateStoreIsolation" name="test_super_admin_can_scope_to_store" time="0.588"><error message="failed on setup with &quot;KeyError: 'token'&quot;">backend/tests/test_sticker_scanner.py:70: in super_token
+    return _login("abdul", "Salam@123")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/test_sticker_scanner.py:26: in _login
+    return r.json()["token"]
+           ^^^^^^^^^^^^^^^^^
+E   KeyError: 'token'</error></testcase><testcase classname="tests.test_sticker_scanner.TestScanStickerShape" name="test_returns_expected_json_shape" time="0.000"><error message="failed on setup with &quot;KeyError: 'token'&quot;">backend/tests/test_sticker_scanner.py:65: in teststore1_token
+    return _login("teststore1", "Test@123")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/test_sticker_scanner.py:26: in _login
+    return r.json()["token"]
+           ^^^^^^^^^^^^^^^^^
+E   KeyError: 'token'</error></testcase></testsuite></testsuites>

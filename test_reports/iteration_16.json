@@ -1,0 +1,37 @@
+{
+  "summary": "Backend testing for iteration 16 — verified new/changed endpoints for the Auto Parts Store multi-tenant app: POST /api/scan-sticker (AI vision), Company Logo Library CRUD (/api/logos), Sticker Templates CRUD (/api/sticker-templates), multi-tenant isolation for both, and meta endpoints GET /api/categories & GET /api/companies. All 7 pytest tests passed (100% backend success). Notes: login endpoint returns {\"access_token\": ...} (NOT \"token\") — matches review spec. scan-sticker latency was ~1-3s on a synthetic 480x300 label image; response shape (aspect/part_number/lines/code/logo) is intact and normalized with defaults. Categories returns exactly 22 groups. Companies list contains Maruti Suzuki, Hyundai, Tata as required. Store-scoped isolation confirmed for both logos and sticker-templates (store B cannot see store A records).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/logos", "issue": "Response 'store_id' field is included in POST /api/logos response but is null when the caller is a store owner? Not verified — POST response includes store_id=<store uuid> as expected. Minor: no explicit test for super_admin cross-store visibility on /api/logos (out of scope of review)."},
+      {"endpoint": "DELETE /api/logos/{lid} & DELETE /api/sticker-templates/{tid}", "issue": "Both return 200 {ok:true} even when the id does not belong to the caller's store (store-scoped filter via sq() silently no-ops). Behavior is safe (no data leak) but a 404 on cross-store/unknown id would be more RESTful."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_scan_logos_templates.py",
+    "/app/test_reports/pytest/scan_logos_templates_results.xml"
+  ],
+  "action_items": [
+    "None from testing — all reviewed endpoints work as spec'd. Optional: consider returning 404 from DELETE endpoints on unknown/foreign ids for cleaner REST semantics."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 1891 lines — should be split into routers (auth, meta, stickers, logos, etc.) for maintainability.",
+    "/api/scan-sticker: on emergentintegrations failure the exception message is surfaced verbatim (HTTPException(502, f\"AI scan failed: {e}\")) — could leak internal error details; consider a sanitized message and log the trace.",
+    "/api/sticker-templates and /api/logos POST endpoints accept arbitrarily large data_url / bg_data_url strings — consider a size cap (e.g. 2 MB) to protect Mongo document limits."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_scan_logos_templates.py (new)"
+  ],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "not tested (per request)"},
+  "seed_data_creation": "Registered a temporary isolation store TEST_isoB_<hex> via /api/auth/register per test module run; all TEST_* logos/templates are deleted in-test via finally blocks.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login endpoint returns access_token (not token). For AI /scan-sticker tests, use a real-looking PIL-generated JPEG with visible text so 'lines' array is non-empty. Fixture 'store_b' registers a fresh store to verify cross-tenant isolation; do not rely on hard-coded second store. sq() helper in server.py silently scopes queries by store_id — DELETE on foreign ids returns 200 but does nothing.",
+  "rca_of_issue": "N/A — no failures."
+}
