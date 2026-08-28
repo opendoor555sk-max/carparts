@@ -1,8 +1,7 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { SvgXml } from "react-native-svg";
 import * as ImagePicker from "expo-image-picker";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
@@ -10,8 +9,6 @@ import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
 import { FilterChip, Header } from "@/src/components/ui";
 import { printHtml } from "@/src/utils/print";
-import { qrSvg } from "@/src/utils/qr";
-import { barcodeSvg } from "@/src/utils/barcode128";
 import { Box, SHEET_LAYOUTS, StickerTemplate, generateRichStickerSheetHtml } from "@/src/utils/labelSheet";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -32,11 +29,50 @@ export default function ScanSticker() {
   const [busy, setBusy] = useState(false);
   const [tpl, setTpl] = useState<StickerTemplate | null>(null);
   const [partNumber, setPartNumber] = useState("");
-  const [codeType, setCodeType] = useState<"qr" | "barcode">("qr");
 
   const [layoutCode, setLayoutCode] = useState("24L");
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [saved, setSaved] = useState<any[]>([]);
   const layout = useMemo(() => SHEET_LAYOUTS.find((l) => l.code === layoutCode)!, [layoutCode]);
+
+  const loadSaved = useCallback(async () => {
+    try {
+      setSaved(await api.get<any[]>("/sticker-templates"));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    loadSaved();
+  }, [loadSaved]);
+
+  const saveTemplate = async () => {
+    if (!tpl) return;
+    try {
+      await api.post("/sticker-templates", {
+        name: (partNumber || "Sticker").trim(),
+        bg_data_url: tpl.bgDataUrl,
+        aspect: tpl.aspect,
+        pn_box: tpl.pnBox,
+        part_number: partNumber,
+      });
+      show("Template saved", "success");
+      loadSaved();
+    } catch (e: any) {
+      show(e?.message || "Save failed", "error");
+    }
+  };
+
+  const openTemplate = (t: any) => {
+    setTpl({ bgDataUrl: t.bg_data_url, aspect: t.aspect || 1.4, pnBox: t.pn_box || null, pnText: t.part_number || "", code: null });
+    setPartNumber(t.part_number || "");
+    setSelected(new Set());
+  };
+
+  const deleteTemplate = async (id: string) => {
+    try {
+      await api.del(`/sticker-templates/${id}`);
+      loadSaved();
+    } catch {}
+  };
 
   const processImage = async (asset: ImagePicker.ImagePickerAsset) => {
     setBusy(true);
@@ -74,18 +110,15 @@ export default function ScanSticker() {
       const aspect = finalW / Math.max(1, finalH);
 
       const pn = res.part_number || "";
-      const ct: "qr" | "barcode" = res.code?.type === "barcode" ? "barcode" : "qr";
-      const codeBox = res.code ? { x: res.code.x, y: res.code.y, w: res.code.w, h: res.code.h } : null;
 
       setTpl({
         bgDataUrl,
         aspect,
         pnBox: res.part_number_box || null,
         pnText: pn,
-        code: codeBox ? { type: ct, value: pn, box: codeBox } : null,
+        code: null, // keep the ORIGINAL code from the photo as-is (do NOT regenerate)
       });
       setPartNumber(pn);
-      setCodeType(ct);
       setSelected(new Set());
       show("Sticker captured", "success");
     } catch (e: any) {
@@ -110,11 +143,7 @@ export default function ScanSticker() {
 
   const applyPn = (value: string) => {
     setPartNumber(value);
-    setTpl((prev) => (prev ? { ...prev, pnText: value, code: prev.code ? { ...prev.code, value } : null } : prev));
-  };
-  const setCode = (t: "qr" | "barcode") => {
-    setCodeType(t);
-    setTpl((prev) => (prev && prev.code ? { ...prev, code: { ...prev.code, type: t } } : prev));
+    setTpl((prev) => (prev ? { ...prev, pnText: value } : prev));
   };
 
   const toggleCell = (num: number) =>
@@ -129,17 +158,13 @@ export default function ScanSticker() {
     if (!tpl) return;
     if (selected.size === 0) return show("Tap blocks to print on", "error");
     try {
-      await printHtml(generateRichStickerSheetHtml(tpl, { layout, cells: Array.from(selected), showBorder: true }));
+      await printHtml(generateRichStickerSheetHtml(tpl, { layout, cells: Array.from(selected), showBorder: false }));
     } catch (e: any) {
       show(e?.message || "Print failed", "error");
     }
   };
 
   const previewH = tpl ? PREVIEW_W / (tpl.aspect || 1.4) : 220;
-  const codeSvg = useMemo(() => {
-    if (!tpl?.code?.value) return "";
-    return codeType === "qr" ? qrSvg(tpl.code.value, { margin: 1 }) : barcodeSvg(tpl.code.value, { height: 60, moduleWidth: 2, showText: false });
-  }, [tpl?.code?.value, codeType]);
 
   const cellW = Math.min(320 / layout.cols, 60);
   const cellH = Math.max(10, cellW / (layout.w / layout.h));
@@ -159,6 +184,25 @@ export default function ScanSticker() {
           </Pressable>
         </View>
 
+        {saved.length ? (
+          <>
+            <Text style={styles.section}>SAVED STICKERS (tap to reuse)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.savedRow}>
+              {saved.map((t) => (
+                <View key={t.id} style={styles.savedCard}>
+                  <Pressable onPress={() => openTemplate(t)} testID={`saved-${t.id}`}>
+                    <Image source={{ uri: t.bg_data_url }} style={styles.savedThumb} resizeMode="cover" />
+                    <Text numberOfLines={1} style={styles.savedName}>{t.name}</Text>
+                  </Pressable>
+                  <Pressable style={styles.savedDel} onPress={() => deleteTemplate(t.id)} testID={`del-${t.id}`}>
+                    <Ionicons name="close-circle" size={18} color={colors.error} />
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
+
         {busy ? (
           <View style={styles.busy}>
             <ActivityIndicator size="large" color={colors.brand} />
@@ -176,21 +220,15 @@ export default function ScanSticker() {
                   <Text numberOfLines={1} style={{ fontSize: Math.max(7, (tpl.pnBox.h / 100) * previewH * 0.72), fontWeight: "800", color: "#000" }}>{partNumber}</Text>
                 </View>
               ) : null}
-              {tpl.code && codeSvg ? (
-                <View style={{ position: "absolute", left: (tpl.code.box.x / 100) * PREVIEW_W, top: (tpl.code.box.y / 100) * previewH, width: (tpl.code.box.w / 100) * PREVIEW_W, height: (tpl.code.box.h / 100) * previewH, backgroundColor: "#fff", padding: 1 }}>
-                  <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio={codeType === "qr" ? "xMidYMid meet" : "none"} />
-                </View>
-              ) : null}
             </View>
 
             <Text style={styles.section}>PART NUMBER (only this changes)</Text>
             <TextInput style={styles.input} value={partNumber} onChangeText={applyPn} autoCapitalize="characters" testID="scan-pn" />
-
-            <Text style={styles.flabel}>CODE TYPE</Text>
-            <View style={styles.chipWrap}>
-              <FilterChip label="QR Code" active={codeType === "qr"} onPress={() => setCode("qr")} testID="ct-qr" />
-              <FilterChip label="Barcode" active={codeType === "barcode"} onPress={() => setCode("barcode")} testID="ct-barcode" />
-            </View>
+            <Text style={styles.dim}>The original code stays exactly as in the photo — only the part number is replaced.</Text>
+            <Pressable style={styles.saveBtn} onPress={saveTemplate} testID="save-template">
+              <Ionicons name="bookmark" size={18} color={colors.brand} />
+              <Text style={styles.saveText}>Save this sticker for reuse</Text>
+            </Pressable>
 
             <Text style={styles.section}>A4 SHEET LAYOUT</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -251,4 +289,11 @@ const styles = StyleSheet.create({
   cellTextOn: { color: colors.onBrand },
   printBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.md, marginTop: spacing.md },
   printText: { color: colors.onBrand, fontSize: font.base, fontWeight: "800", letterSpacing: 0.5 },
+  saveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.sm, marginTop: spacing.xs },
+  saveText: { color: colors.brand, fontSize: font.sm, fontWeight: "800" },
+  savedRow: { gap: spacing.md, paddingVertical: spacing.xs },
+  savedCard: { width: 96 },
+  savedThumb: { width: 96, height: 60, borderRadius: radius.sm, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border },
+  savedName: { color: colors.onSurface3, fontSize: font.sm - 1, marginTop: 2 },
+  savedDel: { position: "absolute", top: -6, right: -6, backgroundColor: colors.surface, borderRadius: 10 },
 });

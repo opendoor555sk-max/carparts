@@ -190,3 +190,8 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Frontend scan-sticker.tsx rewritten: crop sticker bbox + rotate upright (expo-image-manipulator) => bgDataUrl; edit ONLY part number; QR/Barcode toggle; preview = real image + overlays; print via generateRichStickerSheetHtml.
 - labelSheet.ts StickerTemplate rewritten: {bgDataUrl, aspect, pnBox, pnText, code:{type,value,box}}. templateInner = bg img(fill) + white patch + new PN + new code.
 - CAVEATS: best with CLEAR STRAIGHT photo; wrong rotation guess = tilted; AI part_number_box slightly off => patch misalign. NATIVE-only full flow.
+
+## Scanner FINAL (Option A + Save Templates) 2026-06 fork
+- User chose Option A (real photo). Complaints fixed: (1) removed the app-generated QR entirely — the ORIGINAL code stays in the photo (copied), only the part number is overlaid (tpl.code=null; CODE TYPE UI removed). (2) print outline removed (scanner prints with showBorder:false). (3) rotation applied via crop+rotate.
+- Save Templates workflow (their real vision): backend store-scoped CRUD /api/sticker-templates (POST/GET/DELETE) storing {name,bg_data_url(base64),aspect,pn_box,part_number}. Frontend: "Save this sticker for reuse" button + "SAVED STICKERS" horizontal thumbnail row on scan-sticker.tsx; tap a saved thumb -> loads template (bg+pnBox), user types new part number -> prints. Delete via x on thumb. Backend CRUD verified via curl (save/list/delete ok).
+- NOTE: rotation/part_number_box come from gpt-4o-mini and are approximate; best results with a straight, flat, full-frame photo. Full flow native-only (image picker), screen renders on web.

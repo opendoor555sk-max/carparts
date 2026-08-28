@@ -1813,6 +1813,45 @@ async def scan_sticker(req: StickerScanReq, user=Depends(get_current_user)):
     return data
 
 
+# ---------------- Saved Sticker Templates (store-scoped) ----------------
+class StickerTemplateReq(BaseModel):
+    name: str
+    bg_data_url: str
+    aspect: float = 1.4
+    pn_box: Optional[dict] = None
+    part_number: str = ""
+
+
+@api.post("/sticker-templates")
+async def save_sticker_template(req: StickerTemplateReq, user=Depends(get_current_user)):
+    sid = resolve_store(user, None)
+    doc = {
+        "id": uuid.uuid4().hex,
+        "store_id": sid,
+        "name": req.name or "Sticker",
+        "bg_data_url": req.bg_data_url,
+        "aspect": req.aspect,
+        "pn_box": req.pn_box,
+        "part_number": req.part_number,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.sticker_templates.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api.get("/sticker-templates")
+async def list_sticker_templates(store_id: Optional[str] = None, user=Depends(get_current_user)):
+    return await db.sticker_templates.find(sq(user, None, store_id), {"_id": 0}).sort("created_at", -1).to_list(200)
+
+
+@api.delete("/sticker-templates/{tid}")
+async def delete_sticker_template(tid: str, user=Depends(get_current_user)):
+    await db.sticker_templates.delete_one(sq(user, {"id": tid}))
+    return {"ok": True}
+
+
+
 
 app.include_router(api)
 
