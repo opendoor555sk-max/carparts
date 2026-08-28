@@ -100,7 +100,7 @@ function escapeHtml(s: any): string {
 }
 
 export type Box = { x: number; y: number; w: number; h: number };
-export type TplLine = { text: string; x: number; y: number; size: number; bold?: boolean };
+export type TplLine = { text: string; x: number; y: number; size: number; bold?: boolean; zone?: string };
 export type StickerTemplate = {
   aspect: number;
   lines: TplLine[];

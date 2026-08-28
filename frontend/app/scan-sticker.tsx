@@ -42,58 +42,65 @@ function layoutLines(raw: { text: string; bold?: boolean }[], aspect: number, ha
   });
 }
 
-// Hyundai / Kia real-sticker 2-column layout (matches OEM label, per user's zone spec):
-//  - Right-top: UNIT ASSY / HKMC P/N / SYEC P/N / LOT N/O / (value) / H/W Ver / S/W Ver
-//  - Left-top (under logo): HYUNDAI KIA MOTORS
-//  - Left-mid: MODEL / TA / IFT ID   then below it the leftover code (e.g. CRCH-23369)
-//  - Right-mid: QR (placed via code box)
-//  - Bottom-center: VBHH ; Bottom full-width: SEOYON ... MADE IN INDIA
-function layoutHyundaiKia(raw: { text: string; bold?: boolean }[], aspect: number): TplLine[] {
-  const lines = raw.map((l) => ({ text: (l.text || "").trim(), bold: l.bold })).filter((l) => l.text);
+// ---------------- Zone-based placement (user arranges each line freely) ----------------
+// Each line is assigned a ZONE; the user can re-assign any line's zone and reorder lines.
+type ZonedLine = { text: string; bold?: boolean; zone?: string };
+type Zone = { key: string; label: string; x: number; y0: number; dy: number; w: number; base: number; center?: boolean };
+const ZONES: Zone[] = [
+  { key: "leftTop",   label: "L-Top",    x: 2,  y0: 19, dy: 6.5, w: 40, base: 6 },
+  { key: "rightTop",  label: "R-Top",    x: 44, y0: 3,  dy: 5.2, w: 54, base: 5.4 },
+  { key: "leftMid",   label: "L-Mid",    x: 2,  y0: 44, dy: 6.5, w: 54, base: 6 },
+  { key: "rightMid",  label: "R-Mid",    x: 44, y0: 46, dy: 6,   w: 40, base: 5.4 },
+  { key: "botCenter", label: "Bottom-C", x: 0,  y0: 82, dy: 5,   w: 96, base: 5.5, center: true },
+  { key: "bottom",    label: "Bottom",   x: 2,  y0: 90, dy: 5,   w: 96, base: 4.6 },
+];
 
+// Positions zoned lines: groups by zone (in array order) and stacks each group.
+function positionLines(lines: ZonedLine[], aspect: number): TplLine[] {
+  const fit = (w: number, len: number, base: number) =>
+    Math.max(2.0, Math.min(base, (w * aspect) / (Math.max(1, len) * 0.5)));
+  const count: Record<string, number> = {};
+  return lines.map((ln) => {
+    const z = ZONES.find((zz) => zz.key === ln.zone) || ZONES[2]; // default L-Mid
+    const i = count[z.key] || 0; count[z.key] = i + 1;
+    const size = fit(z.w, ln.text.length, z.base);
+    let x = z.x;
+    if (z.center) {
+      const wpct = (ln.text.length * 0.5 * size) / aspect; // approx text width (% of width)
+      x = Math.max(1, 50 - wpct / 2);
+    }
+    return { text: ln.text, x, y: z.y0 + i * z.dy, size, bold: ln.bold, zone: z.key };
+  });
+}
+
+// Auto-guess a starting zone for each scanned line of a Hyundai/Kia OEM label.
+// The user can override any of these afterwards.
+function autoZonesHK(raw: { text: string; bold?: boolean }[]): ZonedLine[] {
+  const lines = raw.map((l) => ({ text: (l.text || "").trim(), bold: l.bold })).filter((l) => l.text);
   const isBottom = (u: string) => /(MADE IN|ELECTRONIC|SEOYON|PVT|LTD|\/\/)/.test(u);
   const isBrand = (u: string) => /MOTORS/.test(u) || /^HYUNDAI\s*KIA/.test(u);
   const isRight = (u: string) => /(UNIT ASSY|ASSY|P\/N|LOT|H\/W|S\/W|VER|HKMC|SYEC)/.test(u);
   const isLeft = (u: string) => /(MODEL|IFT|^TA[ -])/.test(u);
   const isCenter = (t: string) => t.length <= 6 && /^[A-Za-z]+$/.test(t); // e.g. VBHH
-
-  const brand: typeof lines = [], rightTop: typeof lines = [], leftMid: typeof lines = [], bottom: typeof lines = [];
-  let center: { text: string; bold?: boolean } | null = null;
-  let last: "right" | "left" | "bottom" | "brand" | "center" = "left";
+  const out: ZonedLine[] = [];
+  let last = "leftMid";
   for (const ln of lines) {
     const u = ln.text.toUpperCase();
-    if (isBottom(u)) { bottom.push(ln); last = "bottom"; }
-    else if (isBrand(u)) { brand.push(ln); last = "brand"; }
-    else if (isCenter(ln.text)) { if (!center) center = ln; last = "center"; }
-    else if (isLeft(u)) { leftMid.push(ln); last = "left"; }
-    else if (isRight(u)) { rightTop.push(ln); last = "right"; }
-    else {
-      // unmatched: it's a continuation → inherit the previous line's zone.
-      if (last === "right") rightTop.push(ln);
-      else if (last === "bottom") bottom.push(ln);
-      else { leftMid.push(ln); last = "left"; }
-    }
+    let zone: string;
+    if (isBottom(u)) zone = "bottom";
+    else if (isBrand(u)) zone = "leftTop";
+    else if (isCenter(ln.text)) zone = "botCenter";
+    else if (isLeft(u)) zone = "leftMid";
+    else if (isRight(u)) zone = "rightTop";
+    else zone = last === "rightTop" ? "rightTop" : last === "bottom" ? "bottom" : "leftMid"; // continuation
+    last = zone;
+    out.push({ text: ln.text, bold: ln.bold, zone });
   }
-
-  const fit = (wPct: number, len: number, base: number) =>
-    Math.max(2.0, Math.min(base, (wPct * aspect) / (Math.max(1, len) * 0.5)));
-  const out: TplLine[] = [];
-  // Left-top brand line, just under the logo.
-  brand.forEach((ln, i) => out.push({ text: ln.text, x: 2, y: 19 + i * 6.5, size: fit(40, ln.text.length, 6), bold: true }));
-  // Right-top P/N block.
-  const rtStep = rightTop.length ? Math.min(5.5, (44 - 3) / rightTop.length) : 0;
-  rightTop.forEach((ln, i) => out.push({ text: ln.text, x: 44, y: 3 + i * rtStep, size: fit(54, ln.text.length, 5.4), bold: ln.bold }));
-  // Left-mid block (MODEL/TA/IFT) + leftover code stacked below.
-  leftMid.forEach((ln, i) => out.push({ text: ln.text, x: 2, y: 44 + i * 6.5, size: fit(54, ln.text.length, 6), bold: ln.bold }));
-  // Bottom center small line.
-  if (center) out.push({ text: center.text, x: 42, y: 82, size: fit(28, center.text.length, 5.5), bold: false });
-  // Bottom full-width line(s).
-  bottom.forEach((ln, i) => out.push({ text: ln.text, x: 2, y: 90 + i * 5, size: fit(96, ln.text.length, 4.6), bold: false }));
   return out;
 }
 
 function buildLines(raw: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, hasLogo: boolean, company?: string): TplLine[] {
-  if (company && FORMATTED_COMPANIES.includes(company)) return layoutHyundaiKia(raw, aspect);
+  if (company && FORMATTED_COMPANIES.includes(company)) return positionLines(autoZonesHK(raw), aspect);
   return layoutLines(raw, aspect, hasCode, hasLogo ? 20 : 4);
 }
 
@@ -114,7 +121,9 @@ export default function ScanSticker() {
   const [logos, setLogos] = useState<any[]>([]);
   const [company, setCompany] = useState("Hyundai / Kia");
   const [rawLines, setRawLines] = useState<{ text: string; bold?: boolean }[]>([]);
+  const [logoPos, setLogoPos] = useState("leftTop");
   const layout = useMemo(() => SHEET_LAYOUTS.find((l) => l.code === layoutCode)!, [layoutCode]);
+  const isFormatted = FORMATTED_COMPANIES.includes(company);
 
   const loadSaved = useCallback(async () => {
     try { setSaved(await api.get<any[]>("/sticker-templates")); } catch {}
@@ -122,14 +131,28 @@ export default function ScanSticker() {
   }, []);
   useEffect(() => { loadSaved(); }, [loadSaved]);
 
-  const LOGO_BOX: Box = { x: 3, y: 2, w: 34, h: 15 };
+  const LOGO_POSITIONS: Record<string, Box> = {
+    leftTop: { x: 3, y: 2, w: 34, h: 15 },
+    centerTop: { x: 33, y: 2, w: 34, h: 15 },
+    rightTop: { x: 63, y: 2, w: 34, h: 15 },
+    leftMid: { x: 3, y: 40, w: 30, h: 14 },
+  };
+  const LOGO_POS_LABELS: [string, string][] = [["leftTop", "L-Top"], ["centerTop", "Center"], ["rightTop", "R-Top"], ["leftMid", "L-Mid"]];
+
   const applyLogo = (dataUrl: string | null) =>
     setTpl((prev) => {
       if (!prev) return prev;
-      const logo = dataUrl ? { dataUrl, box: LOGO_BOX } : null;
-      const lines = buildLines(rawLines, prev.aspect, !!prev.code, !!logo, prev.company);
+      const logo = dataUrl ? { dataUrl, box: LOGO_POSITIONS[logoPos] || LOGO_POSITIONS.leftTop } : null;
+      // Formatted (zone) layout is independent of the logo → keep the user's line arrangement.
+      if (prev.company && FORMATTED_COMPANIES.includes(prev.company)) return { ...prev, logo };
+      const lines = layoutLines(prev.lines.map((l) => ({ text: l.text, bold: l.bold })), prev.aspect, !!prev.code, logo ? 20 : 4);
       return { ...prev, logo, lines };
     });
+
+  const moveLogo = (pos: string) => {
+    setLogoPos(pos);
+    setTpl((prev) => (prev && prev.logo ? { ...prev, logo: { ...prev.logo, box: LOGO_POSITIONS[pos] || LOGO_POSITIONS.leftTop } } : prev));
+  };
 
   const addLogo = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -237,12 +260,34 @@ export default function ScanSticker() {
     setCodeType(t);
     setTpl((prev) => (prev && prev.code ? { ...prev, code: { ...prev.code, type: t } } : prev));
   };
+  // Recompute positions after a line edit/zone-change/reorder, preserving the user's arrangement.
+  const recompute = (lines: TplLine[], prev: StickerTemplate): TplLine[] =>
+    prev.company && FORMATTED_COMPANIES.includes(prev.company)
+      ? positionLines(lines.map((l) => ({ text: l.text, bold: l.bold, zone: l.zone })), prev.aspect)
+      : layoutLines(lines.map((l) => ({ text: l.text, bold: l.bold })), prev.aspect, !!prev.code, prev.logo ? 20 : 4);
+
   const editLine = (idx: number, text: string) =>
     setTpl((prev) => {
       if (!prev) return prev;
+      const lines = prev.lines.map((l, i) => (i === idx ? { ...l, text } : l));
+      return { ...prev, lines: recompute(lines, prev) };
+    });
+
+  const setLineZone = (idx: number, zone: string) =>
+    setTpl((prev) => {
+      if (!prev) return prev;
+      const lines = prev.lines.map((l, i) => (i === idx ? { ...l, zone } : l));
+      return { ...prev, lines: recompute(lines, prev) };
+    });
+
+  const moveLine = (idx: number, dir: -1 | 1) =>
+    setTpl((prev) => {
+      if (!prev) return prev;
+      const j = idx + dir;
+      if (j < 0 || j >= prev.lines.length) return prev;
       const lines = prev.lines.slice();
-      lines[idx] = { ...lines[idx], text };
-      return { ...prev, lines };
+      [lines[idx], lines[j]] = [lines[j], lines[idx]];
+      return { ...prev, lines: recompute(lines, prev) };
     });
 
   const saveTemplate = async () => {
@@ -256,11 +301,16 @@ export default function ScanSticker() {
   const openTemplate = (t: any) => {
     try {
       const parsed: StickerTemplate = JSON.parse(t.bg_data_url);
-      setTpl(parsed);
+      const comp = parsed.company || "Hyundai / Kia";
+      const rawT = (parsed.lines || []).map((l) => ({ text: l.text, bold: l.bold }));
+      // Legacy templates saved before zones: auto-arrange so the zone editor works.
+      const needsZones = FORMATTED_COMPANIES.includes(comp) && !(parsed.lines || []).some((l) => l.zone);
+      const lines = needsZones ? positionLines(autoZonesHK(rawT), parsed.aspect || 1.6) : parsed.lines;
+      setTpl({ ...parsed, company: comp, lines });
       setPartNumber(t.part_number || parsed.code?.value || "");
       setCodeType(parsed.code?.type || "qr");
-      setCompany(parsed.company || "Hyundai / Kia");
-      setRawLines((parsed.lines || []).map((l) => ({ text: l.text, bold: l.bold })));
+      setCompany(comp);
+      setRawLines(rawT);
       setSelected(new Set());
     } catch { show("Could not open template", "error"); }
   };
@@ -373,7 +423,7 @@ export default function ScanSticker() {
             </ScrollView>
             <Text style={styles.hint}>
               {FORMATTED_COMPANIES.includes(company)
-                ? `★ ${company} format: 2-column OEM layout (logo + P/N block, QR right).`
+                ? `★ ${company} format: arrange each line's place (L-Top / R-Top / L-Mid / Bottom), reorder, move logo. DataMatrix on the right.`
                 : `${company}: standard layout. A dedicated format can be added later.`}
             </Text>
 
@@ -398,6 +448,16 @@ export default function ScanSticker() {
                 </View>
               ))}
             </ScrollView>
+            {tpl.logo ? (
+              <>
+                <Text style={styles.subHint}>Logo position</Text>
+                <View style={styles.chipWrap}>
+                  {LOGO_POS_LABELS.map(([key, lbl]) => (
+                    <FilterChip key={key} label={lbl} active={logoPos === key} onPress={() => moveLogo(key)} testID={`logopos-${key}`} />
+                  ))}
+                </View>
+              </>
+            ) : null}
 
             <Text style={styles.flabel}>CODE TYPE</Text>
             <View style={styles.chipWrap}>
@@ -406,9 +466,30 @@ export default function ScanSticker() {
               <FilterChip label="Barcode" active={codeType === "barcode"} onPress={() => setCode("barcode")} testID="ct-barcode" />
             </View>
 
-            <Text style={styles.flabel}>TEXT LINES (tap to edit)</Text>
+            <Text style={styles.flabel}>TEXT LINES{isFormatted ? " — set each line's place / reorder" : " (tap to edit)"}</Text>
             {tpl.lines.map((ln, i) => (
-              <TextInput key={`e${i}`} style={styles.lineInput} value={ln.text} onChangeText={(t) => editLine(i, t)} testID={`line-${i}`} />
+              <View key={`e${i}`} style={styles.lineBlock}>
+                <View style={styles.lineTopRow}>
+                  <TextInput style={styles.lineInputFlex} value={ln.text} onChangeText={(t) => editLine(i, t)} testID={`line-${i}`} />
+                  {isFormatted ? (
+                    <View style={styles.moveCol}>
+                      <Pressable style={styles.moveBtn} onPress={() => moveLine(i, -1)} testID={`up-${i}`}>
+                        <Ionicons name="chevron-up" size={16} color={colors.onSurface} />
+                      </Pressable>
+                      <Pressable style={styles.moveBtn} onPress={() => moveLine(i, 1)} testID={`down-${i}`}>
+                        <Ionicons name="chevron-down" size={16} color={colors.onSurface} />
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+                {isFormatted ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.zoneRow}>
+                    {ZONES.map((z) => (
+                      <FilterChip key={z.key} label={z.label} active={ln.zone === z.key} onPress={() => setLineZone(i, z.key)} testID={`zone-${i}-${z.key}`} />
+                    ))}
+                  </ScrollView>
+                ) : null}
+              </View>
             ))}
 
             <Pressable style={styles.saveBtn} onPress={saveTemplate} testID="save-template">
@@ -474,6 +555,13 @@ const styles = StyleSheet.create({
   preview: { backgroundColor: "#fff", borderRadius: radius.sm, alignSelf: "center", overflow: "hidden", borderWidth: 1, borderColor: colors.border },
   input: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.onSurface, fontSize: font.base },
   lineInput: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.sm },
+  lineBlock: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: spacing.xs, gap: spacing.xs },
+  lineTopRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  lineInputFlex: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.sm },
+  moveCol: { flexDirection: "row", gap: 4 },
+  moveBtn: { width: 34, height: 34, borderRadius: radius.sm, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border },
+  zoneRow: { gap: spacing.xs, paddingVertical: 2 },
+  subHint: { color: colors.info, fontSize: font.sm - 1, marginTop: spacing.xs },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chipRow: { gap: spacing.sm, paddingVertical: spacing.xs },
   gridCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, alignItems: "center" },
