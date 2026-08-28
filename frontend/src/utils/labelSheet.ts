@@ -53,6 +53,8 @@ export type SheetOptions = {
   layout: SheetLayout;
   cells: number[]; // 1-based cell indices to print on
   showBorder?: boolean; // dashed cut guides
+  marginTop?: number | null; // mm, manual top margin override (null/undefined = auto)
+  marginLeft?: number | null; // mm, manual left margin override
 };
 
 const A4_W = 210;
@@ -125,12 +127,13 @@ function templateInner(tpl: StickerTemplate, hMm: number): string {
   return out;
 }
 
-function buildSheet(layout: SheetLayout, cells: number[], showBorder: boolean, innerFor: (w: number, h: number) => string): string {
+function buildSheet(opts: SheetOptions, innerFor: (w: number, h: number) => string): string {
+  const { layout, cells, showBorder } = opts;
   const { w, h, rows, cols, total } = layout;
-  const leftM = Math.max(0, (A4_W - cols * w) / 2);
-  // keep the top margin small (never larger than the side margin) so labels
-  // sit near the top and don't waste/mis-align on pre-cut sheets
-  const topM = Math.min(Math.max(0, (A4_H - rows * h) / 2), leftM);
+  const autoLeft = Math.max(0, (A4_W - cols * w) / 2);
+  const autoTop = Math.min(Math.max(0, (A4_H - rows * h) / 2), autoLeft);
+  const leftM = opts.marginLeft == null ? autoLeft : Math.max(0, opts.marginLeft);
+  const topM = opts.marginTop == null ? autoTop : Math.max(0, opts.marginTop);
   const selected = new Set(cells);
   let out = "";
   for (let i = 0; i < total; i++) {
@@ -154,9 +157,9 @@ function buildSheet(layout: SheetLayout, cells: number[], showBorder: boolean, i
 }
 
 export function generateSheetHtml(content: LabelContent, opts: SheetOptions): string {
-  return buildSheet(opts.layout, opts.cells, !!opts.showBorder, (w, h) => labelInner(content, w, h));
+  return buildSheet(opts, (w, h) => labelInner(content, w, h));
 }
 
 export function generateRichStickerSheetHtml(tpl: StickerTemplate, opts: SheetOptions): string {
-  return buildSheet(opts.layout, opts.cells, !!opts.showBorder, (_w, h) => templateInner(tpl, h));
+  return buildSheet(opts, (_w, h) => templateInner(tpl, h));
 }

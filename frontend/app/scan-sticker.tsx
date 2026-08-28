@@ -45,6 +45,8 @@ export default function ScanSticker() {
 
   const [layoutCode, setLayoutCode] = useState("24L");
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [marginTop, setMarginTop] = useState("");
+  const [marginLeft, setMarginLeft] = useState("");
   const [saved, setSaved] = useState<any[]>([]);
   const [logos, setLogos] = useState<any[]>([]);
   const layout = useMemo(() => SHEET_LAYOUTS.find((l) => l.code === layoutCode)!, [layoutCode]);
@@ -177,7 +179,9 @@ export default function ScanSticker() {
     if (!tpl) return;
     if (selected.size === 0) return show("Tap blocks to print on", "error");
     try {
-      await printHtml(generateRichStickerSheetHtml(tpl, { layout, cells: Array.from(selected), showBorder: false }));
+      const mt = marginTop.trim() === "" ? null : Math.max(0, parseFloat(marginTop) || 0);
+      const ml = marginLeft.trim() === "" ? null : Math.max(0, parseFloat(marginLeft) || 0);
+      await printHtml(generateRichStickerSheetHtml(tpl, { layout, cells: Array.from(selected), showBorder: false, marginTop: mt, marginLeft: ml }));
     } catch (e: any) { show(e?.message || "Print failed", "error"); }
   };
 
@@ -304,6 +308,15 @@ export default function ScanSticker() {
               </View>
             </View>
 
+            <Text style={styles.flabel}>PAPER MARGIN (mm) — blank = auto</Text>
+            <View style={styles.chipWrap}>
+              <TextInput style={styles.marginInput} value={marginTop} onChangeText={setMarginTop} placeholder="Top" placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="margin-top" />
+              <TextInput style={styles.marginInput} value={marginLeft} onChangeText={setMarginLeft} placeholder="Left" placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="margin-left" />
+              <Pressable style={styles.logoAdd} onPress={() => { setMarginTop("0"); setMarginLeft("0"); }} testID="margin-zero">
+                <Text style={styles.saveText}>0 / 0</Text>
+              </Pressable>
+            </View>
+
             <Pressable style={styles.printBtn} onPress={onPrint} testID="scan-print">
               <Ionicons name="print" size={20} color={colors.onBrand} /><Text style={styles.printText}>Print A4 Sheet</Text>
             </Pressable>
@@ -352,4 +365,5 @@ const styles = StyleSheet.create({
   logoAdd: { width: 64, height: 56, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.sm, alignItems: "center", justifyContent: "center", gap: 2 },
   logoCard: { width: 72 },
   logoThumb: { width: 72, height: 56, borderRadius: radius.sm, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border },
+  marginInput: { width: 80, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.base },
 });

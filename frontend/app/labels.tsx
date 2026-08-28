@@ -34,6 +34,8 @@ export default function Labels() {
   const [layoutCode, setLayoutCode] = useState("24L");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [showBorder, setShowBorder] = useState(true);
+  const [marginTop, setMarginTop] = useState("");
+  const [marginLeft, setMarginLeft] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const scannedRef = useRef(false);
@@ -95,7 +97,7 @@ export default function Labels() {
     try {
       const html = generateSheetHtml(
         { partNumber: partNumber.trim(), line1: line1.trim(), line2: line2.trim(), code },
-        { layout, cells: Array.from(selected), showBorder },
+        { layout, cells: Array.from(selected), showBorder, marginTop: marginTop.trim() === "" ? null : Math.max(0, parseFloat(marginTop) || 0), marginLeft: marginLeft.trim() === "" ? null : Math.max(0, parseFloat(marginLeft) || 0) },
       );
       await printHtml(html);
     } catch (e: any) {
@@ -199,6 +201,15 @@ export default function Labels() {
           <Switch value={showBorder} onValueChange={setShowBorder} trackColor={{ true: colors.brand }} testID="lbl-border" />
         </View>
 
+        <Text style={styles.flabel}>PAPER MARGIN (mm) — blank = auto</Text>
+        <View style={styles.chipWrap}>
+          <TextInput style={styles.mInput} value={marginTop} onChangeText={setMarginTop} placeholder="Top" placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="margin-top" />
+          <TextInput style={styles.mInput} value={marginLeft} onChangeText={setMarginLeft} placeholder="Left" placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="margin-left" />
+          <Pressable style={styles.zeroBtn} onPress={() => { setMarginTop("0"); setMarginLeft("0"); }} testID="margin-zero">
+            <Text style={styles.resetText}>0 / 0</Text>
+          </Pressable>
+        </View>
+
         <Text style={styles.dim}>Printing {selectedCount} label{selectedCount === 1 ? "" : "s"} on selected blocks</Text>
 
         <Pressable style={styles.printBtn} onPress={onPrint} testID="lbl-print">
@@ -258,6 +269,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   resetBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md },
   resetText: { color: colors.brand, fontWeight: "700", fontSize: font.sm },
+  mInput: { width: 80, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.base },
+  zeroBtn: { justifyContent: "center", paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.sm },
   borderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.xs },
   borderLabel: { color: colors.onSurface, fontSize: font.base },
   printBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.md, marginTop: spacing.md },
