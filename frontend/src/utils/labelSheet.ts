@@ -1,6 +1,7 @@
 // A4 sticker-sheet master layouts + anti-wastage print HTML generator.
 // Data from the user's sticker chart (Layout Code / Total / W x H mm / Rows x Cols).
 import { barcodeSvg } from "@/src/utils/barcode128";
+import { dataMatrixSvg } from "@/src/utils/dmatrix";
 import { qrSvg } from "@/src/utils/qr";
 
 export type SheetLayout = {
@@ -103,7 +104,7 @@ export type TplLine = { text: string; x: number; y: number; size: number; bold?:
 export type StickerTemplate = {
   aspect: number;
   lines: TplLine[];
-  code: { type: "qr" | "barcode"; value: string; box: Box } | null;
+  code: { type: "qr" | "barcode" | "datamatrix"; value: string; box: Box } | null;
   logo?: { dataUrl: string; box: Box } | null;
   company?: string;
 };
@@ -120,16 +121,18 @@ function templateInner(tpl: StickerTemplate, wMm: number, hMm: number): string {
     out += `<div style="position:absolute;left:${ln.x}%;top:${ln.y}%;font-size:${fs.toFixed(2)}mm;font-weight:${ln.bold ? 800 : 500};white-space:nowrap;line-height:1;color:#000;font-family:Arial,Helvetica,sans-serif">${escapeHtml(ln.text)}</div>`;
   }
   if (tpl.code && tpl.code.value) {
-    if (tpl.code.type === "qr") {
-      // FIXED 10mm x 10mm QR (capped to fit). Vertical position from box.y, right-aligned.
-      const qmm = Math.min(10, hMm - 1, wMm - 2);
-      const topMm = Math.max(0, Math.min((tpl.code.box.y / 100) * hMm, hMm - qmm));
-      const svg = qrSvg(tpl.code.value, { margin: 1 });
-      out += `<div style="position:absolute;right:2mm;top:${topMm.toFixed(2)}mm;width:${qmm.toFixed(2)}mm;height:${qmm.toFixed(2)}mm;display:flex;align-items:center;justify-content:center">${svg.replace("<svg ", `<svg style="width:100%;height:100%" `)}</div>`;
-    } else {
+    if (tpl.code.type === "barcode") {
       const b = tpl.code.box;
       const svg = barcodeSvg(tpl.code.value, { height: 60, moduleWidth: 2, showText: false });
       out += `<div style="position:absolute;left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%;display:flex;align-items:center;justify-content:center">${svg.replace("<svg ", `<svg preserveAspectRatio="none" style="width:100%;height:100%" `)}</div>`;
+    } else {
+      // Square 2D code (QR or DataMatrix): FIXED 10mm (capped), box.y vertical, right-aligned.
+      const qmm = Math.min(10, hMm - 1, wMm - 2);
+      const topMm = Math.max(0, Math.min((tpl.code.box.y / 100) * hMm, hMm - qmm));
+      const svg = tpl.code.type === "datamatrix"
+        ? dataMatrixSvg(tpl.code.value, { margin: 1 })
+        : qrSvg(tpl.code.value, { margin: 1 });
+      out += `<div style="position:absolute;right:2mm;top:${topMm.toFixed(2)}mm;width:${qmm.toFixed(2)}mm;height:${qmm.toFixed(2)}mm;display:flex;align-items:center;justify-content:center">${svg.replace("<svg ", `<svg style="width:100%;height:100%" `)}</div>`;
     }
   }
   return out;

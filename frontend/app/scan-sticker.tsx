@@ -12,10 +12,12 @@ import { FilterChip, Header } from "@/src/components/ui";
 import { printHtml } from "@/src/utils/print";
 import { qrSvg } from "@/src/utils/qr";
 import { barcodeSvg } from "@/src/utils/barcode128";
+import { dataMatrixSvg } from "@/src/utils/dmatrix";
 import { Box, SHEET_LAYOUTS, StickerTemplate, TplLine, generateRichStickerSheetHtml } from "@/src/utils/labelSheet";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type ScanResult = { aspect: number; part_number: string; lines: { text: string; bold?: boolean }[]; code: { type: string } | null; logo: Box | null };
+type CodeType = "qr" | "barcode" | "datamatrix";
 
 const PREVIEW_W = 320;
 
@@ -102,7 +104,7 @@ export default function ScanSticker() {
   const [busy, setBusy] = useState(false);
   const [tpl, setTpl] = useState<StickerTemplate | null>(null);
   const [partNumber, setPartNumber] = useState("");
-  const [codeType, setCodeType] = useState<"qr" | "barcode">("qr");
+  const [codeType, setCodeType] = useState<CodeType>("qr");
 
   const [layoutCode, setLayoutCode] = useState("24L");
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -169,7 +171,6 @@ export default function ScanSticker() {
 
       const res = await api.post<ScanResult>("/scan-sticker", { image_base64: sendB64 });
       const aspect = res.aspect || 1.6;
-      const ct: "qr" | "barcode" = res.code?.type === "barcode" ? "barcode" : "qr";
       const hasCode = !!res.code;
       const pn = res.part_number || "";
       const rl = res.lines || [];
@@ -177,6 +178,9 @@ export default function ScanSticker() {
       const joined = rl.map((l) => (l.text || "").toUpperCase()).join(" ");
       let comp = company;
       if (/HYUNDAI/.test(joined) || /\bKIA\b/.test(joined)) comp = "Hyundai / Kia";
+      // Hyundai/Kia OEM labels use a DataMatrix code (not QR). Others: keep detected.
+      let ct: CodeType = res.code?.type === "barcode" ? "barcode" : "qr";
+      if (FORMATTED_COMPANIES.includes(comp)) ct = "datamatrix";
       setRawLines(rl);
       setCompany(comp);
       buildTpl(rl, aspect, hasCode, ct, pn, null, comp);
@@ -191,7 +195,7 @@ export default function ScanSticker() {
     }
   };
 
-  const buildTpl = (rl: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, ct: "qr" | "barcode", pn: string, logo: StickerTemplate["logo"], comp: string) => {
+  const buildTpl = (rl: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, ct: CodeType, pn: string, logo: StickerTemplate["logo"], comp: string) => {
     const lines = buildLines(rl, aspect, hasCode, !!logo, comp);
     setTpl({ aspect, lines, code: hasCode ? { type: ct, value: pn, box: codeBox(aspect, comp) } : null, logo, company: comp });
   };
@@ -201,7 +205,13 @@ export default function ScanSticker() {
     setTpl((prev) => {
       if (!prev) return prev;
       const lines = buildLines(rawLines, prev.aspect, !!prev.code, !!prev.logo, comp);
-      const code = prev.code ? { ...prev.code, box: codeBox(prev.aspect, comp) } : null;
+      let code = prev.code ? { ...prev.code, box: codeBox(prev.aspect, comp) } : null;
+      if (code) {
+        // Formatted companies default to DataMatrix; leaving reverts DataMatrix -> QR.
+        const nt: CodeType = FORMATTED_COMPANIES.includes(comp) ? "datamatrix" : code.type === "datamatrix" ? "qr" : code.type;
+        code = { ...code, type: nt };
+        setCodeType(nt);
+      }
       return { ...prev, company: comp, lines, code };
     });
   };
@@ -223,7 +233,7 @@ export default function ScanSticker() {
     setPartNumber(value);
     setTpl((prev) => (prev ? { ...prev, code: prev.code ? { ...prev.code, value } : null } : prev));
   };
-  const setCode = (t: "qr" | "barcode") => {
+  const setCode = (t: CodeType) => {
     setCodeType(t);
     setTpl((prev) => (prev && prev.code ? { ...prev, code: { ...prev.code, type: t } } : prev));
   };
@@ -272,7 +282,9 @@ export default function ScanSticker() {
   const previewH = tpl ? PREVIEW_W / (tpl.aspect || 1.6) : 220;
   const codeSvg = useMemo(() => {
     if (!tpl?.code?.value) return "";
-    return codeType === "qr" ? qrSvg(tpl.code.value, { margin: 1 }) : barcodeSvg(tpl.code.value, { height: 60, moduleWidth: 2, showText: false });
+    if (codeType === "barcode") return barcodeSvg(tpl.code.value, { height: 60, moduleWidth: 2, showText: false });
+    if (codeType === "datamatrix") return dataMatrixSvg(tpl.code.value, { margin: 1 });
+    return qrSvg(tpl.code.value, { margin: 1 });
   }, [tpl?.code?.value, codeType]);
 
   const cellW = Math.min(320 / layout.cols, 60);
@@ -322,7 +334,11 @@ export default function ScanSticker() {
                 <Image source={{ uri: tpl.logo.dataUrl }} resizeMode="contain" style={{ position: "absolute", left: (tpl.logo.box.x / 100) * PREVIEW_W, top: (tpl.logo.box.y / 100) * previewH, width: (tpl.logo.box.w / 100) * PREVIEW_W, height: (tpl.logo.box.h / 100) * previewH }} />
               ) : null}
               {tpl.code && codeSvg ? (
-                codeType === "qr" ? (
+                codeType === "barcode" ? (
+                  <View style={{ position: "absolute", left: (tpl.code.box.x / 100) * PREVIEW_W, top: (tpl.code.box.y / 100) * previewH, width: (tpl.code.box.w / 100) * PREVIEW_W, height: (tpl.code.box.h / 100) * previewH }}>
+                    <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio="none" />
+                  </View>
+                ) : (
                   (() => {
                     const qpx = Math.min(previewH - 4, (10 / layout.h) * previewH);
                     const left = PREVIEW_W - qpx - (2 / layout.w) * PREVIEW_W;
@@ -333,10 +349,6 @@ export default function ScanSticker() {
                       </View>
                     );
                   })()
-                ) : (
-                  <View style={{ position: "absolute", left: (tpl.code.box.x / 100) * PREVIEW_W, top: (tpl.code.box.y / 100) * previewH, width: (tpl.code.box.w / 100) * PREVIEW_W, height: (tpl.code.box.h / 100) * previewH }}>
-                    <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio="none" />
-                  </View>
                 )
               ) : null}
               {tpl.lines.map((ln, i) => (
@@ -390,6 +402,7 @@ export default function ScanSticker() {
             <Text style={styles.flabel}>CODE TYPE</Text>
             <View style={styles.chipWrap}>
               <FilterChip label="QR Code" active={codeType === "qr"} onPress={() => setCode("qr")} testID="ct-qr" />
+              <FilterChip label="DataMatrix" active={codeType === "datamatrix"} onPress={() => setCode("datamatrix")} testID="ct-datamatrix" />
               <FilterChip label="Barcode" active={codeType === "barcode"} onPress={() => setCode("barcode")} testID="ct-barcode" />
             </View>
 
