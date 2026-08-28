@@ -19,10 +19,10 @@ type ScanResult = { aspect: number; part_number: string; lines: { text: string; 
 
 const PREVIEW_W = 320;
 
-const COMPANIES = ["Hyundai", "Kia", "Maruti Suzuki", "Tata", "Mahindra", "Toyota", "Honda", "Nissan", "Renault", "Ford", "Volkswagen", "Skoda", "MG", "Datsun", "Chevrolet", "Fiat", "Jeep", "Citroen", "Isuzu", "Other"];
+const COMPANIES = ["Hyundai / Kia", "Maruti Suzuki", "Tata", "Mahindra", "Toyota", "Honda", "Nissan", "Renault", "Ford", "Volkswagen", "Skoda", "MG", "Datsun", "Chevrolet", "Fiat", "Jeep", "Citroen", "Isuzu", "Other"];
 
 // Companies that have a dedicated 2-column layout preset. Others fall back to generic.
-const FORMATTED_COMPANIES = ["Hyundai", "Kia"];
+const FORMATTED_COMPANIES = ["Hyundai / Kia"];
 
 // Clean vertical layout: no overlap, font shrinks to fit width, code in right column.
 function layoutLines(raw: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, topPad: number): TplLine[] {
@@ -110,7 +110,7 @@ export default function ScanSticker() {
   const [marginLeft, setMarginLeft] = useState("");
   const [saved, setSaved] = useState<any[]>([]);
   const [logos, setLogos] = useState<any[]>([]);
-  const [company, setCompany] = useState("Hyundai");
+  const [company, setCompany] = useState("Hyundai / Kia");
   const [rawLines, setRawLines] = useState<{ text: string; bold?: boolean }[]>([]);
   const layout = useMemo(() => SHEET_LAYOUTS.find((l) => l.code === layoutCode)!, [layoutCode]);
 
@@ -176,8 +176,7 @@ export default function ScanSticker() {
       // Auto-detect company from the sticker text.
       const joined = rl.map((l) => (l.text || "").toUpperCase()).join(" ");
       let comp = company;
-      if (/HYUNDAI/.test(joined)) comp = "Hyundai";
-      else if (/\bKIA\b/.test(joined)) comp = "Kia";
+      if (/HYUNDAI/.test(joined) || /\bKIA\b/.test(joined)) comp = "Hyundai / Kia";
       setRawLines(rl);
       setCompany(comp);
       buildTpl(rl, aspect, hasCode, ct, pn, null, comp);
@@ -250,7 +249,7 @@ export default function ScanSticker() {
       setTpl(parsed);
       setPartNumber(t.part_number || parsed.code?.value || "");
       setCodeType(parsed.code?.type || "qr");
-      setCompany(parsed.company || "Hyundai");
+      setCompany(parsed.company || "Hyundai / Kia");
       setRawLines((parsed.lines || []).map((l) => ({ text: l.text, bold: l.bold })));
       setSelected(new Set());
     } catch { show("Could not open template", "error"); }
