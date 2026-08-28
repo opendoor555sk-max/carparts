@@ -1747,6 +1747,88 @@ async def backup_excel(user=Depends(require_admin)):
     )
 
 
+# ---------------- AI Sticker Scanner (Gemini 3 Pro vision) ----------------
+class StickerScanReq(BaseModel):
+    image_base64: str  # raw base64 (no data: prefix)
+
+
+STICKER_SCAN_PROMPT = """You are an OCR + layout extraction engine for product stickers/labels (e.g. automotive ECU labels).
+Analyze the sticker in the image and return ONLY a strict JSON object (no markdown, no explanation) with this schema:
+{
+  "aspect": <number, sticker width divided by height, e.g. 1.45>,
+  "part_number": "<the single most important part number on the label, best guess>",
+  "lines": [
+    {
+      "text": "<exact text of this line>",
+      "x": <number 0-100, left edge % of the text block>,
+      "y": <number 0-100, top edge % of the text block>,
+      "size": <number 2-20, font height as % of sticker height>,
+      "bold": <true|false>,
+      "align": "left" | "center" | "right"
+    }
+  ],
+  "logos": [
+    { "label": "<brand name if known e.g. Hyundai>", "x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100> }
+  ],
+  "codes": [
+    { "type": "qr" | "barcode" | "datamatrix", "value": "<decoded value if readable else best guess or empty>", "x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100> }
+  ]
+}
+Rules:
+- Capture EVERY visible text line in reading order (top to bottom), however many there are.
+- x/y/w/h are percentages relative to the STICKER's bounding box (not the whole photo).
+- If the image is rotated/upside-down, read it in its correct upright orientation.
+- Include manufacturer logos as logo entries with their bounding box.
+- Detect any QR / barcode / datamatrix and its bounding box and type.
+- Return valid JSON only."""
+
+
+@api.post("/scan-sticker")
+async def scan_sticker(req: StickerScanReq, user=Depends(get_current_user)):
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(500, "AI key not configured")
+    b64 = req.image_base64
+    if "," in b64 and b64.strip().startswith("data:"):
+        b64 = b64.split(",", 1)[1]
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"sticker-{uuid.uuid4().hex[:8]}",
+            system_message="You extract structured JSON from product label images. Output JSON only.",
+        ).with_model("gemini", "gemini-3.1-pro-preview")
+        msg = UserMessage(text=STICKER_SCAN_PROMPT, file_contents=[ImageContent(image_base64=b64)])
+        raw = await chat.send_message(msg)
+    except Exception as e:
+        logger.exception("sticker scan failed")
+        raise HTTPException(502, f"AI scan failed: {e}")
+
+    text = raw if isinstance(raw, str) else str(raw)
+    # strip markdown fences if present
+    t = text.strip()
+    if t.startswith("```"):
+        t = t.strip("`")
+        if t.lower().startswith("json"):
+            t = t[4:]
+    # extract first {...}
+    start = t.find("{")
+    end = t.rfind("}")
+    if start == -1 or end == -1:
+        raise HTTPException(502, "AI returned no JSON")
+    try:
+        data = json.loads(t[start:end + 1])
+    except Exception:
+        raise HTTPException(502, "AI returned invalid JSON")
+    # normalize
+    data.setdefault("aspect", 1.4)
+    data.setdefault("part_number", "")
+    data.setdefault("lines", [])
+    data.setdefault("logos", [])
+    data.setdefault("codes", [])
+    return data
+
+
+
 app.include_router(api)
 
 app.add_middleware(

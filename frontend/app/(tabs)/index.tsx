@@ -166,6 +166,20 @@ export default function Home() {
         <View style={{ gap: spacing.md }}>
           <Pressable
             style={styles.report}
+            onPress={() => router.push("/scan-sticker" as any)}
+            testID="home-scan-sticker"
+          >
+            <View style={[styles.reportIcon, { borderColor: colors.brand }]}>
+              <Ionicons name="scan" size={22} color={colors.brand} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reportTitle}>AI Sticker Scanner</Text>
+              <Text style={styles.reportSub}>Scan any sticker from gallery/camera • edit part no • reprint</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.info} />
+          </Pressable>
+          <Pressable
+            style={styles.report}
             onPress={() => router.push("/labels" as any)}
             testID="home-labels"
           >

@@ -94,16 +94,36 @@ function escapeHtml(s: any): string {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function generateSheetHtml(content: LabelContent, opts: SheetOptions): string {
-  const { layout, cells, showBorder } = opts;
+export type TplLine = { text: string; x: number; y: number; size: number; bold?: boolean; align?: "left" | "center" | "right" };
+export type TplLogo = { dataUrl: string; x: number; y: number; w: number; h: number };
+export type TplCode = { type: "qr" | "barcode"; value: string; x: number; y: number; w: number; h: number };
+export type StickerTemplate = { aspect: number; lines: TplLine[]; logos: TplLogo[]; code: TplCode | null };
+
+// Renders a full captured sticker template inside one label cell (positions are % of the cell).
+function templateInner(tpl: StickerTemplate, h: number): string {
+  let out = "";
+  for (const lg of tpl.logos) {
+    out += `<img src="${lg.dataUrl}" style="position:absolute;left:${lg.x}%;top:${lg.y}%;width:${lg.w}%;height:${lg.h}%;object-fit:contain"/>`;
+  }
+  if (tpl.code && tpl.code.value) {
+    const svg = tpl.code.type === "qr"
+      ? qrSvg(tpl.code.value, { margin: 1 })
+      : barcodeSvg(tpl.code.value, { height: 60, moduleWidth: 2, showText: false });
+    const pa = tpl.code.type === "qr" ? "" : 'preserveAspectRatio="none"';
+    out += `<div style="position:absolute;left:${tpl.code.x}%;top:${tpl.code.y}%;width:${tpl.code.w}%;height:${tpl.code.h}%;display:flex;align-items:center;justify-content:center">${svg.replace("<svg ", `<svg ${pa} style="width:100%;height:100%" `)}</div>`;
+  }
+  for (const ln of tpl.lines) {
+    const fs = Math.max(0.6, (ln.size / 100) * h); // mm
+    out += `<div style="position:absolute;left:${ln.x}%;top:${ln.y}%;font-size:${fs.toFixed(2)}mm;font-weight:${ln.bold ? 800 : 500};white-space:nowrap;line-height:1">${escapeHtml(ln.text)}</div>`;
+  }
+  return out;
+}
+
+function buildSheet(layout: SheetLayout, cells: number[], showBorder: boolean, innerFor: (w: number, h: number) => string): string {
   const { w, h, rows, cols, total } = layout;
-  const gridW = cols * w;
-  const gridH = rows * h;
-  const leftM = Math.max(0, (A4_W - gridW) / 2);
-  const topM = Math.max(0, (A4_H - gridH) / 2);
-
+  const leftM = Math.max(0, (A4_W - cols * w) / 2);
+  const topM = Math.max(0, (A4_H - rows * h) / 2);
   const selected = new Set(cells);
-
   let out = "";
   for (let i = 0; i < total; i++) {
     const r = Math.floor(i / cols);
@@ -111,12 +131,10 @@ export function generateSheetHtml(content: LabelContent, opts: SheetOptions): st
     const x = leftM + col * w;
     const y = topM + r * h;
     const num = i + 1;
-    const filled = selected.has(num);
     const border = showBorder ? "border:0.2mm dashed #bbb;" : "";
-    const inner = filled ? labelInner(content, w, h) : "";
-    out += `<div style="position:absolute;left:${x}mm;top:${y}mm;width:${w}mm;height:${h}mm;box-sizing:border-box;overflow:hidden;${border}">${inner}</div>`;
+    const inner = selected.has(num) ? innerFor(w, h) : "";
+    out += `<div style="position:absolute;left:${x}mm;top:${y}mm;width:${w}mm;height:${h}mm;box-sizing:border-box;overflow:hidden;background:#fff;${border}"><div style="position:relative;width:100%;height:100%">${inner}</div></div>`;
   }
-
   return `<html><head><meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     @page { size: A4; margin: 0; }
@@ -125,4 +143,12 @@ export function generateSheetHtml(content: LabelContent, opts: SheetOptions): st
     * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   </style></head>
   <body><div class="sheet">${out}</div></body></html>`;
+}
+
+export function generateSheetHtml(content: LabelContent, opts: SheetOptions): string {
+  return buildSheet(opts.layout, opts.cells, !!opts.showBorder, (w, h) => labelInner(content, w, h));
+}
+
+export function generateRichStickerSheetHtml(tpl: StickerTemplate, opts: SheetOptions): string {
+  return buildSheet(opts.layout, opts.cells, !!opts.showBorder, (_w, h) => templateInner(tpl, h));
 }
