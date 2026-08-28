@@ -271,6 +271,7 @@ class RegisterIn(BaseModel):
     name: str
     username: str
     password: str
+    contact: str
 
 
 class ApiSettingsIn(BaseModel):
@@ -462,20 +463,22 @@ async def root():
 async def register(body: RegisterIn):
     username = body.username.lower().strip()
     if not username or not body.password or not body.store_name.strip():
-        raise HTTPException(422, "Store name, username અને password જરૂરી છે")
+        raise HTTPException(422, "Store name, username and password are required")
+    if not body.contact.strip():
+        raise HTTPException(422, "Contact number is required")
     if len(body.password) < 6:
-        raise HTTPException(422, "Password ઓછામાં ઓછો 6 અક્ષર હોવો જોઈએ")
+        raise HTTPException(422, "Password must be at least 6 characters")
     if await db.users.find_one({"username": username}):
         raise HTTPException(400, "આ username પહેલેથી વપરાયેલ છે — બીજું પસંદ કરો")
     store_id = new_id()
     store = {"id": store_id, "name": body.store_name.strip(), "owner_username": username,
-             "created_at": now_iso()}
+             "contact": body.contact.strip(), "created_at": now_iso()}
     await db.stores.insert_one(dict(store))
     user = {
         "id": new_id(), "name": body.name.strip() or body.store_name.strip(), "username": username,
         "password_hash": hash_pw(body.password), "password_enc": encrypt_pw(body.password),
         "role": "admin", "store_id": store_id, "permissions": ALL_PERMISSIONS,
-        "disabled": False, "created_at": now_iso(),
+        "contact": body.contact.strip(), "disabled": False, "created_at": now_iso(),
     }
     await db.users.insert_one(dict(user))
     # per-store purchase limit settings

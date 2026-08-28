@@ -126,3 +126,8 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Report custom date picker: native calendar + web date fields.
 - FULL ENGLISH: all Gujarati removed from every screen (verified grep = NONE). Company list = real names (Honda, Nissan, Toyota, etc).
 - PENDING: Common Part Catalog (part identity shared across stores, buys/sales/stock private) — big backend refactor, needs focused turn + model confirm (verified/technical shared? default yes).
+
+## Buy Company picker + Signup contact (2026-08-28)
+- Buy screen: added COMPANY chip selector (Maruti Suzuki/Hyundai/Honda/Nissan/Toyota/etc) -> saved to part -> reports group by company. Category field already present.
+- Signup: CONTACT NUMBER now compulsory (backend 422 without it; stored on store + owner user).
+- PENDING (next turn, budget): GPS+contact on inquiry/requirement admin-only tracking; Statistics cards clickable; Common Part Catalog (shared identity); Company picker on Sell too.

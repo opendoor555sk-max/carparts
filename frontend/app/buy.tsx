@@ -22,9 +22,11 @@ import * as ImagePicker from "expo-image-picker";
 import { api, fileUrl, uploadImage } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
-import { Button, Card, Field, Header, LimitBar, Loading, StatusChip } from "@/src/components/ui";
+import { Button, Card, Field, FilterChip, Header, LimitBar, Loading, StatusChip } from "@/src/components/ui";
 import { printReceipt, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
+
+const COMPANIES = ["All", "Maruti Suzuki", "Hyundai", "Tata", "Mahindra", "Kia", "Toyota", "Honda", "Nissan", "Renault", "Ford", "Volkswagen", "Skoda", "MG", "Datsun", "Chevrolet"];
 
 const CONDITIONS = ["Working", "Testing", "Repairable", "Damaged", "Incomplete", "Scrap", "Unknown"];
 
@@ -56,6 +58,7 @@ export default function Buy() {
   const [condition, setCondition] = useState("Working");
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
+  const [buyCompany, setBuyCompany] = useState(company);
   const [vehicles, setVehicles] = useState("");
   const [variant, setVariant] = useState("");
   const [rack, setRack] = useState("");
@@ -176,7 +179,7 @@ export default function Buy() {
     try {
       await api.post("/buy", {
         part_number: partNumber,
-        company,
+        company: buyCompany,
         name,
         category,
         compatible_vehicles: vehicles.split(",").map((s) => s.trim()).filter(Boolean),
@@ -288,6 +291,12 @@ export default function Buy() {
               style={{ marginBottom: spacing.md }}
             />
             <Field label="Name" value={name} onChangeText={setName} placeholder="Part name" testID="buy-name" />
+            <Text style={styles.pickLabel}>COMPANY</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pickRow}>
+              {COMPANIES.map((c) => (
+                <FilterChip key={c} label={c} active={buyCompany === c} onPress={() => setBuyCompany(c)} testID={`buy-co-${c}`} />
+              ))}
+            </ScrollView>
             <Field label="Category" value={category} onChangeText={setCategory} placeholder="Category" testID="buy-category" />
             <Field
               label="Compatible Vehicles (comma separated)"
@@ -300,7 +309,7 @@ export default function Buy() {
             <View style={styles.compatHint}>
               <Ionicons name="save" size={13} color={colors.brand} />
               <Text style={styles.compatHintText}>
-                Company ({company}) + these details will auto-save under this part number with the purchase
+                Company ({buyCompany}) + these details will auto-save under this part number with the purchase
               </Text>
             </View>
           </Card>
@@ -469,6 +478,8 @@ const styles = StyleSheet.create({
   bar: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.md },
   compatHint: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.xs },
   compatHintText: { color: colors.info, fontSize: font.sm, flex: 1 },
+  pickLabel: { color: colors.info, fontSize: font.sm - 1, fontWeight: "800", letterSpacing: 0.5, marginTop: spacing.xs, marginBottom: spacing.xs },
+  pickRow: { gap: spacing.sm, paddingVertical: spacing.xs, paddingRight: spacing.md },
   gpsRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.sm },
   gpsText: { fontSize: font.sm, fontWeight: "700" },
   photoCount: { color: colors.info, fontSize: font.sm, fontWeight: "800" },

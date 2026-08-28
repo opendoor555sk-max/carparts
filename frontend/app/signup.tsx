@@ -23,6 +23,7 @@ export default function SignUp() {
   const [storeName, setStoreName] = useState("");
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
+  const [contact, setContact] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [err, setErr] = useState("");
@@ -32,6 +33,10 @@ export default function SignUp() {
     setErr("");
     if (!storeName.trim() || !username.trim() || !password) {
       setErr("Store name, username and password are required");
+      return;
+    }
+    if (!contact.trim()) {
+      setErr("Contact number is required");
       return;
     }
     if (password.length < 6) {
@@ -45,6 +50,7 @@ export default function SignUp() {
         name: name.trim(),
         username: username.trim(),
         password,
+        contact: contact.trim(),
       });
       router.replace("/(tabs)");
     } catch (e: any) {
@@ -82,6 +88,14 @@ export default function SignUp() {
             onChangeText={setName}
             placeholder="Owner name"
             testID="signup-name"
+          />
+          <Field
+            label="CONTACT NUMBER"
+            value={contact}
+            onChangeText={setContact}
+            placeholder="e.g. +91 98xxxxxxxx"
+            keyboardType="phone-pad"
+            testID="signup-contact"
           />
           <Field
             label="USERNAME (for login)"

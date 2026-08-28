@@ -26,6 +26,7 @@ export type RegisterPayload = {
   name: string;
   username: string;
   password: string;
+  contact: string;
 };
 
 type AuthState = {
