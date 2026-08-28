@@ -10,14 +10,12 @@ import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
 import { FilterChip, Header } from "@/src/components/ui";
 import { printHtml } from "@/src/utils/print";
-import { qrSvg } from "@/src/utils/qr";
-import { barcodeSvg } from "@/src/utils/barcode128";
-import { dataMatrixSvg } from "@/src/utils/dmatrix";
+import { CODE_TYPES, codeSvg as genCodeSvg, svgRatio } from "@/src/utils/codegen";
 import { Box, SHEET_LAYOUTS, StickerTemplate, TplLine, generateRichStickerSheetHtml } from "@/src/utils/labelSheet";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type ScanResult = { aspect: number; part_number: string; lines: { text: string; bold?: boolean }[]; code: { type: string } | null; logo: Box | null };
-type CodeType = "qr" | "barcode" | "datamatrix";
+type CodeType = string;
 
 const PREVIEW_W = 320;
 
@@ -112,6 +110,7 @@ export default function ScanSticker() {
   const [tpl, setTpl] = useState<StickerTemplate | null>(null);
   const [partNumber, setPartNumber] = useState("");
   const [codeType, setCodeType] = useState<CodeType>("qr");
+  const [codeSize, setCodeSize] = useState(10);
 
   const [layoutCode, setLayoutCode] = useState("24L");
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -206,7 +205,7 @@ export default function ScanSticker() {
       if (FORMATTED_COMPANIES.includes(comp)) ct = "datamatrix";
       setRawLines(rl);
       setCompany(comp);
-      buildTpl(rl, aspect, hasCode, ct, pn, null, comp);
+      buildTpl(rl, aspect, hasCode, ct, pn, null, comp, codeSize);
       setPartNumber(pn);
       setCodeType(ct);
       setSelected(new Set());
@@ -218,9 +217,9 @@ export default function ScanSticker() {
     }
   };
 
-  const buildTpl = (rl: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, ct: CodeType, pn: string, logo: StickerTemplate["logo"], comp: string) => {
+  const buildTpl = (rl: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, ct: CodeType, pn: string, logo: StickerTemplate["logo"], comp: string, sizeMm: number) => {
     const lines = buildLines(rl, aspect, hasCode, !!logo, comp);
-    setTpl({ aspect, lines, code: hasCode ? { type: ct, value: pn, box: codeBox(aspect, comp) } : null, logo, company: comp });
+    setTpl({ aspect, lines, code: hasCode ? { type: ct, value: pn, box: codeBox(aspect, comp), sizeMm } : null, logo, company: comp });
   };
 
   const applyCompany = (comp: string) => {
@@ -259,6 +258,11 @@ export default function ScanSticker() {
   const setCode = (t: CodeType) => {
     setCodeType(t);
     setTpl((prev) => (prev && prev.code ? { ...prev, code: { ...prev.code, type: t } } : prev));
+  };
+  const changeCodeSize = (delta: number) => {
+    const s = Math.max(5, Math.min(30, Math.round((codeSize + delta) * 10) / 10));
+    setCodeSize(s);
+    setTpl((prev) => (prev && prev.code ? { ...prev, code: { ...prev.code, sizeMm: s } } : prev));
   };
   // Recompute positions after a line edit/zone-change/reorder, preserving the user's arrangement.
   const recompute = (lines: TplLine[], prev: StickerTemplate): TplLine[] =>
@@ -309,6 +313,7 @@ export default function ScanSticker() {
       setTpl({ ...parsed, company: comp, lines });
       setPartNumber(t.part_number || parsed.code?.value || "");
       setCodeType(parsed.code?.type || "qr");
+      setCodeSize(parsed.code?.sizeMm || 10);
       setCompany(comp);
       setRawLines(rawT);
       setSelected(new Set());
@@ -332,10 +337,9 @@ export default function ScanSticker() {
   const previewH = tpl ? PREVIEW_W / (tpl.aspect || 1.6) : 220;
   const codeSvg = useMemo(() => {
     if (!tpl?.code?.value) return "";
-    if (codeType === "barcode") return barcodeSvg(tpl.code.value, { height: 60, moduleWidth: 2, showText: false });
-    if (codeType === "datamatrix") return dataMatrixSvg(tpl.code.value, { margin: 1 });
-    return qrSvg(tpl.code.value, { margin: 1 });
+    return genCodeSvg(codeType, tpl.code.value);
   }, [tpl?.code?.value, codeType]);
+  const codeRatio = useMemo(() => (codeSvg ? svgRatio(codeSvg) : 1), [codeSvg]);
 
   const cellW = Math.min(320 / layout.cols, 60);
   const cellH = Math.max(10, cellW / (layout.w / layout.h));
@@ -384,22 +388,17 @@ export default function ScanSticker() {
                 <Image source={{ uri: tpl.logo.dataUrl }} resizeMode="contain" style={{ position: "absolute", left: (tpl.logo.box.x / 100) * PREVIEW_W, top: (tpl.logo.box.y / 100) * previewH, width: (tpl.logo.box.w / 100) * PREVIEW_W, height: (tpl.logo.box.h / 100) * previewH }} />
               ) : null}
               {tpl.code && codeSvg ? (
-                codeType === "barcode" ? (
-                  <View style={{ position: "absolute", left: (tpl.code.box.x / 100) * PREVIEW_W, top: (tpl.code.box.y / 100) * previewH, width: (tpl.code.box.w / 100) * PREVIEW_W, height: (tpl.code.box.h / 100) * previewH }}>
-                    <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio="none" />
-                  </View>
-                ) : (
-                  (() => {
-                    const qpx = Math.min(previewH - 4, (10 / layout.h) * previewH);
-                    const left = PREVIEW_W - qpx - (2 / layout.w) * PREVIEW_W;
-                    const top = Math.max(0, Math.min((tpl.code.box.y / 100) * previewH, previewH - qpx));
-                    return (
-                      <View style={{ position: "absolute", left, top, width: qpx, height: qpx }}>
-                        <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
-                      </View>
-                    );
-                  })()
-                )
+                (() => {
+                  const hpx = Math.min(previewH - 2, (codeSize / layout.h) * previewH);
+                  const wpx = codeRatio > 1.3 ? Math.min(PREVIEW_W * 0.6, hpx * codeRatio) : hpx;
+                  const left = PREVIEW_W - wpx - (2 / layout.w) * PREVIEW_W;
+                  const top = Math.max(0, Math.min((tpl.code.box.y / 100) * previewH, previewH - hpx));
+                  return (
+                    <View style={{ position: "absolute", left, top, width: wpx, height: hpx }}>
+                      <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
+                    </View>
+                  );
+                })()
               ) : null}
               {tpl.lines.map((ln, i) => (
                 <Text key={i} numberOfLines={1} style={{ position: "absolute", left: (ln.x / 100) * PREVIEW_W, top: (ln.y / 100) * previewH, fontSize: Math.max(6, (ln.size / 100) * previewH), fontWeight: ln.bold ? "800" : "500", color: "#000" }}>{ln.text}</Text>
@@ -459,11 +458,22 @@ export default function ScanSticker() {
               </>
             ) : null}
 
-            <Text style={styles.flabel}>CODE TYPE</Text>
-            <View style={styles.chipWrap}>
-              <FilterChip label="QR Code" active={codeType === "qr"} onPress={() => setCode("qr")} testID="ct-qr" />
-              <FilterChip label="DataMatrix" active={codeType === "datamatrix"} onPress={() => setCode("datamatrix")} testID="ct-datamatrix" />
-              <FilterChip label="Barcode" active={codeType === "barcode"} onPress={() => setCode("barcode")} testID="ct-barcode" />
+            <Text style={styles.flabel}>CODE TYPE ({CODE_TYPES.length} types)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+              {CODE_TYPES.map((c) => (
+                <FilterChip key={c.key} label={c.label} active={codeType === c.key} onPress={() => setCode(c.key)} testID={`ct-${c.key}`} />
+              ))}
+            </ScrollView>
+
+            <Text style={styles.subHint}>Code size: {codeSize} mm</Text>
+            <View style={styles.sizeRow}>
+              <Pressable style={styles.sizeBtn} onPress={() => changeCodeSize(-1)} testID="code-size-minus">
+                <Ionicons name="remove" size={20} color={colors.onSurface} />
+              </Pressable>
+              <View style={styles.sizeVal}><Text style={styles.sizeValText}>{codeSize} mm</Text></View>
+              <Pressable style={styles.sizeBtn} onPress={() => changeCodeSize(1)} testID="code-size-plus">
+                <Ionicons name="add" size={20} color={colors.onSurface} />
+              </Pressable>
             </View>
 
             <Text style={styles.flabel}>TEXT LINES{isFormatted ? " — set each line's place / reorder" : " (tap to edit)"}</Text>
@@ -562,6 +572,10 @@ const styles = StyleSheet.create({
   moveBtn: { width: 34, height: 34, borderRadius: radius.sm, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border },
   zoneRow: { gap: spacing.xs, paddingVertical: 2 },
   subHint: { color: colors.info, fontSize: font.sm - 1, marginTop: spacing.xs },
+  sizeRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: 4 },
+  sizeBtn: { width: 44, height: 40, borderRadius: radius.sm, backgroundColor: colors.surface2, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border },
+  sizeVal: { minWidth: 80, height: 40, borderRadius: radius.sm, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border },
+  sizeValText: { color: colors.onSurface, fontWeight: "800", fontSize: font.base },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chipRow: { gap: spacing.sm, paddingVertical: spacing.xs },
   gridCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, alignItems: "center" },
