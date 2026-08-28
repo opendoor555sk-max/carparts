@@ -1,4 +1,5 @@
 import * as Print from "expo-print";
+import { Platform } from "react-native";
 
 import { fileUrl } from "@/src/api/client";
 import { barcodeSvg } from "@/src/utils/barcode128";
@@ -75,6 +76,49 @@ function wrap(title: string, b: Branding, body: string): string {
 }
 
 export async function printHtml(html: string): Promise<void> {
+  if (Platform.OS === "web") {
+    // On web / in-app webview, Print.printAsync can print the whole app page.
+    // Render ONLY our HTML in an isolated iframe and print that.
+    return new Promise<void>((resolve) => {
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+      const doc = iframe.contentWindow?.document;
+      if (!doc) {
+        document.body.removeChild(iframe);
+        // fallback: new window
+        const w = window.open("", "_blank");
+        if (w) {
+          w.document.open();
+          w.document.write(html);
+          w.document.close();
+          setTimeout(() => { w.focus(); w.print(); }, 500);
+        }
+        resolve();
+        return;
+      }
+      doc.open();
+      doc.write(html);
+      doc.close();
+      const done = () => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch {}
+        setTimeout(() => {
+          try { document.body.removeChild(iframe); } catch {}
+          resolve();
+        }, 1000);
+      };
+      // give images/QR SVG time to render
+      setTimeout(done, 600);
+    });
+  }
   await Print.printAsync({ html });
 }
 
