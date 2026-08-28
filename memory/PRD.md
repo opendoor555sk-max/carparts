@@ -261,3 +261,6 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 
 ## Print PAGE MARGIN control (2026-06 fork)
 - User wanted control over the PDF page margin (edge-to-edge label sheets). Added `pageMargin` (mm) to SheetOptions -> buildSheet emits `@page { size:A4; margin:${pageM}mm }` (default 0 = edge-to-edge). Exposed a "PAGE MARGIN (mm)" input + "Set 0" button on BOTH labels.tsx and scan-sticker.tsx. Note added that OS print dialog Margins=None & Scale=100% must also be chosen (OS framework margin cannot be forced programmatically). Lint clean, screens load.
+
+## Removed "Sticker Sheet Print" entry (2026-06 fork)
+- User: AI Scanner now covers all needs; remove the separate Sticker Sheet Print feature. Removed its card from app/(tabs)/index.tsx STICKER PRINTING section and the "Print on A4 Sticker Sheet" button from app/part/[pn].tsx. AI Sticker Scanner kept. labels.tsx route file left in place (dead, unlinked) since no rm; no code references remain. Lint clean.

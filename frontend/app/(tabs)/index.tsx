@@ -178,20 +178,6 @@ export default function Home() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.info} />
           </Pressable>
-          <Pressable
-            style={styles.report}
-            onPress={() => router.push("/labels" as any)}
-            testID="home-labels"
-          >
-            <View style={[styles.reportIcon, { borderColor: colors.brand }]}>
-              <Ionicons name="pricetags" size={22} color={colors.brand} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.reportTitle}>Sticker Sheet Print</Text>
-              <Text style={styles.reportSub}>A4 label sheets • QR / barcode • start from any block (no wastage)</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.info} />
-          </Pressable>
         </View>
       </ScrollView>
     </View>
