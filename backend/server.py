@@ -1752,20 +1752,19 @@ class StickerScanReq(BaseModel):
     image_base64: str  # raw base64 (no data: prefix)
 
 
-STICKER_SCAN_PROMPT = """Read this product label/sticker image. Return ONLY strict JSON (no markdown) with this schema:
+STICKER_SCAN_PROMPT = """Read this product label/sticker (it may be rotated/upside-down — read it UPRIGHT). Return ONLY strict JSON (no markdown):
 {
   "aspect": <sticker width/height ratio, e.g. 1.6>,
-  "part_number": "<the single main part number, best guess>",
+  "part_number": "<the single main part number, exact characters>",
   "lines": [ {"text": "<one text line>", "bold": <true|false>} ],
   "logos": [ {"label": "<BRAND name only, e.g. Hyundai, Kia>", "x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>} ],
   "codes": [ {"type": "qr"|"barcode"|"datamatrix", "x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>} ]
 }
 Rules:
-- "lines": every visible text line in top-to-bottom reading order. Just the text, no coordinates.
-- Read the label upright even if the photo is rotated/upside-down.
+- "lines": EVERY visible text line in top-to-bottom reading order, exact text, no coordinates.
 - "logos": ONLY real manufacturer brand logos (Hyundai, Kia, Maruti, etc). IGNORE Pb, CE, E11, e-mark, recycling and connector symbols.
-- "codes": bounding box (% of sticker) and type of any QR / barcode / datamatrix. Empty list if none.
-- Be fast and concise. JSON only."""
+- "codes": bounding box (% of sticker) + type of any QR / barcode / datamatrix. Empty list if none.
+- Be fast. JSON only."""
 
 
 @api.post("/scan-sticker")
@@ -1781,7 +1780,7 @@ async def scan_sticker(req: StickerScanReq, user=Depends(get_current_user)):
             api_key=EMERGENT_LLM_KEY,
             session_id=f"sticker-{uuid.uuid4().hex[:8]}",
             system_message="You extract structured JSON from product label images. Output JSON only.",
-        ).with_model("gemini", "gemini-3.7-flash")
+        ).with_model("openai", "gpt-4o-mini")
         msg = UserMessage(text=STICKER_SCAN_PROMPT, file_contents=[ImageContent(image_base64=b64)])
         raw = await chat.send_message(msg)
     except Exception as e:

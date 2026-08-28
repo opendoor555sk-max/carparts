@@ -68,7 +68,7 @@ export default function ScanSticker() {
       let sendB64 = asset.base64!;
       try {
         const rs = ImageManipulator.manipulate(asset.uri);
-        rs.resize({ width: 1100 });
+        rs.resize({ width: 800 });
         const rimg = await rs.renderAsync();
         const rout = await rimg.saveAsync({ format: SaveFormat.JPEG, base64: true });
         if (rout.base64) sendB64 = rout.base64;
