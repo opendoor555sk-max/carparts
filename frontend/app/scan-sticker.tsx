@@ -120,9 +120,9 @@ export default function ScanSticker() {
   const [logos, setLogos] = useState<any[]>([]);
   const [company, setCompany] = useState("Hyundai / Kia");
   const [rawLines, setRawLines] = useState<{ text: string; bold?: boolean }[]>([]);
-  const [logoPos, setLogoPos] = useState("leftTop");
+  const [selLines, setSelLines] = useState<Set<number>>(new Set());
+  const [nudgeStep, setNudgeStep] = useState(2);
   const layout = useMemo(() => SHEET_LAYOUTS.find((l) => l.code === layoutCode)!, [layoutCode]);
-  const isFormatted = FORMATTED_COMPANIES.includes(company);
 
   const loadSaved = useCallback(async () => {
     try { setSaved(await api.get<any[]>("/sticker-templates")); } catch {}
@@ -130,28 +130,32 @@ export default function ScanSticker() {
   }, []);
   useEffect(() => { loadSaved(); }, [loadSaved]);
 
-  const LOGO_POSITIONS: Record<string, Box> = {
-    leftTop: { x: 3, y: 2, w: 34, h: 15 },
-    centerTop: { x: 33, y: 2, w: 34, h: 15 },
-    rightTop: { x: 63, y: 2, w: 34, h: 15 },
-    leftMid: { x: 3, y: 40, w: 30, h: 14 },
-  };
-  const LOGO_POS_LABELS: [string, string][] = [["leftTop", "L-Top"], ["centerTop", "Center"], ["rightTop", "R-Top"], ["leftMid", "L-Mid"]];
+  const LOGO_START: Box = { x: 3, y: 2, w: 34, h: 15 };
 
   const applyLogo = (dataUrl: string | null) =>
     setTpl((prev) => {
       if (!prev) return prev;
-      const logo = dataUrl ? { dataUrl, box: LOGO_POSITIONS[logoPos] || LOGO_POSITIONS.leftTop } : null;
+      const logo = dataUrl ? { dataUrl, box: prev.logo?.box || LOGO_START } : null;
       // Formatted (zone) layout is independent of the logo → keep the user's line arrangement.
       if (prev.company && FORMATTED_COMPANIES.includes(prev.company)) return { ...prev, logo };
       const lines = layoutLines(prev.lines.map((l) => ({ text: l.text, bold: l.bold })), prev.aspect, !!prev.code, logo ? 20 : 4);
       return { ...prev, logo, lines };
     });
 
-  const moveLogo = (pos: string) => {
-    setLogoPos(pos);
-    setTpl((prev) => (prev && prev.logo ? { ...prev, logo: { ...prev.logo, box: LOGO_POSITIONS[pos] || LOGO_POSITIONS.leftTop } } : prev));
-  };
+  const nudgeLogo = (dx: number, dy: number) =>
+    setTpl((prev) => {
+      if (!prev || !prev.logo) return prev;
+      const b = prev.logo.box;
+      return { ...prev, logo: { ...prev.logo, box: { ...b, x: Math.max(0, Math.min(99, b.x + dx * nudgeStep)), y: Math.max(0, Math.min(99, b.y + dy * nudgeStep)) } } };
+    });
+  const resizeLogo = (delta: number) =>
+    setTpl((prev) => {
+      if (!prev || !prev.logo) return prev;
+      const b = prev.logo.box;
+      const ratio = b.h / b.w;
+      const w = Math.max(6, Math.min(90, b.w + delta));
+      return { ...prev, logo: { ...prev.logo, box: { ...b, w, h: Math.max(3, w * ratio) } } };
+    });
 
   const addLogo = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -264,34 +268,36 @@ export default function ScanSticker() {
     setCodeSize(s);
     setTpl((prev) => (prev && prev.code ? { ...prev, code: { ...prev.code, sizeMm: s } } : prev));
   };
-  // Recompute positions after a line edit/zone-change/reorder, preserving the user's arrangement.
-  const recompute = (lines: TplLine[], prev: StickerTemplate): TplLine[] =>
-    prev.company && FORMATTED_COMPANIES.includes(prev.company)
-      ? positionLines(lines.map((l) => ({ text: l.text, bold: l.bold, zone: l.zone })), prev.aspect)
-      : layoutLines(lines.map((l) => ({ text: l.text, bold: l.bold })), prev.aspect, !!prev.code, prev.logo ? 20 : 4);
-
   const editLine = (idx: number, text: string) =>
-    setTpl((prev) => {
-      if (!prev) return prev;
-      const lines = prev.lines.map((l, i) => (i === idx ? { ...l, text } : l));
-      return { ...prev, lines: recompute(lines, prev) };
-    });
+    setTpl((prev) => (prev ? { ...prev, lines: prev.lines.map((l, i) => (i === idx ? { ...l, text } : l)) } : prev));
 
-  const setLineZone = (idx: number, zone: string) =>
-    setTpl((prev) => {
-      if (!prev) return prev;
-      const lines = prev.lines.map((l, i) => (i === idx ? { ...l, zone } : l));
-      return { ...prev, lines: recompute(lines, prev) };
-    });
+  const toggleLineSel = (idx: number) =>
+    setSelLines((p) => { const n = new Set(p); if (n.has(idx)) n.delete(idx); else n.add(idx); return n; });
+  const selectAllLines = () => setSelLines(new Set((tpl?.lines || []).map((_, i) => i)));
+  const clearLineSel = () => setSelLines(new Set());
 
-  const moveLine = (idx: number, dir: -1 | 1) =>
+  const nudgeSel = (dx: number, dy: number) =>
     setTpl((prev) => {
-      if (!prev) return prev;
-      const j = idx + dir;
-      if (j < 0 || j >= prev.lines.length) return prev;
-      const lines = prev.lines.slice();
-      [lines[idx], lines[j]] = [lines[j], lines[idx]];
-      return { ...prev, lines: recompute(lines, prev) };
+      if (!prev || selLines.size === 0) return prev;
+      const lines = prev.lines.map((l, i) =>
+        selLines.has(i)
+          ? { ...l, x: Math.max(0, Math.min(99, l.x + dx * nudgeStep)), y: Math.max(0, Math.min(99, l.y + dy * nudgeStep)) }
+          : l);
+      return { ...prev, lines };
+    });
+  const resizeSel = (delta: number) =>
+    setTpl((prev) => {
+      if (!prev || selLines.size === 0) return prev;
+      const lines = prev.lines.map((l, i) =>
+        selLines.has(i) ? { ...l, size: Math.max(2, Math.min(20, Math.round((l.size + delta) * 10) / 10)) } : l);
+      return { ...prev, lines };
+    });
+  const boldSel = () =>
+    setTpl((prev) => {
+      if (!prev || selLines.size === 0) return prev;
+      const anyNotBold = prev.lines.some((l, i) => selLines.has(i) && !l.bold);
+      const lines = prev.lines.map((l, i) => (selLines.has(i) ? { ...l, bold: anyNotBold } : l));
+      return { ...prev, lines };
     });
 
   const saveTemplate = async () => {
@@ -449,11 +455,14 @@ export default function ScanSticker() {
             </ScrollView>
             {tpl.logo ? (
               <>
-                <Text style={styles.subHint}>Logo position</Text>
-                <View style={styles.chipWrap}>
-                  {LOGO_POS_LABELS.map(([key, lbl]) => (
-                    <FilterChip key={key} label={lbl} active={logoPos === key} onPress={() => moveLogo(key)} testID={`logopos-${key}`} />
-                  ))}
+                <Text style={styles.subHint}>Logo — move &amp; resize (step {nudgeStep})</Text>
+                <View style={styles.sizeRow}>
+                  <Pressable style={styles.sizeBtn} onPress={() => nudgeLogo(-1, 0)} testID="logo-left"><Ionicons name="chevron-back" size={20} color={colors.onSurface} /></Pressable>
+                  <Pressable style={styles.sizeBtn} onPress={() => nudgeLogo(0, -1)} testID="logo-up"><Ionicons name="chevron-up" size={20} color={colors.onSurface} /></Pressable>
+                  <Pressable style={styles.sizeBtn} onPress={() => nudgeLogo(0, 1)} testID="logo-down"><Ionicons name="chevron-down" size={20} color={colors.onSurface} /></Pressable>
+                  <Pressable style={styles.sizeBtn} onPress={() => nudgeLogo(1, 0)} testID="logo-right"><Ionicons name="chevron-forward" size={20} color={colors.onSurface} /></Pressable>
+                  <Pressable style={styles.sizeBtn} onPress={() => resizeLogo(-3)} testID="logo-smaller"><Ionicons name="remove" size={20} color={colors.onSurface} /></Pressable>
+                  <Pressable style={styles.sizeBtn} onPress={() => resizeLogo(3)} testID="logo-bigger"><Ionicons name="add" size={20} color={colors.onSurface} /></Pressable>
                 </View>
               </>
             ) : null}
@@ -476,29 +485,39 @@ export default function ScanSticker() {
               </Pressable>
             </View>
 
-            <Text style={styles.flabel}>TEXT LINES{isFormatted ? " — set each line's place / reorder" : " (tap to edit)"}</Text>
-            {tpl.lines.map((ln, i) => (
-              <View key={`e${i}`} style={styles.lineBlock}>
-                <View style={styles.lineTopRow}>
-                  <TextInput style={styles.lineInputFlex} value={ln.text} onChangeText={(t) => editLine(i, t)} testID={`line-${i}`} />
-                  {isFormatted ? (
-                    <View style={styles.moveCol}>
-                      <Pressable style={styles.moveBtn} onPress={() => moveLine(i, -1)} testID={`up-${i}`}>
-                        <Ionicons name="chevron-up" size={16} color={colors.onSurface} />
-                      </Pressable>
-                      <Pressable style={styles.moveBtn} onPress={() => moveLine(i, 1)} testID={`down-${i}`}>
-                        <Ionicons name="chevron-down" size={16} color={colors.onSurface} />
-                      </Pressable>
-                    </View>
-                  ) : null}
+            <Text style={styles.flabel}>ARRANGE — select lines, then move / resize together</Text>
+            <View style={styles.arrangeTop}>
+              <Text style={styles.subHint}>Step</Text>
+              {[1, 2, 3, 5].map((s) => (
+                <FilterChip key={s} label={`${s}`} active={nudgeStep === s} onPress={() => setNudgeStep(s)} testID={`step-${s}`} />
+              ))}
+              <Pressable style={styles.miniBtn} onPress={selectAllLines} testID="sel-all"><Text style={styles.miniBtnText}>All</Text></Pressable>
+              <Pressable style={styles.miniBtn} onPress={clearLineSel} testID="sel-clear"><Text style={styles.miniBtnText}>Clear</Text></Pressable>
+            </View>
+            <View style={styles.padWrap}>
+              <View style={styles.pad}>
+                <View style={styles.padRow}><Pressable style={styles.padBtn} onPress={() => nudgeSel(0, -1)} testID="nudge-up"><Ionicons name="chevron-up" size={22} color={colors.onSurface} /></Pressable></View>
+                <View style={styles.padRow}>
+                  <Pressable style={styles.padBtn} onPress={() => nudgeSel(-1, 0)} testID="nudge-left"><Ionicons name="chevron-back" size={22} color={colors.onSurface} /></Pressable>
+                  <View style={styles.padCenter}><Text style={styles.padCount}>{selLines.size}</Text></View>
+                  <Pressable style={styles.padBtn} onPress={() => nudgeSel(1, 0)} testID="nudge-right"><Ionicons name="chevron-forward" size={22} color={colors.onSurface} /></Pressable>
                 </View>
-                {isFormatted ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.zoneRow}>
-                    {ZONES.map((z) => (
-                      <FilterChip key={z.key} label={z.label} active={ln.zone === z.key} onPress={() => setLineZone(i, z.key)} testID={`zone-${i}-${z.key}`} />
-                    ))}
-                  </ScrollView>
-                ) : null}
+                <View style={styles.padRow}><Pressable style={styles.padBtn} onPress={() => nudgeSel(0, 1)} testID="nudge-down"><Ionicons name="chevron-down" size={22} color={colors.onSurface} /></Pressable></View>
+              </View>
+              <View style={styles.fontCol}>
+                <Pressable style={styles.padBtn} onPress={() => resizeSel(0.5)} testID="font-bigger"><Text style={styles.fontBig}>A+</Text></Pressable>
+                <Pressable style={styles.padBtn} onPress={() => resizeSel(-0.5)} testID="font-smaller"><Text style={styles.fontSmall}>A-</Text></Pressable>
+                <Pressable style={styles.padBtn} onPress={boldSel} testID="font-bold"><Text style={styles.fontBoldBtn}>B</Text></Pressable>
+              </View>
+            </View>
+
+            <Text style={styles.flabel}>TEXT LINES (tap ☐ to select, tap text to edit)</Text>
+            {tpl.lines.map((ln, i) => (
+              <View key={`e${i}`} style={[styles.lineTopRow, selLines.has(i) && styles.lineSelected]}>
+                <Pressable style={styles.checkBtn} onPress={() => toggleLineSel(i)} testID={`sel-${i}`}>
+                  <Ionicons name={selLines.has(i) ? "checkbox" : "square-outline"} size={22} color={selLines.has(i) ? colors.brand : colors.info} />
+                </Pressable>
+                <TextInput style={styles.lineInputFlex} value={ln.text} onChangeText={(t) => editLine(i, t)} testID={`line-${i}`} />
               </View>
             ))}
 
@@ -565,14 +584,25 @@ const styles = StyleSheet.create({
   preview: { backgroundColor: "#fff", borderRadius: radius.sm, alignSelf: "center", overflow: "hidden", borderWidth: 1, borderColor: colors.border },
   input: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.onSurface, fontSize: font.base },
   lineInput: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.sm },
-  lineBlock: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: spacing.xs, gap: spacing.xs },
-  lineTopRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  lineInputFlex: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.sm },
-  moveCol: { flexDirection: "row", gap: 4 },
-  moveBtn: { width: 34, height: 34, borderRadius: radius.sm, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border },
-  zoneRow: { gap: spacing.xs, paddingVertical: 2 },
+  lineTopRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginBottom: spacing.xs },
+  lineSelected: { backgroundColor: colors.brandFaint, borderRadius: radius.sm, paddingHorizontal: 2 },
+  checkBtn: { width: 36, height: 40, alignItems: "center", justifyContent: "center" },
+  lineInputFlex: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.sm },
   subHint: { color: colors.info, fontSize: font.sm - 1, marginTop: spacing.xs },
-  sizeRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: 4 },
+  arrangeTop: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.xs, marginTop: 4 },
+  miniBtn: { paddingHorizontal: spacing.md, height: 32, borderRadius: radius.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  miniBtnText: { color: colors.onSurface, fontWeight: "700", fontSize: font.sm },
+  padWrap: { flexDirection: "row", alignItems: "center", gap: spacing.xl, marginTop: spacing.sm, marginBottom: spacing.xs },
+  pad: { alignItems: "center", gap: 6 },
+  padRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  padBtn: { width: 48, height: 44, borderRadius: radius.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  padCenter: { width: 48, height: 44, borderRadius: radius.sm, backgroundColor: colors.brandFaint, alignItems: "center", justifyContent: "center" },
+  padCount: { color: colors.brand, fontWeight: "800", fontSize: font.base },
+  fontCol: { gap: 6 },
+  fontBig: { color: colors.onSurface, fontWeight: "800", fontSize: 20 },
+  fontSmall: { color: colors.onSurface, fontWeight: "800", fontSize: 13 },
+  fontBoldBtn: { color: colors.onSurface, fontWeight: "900", fontSize: 18 },
+  sizeRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: 4, flexWrap: "wrap" },
   sizeBtn: { width: 44, height: 40, borderRadius: radius.sm, backgroundColor: colors.surface2, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border },
   sizeVal: { minWidth: 80, height: 40, borderRadius: radius.sm, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border },
   sizeValText: { color: colors.onSurface, fontWeight: "800", fontSize: font.base },
