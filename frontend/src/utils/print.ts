@@ -77,3 +77,34 @@ export async function printReceipt(store: string, kind: "BUY" | "SELL", data: Re
   const body = `<table>${rows}</table>`;
   await printHtml(wrap(kind === "BUY" ? "Purchase Receipt" : "Sale Receipt", store, body));
 }
+
+export async function printRequirements(store: string, reqs: any[]): Promise<void> {
+  const rows = reqs
+    .map(
+      (r, i) =>
+        `<tr><td>${i + 1}</td><td>${esc(r.part_number)}</td><td>${esc(r.name || "")}</td><td>${esc(
+          r.priority || "",
+        )}</td><td>${esc(r.quantity ?? "")}</td><td>${esc(r.stock_count ?? 0)}</td><td>${esc(
+          r.status || "",
+        )}</td></tr>`,
+    )
+    .join("");
+  const body = `<table><thead><tr><th>#</th><th>Part Number</th><th>Name</th><th>Priority</th><th>Qty</th><th>In Stock</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><div class="tot">Total: ${reqs.length}</div>`;
+  await printHtml(wrap("Requirements / Inquiry List", store, body));
+}
+
+export async function printHistory(store: string, kind: "buy" | "sell", txns: any[]): Promise<void> {
+  const rows = txns
+    .map(
+      (t, i) =>
+        `<tr><td>${i + 1}</td><td>${esc(t.part_number)}</td><td>${esc(t.part_name || "")}</td><td>${esc(
+          t.by || "",
+        )}</td><td>${esc(t.buyer || "")}</td><td>${esc(t.price != null ? "₹ " + t.price : "")}</td><td>${esc(
+          t.at ? new Date(t.at).toLocaleString() : "",
+        )}</td></tr>`,
+    )
+    .join("");
+  const total = txns.reduce((s, t) => s + (Number(t.price) || 0), 0);
+  const body = `<table><thead><tr><th>#</th><th>Part Number</th><th>Name</th><th>By</th><th>Buyer</th><th>Price</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table><div class="tot">Entries: ${txns.length} &nbsp; | &nbsp; Total ₹ ${total}</div>`;
+  await printHtml(wrap(kind === "buy" ? "Purchase (ખરીદ) History" : "Sale (વેચાણ) History", store, body));
+}

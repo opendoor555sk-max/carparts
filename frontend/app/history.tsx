@@ -6,8 +6,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
 import { api } from "@/src/api/client";
+import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { ConfirmModal, EmptyState, FilterChip, Header, Loading } from "@/src/components/ui";
+import { printHistory } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type Txn = {
@@ -25,6 +27,7 @@ export default function History() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { show } = useToast();
+  const { user } = useAuth();
   const [tab, setTab] = useState<"buy" | "sell">("buy");
   const [txns, setTxns] = useState<Txn[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,9 +84,14 @@ export default function History() {
         onBack={() => router.back()}
         right={
           txns.length > 0 ? (
-            <Pressable onPress={toggleAll} testID="select-all">
-              <Text style={styles.selAll}>{allSelected ? "Clear" : "All"}</Text>
-            </Pressable>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.lg }}>
+              <Pressable onPress={() => printHistory(user?.store_name || "", tab, txns)} testID="print-history">
+                <Ionicons name="print" size={22} color={colors.brand} />
+              </Pressable>
+              <Pressable onPress={toggleAll} testID="select-all">
+                <Text style={styles.selAll}>{allSelected ? "Clear" : "All"}</Text>
+              </Pressable>
+            </View>
           ) : undefined
         }
       />

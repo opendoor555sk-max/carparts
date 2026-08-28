@@ -12,8 +12,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
+import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { Header, StatusChip, Loading, EmptyState, FilterChip } from "@/src/components/ui";
+import { printRequirements } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type Req = {
@@ -34,6 +36,7 @@ const NEXT: Record<string, string> = { Pending: "Purchased", Purchased: "Complet
 export default function Requirements() {
   const router = useRouter();
   const { show } = useToast();
+  const { user } = useAuth();
   const [reqs, setReqs] = useState<Req[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -76,13 +79,20 @@ export default function Requirements() {
         title="Requirements"
         subtitle="જરૂરિયાત list"
         right={
-          <Pressable
-            onPress={() => router.push("/scan?mode=requirement" as any)}
-            style={styles.addBtn}
-            testID="add-requirement"
-          >
-            <Ionicons name="add" size={22} color={colors.onBrand} />
-          </Pressable>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+            {reqs.length ? (
+              <Pressable onPress={() => printRequirements(user?.store_name || "", reqs)} hitSlop={10} testID="print-requirements">
+                <Ionicons name="print" size={22} color={colors.brand} />
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={() => router.push("/scan?mode=requirement" as any)}
+              style={styles.addBtn}
+              testID="add-requirement"
+            >
+              <Ionicons name="add" size={22} color={colors.onBrand} />
+            </Pressable>
+          </View>
         }
       />
       <ScrollView
