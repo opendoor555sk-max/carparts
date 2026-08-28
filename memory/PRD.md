@@ -147,3 +147,6 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 ## Report filters = full masters (2026-06 fork)
 - report.tsx COMPANY + CATEGORY filter chips now load the FULL master lists from backend (/companies, /categories) instead of only values present in current results. All companies (Maruti Suzuki, Hyundai, Tata, Mahindra, Kia, Toyota, Honda, Nissan, Renault, Ford, Volkswagen, Skoda, MG, Datsun, Chevrolet, Fiat, Jeep, Citroen, Isuzu) + full Category Master (73 items) selectable in Buy/Sale/Stock reports. Backend /transactions + /inventory already filter by company/category. Verified on preview.
 - PENDING next: Search GPS super-admin-only tracking + super-admin Search Report (compulsory custom date); Security fixes SEC-001/003/004; Common Part Catalog refactor.
+
+## Demand & Search filters (2026-06 fork)
+- demand.tsx now has DATE (presets + custom From-To) + COMPANY (full master) + CATEGORY (full Category Master) filters, mirroring report.tsx. Backend /search-history extended with date_from/date_to/company/category params + joins parts to attach company/category/part_name. Verified via curl (no-filter returns items with company/category; Hyundai + old-date filters correctly return []). SEC-003 already fixed in /files (store ownership enforced).

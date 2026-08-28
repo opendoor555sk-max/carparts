@@ -1439,8 +1439,32 @@ async def reject_ai(research_id: str, user=Depends(require("ai_approve"))):
 
 # ---------------- Search history / demand / stats ----------------
 @api.get("/search-history")
-async def search_history(store_id: Optional[str] = None, user=Depends(get_current_user)):
-    return await db.search_history.find(sq(user, None, store_id), {"_id": 0}).sort("count", -1).to_list(200)
+async def search_history(store_id: Optional[str] = None,
+                         date_from: Optional[str] = None, date_to: Optional[str] = None,
+                         company: Optional[str] = None, category: Optional[str] = None,
+                         user=Depends(get_current_user)):
+    q: Dict[str, Any] = sq(user, None, store_id)
+    if date_from or date_to:
+        rng: Dict[str, Any] = {}
+        if date_from:
+            rng["$gte"] = date_from
+        if date_to:
+            rng["$lte"] = date_to + "T23:59:59"
+        q["last_searched"] = rng
+    hist = await db.search_history.find(q, {"_id": 0}).sort("count", -1).to_list(500)
+    out = []
+    for h in hist:
+        p = await db.parts.find_one({"store_id": h.get("store_id"), "part_number": h["part_number"]},
+                                    {"_id": 0, "name": 1, "company": 1, "category": 1})
+        h["part_name"] = (p or {}).get("name", "")
+        h["company"] = (p or {}).get("company", "") or "All"
+        h["category"] = (p or {}).get("category", "") or "Uncategorized"
+        if company and company != "All" and h["company"] != company:
+            continue
+        if category and h["category"] != category:
+            continue
+        out.append(h)
+    return out
 
 
 @api.get("/demand")
