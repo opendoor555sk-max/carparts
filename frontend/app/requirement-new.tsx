@@ -20,7 +20,7 @@ import { colors, font, radius, spacing } from "@/src/theme";
 const PRIORITIES = ["High", "Medium", "Low"];
 
 export default function RequirementNew() {
-  const { pn = "", company = "All" } = useLocalSearchParams<{ pn: string; company: string }>();
+  const { pn = "", company = "All", gps: gpsParam = "" } = useLocalSearchParams<{ pn: string; company: string; gps: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { show } = useToast();
@@ -32,9 +32,10 @@ export default function RequirementNew() {
   const [quantity, setQuantity] = useState("1");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [gps, setGps] = useState("");
+  const [gps, setGps] = useState((gpsParam as string) || "");
 
   useEffect(() => {
+    if (gps) return; // already have GPS passed from scanner
     (async () => {
       try {
         const perm = await Location.getForegroundPermissionsAsync();

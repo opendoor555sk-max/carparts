@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -58,6 +58,22 @@ export default function Report() {
   const [customFrom, setCustomFrom] = useState(iso(new Date()));
   const [customTo, setCustomTo] = useState(iso(new Date()));
   const [picker, setPicker] = useState<null | "from" | "to">(null);
+  const [allCompanies, setAllCompanies] = useState<string[]>(["All"]);
+  const [allCategories, setAllCategories] = useState<string[]>(["All"]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const co = await api.get<string[]>("/companies");
+        setAllCompanies(co.includes("All") ? co : ["All", ...co]);
+      } catch {}
+      try {
+        const cat = await api.get<{ groups: { group: string; items: string[] }[] }>("/categories");
+        const flat = cat.groups.flatMap((g) => g.items);
+        setAllCategories(["All", ...flat]);
+      } catch {}
+    })();
+  }, []);
 
   const resolveRange = useCallback((): { from?: string; to?: string } => {
     const now = new Date();
@@ -97,16 +113,8 @@ export default function Report() {
     }, [load]),
   );
 
-  const companies = useMemo(() => {
-    const s = new Set<string>();
-    items.forEach((i) => s.add(i.company || "All"));
-    return ["All", ...Array.from(s).filter((c) => c !== "All").sort()];
-  }, [items]);
-  const categories = useMemo(() => {
-    const s = new Set<string>();
-    items.forEach((i) => s.add(i.category || "Uncategorized"));
-    return ["All", ...Array.from(s).sort()];
-  }, [items]);
+  const companies = allCompanies;
+  const categories = allCategories;
 
   const sections = useMemo(() => {
     const g: Record<string, Record<string, Item[]>> = {};

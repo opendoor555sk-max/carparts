@@ -10,6 +10,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import * as Location from "expo-location";
 
 import { Button, Field, Header } from "@/src/components/ui";
 import { extractPartNumber } from "@/src/utils/barcode";
@@ -31,7 +32,25 @@ export default function Scan() {
   const [permission, requestPermission] = useCameraPermissions();
   const [manual, setManual] = useState("");
   const [scanning, setScanning] = useState(true);
+  const [gps, setGps] = useState("");
   const lastScan = useRef<string>("");
+
+  // Capture GPS location on entry so it is attached to this action (admin can track).
+  useEffect(() => {
+    (async () => {
+      try {
+        const perm = await Location.getForegroundPermissionsAsync();
+        let granted = perm.granted;
+        if (!granted && perm.canAskAgain) granted = (await Location.requestForegroundPermissionsAsync()).granted;
+        if (granted) {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          setGps(`${loc.coords.latitude.toFixed(6)},${loc.coords.longitude.toFixed(6)}`);
+        }
+      } catch {
+        // location optional
+      }
+    })();
+  }, []);
 
   // Auto-request camera permission on mount so the scanner opens immediately.
   useEffect(() => {
@@ -53,7 +72,7 @@ export default function Scan() {
           router.replace(`/sell?pn=${encodeURIComponent(pn)}` as any);
           break;
         case "requirement":
-          router.replace(`/requirement-new?pn=${encodeURIComponent(pn)}&company=${c}` as any);
+          router.replace(`/requirement-new?pn=${encodeURIComponent(pn)}&company=${c}&gps=${encodeURIComponent(gps)}` as any);
           break;
         default:
           router.replace(`/part/${encodeURIComponent(pn)}` as any);
@@ -131,6 +150,10 @@ export default function Scan() {
         subtitle={`Company: ${company}`}
         onBack={() => router.back()}
       />
+      <View style={styles.gpsBar} testID="scan-gps">
+        <Ionicons name="location" size={14} color={gps ? colors.success : colors.info} />
+        <Text style={styles.gpsText}>{gps ? `GPS: ${gps}` : "Getting GPS location…"}</Text>
+      </View>
       <View style={{ flex: 1 }}>
         {renderCameraArea()}
 
@@ -180,6 +203,8 @@ const styles = StyleSheet.create({
   permTitle: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800", textAlign: "center" },
   permSub: { color: colors.info, fontSize: font.base, textAlign: "center", marginBottom: spacing.sm },
   orText: { color: colors.info, fontSize: font.sm, marginTop: spacing.md },
+  gpsBar: { flexDirection: "row", alignItems: "center", gap: spacing.xs, backgroundColor: colors.surface2, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  gpsText: { color: colors.onSurface3, fontSize: font.sm, fontWeight: "700" },
   bottom: {
     backgroundColor: colors.surface,
     borderTopWidth: 1,

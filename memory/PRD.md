@@ -137,3 +137,13 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Admin STATISTICS cards now clickable -> navigate (Parts->/parts, In Stock->/report stock, Sold->/report sell, Pending Needs->requirements, AI Pending->/ai-approvals, Verified->/parts).
 - Buy has company picker; company flows to reports. Sell/Stock inherit company from the part (set at buy) so reports already group.
 - PENDING: Common Part Catalog (shared part identity across stores + per-store limits move) — dedicated next turn.
+
+## GPS banner + printable stat reports (2026-08-28)
+- scan.tsx + scan.web.tsx: capture GPS on entry (expo-location) and show a visible GPS banner for ALL modes (Search/Buy/Sell/Requirement). GPS passed to requirement-new and saved.
+- Admin STATISTICS cards now route to the printable /report screen (print + custom From-To date) instead of plain list.
+- NOTE: browser preview blocks geolocation in iframe (shows Getting GPS...) but real device captures coords.
+- STILL PENDING: (1) log GPS+contact for plain Search lookups super-admin-only; (2) category catalogue dropdown in Buy/Sell; (3) Common Part Catalog (big refactor); (4) automated testing pass.
+
+## Report filters = full masters (2026-06 fork)
+- report.tsx COMPANY + CATEGORY filter chips now load the FULL master lists from backend (/companies, /categories) instead of only values present in current results. All companies (Maruti Suzuki, Hyundai, Tata, Mahindra, Kia, Toyota, Honda, Nissan, Renault, Ford, Volkswagen, Skoda, MG, Datsun, Chevrolet, Fiat, Jeep, Citroen, Isuzu) + full Category Master (73 items) selectable in Buy/Sale/Stock reports. Backend /transactions + /inventory already filter by company/category. Verified on preview.
+- PENDING next: Search GPS super-admin-only tracking + super-admin Search Report (compulsory custom date); Security fixes SEC-001/003/004; Common Part Catalog refactor.

@@ -48,12 +48,12 @@ export default function Admin() {
 
   const statCards: { label: string; value: number; color: string; icon: keyof typeof Ionicons.glyphMap; route: string }[] = stats
     ? [
-        { label: "Parts", value: stats.total_parts, color: colors.brand, icon: "documents", route: "/parts" },
+        { label: "Parts", value: stats.total_parts, color: colors.brand, icon: "documents", route: "/report?mode=stock" },
         { label: "In Stock", value: stats.in_stock_units, color: colors.success, icon: "cube", route: "/report?mode=stock" },
         { label: "Sold", value: stats.sold_units, color: colors.info, icon: "cash", route: "/report?mode=sell" },
         { label: "Pending Needs", value: stats.pending_requirements, color: colors.warning, icon: "list", route: "/(tabs)/requirements" },
         { label: "AI Pending", value: stats.pending_ai, color: colors.warning, icon: "sparkles", route: "/ai-approvals" },
-        { label: "Verified", value: stats.verified_parts, color: colors.success, icon: "shield-checkmark", route: "/parts" },
+        { label: "Verified", value: stats.verified_parts, color: colors.success, icon: "shield-checkmark", route: "/report?mode=stock" },
       ]
     : [];
 

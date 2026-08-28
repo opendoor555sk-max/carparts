@@ -11,6 +11,7 @@ import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { Button, Field, Header } from "@/src/components/ui";
 import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
+import * as Location from "expo-location";
 
 const MODE_META: Record<string, { title: string; color: string }> = {
   search: { title: "SEARCH", color: colors.info },
@@ -26,6 +27,23 @@ export default function ScanWeb() {
   const meta = MODE_META[mode as string] || MODE_META.search;
 
   const [manual, setManual] = useState("");
+  const [gps, setGps] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const perm = await Location.getForegroundPermissionsAsync();
+        let granted = perm.granted;
+        if (!granted && perm.canAskAgain) granted = (await Location.requestForegroundPermissionsAsync()).granted;
+        if (granted) {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          setGps(`${loc.coords.latitude.toFixed(6)},${loc.coords.longitude.toFixed(6)}`);
+        }
+      } catch {
+        // optional
+      }
+    })();
+  }, []);
   const [status, setStatus] = useState<"init" | "ready" | "denied" | "error">("init");
   const videoRef = useRef<any>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -146,6 +164,10 @@ export default function ScanWeb() {
   return (
     <View style={styles.flex}>
       <Header title={`${meta.title} — Scan`} subtitle={`Company: ${company}`} onBack={() => router.back()} />
+      <View style={styles.gpsBar} testID="scan-gps">
+        <Ionicons name="location" size={14} color={gps ? colors.success : colors.info} />
+        <Text style={styles.gpsText}>{gps ? `GPS: ${gps}` : "Getting GPS location…"}</Text>
+      </View>
       <View style={{ flex: 1 }}>
         <View style={styles.cameraWrap}>
           {VideoEl}
@@ -197,6 +219,8 @@ export default function ScanWeb() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
   cameraWrap: { flex: 1, minHeight: 300, backgroundColor: "#000", overflow: "hidden" },
+  gpsBar: { flexDirection: "row", alignItems: "center", gap: spacing.xs, backgroundColor: colors.surface2, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  gpsText: { color: colors.onSurface3, fontSize: font.sm, fontWeight: "700" },
   overlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: spacing.xl },
   bracket: { width: 240, height: 160, borderWidth: 3, borderRadius: radius.md, backgroundColor: "transparent" },
   scanHint: { color: "#fff", fontSize: font.base, fontWeight: "700", textAlign: "center", paddingHorizontal: spacing.xl },
