@@ -56,6 +56,7 @@ export type SheetOptions = {
   showBorder?: boolean; // dashed cut guides
   marginTop?: number | null; // mm, manual top margin override (null/undefined = auto)
   marginLeft?: number | null; // mm, manual left margin override
+  pageMargin?: number | null; // mm, PDF @page margin (null/undefined = 0 = edge-to-edge)
 };
 
 const A4_W = 210;
@@ -141,6 +142,7 @@ function buildSheet(opts: SheetOptions, innerFor: (w: number, h: number) => stri
   const leftM = opts.marginLeft == null ? autoLeft : Math.max(0, opts.marginLeft);
   const topM = opts.marginTop == null ? autoTop : Math.max(0, opts.marginTop);
   const selected = new Set(cells);
+  const pageM = opts.pageMargin == null ? 0 : Math.max(0, opts.pageMargin);
   let out = "";
   for (let i = 0; i < total; i++) {
     const r = Math.floor(i / cols);
@@ -154,7 +156,7 @@ function buildSheet(opts: SheetOptions, innerFor: (w: number, h: number) => stri
   }
   return `<html><head><meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    @page { size: A4; margin: 0; }
+    @page { size: A4; margin: ${pageM}mm; }
     html,body { margin:0; padding:0; }
     .sheet { position:relative; width:${A4_W}mm; height:${A4_H}mm; }
     * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }

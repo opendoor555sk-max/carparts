@@ -116,19 +116,50 @@ export default function ScanSticker() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [marginTop, setMarginTop] = useState("");
   const [marginLeft, setMarginLeft] = useState("");
+  const [pageMargin, setPageMargin] = useState("0");
   const [saved, setSaved] = useState<any[]>([]);
   const [logos, setLogos] = useState<any[]>([]);
   const [company, setCompany] = useState("Hyundai / Kia");
   const [rawLines, setRawLines] = useState<{ text: string; bold?: boolean }[]>([]);
   const [selLines, setSelLines] = useState<Set<number>>(new Set());
   const [nudgeStep, setNudgeStep] = useState(2);
+  const [companyFormats, setCompanyFormats] = useState<Record<string, any>>({});
   const layout = useMemo(() => SHEET_LAYOUTS.find((l) => l.code === layoutCode)!, [layoutCode]);
 
   const loadSaved = useCallback(async () => {
     try { setSaved(await api.get<any[]>("/sticker-templates")); } catch {}
     try { setLogos(await api.get<any[]>("/logos")); } catch {}
+    try {
+      const fmts = await api.get<any[]>("/company-formats");
+      const map: Record<string, any> = {};
+      fmts.forEach((f) => { map[f.company] = f.template; });
+      setCompanyFormats(map);
+    } catch {}
   }, []);
   useEffect(() => { loadSaved(); }, [loadSaved]);
+
+  // Re-apply a saved company format's arrangement onto freshly-scanned lines.
+  // Lines are matched by their field key (text before ':' with digits stripped),
+  // so recurring OEM fields (HKMC P/N, MODEL, IFT ID...) land where the user placed them.
+  const fieldKey = (t: string) => {
+    const u = (t || "").toUpperCase().trim();
+    const c = u.indexOf(":");
+    const k = (c >= 0 ? u.slice(0, c) : u).replace(/[0-9]/g, "").replace(/\s+/g, " ").trim();
+    return k || u.slice(0, 4);
+  };
+  const applyCompanyFormat = (tplIn: StickerTemplate, fmt: any): StickerTemplate => {
+    if (!fmt || !Array.isArray(fmt.lines)) return tplIn;
+    const map = new Map<string, any>();
+    for (const s of fmt.lines) { const k = fieldKey(s.text); if (!map.has(k)) map.set(k, s); }
+    const lines = tplIn.lines.map((l) => {
+      const s = map.get(fieldKey(l.text));
+      return s ? { ...l, x: s.x, y: s.y, size: s.size, bold: s.bold } : l;
+    });
+    const code = tplIn.code && fmt.code
+      ? { ...tplIn.code, type: fmt.code.type || tplIn.code.type, sizeMm: fmt.code.sizeMm ?? tplIn.code.sizeMm, box: { ...tplIn.code.box, y: fmt.code.box?.y ?? tplIn.code.box.y } }
+      : tplIn.code;
+    return { ...tplIn, lines, code };
+  };
 
   const LOGO_START: Box = { x: 3, y: 2, w: 34, h: 15 };
 
@@ -210,10 +241,17 @@ export default function ScanSticker() {
       setRawLines(rl);
       setCompany(comp);
       buildTpl(rl, aspect, hasCode, ct, pn, null, comp, codeSize);
+      // If the user saved a format for this company, re-apply their arrangement.
+      const fmt = companyFormats[comp];
+      if (fmt) {
+        if (fmt.code?.type) ct = fmt.code.type;
+        if (fmt.code?.sizeMm) setCodeSize(fmt.code.sizeMm);
+        setTpl((prev) => (prev ? applyCompanyFormat(prev, fmt) : prev));
+      }
       setPartNumber(pn);
       setCodeType(ct);
       setSelected(new Set());
-      show(`Sticker generated${FORMATTED_COMPANIES.includes(comp) ? ` (${comp} format)` : ""}`, "success");
+      show(`Sticker generated${fmt ? ` (${comp} saved format)` : FORMATTED_COMPANIES.includes(comp) ? ` (${comp} format)` : ""}`, "success");
     } catch (e: any) {
       show(e?.message || "Scan failed", "error");
     } finally {
@@ -228,6 +266,7 @@ export default function ScanSticker() {
 
   const applyCompany = (comp: string) => {
     setCompany(comp);
+    const fmt = companyFormats[comp];
     setTpl((prev) => {
       if (!prev) return prev;
       const lines = buildLines(rawLines, prev.aspect, !!prev.code, !!prev.logo, comp);
@@ -238,7 +277,13 @@ export default function ScanSticker() {
         code = { ...code, type: nt };
         setCodeType(nt);
       }
-      return { ...prev, company: comp, lines, code };
+      const next = { ...prev, company: comp, lines, code };
+      if (fmt) {
+        if (fmt.code?.sizeMm) setCodeSize(fmt.code.sizeMm);
+        if (fmt.code?.type) setCodeType(fmt.code.type);
+        return applyCompanyFormat(next, fmt);
+      }
+      return next;
     });
   };
 
@@ -308,6 +353,21 @@ export default function ScanSticker() {
       loadSaved();
     } catch (e: any) { show(e?.message || "Save failed", "error"); }
   };
+
+  const saveCompanyFormat = async () => {
+    if (!tpl) return;
+    try {
+      // Store only the arrangement recipe (positions/sizes/code) — not the specific values.
+      const template = {
+        lines: tpl.lines.map((l) => ({ text: l.text, x: l.x, y: l.y, size: l.size, bold: l.bold })),
+        code: tpl.code ? { type: tpl.code.type, sizeMm: tpl.code.sizeMm ?? codeSize, box: { y: tpl.code.box.y } } : null,
+        logo: tpl.logo ? { box: tpl.logo.box } : null,
+      };
+      await api.post("/company-formats", { company, template });
+      setCompanyFormats((m) => ({ ...m, [company]: template }));
+      show(`Saved as ${company} format`, "success");
+    } catch (e: any) { show(e?.message || "Save failed", "error"); }
+  };
   const openTemplate = (t: any) => {
     try {
       const parsed: StickerTemplate = JSON.parse(t.bg_data_url);
@@ -336,7 +396,8 @@ export default function ScanSticker() {
     try {
       const mt = marginTop.trim() === "" ? null : Math.max(0, parseFloat(marginTop) || 0);
       const ml = marginLeft.trim() === "" ? null : Math.max(0, parseFloat(marginLeft) || 0);
-      await printHtml(generateRichStickerSheetHtml(tpl, { layout, cells: Array.from(selected), showBorder: false, marginTop: mt, marginLeft: ml }));
+      const pm = pageMargin.trim() === "" ? 0 : Math.max(0, parseFloat(pageMargin) || 0);
+      await printHtml(generateRichStickerSheetHtml(tpl, { layout, cells: Array.from(selected), showBorder: false, marginTop: mt, marginLeft: ml, pageMargin: pm }));
     } catch (e: any) { show(e?.message || "Print failed", "error"); }
   };
 
@@ -522,8 +583,13 @@ export default function ScanSticker() {
             ))}
 
             <Pressable style={styles.saveBtn} onPress={saveTemplate} testID="save-template">
-              <Ionicons name="bookmark" size={18} color={colors.brand} /><Text style={styles.saveText}>Save this format{FORMATTED_COMPANIES.includes(company) ? ` (${company})` : ""}</Text>
+              <Ionicons name="bookmark" size={18} color={colors.brand} /><Text style={styles.saveText}>Save this sticker{FORMATTED_COMPANIES.includes(company) ? ` (${company})` : ""}</Text>
             </Pressable>
+            <Pressable style={styles.fmtBtn} onPress={saveCompanyFormat} testID="save-company-format">
+              <Ionicons name="albums" size={18} color={colors.onBrand} />
+              <Text style={styles.fmtText}>Save as {company} FORMAT{companyFormats[company] ? " (update)" : ""}</Text>
+            </Pressable>
+            <Text style={styles.dim}>Format = your arrangement (positions, code, logo). Next scan of {company} auto-uses it.</Text>
 
             <Text style={styles.section}>A4 SHEET LAYOUT</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -554,6 +620,15 @@ export default function ScanSticker() {
                 <Text style={styles.saveText}>0 / 0</Text>
               </Pressable>
             </View>
+
+            <Text style={styles.flabel}>PAGE MARGIN (mm) — 0 = edge-to-edge</Text>
+            <View style={styles.chipWrap}>
+              <TextInput style={styles.marginInput} value={pageMargin} onChangeText={setPageMargin} placeholder="0" placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="page-margin" />
+              <Pressable style={styles.logoAdd} onPress={() => setPageMargin("0")} testID="page-margin-zero">
+                <Text style={styles.saveText}>Set 0</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.hint}>In the print dialog also choose Margins = None &amp; Scale = 100% for exact edge-to-edge.</Text>
 
             <Pressable style={styles.printBtn} onPress={onPrint} testID="scan-print">
               <Ionicons name="print" size={20} color={colors.onBrand} /><Text style={styles.printText}>Print A4 Sheet</Text>
@@ -618,6 +693,8 @@ const styles = StyleSheet.create({
   printText: { color: colors.onBrand, fontSize: font.base, fontWeight: "800", letterSpacing: 0.5 },
   saveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.sm, marginTop: spacing.xs },
   saveText: { color: colors.brand, fontSize: font.sm, fontWeight: "800" },
+  fmtBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.sm, marginTop: spacing.xs },
+  fmtText: { color: colors.onBrand, fontSize: font.sm, fontWeight: "800" },
   savedRow: { gap: spacing.md, paddingVertical: spacing.xs },
   savedCard: { width: 110 },
   savedInner: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: spacing.md, alignItems: "center", gap: 4 },

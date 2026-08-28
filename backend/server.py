@@ -1930,6 +1930,40 @@ async def delete_sticker_template(tid: str, user=Depends(get_current_user)):
     return {"ok": True}
 
 
+# ---------------- Company-wise Sticker Formats (store-scoped, one per company) ----------------
+class CompanyFormatReq(BaseModel):
+    company: str
+    template: dict
+
+
+@api.post("/company-formats")
+async def save_company_format(req: CompanyFormatReq, user=Depends(get_current_user)):
+    sid = resolve_store(user, None)
+    comp = (req.company or "").strip()
+    if not comp:
+        raise HTTPException(400, "Company required")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.company_formats.update_one(
+        {"store_id": sid, "company": comp},
+        {"$set": {"template": req.template, "updated_at": now},
+         "$setOnInsert": {"id": uuid.uuid4().hex, "store_id": sid, "company": comp, "created_at": now}},
+        upsert=True,
+    )
+    doc = await db.company_formats.find_one({"store_id": sid, "company": comp}, {"_id": 0})
+    return doc
+
+
+@api.get("/company-formats")
+async def list_company_formats(store_id: Optional[str] = None, user=Depends(get_current_user)):
+    return await db.company_formats.find(sq(user, None, store_id), {"_id": 0}).sort("company", 1).to_list(100)
+
+
+@api.delete("/company-formats/{company}")
+async def delete_company_format(company: str, user=Depends(get_current_user)):
+    await db.company_formats.delete_one(sq(user, {"company": company}))
+    return {"ok": True}
+
+
 # ---------------- Company Logo Library (store-scoped) ----------------
 class LogoReq(BaseModel):
     name: str

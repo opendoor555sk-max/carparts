@@ -36,6 +36,7 @@ export default function Labels() {
   const [showBorder, setShowBorder] = useState(true);
   const [marginTop, setMarginTop] = useState("");
   const [marginLeft, setMarginLeft] = useState("");
+  const [pageMargin, setPageMargin] = useState("0");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const scannedRef = useRef(false);
@@ -97,7 +98,7 @@ export default function Labels() {
     try {
       const html = generateSheetHtml(
         { partNumber: partNumber.trim(), line1: line1.trim(), line2: line2.trim(), code },
-        { layout, cells: Array.from(selected), showBorder, marginTop: marginTop.trim() === "" ? null : Math.max(0, parseFloat(marginTop) || 0), marginLeft: marginLeft.trim() === "" ? null : Math.max(0, parseFloat(marginLeft) || 0) },
+        { layout, cells: Array.from(selected), showBorder, marginTop: marginTop.trim() === "" ? null : Math.max(0, parseFloat(marginTop) || 0), marginLeft: marginLeft.trim() === "" ? null : Math.max(0, parseFloat(marginLeft) || 0), pageMargin: pageMargin.trim() === "" ? 0 : Math.max(0, parseFloat(pageMargin) || 0) },
       );
       await printHtml(html);
     } catch (e: any) {
@@ -209,6 +210,15 @@ export default function Labels() {
             <Text style={styles.resetText}>0 / 0</Text>
           </Pressable>
         </View>
+
+        <Text style={styles.flabel}>PAGE MARGIN (mm) — 0 = edge-to-edge (no border)</Text>
+        <View style={styles.chipWrap}>
+          <TextInput style={styles.mInput} value={pageMargin} onChangeText={setPageMargin} placeholder="0" placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="page-margin" />
+          <Pressable style={styles.zeroBtn} onPress={() => setPageMargin("0")} testID="page-margin-zero">
+            <Text style={styles.resetText}>Set 0</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.dim}>In the print dialog also pick Margins = None &amp; Scale = 100% for exact edge-to-edge.</Text>
 
         <Text style={styles.dim}>Printing {selectedCount} label{selectedCount === 1 ? "" : "s"} on selected blocks</Text>
 
