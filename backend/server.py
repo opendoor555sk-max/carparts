@@ -132,6 +132,81 @@ CATEGORY_MASTER = [
         "USB / AUX Module", "Interior Light Module", "Power Seat Module", "Digital Clock / Display",
         "Dashcam / DVR Module",
     ]},
+    {"group": "Engine & Components", "items": [
+        "Cylinder Head", "Engine Block", "Piston", "Piston Ring", "Crankshaft", "Camshaft",
+        "Connecting Rod", "Engine Valve", "Timing Chain", "Timing Belt Kit", "Oil Pump",
+        "Water Pump", "Head Gasket", "Engine Mounting", "Flywheel", "Turbocharger",
+        "Intercooler", "Intake Manifold", "Exhaust Manifold",
+    ]},
+    {"group": "Fuel System", "items": [
+        "Fuel Injector", "Fuel Pump", "Fuel Filter", "Fuel Tank", "Carburettor", "Throttle Body",
+        "Fuel Rail", "Fuel Hose", "Diesel Nozzle",
+    ]},
+    {"group": "Cooling System", "items": [
+        "Radiator", "Radiator Fan", "Coolant Hose", "Thermostat", "Coolant Reservoir",
+        "Radiator Cap", "Heater Core",
+    ]},
+    {"group": "Transmission & Clutch", "items": [
+        "Clutch Plate", "Pressure Plate", "Clutch Release Bearing", "Clutch Master Cylinder",
+        "Clutch Slave Cylinder", "Gearbox Assembly", "Gear Set", "CV Joint", "Drive Shaft / Axle",
+        "Propeller Shaft", "Differential", "Transmission Mounting",
+    ]},
+    {"group": "Braking System", "items": [
+        "Brake Pad", "Brake Shoe", "Brake Disc / Rotor", "Brake Drum", "Brake Caliper",
+        "Brake Master Cylinder", "Wheel Cylinder", "Brake Booster", "Brake Hose",
+        "Brake Fluid Reservoir", "Handbrake Cable", "ABS Modulator",
+    ]},
+    {"group": "Suspension & Steering", "items": [
+        "Shock Absorber", "Strut Assembly", "Coil Spring", "Leaf Spring", "Control Arm",
+        "Ball Joint", "Tie Rod End", "Steering Rack", "Steering Column", "Power Steering Pump",
+        "Stabilizer Link", "Bush Kit", "Wheel Bearing", "Wheel Hub",
+    ]},
+    {"group": "Body & Exterior", "items": [
+        "Bonnet / Hood", "Front Bumper", "Rear Bumper", "Fender / Mudguard", "Door Shell",
+        "Door Handle", "Boot / Tailgate", "Grille", "Side Mirror", "Windshield / Windscreen",
+        "Window Glass", "Roof Panel", "Body Panel", "Emblem / Logo", "Wheel Arch", "Running Board",
+    ]},
+    {"group": "Lighting", "items": [
+        "Headlight Assembly", "Tail Light", "Fog Lamp", "Indicator / Turn Signal",
+        "Number Plate Light", "Reverse Light", "DRL", "Cabin Light", "Bulb / LED",
+        "Headlight Ballast",
+    ]},
+    {"group": "Ignition & Electrical (Mech)", "items": [
+        "Spark Plug", "Glow Plug", "Distributor", "HT Cable", "Starter Solenoid",
+        "Voltage Regulator", "Battery Terminal",
+    ]},
+    {"group": "Filters & Fluids", "items": [
+        "Air Filter", "Oil Filter", "Cabin / AC Filter", "Engine Oil", "Coolant", "Brake Fluid",
+        "Power Steering Fluid", "Transmission Fluid", "Grease",
+    ]},
+    {"group": "AC & Heating", "items": [
+        "AC Compressor", "Condenser", "Evaporator", "Expansion Valve", "AC Hose",
+        "Blower Motor", "Cooling Coil", "Receiver Drier", "Cabin Blower",
+    ]},
+    {"group": "Exhaust System", "items": [
+        "Silencer / Muffler", "Exhaust Pipe", "Catalytic Converter", "Exhaust Manifold",
+        "DPF", "Resonator", "Exhaust Gasket",
+    ]},
+    {"group": "Interior & Trim", "items": [
+        "Seat", "Seat Cover", "Dashboard", "Door Trim / Panel", "Steering Wheel", "Gear Knob",
+        "Floor Mat", "Sun Visor", "Armrest", "Handbrake Lever", "Pedal Assembly",
+    ]},
+    {"group": "Wheels & Tyres", "items": [
+        "Alloy Wheel", "Steel Rim", "Tyre", "Tube", "Wheel Cap / Cover", "Wheel Nut / Bolt",
+        "TPMS Valve", "Spare Wheel Carrier",
+    ]},
+    {"group": "Belts, Hoses & Bearings", "items": [
+        "Timing Belt", "Fan Belt / V-Belt", "Serpentine Belt", "Tensioner", "Idler Pulley",
+        "Radiator Hose", "Vacuum Hose", "Wheel Bearing", "Release Bearing",
+    ]},
+    {"group": "Gaskets & Seals", "items": [
+        "Head Gasket", "Valve Cover Gasket", "Oil Seal", "Crank Seal", "Manifold Gasket",
+        "O-Ring Kit", "Sump Gasket",
+    ]},
+    {"group": "Wipers & Washer", "items": [
+        "Wiper Blade", "Wiper Motor", "Wiper Linkage", "Washer Pump", "Washer Tank",
+        "Washer Nozzle",
+    ]},
 ]
 
 CONDITIONS = ["Working", "Testing", "Repairable", "Damaged", "Incomplete", "Scrap", "Unknown"]

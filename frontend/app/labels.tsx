@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SvgXml } from "react-native-svg";
+import { CameraView, useCameraPermissions } from "expo-camera";
 
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
@@ -34,6 +35,33 @@ export default function Labels() {
   const [startCell, setStartCell] = useState(1);
   const [copies, setCopies] = useState<string>("");
   const [showBorder, setShowBorder] = useState(true);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const scannedRef = useRef(false);
+
+  const openScanner = async () => {
+    let perm = permission;
+    if (!perm?.granted) {
+      perm = await requestPermission();
+    }
+    if (perm?.granted) {
+      scannedRef.current = false;
+      setScannerOpen(true);
+    } else if (perm && !perm.canAskAgain) {
+      show("Camera blocked — enable it in Settings", "error");
+      Linking.openSettings();
+    } else {
+      show("Camera permission needed to scan", "error");
+    }
+  };
+
+  const onScanned = ({ data }: { data: string }) => {
+    if (scannedRef.current || !data) return;
+    scannedRef.current = true;
+    setPartNumber(data.trim());
+    setScannerOpen(false);
+    show(`Scanned: ${data.trim()}`, "success");
+  };
 
   const layout = useMemo(() => SHEET_LAYOUTS.find((l) => l.code === layoutCode)!, [layoutCode]);
 
@@ -80,7 +108,13 @@ export default function Labels() {
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl }}>
         {/* Content */}
         <Text style={styles.section}>LABEL CONTENT</Text>
-        <TextInput style={styles.input} value={partNumber} onChangeText={setPartNumber} placeholder="Part Number" placeholderTextColor={colors.info} autoCapitalize="characters" testID="lbl-pn" />
+        <View style={styles.pnRow}>
+          <TextInput style={[styles.input, { flex: 1 }]} value={partNumber} onChangeText={setPartNumber} placeholder="Part Number" placeholderTextColor={colors.info} autoCapitalize="characters" testID="lbl-pn" />
+          <Pressable style={styles.scanBtn} onPress={openScanner} testID="lbl-scan">
+            <Ionicons name="barcode-outline" size={20} color={colors.onBrand} />
+            <Text style={styles.scanBtnText}>Scan</Text>
+          </Pressable>
+        </View>
         <TextInput style={styles.input} value={line1} onChangeText={setLine1} placeholder="Line 1 (company / store)" placeholderTextColor={colors.info} testID="lbl-l1" />
         <TextInput style={styles.input} value={line2} onChangeText={setLine2} placeholder="Line 2 (name / note) — optional" placeholderTextColor={colors.info} testID="lbl-l2" />
 
@@ -179,6 +213,26 @@ export default function Labels() {
         </Pressable>
         {Platform.OS === "web" ? <Text style={styles.dim}>Tip: on web this opens the browser print dialog — choose Save as PDF.</Text> : null}
       </ScrollView>
+
+      <Modal visible={scannerOpen} animationType="slide" onRequestClose={() => setScannerOpen(false)}>
+        <View style={styles.scanModal}>
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            barcodeScannerSettings={{
+              barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "code93", "upc_a", "upc_e", "codabar", "itf14", "datamatrix", "pdf417", "aztec"],
+            }}
+            onBarcodeScanned={onScanned}
+          />
+          <View style={styles.scanOverlay} pointerEvents="none">
+            <View style={styles.scanBracket} />
+            <Text style={styles.scanHint}>Point the camera at any Barcode or QR code</Text>
+          </View>
+          <Pressable style={styles.scanClose} onPress={() => setScannerOpen(false)} testID="scan-close">
+            <Ionicons name="close" size={26} color="#fff" />
+          </Pressable>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -210,4 +264,12 @@ const styles = StyleSheet.create({
   borderLabel: { color: colors.onSurface, fontSize: font.base },
   printBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.md, marginTop: spacing.md },
   printText: { color: colors.onBrand, fontSize: font.base, fontWeight: "800", letterSpacing: 0.5 },
+  pnRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  scanBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.brand, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md },
+  scanBtnText: { color: colors.onBrand, fontWeight: "800", fontSize: font.sm },
+  scanModal: { flex: 1, backgroundColor: "#000" },
+  scanOverlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
+  scanBracket: { width: 240, height: 160, borderWidth: 3, borderColor: colors.brand, borderRadius: radius.md },
+  scanHint: { color: "#fff", fontSize: font.base, marginTop: spacing.lg, textAlign: "center", paddingHorizontal: spacing.xl },
+  scanClose: { position: "absolute", top: 48, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
 });

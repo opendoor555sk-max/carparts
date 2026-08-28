@@ -160,3 +160,7 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Entry points: Home "STICKER PRINTING" tile + Part detail "Print on A4 Sticker Sheet" button (passes pn/company/name).
 - Verified on web preview: layout switch, start-cell coloring (cells<start dark, >=start orange), print action fires with no JS errors. Font/layout exact-photo-clone NOT done (per user OK with approximation). 40P layout is a chart anomaly (overflows A4) but included.
 - NEXT: Module 1+2 AI Universal Scanner (Gemini 3 Pro vision) — scan sticker -> capture text/fields/barcode-QR region -> editable template -> regenerate code on new part number. Needs integration playbook + confirm.
+
+## Category Master expanded + Barcode/QR scanner in labels (2026-06 fork)
+- CATEGORY_MASTER in server.py expanded from 5 electronic groups to 22 groups / 245 items (added Engine, Fuel, Cooling, Transmission/Clutch, Braking, Suspension/Steering, Body/Exterior, Lighting, Ignition, Filters/Fluids, AC/Heating, Exhaust, Interior/Trim, Wheels/Tyres, Belts/Hoses/Bearings, Gaskets/Seals, Wipers). Auto-flows to Buy/Sell picker, Reports filter, Demand filter, Category Master screen. Verified /categories returns 22 groups.
+- labels.tsx: added "Scan" button beside Part Number -> full-screen CameraView modal (expo-camera) scanning qr/code128/ean/etc -> auto-fills Part Number. Camera perms already in app.json. NATIVE feature (Expo Go / build), not web preview.
