@@ -1,0 +1,39 @@
+{
+  "summary": "Phase 1 multi-tenant refactor VERIFIED end-to-end. Backend: 18/18 pytest cases pass on /app/backend/tests/test_multitenant_phase1.py — covers register (creates store+admin, dup username 400, short password 422), login for owner + super_admin, /admin/stores (200 for super, 403 for owner, counts users/parts/in_stock), full data isolation (Store B never sees Store A's inventory/parts/search/stats), store_id query-param IS ignored for non-super (resolve_store lock verified), buy→sell decreases stock, SEC-004 /admin/users response is stripped of password_enc/password_hash/google_api_key/google_cx, SEC-001 store admin creating role='admin' user is forced to 'staff', and cross-store PATCH /admin/users/{id} from Store A on Store B's staff returns 403. Frontend (Expo web, 390x844): Login screen shows go-signup button; sign-up flow POSTs /auth/register, stores token+user in localStorage kabadi.token/kabadi.user with role='admin' + store_id set, and lands on tabs; Admin panel for store admin does NOT show 'All Stores' link (correct — hidden by role); logging in as abdul/Salam@123 gets role='super_admin' and admin-link-stores IS present; tapping it navigates to /stores which lists every store with Users/Parts/In Stock stats — including the just-registered TEST_UI_Store_22713 and the pytest-created TEST_A/TEST_B stores. Deprecated `props.pointerEvents` warning STILL logged from batch-buy overlay (carry-over, low priority, unrelated to Phase 1). No crashes, no red screen, no pageerrors during signup/login/all-stores flow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "batch-buy.web.tsx overlay", "issue": "Carry-over from iteration_10/14: deprecated `props.pointerEvents` warning still fires. Move pointerEvents:'none' into the style prop on the overlay <View>. Reference: /app/frontend/app/batch-buy.web.tsx:122. Not related to this Phase 1 review; safe to defer."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_multitenant_phase1.py",
+    "/app/test_reports/pytest/multitenant_phase1.xml"
+  ],
+  "action_items": [
+    "None required for Phase 1 — all 9 review items pass. (Optional) address the pre-existing pointerEvents deprecation warning in batch-buy.web.tsx."
+  ],
+  "critical_code_review_comments": [
+    "resolve_store(user, store_id_param, require_write) correctly forces non-super users to their own user['store_id'] and ignores any client-supplied ?store_id=X — verified by isolation test test_store_b_cannot_override_store_id_param.",
+    "sq() helper composes {store_id: ...} into every mongo query for tenant collections (parts, stock, transactions, requirements, search_history, ai_research, settings, known_parts, verifications, files) — grep confirms no tenant collection is queried without sq(), except super-admin-only /admin/stores which is intentionally cross-tenant.",
+    "SEC-004: /admin/users projection uses {'_id':0,'password_hash':0,'password_enc':0,'google_api_key':0,'google_cx':0} — response verified to omit all four fields.",
+    "SEC-001: create_user hardcodes role='staff' unless the CALLER is super_admin (role='admin' body is ignored otherwise); update_user blocks non-super from patching any admin/super_admin except self (target.role in admin+ && caller != super && target != self → 403); cross-store target → 403. Behaviour matches spec.",
+    "Startup drops the legacy global unique index parts.part_number_1 and creates a composite (store_id, part_number) unique index — required for multi-tenant part isolation. Wrapped in try/except so re-runs are idempotent.",
+    "Register auto-issues a JWT and public_user response — 'store_name' is populated inline so the frontend AuthContext gets it without a follow-up call to /auth/me.",
+    "Password reveal endpoint /admin/users/{id}/password is properly scoped: non-super caller against a target with different store_id returns 403; only stores' own owners can reveal their own staff's password."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_multitenant_phase1.py (new)",
+    "/app/test_reports/pytest/multitenant_phase1.xml (new)",
+    "/app/test_reports/iteration_15.json (new)"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% (signup→admin, super-admin→all-stores, isolation)"},
+  "seed_data_creation": "pytest fixtures create ephemeral TEST_A_/TEST_B_ stores (with a few TEST parts + txns) and one UI-created store TEST_UI_Store_22713 (owner testui22713 / Test@1234). None cleaned up — all prefixed 'TEST_' per project convention. abdul/Salam@123 unchanged, still 200.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Multi-tenant is live. Every tenant collection carries store_id and resolve_store() locks non-super callers. To test as a store owner, either register via POST /api/auth/register or use one of the TEST_A_*/TEST_B_* users (password 'Test@1234'). Super admin abdul/Salam@123 remains unchanged. Frontend localStorage keys are kabadi.token (JSON-encoded string) and kabadi.user. Sign Up screen testIDs: signup-store, signup-name, signup-username, signup-password, signup-submit, signup-error, go-login. Login extra testID: go-signup. Admin panel extra testID (super only): admin-link-stores which routes to /stores. Print buttons in Buy/Sell/Inventory are NATIVE-DIALOG only per spec — deep testing skipped.",
+  "rca_of_issue": "N/A — no bug reproduced. Phase 1 review passes cleanly on both backend and frontend."
+}

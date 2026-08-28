@@ -9,9 +9,18 @@ export type User = {
   id: string;
   name: string;
   username: string;
-  role: "admin" | "staff";
+  role: "admin" | "staff" | "super_admin";
+  store_id?: string | null;
+  store_name?: string;
   permissions: string[];
   disabled?: boolean;
+};
+
+export type RegisterPayload = {
+  store_name: string;
+  name: string;
+  username: string;
+  password: string;
 };
 
 type AuthState = {
@@ -19,6 +28,7 @@ type AuthState = {
   loading: boolean;
   hasStoredToken: boolean;
   login: (username: string, password: string) => Promise<void>;
+  register: (payload: RegisterPayload) => Promise<void>;
   biometricUnlock: () => Promise<boolean>;
   logout: () => Promise<void>;
   can: (perm: string) => boolean;
@@ -58,6 +68,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await api.post<{ access_token: string; user: User }>(
       "/auth/login",
       { username, password },
+      false,
+    );
+    await storage.secureSet(TOKEN_KEY, res.access_token);
+    await storage.setItem(USER_KEY, res.user as any);
+    setHasStoredToken(true);
+    setUser(res.user);
+  }, []);
+
+  const register = useCallback(async (payload: RegisterPayload) => {
+    const res = await api.post<{ access_token: string; user: User }>(
+      "/auth/register",
+      payload,
       false,
     );
     await storage.secureSet(TOKEN_KEY, res.access_token);
@@ -106,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const can = useCallback(
     (perm: string) => {
       if (!user) return false;
-      if (user.role === "admin") return true;
+      if (user.role === "admin" || user.role === "super_admin") return true;
       return user.permissions?.includes(perm);
     },
     [user],
@@ -114,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, hasStoredToken, login, biometricUnlock, logout, can, refresh }}
+      value={{ user, loading, hasStoredToken, login, register, biometricUnlock, logout, can, refresh }}
     >
       {children}
     </AuthContext.Provider>

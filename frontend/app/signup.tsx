@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,85 +11,86 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as LocalAuthentication from "expo-local-authentication";
 
 import { useAuth } from "@/src/context/AuthContext";
 import { Button, Field } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
-export default function Login() {
-  const { login, biometricUnlock, hasStoredToken, user } = useAuth();
+export default function SignUp() {
+  const { register } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [storeName, setStoreName] = useState("");
+  const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
-  const [bioAvailable, setBioAvailable] = useState(false);
 
-  useEffect(() => {
-    if (user) router.replace("/(tabs)");
-  }, [user]);
-
-  useEffect(() => {
-    (async () => {
-      if (Platform.OS === "web") return;
-      const hw = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      setBioAvailable(hw && enrolled && hasStoredToken);
-    })();
-  }, [hasStoredToken]);
-
-  const onLogin = async () => {
+  const onSubmit = async () => {
     setErr("");
-    if (!username.trim() || !password) {
-      setErr("Username અને password જરૂરી છે");
+    if (!storeName.trim() || !username.trim() || !password) {
+      setErr("Store name, username અને password જરૂરી છે");
+      return;
+    }
+    if (password.length < 6) {
+      setErr("Password ઓછામાં ઓછો 6 અક્ષર હોવો જોઈએ");
       return;
     }
     setLoading(true);
     try {
-      await login(username.trim(), password);
+      await register({
+        store_name: storeName.trim(),
+        name: name.trim(),
+        username: username.trim(),
+        password,
+      });
       router.replace("/(tabs)");
     } catch (e: any) {
-      setErr(e?.message || "Login failed");
+      setErr(e?.message || "Sign up failed");
     } finally {
       setLoading(false);
     }
   };
 
-  const onBio = async () => {
-    const ok = await biometricUnlock();
-    if (ok) router.replace("/(tabs)");
-    else setErr("Biometric unlock નિષ્ફળ — password વાપરો");
-  };
-
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView
-        contentContainerStyle={[styles.container, { paddingTop: insets.top + spacing.xxxl }]}
+        contentContainerStyle={[styles.container, { paddingTop: insets.top + spacing.xxl }]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.logoWrap}>
           <View style={styles.logoBox}>
-            <Ionicons name="hardware-chip" size={40} color={colors.brand} />
+            <Ionicons name="storefront" size={38} color={colors.brand} />
           </View>
-          <Text style={styles.title}>Auto Parts Store</Text>
-          <Text style={styles.subtitle}>Auto Electrical Scrap Parts ERP</Text>
+          <Text style={styles.title}>નવું Store બનાવો</Text>
+          <Text style={styles.subtitle}>તમારું પોતાનું Auto Parts Store શરૂ કરો</Text>
         </View>
 
         <View style={styles.form}>
           <Field
-            label="USERNAME"
+            label="STORE NAME (દુકાનનું નામ)"
+            value={storeName}
+            onChangeText={setStoreName}
+            placeholder="e.g. Raja Auto Parts"
+            testID="signup-store"
+          />
+          <Field
+            label="YOUR NAME (તમારું નામ)"
+            value={name}
+            onChangeText={setName}
+            placeholder="Owner name"
+            testID="signup-name"
+          />
+          <Field
+            label="USERNAME (login માટે)"
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="username"
-            testID="login-username"
+            testID="signup-username"
           />
           <View>
             <Field
@@ -97,59 +98,37 @@ export default function Login() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPw}
-              placeholder="password"
-              testID="login-password"
-              onSubmitEditing={onLogin}
+              placeholder="ઓછામાં ઓછો 6 અક્ષર"
+              testID="signup-password"
+              onSubmitEditing={onSubmit}
               returnKeyType="go"
             />
-            <Pressable
-              style={styles.eye}
-              onPress={() => setShowPw((s) => !s)}
-              hitSlop={12}
-              testID="toggle-password"
-            >
+            <Pressable style={styles.eye} onPress={() => setShowPw((s) => !s)} hitSlop={12}>
               <Ionicons name={showPw ? "eye-off" : "eye"} size={20} color={colors.info} />
             </Pressable>
           </View>
 
           {err ? (
-            <View style={styles.errBanner} testID="login-error">
+            <View style={styles.errBanner} testID="signup-error">
               <Ionicons name="warning" size={16} color={colors.onError} />
               <Text style={styles.errText}>{err}</Text>
             </View>
           ) : null}
 
           <Button
-            title="Sign In"
-            onPress={onLogin}
+            title="Create Store & Sign In"
+            onPress={onSubmit}
             loading={loading}
-            icon="log-in"
-            testID="login-submit"
+            icon="add-circle"
+            testID="signup-submit"
             style={{ marginTop: spacing.sm }}
-          />
-
-          {bioAvailable ? (
-            <Button
-              title="Fingerprint થી Unlock"
-              onPress={onBio}
-              variant="secondary"
-              icon="finger-print"
-              testID="login-biometric"
-              style={{ marginTop: spacing.md }}
-            />
-          ) : null}
-
-          <Button
-            title="નવું Store બનાવો (Sign Up)"
-            onPress={() => router.push("/signup" as any)}
-            variant="secondary"
-            icon="storefront"
-            testID="go-signup"
-            style={{ marginTop: spacing.md }}
           />
         </View>
 
-        <Text style={styles.footer}>ડાઉનલોડ કરનાર દરેક પોતાનું અલગ Store બનાવી શકે</Text>
+        <Pressable onPress={() => router.replace("/login")} style={styles.linkRow} testID="go-login">
+          <Text style={styles.linkText}>પહેલેથી account છે? </Text>
+          <Text style={[styles.linkText, { color: colors.brand, fontWeight: "800" }]}>Sign In</Text>
+        </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -158,7 +137,7 @@ export default function Login() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
   container: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxxl, minHeight: "100%" },
-  logoWrap: { alignItems: "center", marginBottom: spacing.xxxl },
+  logoWrap: { alignItems: "center", marginBottom: spacing.xl },
   logoBox: {
     width: 84,
     height: 84,
@@ -171,7 +150,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   title: { color: colors.onSurface, fontSize: font.xxl, fontWeight: "800", textAlign: "center" },
-  subtitle: { color: colors.brand, fontSize: font.sm, fontWeight: "700", marginTop: spacing.xs, letterSpacing: 0.5 },
+  subtitle: { color: colors.brand, fontSize: font.sm, fontWeight: "700", marginTop: spacing.xs },
   form: {
     backgroundColor: colors.surface2,
     borderWidth: 1,
@@ -190,5 +169,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   errText: { color: colors.onError, fontSize: font.base, fontWeight: "700", flex: 1 },
-  footer: { color: colors.info, textAlign: "center", marginTop: spacing.xl, fontSize: font.sm },
+  linkRow: { flexDirection: "row", justifyContent: "center", marginTop: spacing.xl },
+  linkText: { color: colors.info, fontSize: font.base },
 });

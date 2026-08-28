@@ -23,6 +23,7 @@ import { api, fileUrl, uploadImage } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { Button, Card, Field, Header, LimitBar, Loading, StatusChip } from "@/src/components/ui";
+import { printReceipt } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 const CONDITIONS = ["Working", "Testing", "Repairable", "Damaged", "Incomplete", "Scrap", "Unknown"];
@@ -32,7 +33,7 @@ export default function Buy() {
   const partNumber = decodeURIComponent(pn as string);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const { show } = useToast();
 
   const [info, setInfo] = useState<any>(null);
@@ -401,6 +402,23 @@ export default function Buy() {
         </ScrollView>
 
         <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
+          <Button
+            title="Print Slip"
+            onPress={() =>
+              printReceipt(user?.store_name || "", "BUY", {
+                part_number: partNumber,
+                name,
+                condition,
+                location: { rack, shelf, box, position },
+                price: price || null,
+                by: user?.name,
+              })
+            }
+            variant="secondary"
+            icon="print"
+            testID="print-buy"
+            style={{ marginBottom: spacing.sm }}
+          />
           <Button
             title={isStop && !override ? "BLOCKED — Limit Reached" : "Confirm Buy (Stock +1)"}
             onPress={submit}

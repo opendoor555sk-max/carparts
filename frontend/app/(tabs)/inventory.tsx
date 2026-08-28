@@ -16,6 +16,7 @@ import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { ConfirmModal, Header, StatusChip, Loading, EmptyState, FilterChip } from "@/src/components/ui";
+import { printInventory } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type Unit = {
@@ -99,7 +100,21 @@ export default function Inventory() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Inventory" subtitle="Physical stock units" />
+      <Header
+        title="Inventory"
+        subtitle="Physical stock units"
+        right={
+          units.length ? (
+            <Pressable
+              onPress={() => printInventory(user?.store_name || "", units)}
+              hitSlop={12}
+              testID="print-inventory"
+            >
+              <Ionicons name="print" size={22} color={colors.brand} />
+            </Pressable>
+          ) : undefined
+        }
+      />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

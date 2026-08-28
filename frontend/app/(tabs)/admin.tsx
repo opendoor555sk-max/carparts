@@ -44,6 +44,7 @@ export default function Admin() {
   );
 
   const isAdmin = user?.role === "admin";
+  const isSuperAdmin = user?.role === "super_admin";
 
   const statCards: { label: string; value: number; color: string; icon: keyof typeof Ionicons.glyphMap }[] = stats
     ? [
@@ -68,7 +69,7 @@ export default function Admin() {
     <View style={styles.flex}>
       <Header
         title="Admin Panel"
-        subtitle={user?.name}
+        subtitle={user?.store_name ? `${user?.name} · ${user?.store_name}` : user?.name}
         right={
           <Pressable onPress={logout} hitSlop={12} testID="logout-btn">
             <Ionicons name="log-out-outline" size={24} color={colors.error} />
@@ -96,6 +97,22 @@ export default function Admin() {
             ) : null}
 
             <Text style={[styles.section, { marginTop: spacing.xl }]}>MANAGEMENT</Text>
+            {isSuperAdmin ? (
+              <Pressable
+                style={[styles.link, { marginBottom: spacing.md, borderColor: colors.brand }]}
+                onPress={() => router.push("/stores" as any)}
+                testID="admin-link-stores"
+              >
+                <View style={styles.linkIcon}>
+                  <Ionicons name="business" size={22} color={colors.brand} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.linkTitle}>All Stores (Super Admin)</Text>
+                  <Text style={styles.linkSub}>બધા stores નો data જુઓ</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.info} />
+              </Pressable>
+            ) : null}
             <View style={{ gap: spacing.md }}>
               {links.map((l) => {
                 const allowed = can(l.perm);

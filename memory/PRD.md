@@ -94,3 +94,15 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - ROOT CAUSE: Alert.alert confirm buttons don't fire callbacks on React Native Web (mobile Chrome) — so Delete/Restore actions never executed. Adjust +/- worked but per-unit rows made it look static.
 - FIX: Added cross-platform <ConfirmModal> in src/components/ui.tsx (Modal-based). Replaced ALL Alert.alert confirms with ConfirmModal in inventory.tsx, part/[pn].tsx, history.tsx, backup.tsx.
 - Verified on web: inventory unit delete (confirm modal shows, row removed, toast), part-detail quantity +/- reflects (STOCK UNITS 2->3), counter updates. History bulk delete + backup import use same ConfirmModal.
+
+
+## Phase 1 — Multi-Store Foundation (COMPLETE, 2026-08-28)
+- Converted single-tenant → multi-tenant. Every collection now carries store_id.
+- Sign Up (POST /api/auth/register) creates an isolated store + admin owner.
+- Per-store data isolation enforced server-side via resolve_store() (client cannot override store_id).
+- Super-admin (abdul) god-view: GET /api/admin/stores + /stores screen lists all stores.
+- Security fixes: SEC-001 (no staff->admin escalation, cross-store user edit blocked), SEC-003 (file access store-scoped + disabled-user check), SEC-004 (/admin/users no longer leaks password_enc/google keys). SEC-002 reversible password view KEPT per user request, now store-scoped.
+- Print (expo-print) added to Buy (Print Slip), Sell (Print Bill), Inventory (Print report).
+- Backend /health endpoint added (fixes K8s probe 404).
+- Tested: /app/test_reports/iteration_15.json (18/18 pass).
+- PENDING: Phase 2 (complete car parts catalog + Honda/Nissan companies), Phase 3 (monetization: subscription/ads).

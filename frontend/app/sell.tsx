@@ -9,6 +9,7 @@ import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { Button, Card, Field, Header, Loading, StatusChip, EmptyState } from "@/src/components/ui";
+import { printReceipt } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 export default function Sell() {
@@ -16,7 +17,7 @@ export default function Sell() {
   const partNumber = decodeURIComponent(pn as string);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const { show } = useToast();
 
   const [part, setPart] = useState<any>(null);
@@ -136,6 +137,25 @@ export default function Sell() {
           </ScrollView>
 
           <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
+            <Button
+              title="Print Bill"
+              onPress={() => {
+                const u = units.find((x: any) => x.id === selectedUnit) || units[0];
+                printReceipt(user?.store_name || "", "SELL", {
+                  part_number: partNumber,
+                  name: part?.name,
+                  condition: u?.condition,
+                  location: u?.location,
+                  price: price || null,
+                  buyer,
+                  by: user?.name,
+                });
+              }}
+              variant="secondary"
+              icon="print"
+              testID="print-sell"
+              style={{ marginBottom: spacing.sm }}
+            />
             <Button title="Confirm Sell (Stock −1)" onPress={submit} loading={submitting} icon="cash" testID="confirm-sell" />
           </View>
         </>
