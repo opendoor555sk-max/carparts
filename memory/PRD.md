@@ -182,3 +182,11 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 
 ## Scanner speed: 5-second target (2026-06 fork)
 - User demanded scan complete in ~5s "at any cost". Benchmarked vision models on 720-900px image: gpt-4o-mini ~4s, gpt-5-nano ~21s, gemini-3.5-flash ~18s, gemini-3-flash-preview ~42s (gemini flash more accurate but too slow). Switched /scan-sticker model gemini-3.7-flash -> openai gpt-4o-mini. Frontend downscales image to 800px before upload. End-to-end measured ~5.4s at 900px (model ~4s + transfer). TRADEOFF: gpt-4o-mini is less accurate on blurry/rotated/dirty labels (may misread part number) — screen already lets user edit part number + every text line before print. Prompt updated to stress reading upright + exact part number.
+
+## Scanner REDESIGN — real-image overlay (2026-06 fork) — user rejected reconstruction
+- User demand: printed sticker must look EXACTLY like the original (logo/design/fonts as-is); ONLY the part number changes. From-scratch reconstruction rejected ("you change the logo, won't work").
+- NEW approach: use the ACTUAL sticker photo as print background; overlay ONLY a white patch + new part number at AI part_number_box, and a new QR/barcode at code box. Logo/layout/fonts = original pixels.
+- Backend /scan-sticker returns: rotation(0/90/180/270), sticker bbox (% of photo), part_number, part_number_box (% of upright label), code{type,x,y,w,h}|null. Model gpt-4o-mini, ~3.6s.
+- Frontend scan-sticker.tsx rewritten: crop sticker bbox + rotate upright (expo-image-manipulator) => bgDataUrl; edit ONLY part number; QR/Barcode toggle; preview = real image + overlays; print via generateRichStickerSheetHtml.
+- labelSheet.ts StickerTemplate rewritten: {bgDataUrl, aspect, pnBox, pnText, code:{type,value,box}}. templateInner = bg img(fill) + white patch + new PN + new code.
+- CAVEATS: best with CLEAR STRAIGHT photo; wrong rotation guess = tilted; AI part_number_box slightly off => patch misalign. NATIVE-only full flow.

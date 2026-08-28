@@ -1752,19 +1752,20 @@ class StickerScanReq(BaseModel):
     image_base64: str  # raw base64 (no data: prefix)
 
 
-STICKER_SCAN_PROMPT = """Read this product label/sticker (it may be rotated/upside-down — read it UPRIGHT). Return ONLY strict JSON (no markdown):
+STICKER_SCAN_PROMPT = """Look at this product label/sticker photo. The label may be rotated or upside-down. Return ONLY strict JSON (no markdown):
 {
-  "aspect": <sticker width/height ratio, e.g. 1.6>,
-  "part_number": "<the single main part number, exact characters>",
-  "lines": [ {"text": "<one text line>", "bold": <true|false>} ],
-  "logos": [ {"label": "<BRAND name only, e.g. Hyundai, Kia>", "x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>} ],
-  "codes": [ {"type": "qr"|"barcode"|"datamatrix", "x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>} ]
+  "rotation": <0|90|180|270 = degrees to rotate the CROPPED label clockwise so its text reads upright>,
+  "sticker": {"x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>},
+  "part_number": "<the main part number value, exact characters (e.g. 954A0-Q6040)>",
+  "part_number_box": {"x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>},
+  "code": {"type": "qr"|"barcode"|"datamatrix", "x": <0-100>, "y": <0-100>, "w": <0-100>, "h": <0-100>}
 }
 Rules:
-- "lines": EVERY visible text line in top-to-bottom reading order, exact text, no coordinates.
-- "logos": ONLY real manufacturer brand logos (Hyundai, Kia, Maruti, etc). IGNORE Pb, CE, E11, e-mark, recycling and connector symbols.
-- "codes": bounding box (% of sticker) + type of any QR / barcode / datamatrix. Empty list if none.
-- Be fast. JSON only."""
+- "sticker" = the label's rectangle as % of the WHOLE PHOTO (before rotation).
+- "part_number_box" and "code" = rectangles as % of the UPRIGHT label (after applying rotation). These locate ONLY the part number value text, and the main 2D/void code.
+- If there is no code, use "code": null.
+- part_number = the primary HKMC / P/N value the user will reprint.
+- JSON only, no extra text."""
 
 
 @api.post("/scan-sticker")
@@ -1804,11 +1805,11 @@ async def scan_sticker(req: StickerScanReq, user=Depends(get_current_user)):
     except Exception:
         raise HTTPException(502, "AI returned invalid JSON")
     # normalize
-    data.setdefault("aspect", 1.4)
+    data.setdefault("rotation", 0)
+    data.setdefault("sticker", {"x": 0, "y": 0, "w": 100, "h": 100})
     data.setdefault("part_number", "")
-    data.setdefault("lines", [])
-    data.setdefault("logos", [])
-    data.setdefault("codes", [])
+    data.setdefault("part_number_box", None)
+    data.setdefault("code", None)
     return data
 
 

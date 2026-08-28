@@ -12,41 +12,18 @@ import { FilterChip, Header } from "@/src/components/ui";
 import { printHtml } from "@/src/utils/print";
 import { qrSvg } from "@/src/utils/qr";
 import { barcodeSvg } from "@/src/utils/barcode128";
-import { SHEET_LAYOUTS, StickerTemplate, TplLine, generateRichStickerSheetHtml } from "@/src/utils/labelSheet";
+import { Box, SHEET_LAYOUTS, StickerTemplate, generateRichStickerSheetHtml } from "@/src/utils/labelSheet";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type ScanResult = {
-  aspect: number;
+  rotation: number;
+  sticker: Box;
   part_number: string;
-  lines: { text: string; bold?: boolean }[];
-  logos: { label?: string; x: number; y: number; w: number; h: number }[];
-  codes: { type: string; x: number; y: number; w: number; h: number }[];
+  part_number_box: Box | null;
+  code: { type: string } & Box | null;
 };
 
 const PREVIEW_W = 320;
-
-const KNOWN_BRANDS = ["hyundai", "kia", "maruti", "suzuki", "tata", "mahindra", "toyota", "honda", "nissan", "renault", "ford", "volkswagen", "skoda", "datsun", "chevrolet", "bosch", "continental", "delphi", "denso", "valeo", "mobis", "seoyon", "mobase"];
-
-// Build a clean, non-overlapping layout: text stacked in a left column,
-// code kept in a right column, logos as a small top strip.
-function normalizeLines(raw: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, topPad: number): TplLine[] {
-  const lines = raw.filter((l) => (l.text || "").trim());
-  if (!lines.length) return [];
-  const textFrac = hasCode ? 0.68 : 0.96; // leave room on the right for the code
-  const widthUnits = aspect * 100 * textFrac; // width in % of height
-  const bottomPad = 4;
-  const avail = Math.max(20, 100 - topPad - bottomPad);
-  const slot = avail / lines.length; // vertical slot per line
-  const out: TplLine[] = [];
-  lines.forEach((ln, i) => {
-    const len = Math.max(1, (ln.text || "").length);
-    const fitW = widthUnits / (len * 0.55);
-    const fs = Math.max(2.2, Math.min(slot * 0.8, fitW, 9));
-    const y = topPad + i * slot + (slot - fs) / 2;
-    out.push({ text: ln.text, x: 3, y, size: fs, bold: ln.bold, align: "left" });
-  });
-  return out;
-}
 
 export default function ScanSticker() {
   const router = useRouter();
@@ -64,7 +41,7 @@ export default function ScanSticker() {
   const processImage = async (asset: ImagePicker.ImagePickerAsset) => {
     setBusy(true);
     try {
-      // downscale before upload => faster + cheaper AI
+      // small copy for fast AI
       let sendB64 = asset.base64!;
       try {
         const rs = ImageManipulator.manipulate(asset.uri);
@@ -75,57 +52,38 @@ export default function ScanSticker() {
       } catch {}
 
       const res = await api.post<ScanResult>("/scan-sticker", { image_base64: sendB64 });
-      const imgW = asset.width || 1000;
-      const imgH = asset.height || 1000;
 
-      const first = (res.codes || [])[0];
-      const ct: "qr" | "barcode" = first?.type === "barcode" ? "barcode" : "qr";
+      // crop the real label from the original photo, then rotate upright
+      const rot = [90, 180, 270].includes(res.rotation) ? res.rotation : 0;
+      const s = res.sticker || { x: 0, y: 0, w: 100, h: 100 };
+      const ow = asset.width || 1000;
+      const oh = asset.height || 1000;
+      const ox = Math.max(0, Math.round((s.x / 100) * ow));
+      const oy = Math.max(0, Math.round((s.y / 100) * oh));
+      const cw = Math.max(8, Math.min(ow - ox, Math.round((s.w / 100) * ow)));
+      const ch = Math.max(8, Math.min(oh - oy, Math.round((s.h / 100) * oh)));
+
+      const ctx = ImageManipulator.manipulate(asset.uri);
+      ctx.crop({ originX: ox, originY: oy, width: cw, height: ch });
+      if (rot) ctx.rotate(rot);
+      const rendered = await ctx.renderAsync();
+      const outImg = await rendered.saveAsync({ format: SaveFormat.JPEG, base64: true });
+      const bgDataUrl = `data:image/jpeg;base64,${outImg.base64}`;
+      const finalW = outImg.width || cw;
+      const finalH = outImg.height || ch;
+      const aspect = finalW / Math.max(1, finalH);
+
       const pn = res.part_number || "";
-      const aspect = res.aspect || 1.4;
-      const hasCode = !!first;
-      // deterministic right-column placement so code never overlaps text
-      const ch = 34;
-      const cw = Math.min(40, ch / aspect);
-      const code: StickerTemplate["code"] = {
-        type: ct,
-        value: pn,
-        x: 100 - cw - 3,
-        y: (100 - ch) / 2,
-        w: cw,
-        h: ch,
-      };
+      const ct: "qr" | "barcode" = res.code?.type === "barcode" ? "barcode" : "qr";
+      const codeBox = res.code ? { x: res.code.x, y: res.code.y, w: res.code.w, h: res.code.h } : null;
 
-      // only crop real brand logos (skip Pb / CE / E11 / connectors junk)
-      const brandLogos = (res.logos || []).filter((lg) => {
-        const lbl = (lg.label || "").toLowerCase();
-        return KNOWN_BRANDS.some((b) => lbl.includes(b));
+      setTpl({
+        bgDataUrl,
+        aspect,
+        pnBox: res.part_number_box || null,
+        pnText: pn,
+        code: codeBox ? { type: ct, value: pn, box: codeBox } : null,
       });
-      const logos: StickerTemplate["logos"] = [];
-      const logoH = 10;
-      const logoW = Math.min(16, logoH / aspect * 1.8);
-      let li = 0;
-      for (const lg of brandLogos.slice(0, 4)) {
-        try {
-          const ox = Math.max(0, Math.round((lg.x / 100) * imgW));
-          const oy = Math.max(0, Math.round((lg.y / 100) * imgH));
-          const cwp = Math.min(imgW - ox, Math.round((lg.w / 100) * imgW));
-          const chp = Math.min(imgH - oy, Math.round((lg.h / 100) * imgH));
-          if (cwp < 4 || chp < 4) continue;
-          const ctx = ImageManipulator.manipulate(asset.uri);
-          ctx.crop({ originX: ox, originY: oy, width: cwp, height: chp });
-          const rendered = await ctx.renderAsync();
-          const out = await rendered.saveAsync({ format: SaveFormat.PNG, base64: true });
-          // place in a clean top header row (left side)
-          logos.push({ dataUrl: `data:image/png;base64,${out.base64}`, x: 3 + li * (logoW + 2), y: 2, w: logoW, h: logoH });
-          li += 1;
-        } catch {
-          // skip a logo that fails to crop
-        }
-      }
-
-      const topPad = logos.length ? 15 : 4;
-      const lines = normalizeLines(res.lines || [], aspect, hasCode, topPad);
-      setTpl({ aspect, lines, logos, code });
       setPartNumber(pn);
       setCodeType(ct);
       setSelected(new Set());
@@ -139,40 +97,24 @@ export default function ScanSticker() {
 
   const pickGallery = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      show("Gallery permission needed", "error");
-      return;
-    }
-    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], base64: true, quality: 0.8 });
+    if (!perm.granted) return show("Gallery permission needed", "error");
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], base64: true, quality: 0.9 });
     if (!r.canceled && r.assets?.[0]?.base64) processImage(r.assets[0]);
   };
-
   const takePhoto = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      show("Camera permission needed", "error");
-      return;
-    }
-    const r = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.8 });
+    if (!perm.granted) return show("Camera permission needed", "error");
+    const r = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.9 });
     if (!r.canceled && r.assets?.[0]?.base64) processImage(r.assets[0]);
   };
 
-  // keep template code + part-number line text in sync with edits
   const applyPn = (value: string) => {
     setPartNumber(value);
-    setTpl((prev) => (prev && prev.code ? { ...prev, code: { ...prev.code, value } } : prev));
+    setTpl((prev) => (prev ? { ...prev, pnText: value, code: prev.code ? { ...prev.code, value } : null } : prev));
   };
   const setCode = (t: "qr" | "barcode") => {
     setCodeType(t);
     setTpl((prev) => (prev && prev.code ? { ...prev, code: { ...prev.code, type: t } } : prev));
-  };
-  const editLine = (idx: number, text: string) => {
-    setTpl((prev) => {
-      if (!prev) return prev;
-      const lines = prev.lines.slice();
-      lines[idx] = { ...lines[idx], text };
-      return { ...prev, lines };
-    });
   };
 
   const toggleCell = (num: number) =>
@@ -185,10 +127,7 @@ export default function ScanSticker() {
 
   const onPrint = async () => {
     if (!tpl) return;
-    if (selected.size === 0) {
-      show("Tap blocks to print on", "error");
-      return;
-    }
+    if (selected.size === 0) return show("Tap blocks to print on", "error");
     try {
       await printHtml(generateRichStickerSheetHtml(tpl, { layout, cells: Array.from(selected), showBorder: true }));
     } catch (e: any) {
@@ -207,7 +146,7 @@ export default function ScanSticker() {
 
   return (
     <View style={styles.flex}>
-      <Header title="AI Sticker Scanner" subtitle="Capture any sticker → edit → print" onBack={() => router.back()} />
+      <Header title="AI Sticker Scanner" subtitle="Copy any sticker → change part no → print" onBack={() => router.back()} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl }}>
         <View style={styles.pickRow}>
           <Pressable style={styles.pickBtn} onPress={pickGallery} disabled={busy} testID="pick-gallery">
@@ -223,39 +162,28 @@ export default function ScanSticker() {
         {busy ? (
           <View style={styles.busy}>
             <ActivityIndicator size="large" color={colors.brand} />
-            <Text style={styles.dim}>Reading sticker with AI… (a few seconds)</Text>
+            <Text style={styles.dim}>Reading sticker… (a few seconds)</Text>
           </View>
         ) : null}
 
         {tpl ? (
           <>
-            <Text style={styles.section}>PREVIEW (rebuilt)</Text>
+            <Text style={styles.section}>PREVIEW (real sticker, only part no changes)</Text>
             <View style={[styles.preview, { width: PREVIEW_W, height: previewH }]}>
-              {tpl.logos.map((lg, i) => (
-                <Image
-                  key={`lg${i}`}
-                  source={{ uri: lg.dataUrl }}
-                  style={{ position: "absolute", left: (lg.x / 100) * PREVIEW_W, top: (lg.y / 100) * previewH, width: (lg.w / 100) * PREVIEW_W, height: (lg.h / 100) * previewH }}
-                  resizeMode="contain"
-                />
-              ))}
+              <Image source={{ uri: tpl.bgDataUrl }} style={{ position: "absolute", left: 0, top: 0, width: PREVIEW_W, height: previewH }} resizeMode="stretch" />
+              {tpl.pnBox ? (
+                <View style={{ position: "absolute", left: (tpl.pnBox.x / 100) * PREVIEW_W, top: (tpl.pnBox.y / 100) * previewH, width: (tpl.pnBox.w / 100) * PREVIEW_W, height: (tpl.pnBox.h / 100) * previewH, backgroundColor: "#fff", justifyContent: "center", overflow: "hidden" }}>
+                  <Text numberOfLines={1} style={{ fontSize: Math.max(7, (tpl.pnBox.h / 100) * previewH * 0.72), fontWeight: "800", color: "#000" }}>{partNumber}</Text>
+                </View>
+              ) : null}
               {tpl.code && codeSvg ? (
-                <View style={{ position: "absolute", left: (tpl.code.x / 100) * PREVIEW_W, top: (tpl.code.y / 100) * previewH, width: (tpl.code.w / 100) * PREVIEW_W, height: (tpl.code.h / 100) * previewH }}>
+                <View style={{ position: "absolute", left: (tpl.code.box.x / 100) * PREVIEW_W, top: (tpl.code.box.y / 100) * previewH, width: (tpl.code.box.w / 100) * PREVIEW_W, height: (tpl.code.box.h / 100) * previewH, backgroundColor: "#fff", padding: 1 }}>
                   <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio={codeType === "qr" ? "xMidYMid meet" : "none"} />
                 </View>
               ) : null}
-              {tpl.lines.map((ln, i) => (
-                <Text
-                  key={`ln${i}`}
-                  numberOfLines={1}
-                  style={{ position: "absolute", left: (ln.x / 100) * PREVIEW_W, top: (ln.y / 100) * previewH, fontSize: Math.max(6, (ln.size / 100) * previewH), fontWeight: ln.bold ? "800" : "500", color: "#000" }}
-                >
-                  {ln.text}
-                </Text>
-              ))}
             </View>
 
-            <Text style={styles.section}>PART NUMBER (encoded in the code)</Text>
+            <Text style={styles.section}>PART NUMBER (only this changes)</Text>
             <TextInput style={styles.input} value={partNumber} onChangeText={applyPn} autoCapitalize="characters" testID="scan-pn" />
 
             <Text style={styles.flabel}>CODE TYPE</Text>
@@ -263,11 +191,6 @@ export default function ScanSticker() {
               <FilterChip label="QR Code" active={codeType === "qr"} onPress={() => setCode("qr")} testID="ct-qr" />
               <FilterChip label="Barcode" active={codeType === "barcode"} onPress={() => setCode("barcode")} testID="ct-barcode" />
             </View>
-
-            <Text style={styles.flabel}>TEXT LINES (tap to edit)</Text>
-            {tpl.lines.map((ln, i) => (
-              <TextInput key={`edit${i}`} style={styles.lineInput} value={ln.text} onChangeText={(t) => editLine(i, t)} testID={`line-${i}`} />
-            ))}
 
             <Text style={styles.section}>A4 SHEET LAYOUT</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -298,7 +221,7 @@ export default function ScanSticker() {
         ) : !busy ? (
           <View style={styles.empty}>
             <Ionicons name="scan-outline" size={48} color={colors.info} />
-            <Text style={styles.dim}>Pick a sticker photo from Gallery or take a new photo. AI will capture the text, logo and code so you can reprint it with a new part number.</Text>
+            <Text style={styles.dim}>Pick a clear, straight sticker photo. The app keeps the original design/logo exactly and lets you change only the part number, then print.</Text>
           </View>
         ) : null}
       </ScrollView>
@@ -318,7 +241,6 @@ const styles = StyleSheet.create({
   flabel: { color: colors.info, fontSize: font.sm - 1, fontWeight: "800", letterSpacing: 0.5, marginTop: spacing.xs },
   preview: { backgroundColor: "#fff", borderRadius: radius.sm, alignSelf: "center", overflow: "hidden", borderWidth: 1, borderColor: colors.border },
   input: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.onSurface, fontSize: font.base },
-  lineInput: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.sm },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chipRow: { gap: spacing.sm, paddingVertical: spacing.xs },
   gridCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, alignItems: "center" },
