@@ -264,3 +264,6 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 
 ## Removed "Sticker Sheet Print" entry (2026-06 fork)
 - User: AI Scanner now covers all needs; remove the separate Sticker Sheet Print feature. Removed its card from app/(tabs)/index.tsx STICKER PRINTING section and the "Print on A4 Sticker Sheet" button from app/part/[pn].tsx. AI Sticker Scanner kept. labels.tsx route file left in place (dead, unlinked) since no rm; no code references remain. Lint clean.
+
+## Batch Print in AI Scanner (2026-06 fork)
+- User wanted to print multiple part numbers / multiple copies at once from saved stickers. Added `generateBatchSheetHtml(queue, opts)` in labelSheet.ts (refactored buildSheet -> shared `renderSheet(opts, innerForCell)`), fills grid sequentially from startCell (anti-wastage). scan-sticker: "Batch Print" collapsible under SAVED STICKERS — company filter chips, per-sticker qty steppers (batchQty keyed by id, persists across company filter so multiple companies/numbers can mix), sheet layout picker, total vs sheet-capacity note, and Print Batch button building queue = each saved tpl x qty. Reuses marginTop/left/pageMargin. Lint clean, screen loads.

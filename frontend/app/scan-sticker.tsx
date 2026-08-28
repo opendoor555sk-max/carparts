@@ -11,7 +11,7 @@ import { useToast } from "@/src/context/ToastContext";
 import { FilterChip, Header } from "@/src/components/ui";
 import { printHtml } from "@/src/utils/print";
 import { CODE_TYPES, codeSvg as genCodeSvg, svgRatio } from "@/src/utils/codegen";
-import { Box, SHEET_LAYOUTS, StickerTemplate, TplLine, generateRichStickerSheetHtml } from "@/src/utils/labelSheet";
+import { Box, SHEET_LAYOUTS, StickerTemplate, TplLine, generateBatchSheetHtml, generateRichStickerSheetHtml } from "@/src/utils/labelSheet";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type ScanResult = { aspect: number; part_number: string; lines: { text: string; bold?: boolean }[]; code: { type: string } | null; logo: Box | null };
@@ -117,6 +117,9 @@ export default function ScanSticker() {
   const [marginTop, setMarginTop] = useState("");
   const [marginLeft, setMarginLeft] = useState("");
   const [pageMargin, setPageMargin] = useState("0");
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [batchQty, setBatchQty] = useState<Record<string, number>>({});
+  const [batchCompany, setBatchCompany] = useState("All");
   const [saved, setSaved] = useState<any[]>([]);
   const [logos, setLogos] = useState<any[]>([]);
   const [company, setCompany] = useState("Hyundai / Kia");
@@ -387,6 +390,38 @@ export default function ScanSticker() {
   };
   const deleteTemplate = async (id: string) => { try { await api.del(`/sticker-templates/${id}`); loadSaved(); } catch {} };
 
+  // ---- Batch print (multiple saved stickers × copies onto one A4 sheet) ----
+  const batchCompanies = useMemo(() => {
+    const set = new Set<string>();
+    saved.forEach((t) => { try { const c = JSON.parse(t.bg_data_url).company; if (c) set.add(c); } catch {} });
+    return ["All", ...Array.from(set)];
+  }, [saved]);
+  const batchList = useMemo(() => saved.filter((t) => {
+    if (batchCompany === "All") return true;
+    try { return JSON.parse(t.bg_data_url).company === batchCompany; } catch { return false; }
+  }), [saved, batchCompany]);
+  const batchTotal = useMemo(() => Object.values(batchQty).reduce((a, b) => a + (b || 0), 0), [batchQty]);
+  const setQty = (id: string, delta: number) =>
+    setBatchQty((p) => ({ ...p, [id]: Math.max(0, Math.min(999, (p[id] || 0) + delta)) }));
+  const printBatch = async () => {
+    const queue: StickerTemplate[] = [];
+    for (const t of saved) {
+      const q = batchQty[t.id] || 0;
+      if (q <= 0) continue;
+      let parsed: StickerTemplate | null = null;
+      try { parsed = JSON.parse(t.bg_data_url); } catch { continue; }
+      if (parsed) for (let k = 0; k < q; k++) queue.push(parsed);
+    }
+    if (queue.length === 0) { show("Set a quantity for at least one sticker", "error"); return; }
+    if (queue.length > layout.total) { show(`Only ${layout.total} fit this sheet — print the rest on another sheet`, "info"); }
+    try {
+      const mt = marginTop.trim() === "" ? null : Math.max(0, parseFloat(marginTop) || 0);
+      const ml = marginLeft.trim() === "" ? null : Math.max(0, parseFloat(marginLeft) || 0);
+      const pm = pageMargin.trim() === "" ? 0 : Math.max(0, parseFloat(pageMargin) || 0);
+      await printHtml(generateBatchSheetHtml(queue, { layout, cells: [], showBorder: false, marginTop: mt, marginLeft: ml, pageMargin: pm, startCell: 1 }));
+    } catch (e: any) { show(e?.message || "Print failed", "error"); }
+  };
+
   const toggleCell = (num: number) =>
     setSelected((p) => { const n = new Set(p); if (n.has(num)) n.delete(num); else n.add(num); return n; });
 
@@ -440,6 +475,44 @@ export default function ScanSticker() {
                 </View>
               ))}
             </ScrollView>
+            <Pressable style={styles.batchToggle} onPress={() => setBatchOpen((v) => !v)} testID="batch-toggle">
+              <Ionicons name={batchOpen ? "chevron-up" : "print"} size={18} color={colors.onBrand} />
+              <Text style={styles.fmtText}>Batch Print — many part numbers / copies</Text>
+            </Pressable>
+            {batchOpen ? (
+              <View style={styles.batchBox}>
+                <Text style={styles.subHint}>Filter by company</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                  {batchCompanies.map((c) => (
+                    <FilterChip key={c} label={c} active={batchCompany === c} onPress={() => setBatchCompany(c)} testID={`bc-${c}`} />
+                  ))}
+                </ScrollView>
+                {batchList.length === 0 ? <Text style={styles.dim}>No saved stickers for this company.</Text> : null}
+                {batchList.map((t) => (
+                  <View key={t.id} style={styles.batchRow}>
+                    <Text numberOfLines={1} style={styles.batchName}>{t.part_number || t.name}</Text>
+                    <View style={styles.qtyGroup}>
+                      <Pressable style={styles.qtyBtn} onPress={() => setQty(t.id, -1)} testID={`bq-minus-${t.id}`}><Ionicons name="remove" size={16} color={colors.onSurface} /></Pressable>
+                      <Text style={styles.qtyVal}>{batchQty[t.id] || 0}</Text>
+                      <Pressable style={styles.qtyBtn} onPress={() => setQty(t.id, 1)} testID={`bq-plus-${t.id}`}><Ionicons name="add" size={16} color={colors.onSurface} /></Pressable>
+                    </View>
+                  </View>
+                ))}
+                <Text style={styles.subHint}>Sheet layout</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                  {SHEET_LAYOUTS.map((l) => (
+                    <FilterChip key={l.code} label={`${l.code} (${l.total})`} active={layoutCode === l.code} onPress={() => setLayoutCode(l.code)} testID={`blayout-${l.code}`} />
+                  ))}
+                </ScrollView>
+                <View style={styles.batchInfoRow}>
+                  <Text style={styles.dim}>Total: {batchTotal} sticker{batchTotal === 1 ? "" : "s"} • sheet holds {layout.total}</Text>
+                </View>
+                <Pressable style={styles.printBtn} onPress={printBatch} testID="batch-print">
+                  <Ionicons name="print" size={20} color={colors.onBrand} />
+                  <Text style={styles.printText}>Print Batch ({batchTotal})</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </>
         ) : null}
 
@@ -695,6 +768,14 @@ const styles = StyleSheet.create({
   saveText: { color: colors.brand, fontSize: font.sm, fontWeight: "800" },
   fmtBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.sm, marginTop: spacing.xs },
   fmtText: { color: colors.onBrand, fontSize: font.sm, fontWeight: "800" },
+  batchToggle: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.sm, marginTop: spacing.sm },
+  batchBox: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, marginTop: spacing.xs },
+  batchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, borderBottomWidth: 0.5, borderBottomColor: colors.border, paddingVertical: 6 },
+  batchName: { flex: 1, color: colors.onSurface, fontSize: font.sm, fontWeight: "700" },
+  qtyGroup: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  qtyBtn: { width: 34, height: 34, borderRadius: radius.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  qtyVal: { minWidth: 28, textAlign: "center", color: colors.onSurface, fontWeight: "800", fontSize: font.base },
+  batchInfoRow: { marginTop: 2 },
   savedRow: { gap: spacing.md, paddingVertical: spacing.xs },
   savedCard: { width: 110 },
   savedInner: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: spacing.md, alignItems: "center", gap: 4 },

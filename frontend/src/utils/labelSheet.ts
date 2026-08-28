@@ -135,13 +135,19 @@ function templateInner(tpl: StickerTemplate, wMm: number, hMm: number): string {
 }
 
 function buildSheet(opts: SheetOptions, innerFor: (w: number, h: number) => string): string {
-  const { layout, cells, showBorder } = opts;
+  const selected = new Set(opts.cells);
+  // Per-cell renderer: fill only the selected cells with the single sticker.
+  return renderSheet(opts, (i, w, h) => (selected.has(i + 1) ? innerFor(w, h) : ""));
+}
+
+// Core sheet renderer — innerForCell(cellIndex0, w, h) returns the cell's inner HTML ("" = empty).
+function renderSheet(opts: SheetOptions, innerForCell: (i: number, w: number, h: number) => string): string {
+  const { layout, showBorder } = opts;
   const { w, h, rows, cols, total } = layout;
   const autoLeft = Math.max(0, (A4_W - cols * w) / 2);
   const autoTop = Math.min(Math.max(0, (A4_H - rows * h) / 2), autoLeft);
   const leftM = opts.marginLeft == null ? autoLeft : Math.max(0, opts.marginLeft);
   const topM = opts.marginTop == null ? autoTop : Math.max(0, opts.marginTop);
-  const selected = new Set(cells);
   const pageM = opts.pageMargin == null ? 0 : Math.max(0, opts.pageMargin);
   let out = "";
   for (let i = 0; i < total; i++) {
@@ -149,9 +155,8 @@ function buildSheet(opts: SheetOptions, innerFor: (w: number, h: number) => stri
     const col = i % cols;
     const x = leftM + col * w;
     const y = topM + r * h;
-    const num = i + 1;
     const border = showBorder ? "border:0.2mm dashed #bbb;" : "";
-    const inner = selected.has(num) ? innerFor(w, h) : "";
+    const inner = innerForCell(i, w, h);
     out += `<div style="position:absolute;left:${x}mm;top:${y}mm;width:${w}mm;height:${h}mm;box-sizing:border-box;overflow:hidden;background:#fff;${border}"><div style="position:relative;width:100%;height:100%">${inner}</div></div>`;
   }
   return `<html><head><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -170,4 +175,14 @@ export function generateSheetHtml(content: LabelContent, opts: SheetOptions): st
 
 export function generateRichStickerSheetHtml(tpl: StickerTemplate, opts: SheetOptions): string {
   return buildSheet(opts, (w, h) => templateInner(tpl, w, h));
+}
+
+// Batch: fill the grid sequentially with a queue of stickers (anti-wastage).
+// Each queue entry = one printed sticker; cells fill left→right, top→bottom from startCell.
+export function generateBatchSheetHtml(queue: StickerTemplate[], opts: SheetOptions & { startCell?: number }): string {
+  const start = Math.max(0, (opts.startCell ?? 1) - 1);
+  return renderSheet(opts, (i, w, h) => {
+    const q = i - start;
+    return q >= 0 && q < queue.length ? templateInner(queue[q], w, h) : "";
+  });
 }
