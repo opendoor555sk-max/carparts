@@ -267,3 +267,8 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 
 ## Batch Print in AI Scanner (2026-06 fork)
 - User wanted to print multiple part numbers / multiple copies at once from saved stickers. Added `generateBatchSheetHtml(queue, opts)` in labelSheet.ts (refactored buildSheet -> shared `renderSheet(opts, innerForCell)`), fills grid sequentially from startCell (anti-wastage). scan-sticker: "Batch Print" collapsible under SAVED STICKERS — company filter chips, per-sticker qty steppers (batchQty keyed by id, persists across company filter so multiple companies/numbers can mix), sheet layout picker, total vs sheet-capacity note, and Print Batch button building queue = each saved tpl x qty. Reuses marginTop/left/pageMargin. Lint clean, screen loads.
+
+## Unified PRINT composer (2026-06 fork)
+- User: consolidate the two confusing print options (single-sticker block select + separate Batch Print) into ONE organized place, and allow placing DIFFERENT companies/part-numbers on specific blocks of the same A4 sheet, with quantities.
+- Added `generateComposedSheetHtml(cellTpls: Record<cellNo,StickerTemplate>, opts)` (via shared renderSheet). Removed the separate Batch collapsible and the old single-sticker grid.
+- New composer in scan-sticker: (1) PICK STICKER TO PLACE chips = "This design" + all saved stickers (any company); (2) Auto-fill Qty -> fills next N empty cells with active sticker; (3) TAP BLOCKS grid -> tap assigns active sticker to that cell (shows part-no short label), tap again clears; Clear all. Print Sheet builds cellMap -> tpl (current design or parsed saved) and prints via generateComposedSheetHtml. Reuses margins/pageMargin. State: cellMap{cellNo:id}, activeId, fillQty. Lint clean, screen loads.

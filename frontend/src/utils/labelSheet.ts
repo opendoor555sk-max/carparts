@@ -186,3 +186,11 @@ export function generateBatchSheetHtml(queue: StickerTemplate[], opts: SheetOpti
     return q >= 0 && q < queue.length ? templateInner(queue[q], w, h) : "";
   });
 }
+
+// Composed sheet: each cell (1-based) can hold a DIFFERENT sticker (any company/part).
+export function generateComposedSheetHtml(cellTpls: Record<number, StickerTemplate>, opts: SheetOptions): string {
+  return renderSheet(opts, (i, w, h) => {
+    const t = cellTpls[i + 1];
+    return t ? templateInner(t, w, h) : "";
+  });
+}

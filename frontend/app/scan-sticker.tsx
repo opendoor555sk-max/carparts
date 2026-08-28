@@ -11,7 +11,7 @@ import { useToast } from "@/src/context/ToastContext";
 import { FilterChip, Header } from "@/src/components/ui";
 import { printHtml } from "@/src/utils/print";
 import { CODE_TYPES, codeSvg as genCodeSvg, svgRatio } from "@/src/utils/codegen";
-import { Box, SHEET_LAYOUTS, StickerTemplate, TplLine, generateBatchSheetHtml, generateRichStickerSheetHtml } from "@/src/utils/labelSheet";
+import { Box, SHEET_LAYOUTS, StickerTemplate, TplLine, generateComposedSheetHtml } from "@/src/utils/labelSheet";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type ScanResult = { aspect: number; part_number: string; lines: { text: string; bold?: boolean }[]; code: { type: string } | null; logo: Box | null };
@@ -113,13 +113,12 @@ export default function ScanSticker() {
   const [codeSize, setCodeSize] = useState(10);
 
   const [layoutCode, setLayoutCode] = useState("24L");
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [cellMap, setCellMap] = useState<Record<number, string>>({});
+  const [activeId, setActiveId] = useState<string>("__current__");
+  const [fillQty, setFillQty] = useState("");
   const [marginTop, setMarginTop] = useState("");
   const [marginLeft, setMarginLeft] = useState("");
   const [pageMargin, setPageMargin] = useState("0");
-  const [batchOpen, setBatchOpen] = useState(false);
-  const [batchQty, setBatchQty] = useState<Record<string, number>>({});
-  const [batchCompany, setBatchCompany] = useState("All");
   const [saved, setSaved] = useState<any[]>([]);
   const [logos, setLogos] = useState<any[]>([]);
   const [company, setCompany] = useState("Hyundai / Kia");
@@ -253,7 +252,7 @@ export default function ScanSticker() {
       }
       setPartNumber(pn);
       setCodeType(ct);
-      setSelected(new Set());
+      setCellMap({});
       show(`Sticker generated${fmt ? ` (${comp} saved format)` : FORMATTED_COMPANIES.includes(comp) ? ` (${comp} format)` : ""}`, "success");
     } catch (e: any) {
       show(e?.message || "Scan failed", "error");
@@ -385,54 +384,52 @@ export default function ScanSticker() {
       setCodeSize(parsed.code?.sizeMm || 10);
       setCompany(comp);
       setRawLines(rawT);
-      setSelected(new Set());
+      setCellMap({});
     } catch { show("Could not open template", "error"); }
   };
   const deleteTemplate = async (id: string) => { try { await api.del(`/sticker-templates/${id}`); loadSaved(); } catch {} };
 
-  // ---- Batch print (multiple saved stickers × copies onto one A4 sheet) ----
-  const batchCompanies = useMemo(() => {
-    const set = new Set<string>();
-    saved.forEach((t) => { try { const c = JSON.parse(t.bg_data_url).company; if (c) set.add(c); } catch {} });
-    return ["All", ...Array.from(set)];
-  }, [saved]);
-  const batchList = useMemo(() => saved.filter((t) => {
-    if (batchCompany === "All") return true;
-    try { return JSON.parse(t.bg_data_url).company === batchCompany; } catch { return false; }
-  }), [saved, batchCompany]);
-  const batchTotal = useMemo(() => Object.values(batchQty).reduce((a, b) => a + (b || 0), 0), [batchQty]);
-  const setQty = (id: string, delta: number) =>
-    setBatchQty((p) => ({ ...p, [id]: Math.max(0, Math.min(999, (p[id] || 0) + delta)) }));
-  const printBatch = async () => {
-    const queue: StickerTemplate[] = [];
-    for (const t of saved) {
-      const q = batchQty[t.id] || 0;
-      if (q <= 0) continue;
-      let parsed: StickerTemplate | null = null;
-      try { parsed = JSON.parse(t.bg_data_url); } catch { continue; }
-      if (parsed) for (let k = 0; k < q; k++) queue.push(parsed);
-    }
-    if (queue.length === 0) { show("Set a quantity for at least one sticker", "error"); return; }
-    if (queue.length > layout.total) { show(`Only ${layout.total} fit this sheet — print the rest on another sheet`, "info"); }
-    try {
-      const mt = marginTop.trim() === "" ? null : Math.max(0, parseFloat(marginTop) || 0);
-      const ml = marginLeft.trim() === "" ? null : Math.max(0, parseFloat(marginLeft) || 0);
-      const pm = pageMargin.trim() === "" ? 0 : Math.max(0, parseFloat(pageMargin) || 0);
-      await printHtml(generateBatchSheetHtml(queue, { layout, cells: [], showBorder: false, marginTop: mt, marginLeft: ml, pageMargin: pm, startCell: 1 }));
-    } catch (e: any) { show(e?.message || "Print failed", "error"); }
+  // ---- Unified print composer: assign any sticker (current design or saved) to any cell ----
+  const tplForId = (id: string): StickerTemplate | null => {
+    if (id === "__current__") return tpl;
+    const t = saved.find((s) => s.id === id);
+    if (!t) return null;
+    try { return JSON.parse(t.bg_data_url); } catch { return null; }
+  };
+  const assignCell = (num: number) =>
+    setCellMap((m) => {
+      const n = { ...m };
+      if (n[num] === activeId) delete n[num]; else n[num] = activeId;
+      return n;
+    });
+  const autoFill = () => {
+    const q = Math.max(0, parseInt(fillQty, 10) || 0);
+    if (q <= 0) return show("Enter a quantity", "error");
+    setCellMap((m) => {
+      const n = { ...m };
+      let placed = 0;
+      for (let i = 1; i <= layout.total && placed < q; i++) {
+        if (!n[i]) { n[i] = activeId; placed++; }
+      }
+      if (placed < q) show(`Only ${placed} empty blocks left on this sheet`, "info");
+      return n;
+    });
   };
 
-  const toggleCell = (num: number) =>
-    setSelected((p) => { const n = new Set(p); if (n.has(num)) n.delete(num); else n.add(num); return n; });
-
   const onPrint = async () => {
-    if (!tpl) return;
-    if (selected.size === 0) return show("Tap blocks to print on", "error");
+    const nums = Object.keys(cellMap);
+    if (nums.length === 0) return show("Place at least one sticker on a block", "error");
+    const cellTpls: Record<number, StickerTemplate> = {};
+    for (const k of nums) {
+      const t = tplForId(cellMap[Number(k)]);
+      if (t) cellTpls[Number(k)] = t;
+    }
+    if (Object.keys(cellTpls).length === 0) return show("Selected stickers unavailable", "error");
     try {
       const mt = marginTop.trim() === "" ? null : Math.max(0, parseFloat(marginTop) || 0);
       const ml = marginLeft.trim() === "" ? null : Math.max(0, parseFloat(marginLeft) || 0);
       const pm = pageMargin.trim() === "" ? 0 : Math.max(0, parseFloat(pageMargin) || 0);
-      await printHtml(generateRichStickerSheetHtml(tpl, { layout, cells: Array.from(selected), showBorder: false, marginTop: mt, marginLeft: ml, pageMargin: pm }));
+      await printHtml(generateComposedSheetHtml(cellTpls, { layout, cells: [], showBorder: false, marginTop: mt, marginLeft: ml, pageMargin: pm }));
     } catch (e: any) { show(e?.message || "Print failed", "error"); }
   };
 
@@ -475,44 +472,6 @@ export default function ScanSticker() {
                 </View>
               ))}
             </ScrollView>
-            <Pressable style={styles.batchToggle} onPress={() => setBatchOpen((v) => !v)} testID="batch-toggle">
-              <Ionicons name={batchOpen ? "chevron-up" : "print"} size={18} color={colors.onBrand} />
-              <Text style={styles.fmtText}>Batch Print — many part numbers / copies</Text>
-            </Pressable>
-            {batchOpen ? (
-              <View style={styles.batchBox}>
-                <Text style={styles.subHint}>Filter by company</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                  {batchCompanies.map((c) => (
-                    <FilterChip key={c} label={c} active={batchCompany === c} onPress={() => setBatchCompany(c)} testID={`bc-${c}`} />
-                  ))}
-                </ScrollView>
-                {batchList.length === 0 ? <Text style={styles.dim}>No saved stickers for this company.</Text> : null}
-                {batchList.map((t) => (
-                  <View key={t.id} style={styles.batchRow}>
-                    <Text numberOfLines={1} style={styles.batchName}>{t.part_number || t.name}</Text>
-                    <View style={styles.qtyGroup}>
-                      <Pressable style={styles.qtyBtn} onPress={() => setQty(t.id, -1)} testID={`bq-minus-${t.id}`}><Ionicons name="remove" size={16} color={colors.onSurface} /></Pressable>
-                      <Text style={styles.qtyVal}>{batchQty[t.id] || 0}</Text>
-                      <Pressable style={styles.qtyBtn} onPress={() => setQty(t.id, 1)} testID={`bq-plus-${t.id}`}><Ionicons name="add" size={16} color={colors.onSurface} /></Pressable>
-                    </View>
-                  </View>
-                ))}
-                <Text style={styles.subHint}>Sheet layout</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-                  {SHEET_LAYOUTS.map((l) => (
-                    <FilterChip key={l.code} label={`${l.code} (${l.total})`} active={layoutCode === l.code} onPress={() => setLayoutCode(l.code)} testID={`blayout-${l.code}`} />
-                  ))}
-                </ScrollView>
-                <View style={styles.batchInfoRow}>
-                  <Text style={styles.dim}>Total: {batchTotal} sticker{batchTotal === 1 ? "" : "s"} • sheet holds {layout.total}</Text>
-                </View>
-                <Pressable style={styles.printBtn} onPress={printBatch} testID="batch-print">
-                  <Ionicons name="print" size={20} color={colors.onBrand} />
-                  <Text style={styles.printText}>Print Batch ({batchTotal})</Text>
-                </Pressable>
-              </View>
-            ) : null}
           </>
         ) : null}
 
@@ -664,21 +623,37 @@ export default function ScanSticker() {
             </Pressable>
             <Text style={styles.dim}>Format = your arrangement (positions, code, logo). Next scan of {company} auto-uses it.</Text>
 
-            <Text style={styles.section}>A4 SHEET LAYOUT</Text>
+            <Text style={styles.section}>PRINT — place any sticker on any block</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
               {SHEET_LAYOUTS.map((l) => (
-                <FilterChip key={l.code} label={`${l.code} (${l.total})`} active={layoutCode === l.code} onPress={() => { setLayoutCode(l.code); setSelected(new Set()); }} testID={`layout-${l.code}`} />
+                <FilterChip key={l.code} label={`${l.code} (${l.total})`} active={layoutCode === l.code} onPress={() => { setLayoutCode(l.code); setCellMap({}); }} testID={`layout-${l.code}`} />
               ))}
             </ScrollView>
-            <Text style={styles.flabel}>TAP ANY BLOCKS TO PRINT ({selected.size} selected)</Text>
+
+            <Text style={styles.flabel}>1. PICK STICKER TO PLACE</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+              <FilterChip label="◆ This design" active={activeId === "__current__"} onPress={() => setActiveId("__current__")} testID="active-current" />
+              {saved.map((t) => (
+                <FilterChip key={t.id} label={t.part_number || t.name} active={activeId === t.id} onPress={() => setActiveId(t.id)} testID={`active-${t.id}`} />
+              ))}
+            </ScrollView>
+            <View style={styles.arrangeTop}>
+              <Text style={styles.subHint}>Auto-fill</Text>
+              <TextInput style={styles.marginInput} value={fillQty} onChangeText={setFillQty} placeholder="Qty" placeholderTextColor={colors.info} keyboardType="number-pad" testID="fill-qty" />
+              <Pressable style={styles.miniBtn} onPress={autoFill} testID="fill-go"><Text style={styles.miniBtnText}>Fill empty</Text></Pressable>
+              <Pressable style={styles.miniBtn} onPress={() => setCellMap({})} testID="cells-clear"><Text style={styles.miniBtnText}>Clear</Text></Pressable>
+            </View>
+
+            <Text style={styles.flabel}>2. TAP BLOCKS ({Object.keys(cellMap).length} placed)</Text>
             <View style={styles.gridCard}>
               <View style={[styles.grid, { width: cellW * layout.cols + 2 }]}>
                 {Array.from({ length: layout.total }).map((_, i) => {
                   const num = i + 1;
-                  const on = selected.has(num);
+                  const assigned = cellMap[num];
+                  const lbl = assigned ? (assigned === "__current__" ? "◆" : (saved.find((s) => s.id === assigned)?.part_number || "•").slice(0, 3)) : `${num}`;
                   return (
-                    <Pressable key={i} onPress={() => toggleCell(num)} style={[styles.cell, { width: cellW, height: cellH }, on && styles.cellOn]} testID={`cell-${num}`}>
-                      <Text style={[styles.cellText, on && styles.cellTextOn]}>{num}</Text>
+                    <Pressable key={i} onPress={() => assignCell(num)} style={[styles.cell, { width: cellW, height: cellH }, assigned && styles.cellOn]} testID={`cell-${num}`}>
+                      <Text style={[styles.cellText, assigned && styles.cellTextOn]} numberOfLines={1}>{lbl}</Text>
                     </Pressable>
                   );
                 })}
@@ -704,7 +679,7 @@ export default function ScanSticker() {
             <Text style={styles.hint}>In the print dialog also choose Margins = None &amp; Scale = 100% for exact edge-to-edge.</Text>
 
             <Pressable style={styles.printBtn} onPress={onPrint} testID="scan-print">
-              <Ionicons name="print" size={20} color={colors.onBrand} /><Text style={styles.printText}>Print A4 Sheet</Text>
+              <Ionicons name="print" size={20} color={colors.onBrand} /><Text style={styles.printText}>Print Sheet ({Object.keys(cellMap).length})</Text>
             </Pressable>
           </>
         ) : !busy ? (
