@@ -217,3 +217,15 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Frontend: buy.tsx prefills Name/Category/Variant/Vehicles/Company from `res.part || res.catalog` (shows "Auto-filled from Common Catalog"). part/[pn].tsx NEW PART card becomes "NEW TO YOUR STORE" with a globe banner + catalog Details rows when `data.catalog` exists; "Add to My Store" pre-fills the new-part form from catalog. StatusChip/statusColor handles "IN CATALOG" (info style).
 - VERIFIED via API (two fresh stores A+B): A creates part → B `/catalog/{pn}` found=true w/ A's identity; B `/search` = "IN CATALOG", own part=None, own /parts list=0 (isolation intact); B buy inherits company from catalog. Backend restart clean.
 - NOTE (handoff correction): test store `teststore1` password is `Test@123` (handoff said `Password@123` — wrong).
+
+## Hyundai/Kia 2-column OEM format + Company selector (2026-06 fork)
+- USER GAVE EXACT ZONE SPEC for the Hyundai/Kia OEM label. New `layoutHyundaiKia()` in scan-sticker.tsx arranges scanned lines into zones (matches real sticker):
+  - Right-top block: UNIT ASSY / HKMC P/N / SYEC P/N / LOT N/O / (value) / H/W Ver / S/W Ver (H/W & S/W kept on SEPARATE lines per user).
+  - Left-top (under logo): HYUNDAI KIA MOTORS.
+  - Left-mid: MODEL / TA / IFT ID, then leftover code (e.g. CRCH-23369) stacked below.
+  - Right-mid: QR (10mm, via code box y=46).
+  - Bottom-center: VBHH ; Bottom full-width: SEOYON ... MADE IN INDIA.
+- Classification is content-based with `lastZone` inheritance for continuation/wrapped lines. CRITICAL ORDER: isLeft is checked BEFORE isRight because the MODEL value "SYECIBUS..." contains "SYEC" (would falsely match the right-block regex). Verified via node sim against user's exact lines → all 14 lines land in correct zones, no overlaps.
+- COMPANY FORMAT selector added on scan screen (chips: Hyundai, Kia, Maruti Suzuki, Tata, Mahindra, Toyota, Honda, Nissan, Renault, Ford, Volkswagen, Skoda, MG, Datsun, Chevrolet, Fiat, Jeep, Citroen, Isuzu, Other). FORMATTED_COMPANIES=[Hyundai,Kia] use the 2-column preset (marked ★); all others fall back to the generic single-column `layoutLines` (dedicated formats to be added later per user). Company auto-detected from scan text (HYUNDAI/KIA); user can switch, which re-lays-out live from stored rawLines.
+- StickerTemplate gained `company`; saved templates persist it (Save button relabeled "Save this format (Company)"), openTemplate restores company + rawLines.
+- QR render (templateInner) now uses code.box.y for vertical position (right-aligned 2mm, fixed 10mm) so the format controls where the 10mm QR sits. Preview updated to match. NATIVE-only full scan flow — user tests on phone.

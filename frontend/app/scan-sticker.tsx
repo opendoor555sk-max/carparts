@@ -19,6 +19,11 @@ type ScanResult = { aspect: number; part_number: string; lines: { text: string; 
 
 const PREVIEW_W = 320;
 
+const COMPANIES = ["Hyundai", "Kia", "Maruti Suzuki", "Tata", "Mahindra", "Toyota", "Honda", "Nissan", "Renault", "Ford", "Volkswagen", "Skoda", "MG", "Datsun", "Chevrolet", "Fiat", "Jeep", "Citroen", "Isuzu", "Other"];
+
+// Companies that have a dedicated 2-column layout preset. Others fall back to generic.
+const FORMATTED_COMPANIES = ["Hyundai", "Kia"];
+
 // Clean vertical layout: no overlap, font shrinks to fit width, code in right column.
 function layoutLines(raw: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, topPad: number): TplLine[] {
   const lines = raw.filter((l) => (l.text || "").trim());
@@ -33,6 +38,61 @@ function layoutLines(raw: { text: string; bold?: boolean }[], aspect: number, ha
     const fs = Math.max(2.75, Math.min(slot * 0.92, widthUnits / (len * 0.46), 11.25));
     return { text: ln.text, x: 3, y: topPad + i * slot + (slot - fs) / 2, size: fs, bold: ln.bold };
   });
+}
+
+// Hyundai / Kia real-sticker 2-column layout (matches OEM label, per user's zone spec):
+//  - Right-top: UNIT ASSY / HKMC P/N / SYEC P/N / LOT N/O / (value) / H/W Ver / S/W Ver
+//  - Left-top (under logo): HYUNDAI KIA MOTORS
+//  - Left-mid: MODEL / TA / IFT ID   then below it the leftover code (e.g. CRCH-23369)
+//  - Right-mid: QR (placed via code box)
+//  - Bottom-center: VBHH ; Bottom full-width: SEOYON ... MADE IN INDIA
+function layoutHyundaiKia(raw: { text: string; bold?: boolean }[], aspect: number): TplLine[] {
+  const lines = raw.map((l) => ({ text: (l.text || "").trim(), bold: l.bold })).filter((l) => l.text);
+
+  const isBottom = (u: string) => /(MADE IN|ELECTRONIC|SEOYON|PVT|LTD|\/\/)/.test(u);
+  const isBrand = (u: string) => /MOTORS/.test(u) || /^HYUNDAI\s*KIA/.test(u);
+  const isRight = (u: string) => /(UNIT ASSY|ASSY|P\/N|LOT|H\/W|S\/W|VER|HKMC|SYEC)/.test(u);
+  const isLeft = (u: string) => /(MODEL|IFT|^TA[ -])/.test(u);
+  const isCenter = (t: string) => t.length <= 6 && /^[A-Za-z]+$/.test(t); // e.g. VBHH
+
+  const brand: typeof lines = [], rightTop: typeof lines = [], leftMid: typeof lines = [], bottom: typeof lines = [];
+  let center: { text: string; bold?: boolean } | null = null;
+  let last: "right" | "left" | "bottom" | "brand" | "center" = "left";
+  for (const ln of lines) {
+    const u = ln.text.toUpperCase();
+    if (isBottom(u)) { bottom.push(ln); last = "bottom"; }
+    else if (isBrand(u)) { brand.push(ln); last = "brand"; }
+    else if (isCenter(ln.text)) { if (!center) center = ln; last = "center"; }
+    else if (isLeft(u)) { leftMid.push(ln); last = "left"; }
+    else if (isRight(u)) { rightTop.push(ln); last = "right"; }
+    else {
+      // unmatched: it's a continuation → inherit the previous line's zone.
+      if (last === "right") rightTop.push(ln);
+      else if (last === "bottom") bottom.push(ln);
+      else { leftMid.push(ln); last = "left"; }
+    }
+  }
+
+  const fit = (wPct: number, len: number, base: number) =>
+    Math.max(2.0, Math.min(base, (wPct * aspect) / (Math.max(1, len) * 0.5)));
+  const out: TplLine[] = [];
+  // Left-top brand line, just under the logo.
+  brand.forEach((ln, i) => out.push({ text: ln.text, x: 2, y: 19 + i * 6.5, size: fit(40, ln.text.length, 6), bold: true }));
+  // Right-top P/N block.
+  const rtStep = rightTop.length ? Math.min(5.5, (44 - 3) / rightTop.length) : 0;
+  rightTop.forEach((ln, i) => out.push({ text: ln.text, x: 44, y: 3 + i * rtStep, size: fit(54, ln.text.length, 5.4), bold: ln.bold }));
+  // Left-mid block (MODEL/TA/IFT) + leftover code stacked below.
+  leftMid.forEach((ln, i) => out.push({ text: ln.text, x: 2, y: 44 + i * 6.5, size: fit(54, ln.text.length, 6), bold: ln.bold }));
+  // Bottom center small line.
+  if (center) out.push({ text: center.text, x: 42, y: 82, size: fit(28, center.text.length, 5.5), bold: false });
+  // Bottom full-width line(s).
+  bottom.forEach((ln, i) => out.push({ text: ln.text, x: 2, y: 90 + i * 5, size: fit(96, ln.text.length, 4.6), bold: false }));
+  return out;
+}
+
+function buildLines(raw: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, hasLogo: boolean, company?: string): TplLine[] {
+  if (company && FORMATTED_COMPANIES.includes(company)) return layoutHyundaiKia(raw, aspect);
+  return layoutLines(raw, aspect, hasCode, hasLogo ? 20 : 4);
 }
 
 export default function ScanSticker() {
@@ -50,6 +110,8 @@ export default function ScanSticker() {
   const [marginLeft, setMarginLeft] = useState("");
   const [saved, setSaved] = useState<any[]>([]);
   const [logos, setLogos] = useState<any[]>([]);
+  const [company, setCompany] = useState("Hyundai");
+  const [rawLines, setRawLines] = useState<{ text: string; bold?: boolean }[]>([]);
   const layout = useMemo(() => SHEET_LAYOUTS.find((l) => l.code === layoutCode)!, [layoutCode]);
 
   const loadSaved = useCallback(async () => {
@@ -63,7 +125,7 @@ export default function ScanSticker() {
     setTpl((prev) => {
       if (!prev) return prev;
       const logo = dataUrl ? { dataUrl, box: LOGO_BOX } : null;
-      const lines = layoutLines(prev.lines.map((l) => ({ text: l.text, bold: l.bold })), prev.aspect, !!prev.code, logo ? 20 : 4);
+      const lines = buildLines(rawLines, prev.aspect, !!prev.code, !!logo, prev.company);
       return { ...prev, logo, lines };
     });
 
@@ -86,9 +148,11 @@ export default function ScanSticker() {
   };
   const deleteLogo = async (id: string) => { try { await api.del(`/logos/${id}`); loadSaved(); } catch {} };
 
-  const codeBox = (aspect: number): Box => {
+  const codeBox = (aspect: number, comp?: string): Box => {
     const h = 34, w = Math.min(40, h / aspect);
-    return { x: 100 - w - 3, y: (100 - h) / 2, w, h };
+    // Hyundai/Kia: QR sits lower (mid band, below the P/N text block). Generic: vertical center.
+    const y = comp && FORMATTED_COMPANIES.includes(comp) ? 46 : (100 - h) / 2;
+    return { x: 100 - w - 3, y, w, h };
   };
 
   const processImage = async (asset: ImagePicker.ImagePickerAsset) => {
@@ -108,11 +172,19 @@ export default function ScanSticker() {
       const ct: "qr" | "barcode" = res.code?.type === "barcode" ? "barcode" : "qr";
       const hasCode = !!res.code;
       const pn = res.part_number || "";
-      buildTpl(res.lines || [], aspect, hasCode, ct, pn, null);
+      const rl = res.lines || [];
+      // Auto-detect company from the sticker text.
+      const joined = rl.map((l) => (l.text || "").toUpperCase()).join(" ");
+      let comp = company;
+      if (/HYUNDAI/.test(joined)) comp = "Hyundai";
+      else if (/\bKIA\b/.test(joined)) comp = "Kia";
+      setRawLines(rl);
+      setCompany(comp);
+      buildTpl(rl, aspect, hasCode, ct, pn, null, comp);
       setPartNumber(pn);
       setCodeType(ct);
       setSelected(new Set());
-      show("Sticker generated", "success");
+      show(`Sticker generated${FORMATTED_COMPANIES.includes(comp) ? ` (${comp} format)` : ""}`, "success");
     } catch (e: any) {
       show(e?.message || "Scan failed", "error");
     } finally {
@@ -120,9 +192,19 @@ export default function ScanSticker() {
     }
   };
 
-  const buildTpl = (rawLines: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, ct: "qr" | "barcode", pn: string, logo: StickerTemplate["logo"]) => {
-    const lines = layoutLines(rawLines, aspect, hasCode, logo ? 20 : 4);
-    setTpl({ aspect, lines, code: hasCode ? { type: ct, value: pn, box: codeBox(aspect) } : null, logo });
+  const buildTpl = (rl: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, ct: "qr" | "barcode", pn: string, logo: StickerTemplate["logo"], comp: string) => {
+    const lines = buildLines(rl, aspect, hasCode, !!logo, comp);
+    setTpl({ aspect, lines, code: hasCode ? { type: ct, value: pn, box: codeBox(aspect, comp) } : null, logo, company: comp });
+  };
+
+  const applyCompany = (comp: string) => {
+    setCompany(comp);
+    setTpl((prev) => {
+      if (!prev) return prev;
+      const lines = buildLines(rawLines, prev.aspect, !!prev.code, !!prev.logo, comp);
+      const code = prev.code ? { ...prev.code, box: codeBox(prev.aspect, comp) } : null;
+      return { ...prev, company: comp, lines, code };
+    });
   };
 
   const pickGallery = async () => {
@@ -168,6 +250,8 @@ export default function ScanSticker() {
       setTpl(parsed);
       setPartNumber(t.part_number || parsed.code?.value || "");
       setCodeType(parsed.code?.type || "qr");
+      setCompany(parsed.company || "Hyundai");
+      setRawLines((parsed.lines || []).map((l) => ({ text: l.text, bold: l.bold })));
       setSelected(new Set());
     } catch { show("Could not open template", "error"); }
   };
@@ -243,7 +327,7 @@ export default function ScanSticker() {
                   (() => {
                     const qpx = Math.min(previewH - 4, (10 / layout.h) * previewH);
                     const left = PREVIEW_W - qpx - (2 / layout.w) * PREVIEW_W;
-                    const top = (previewH - qpx) / 2;
+                    const top = Math.max(0, Math.min((tpl.code.box.y / 100) * previewH, previewH - qpx));
                     return (
                       <View style={{ position: "absolute", left, top, width: qpx, height: qpx }}>
                         <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
@@ -263,6 +347,24 @@ export default function ScanSticker() {
 
             <Text style={styles.section}>PART NUMBER</Text>
             <TextInput style={styles.input} value={partNumber} onChangeText={applyPn} autoCapitalize="characters" testID="scan-pn" />
+
+            <Text style={styles.flabel}>COMPANY FORMAT (tap to switch layout)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+              {COMPANIES.map((c) => (
+                <FilterChip
+                  key={c}
+                  label={FORMATTED_COMPANIES.includes(c) ? `${c} ★` : c}
+                  active={company === c}
+                  onPress={() => applyCompany(c)}
+                  testID={`company-${c}`}
+                />
+              ))}
+            </ScrollView>
+            <Text style={styles.hint}>
+              {FORMATTED_COMPANIES.includes(company)
+                ? `★ ${company} format: 2-column OEM layout (logo + P/N block, QR right).`
+                : `${company}: standard layout. A dedicated format can be added later.`}
+            </Text>
 
             <Text style={styles.flabel}>COMPANY LOGO (tap to set on sticker)</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.savedRow}>
@@ -298,7 +400,7 @@ export default function ScanSticker() {
             ))}
 
             <Pressable style={styles.saveBtn} onPress={saveTemplate} testID="save-template">
-              <Ionicons name="bookmark" size={18} color={colors.brand} /><Text style={styles.saveText}>Save this sticker for reuse</Text>
+              <Ionicons name="bookmark" size={18} color={colors.brand} /><Text style={styles.saveText}>Save this format{FORMATTED_COMPANIES.includes(company) ? ` (${company})` : ""}</Text>
             </Pressable>
 
             <Text style={styles.section}>A4 SHEET LAYOUT</Text>
@@ -356,6 +458,7 @@ const styles = StyleSheet.create({
   dim: { color: colors.info, fontSize: font.sm, textAlign: "center", paddingHorizontal: spacing.lg, lineHeight: 20 },
   section: { color: colors.brand, fontSize: font.sm, fontWeight: "800", letterSpacing: 0.5, marginTop: spacing.sm },
   flabel: { color: colors.info, fontSize: font.sm - 1, fontWeight: "800", letterSpacing: 0.5, marginTop: spacing.xs },
+  hint: { color: colors.info, fontSize: font.sm - 1, lineHeight: 16, marginTop: 2 },
   preview: { backgroundColor: "#fff", borderRadius: radius.sm, alignSelf: "center", overflow: "hidden", borderWidth: 1, borderColor: colors.border },
   input: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.onSurface, fontSize: font.base },
   lineInput: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.sm },

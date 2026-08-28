@@ -105,6 +105,7 @@ export type StickerTemplate = {
   lines: TplLine[];
   code: { type: "qr" | "barcode"; value: string; box: Box } | null;
   logo?: { dataUrl: string; box: Box } | null;
+  company?: string;
 };
 
 // Builds a CLEAN white sticker: typed text lines + a regenerated code. No photo pixels.
@@ -120,10 +121,11 @@ function templateInner(tpl: StickerTemplate, wMm: number, hMm: number): string {
   }
   if (tpl.code && tpl.code.value) {
     if (tpl.code.type === "qr") {
-      // FIXED 10mm x 10mm QR (capped to fit), right side, vertically centered.
+      // FIXED 10mm x 10mm QR (capped to fit). Vertical position from box.y, right-aligned.
       const qmm = Math.min(10, hMm - 1, wMm - 2);
+      const topMm = Math.max(0, Math.min((tpl.code.box.y / 100) * hMm, hMm - qmm));
       const svg = qrSvg(tpl.code.value, { margin: 1 });
-      out += `<div style="position:absolute;right:2mm;top:${((hMm - qmm) / 2).toFixed(2)}mm;width:${qmm.toFixed(2)}mm;height:${qmm.toFixed(2)}mm;display:flex;align-items:center;justify-content:center">${svg.replace("<svg ", `<svg style="width:100%;height:100%" `)}</div>`;
+      out += `<div style="position:absolute;right:2mm;top:${topMm.toFixed(2)}mm;width:${qmm.toFixed(2)}mm;height:${qmm.toFixed(2)}mm;display:flex;align-items:center;justify-content:center">${svg.replace("<svg ", `<svg style="width:100%;height:100%" `)}</div>`;
     } else {
       const b = tpl.code.box;
       const svg = barcodeSvg(tpl.code.value, { height: 60, moduleWidth: 2, showText: false });
