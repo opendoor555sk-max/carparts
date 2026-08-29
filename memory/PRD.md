@@ -272,3 +272,8 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - User: consolidate the two confusing print options (single-sticker block select + separate Batch Print) into ONE organized place, and allow placing DIFFERENT companies/part-numbers on specific blocks of the same A4 sheet, with quantities.
 - Added `generateComposedSheetHtml(cellTpls: Record<cellNo,StickerTemplate>, opts)` (via shared renderSheet). Removed the separate Batch collapsible and the old single-sticker grid.
 - New composer in scan-sticker: (1) PICK STICKER TO PLACE chips = "This design" + all saved stickers (any company); (2) Auto-fill Qty -> fills next N empty cells with active sticker; (3) TAP BLOCKS grid -> tap assigns active sticker to that cell (shows part-no short label), tap again clears; Clear all. Print Sheet builds cellMap -> tpl (current design or parsed saved) and prints via generateComposedSheetHtml. Reuses margins/pageMargin. State: cellMap{cellNo:id}, activeId, fillQty. Lint clean, screen loads.
+
+## One-sticker-per-PN + code move + super-admin-only (2026-06 fork)
+- ONE STICKER PER PART NUMBER: POST /api/sticker-templates now upserts by (store_id, part_number) — re-saving the same PN updates instead of duplicating. Verified via curl (2 PNs -> 2 docs; re-save updates name).
+- CODE FREE MOVE: templateInner now positions the code by box.x (left) AND box.y (top) with clamping (was right-aligned). Added "Move code" ◀▲▼▶ pad (moveCode, uses nudgeStep) next to Code size in scan-sticker; preview uses box.x for left too.
+- SUPER ADMIN ONLY: AI Sticker Scanner card on home (index.tsx) shown only when user.role==="super_admin"; scan-sticker route guards & router.back() for non-super-admins. Sticker creation authority = Super Admin only.

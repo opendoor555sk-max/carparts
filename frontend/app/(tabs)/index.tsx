@@ -162,23 +162,27 @@ export default function Home() {
           ))}
         </View>
 
-        <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>STICKER PRINTING</Text>
-        <View style={{ gap: spacing.md }}>
-          <Pressable
-            style={styles.report}
-            onPress={() => router.push("/scan-sticker" as any)}
-            testID="home-scan-sticker"
-          >
-            <View style={[styles.reportIcon, { borderColor: colors.brand }]}>
-              <Ionicons name="scan" size={22} color={colors.brand} />
+        {user?.role === "super_admin" ? (
+          <>
+            <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>STICKER PRINTING</Text>
+            <View style={{ gap: spacing.md }}>
+              <Pressable
+                style={styles.report}
+                onPress={() => router.push("/scan-sticker" as any)}
+                testID="home-scan-sticker"
+              >
+                <View style={[styles.reportIcon, { borderColor: colors.brand }]}>
+                  <Ionicons name="scan" size={22} color={colors.brand} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.reportTitle}>AI Sticker Scanner</Text>
+                  <Text style={styles.reportSub}>Scan any sticker from gallery/camera • edit part no • reprint</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.info} />
+              </Pressable>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.reportTitle}>AI Sticker Scanner</Text>
-              <Text style={styles.reportSub}>Scan any sticker from gallery/camera • edit part no • reprint</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.info} />
-          </Pressable>
-        </View>
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );

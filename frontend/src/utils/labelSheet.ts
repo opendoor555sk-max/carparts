@@ -123,13 +123,15 @@ function templateInner(tpl: StickerTemplate, wMm: number, hMm: number): string {
   }
   if (tpl.code && tpl.code.value) {
     // Unified: any code type. Size from code.sizeMm (default 10mm, capped to cell).
-    // Right-aligned, vertical position from box.y. Wide codes keep their aspect.
+    // Free X/Y placement from box.x / box.y. Wide codes keep their aspect.
     const svg = codeSvg(tpl.code.type, tpl.code.value);
     const ratio = svgRatio(svg);
     const sizeMm = Math.min(tpl.code.sizeMm ?? 10, hMm - 1);
     const codeWmm = ratio > 1.3 ? Math.min(sizeMm * ratio, wMm * 0.6) : sizeMm;
     const topMm = Math.max(0, Math.min((tpl.code.box.y / 100) * hMm, hMm - sizeMm));
-    out += `<div style="position:absolute;right:2mm;top:${topMm.toFixed(2)}mm;width:${codeWmm.toFixed(2)}mm;height:${sizeMm.toFixed(2)}mm;display:flex;align-items:center;justify-content:center">${svg.replace("<svg ", `<svg preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%" `)}</div>`;
+    const maxLeft = Math.max(0, wMm - codeWmm);
+    const leftMm = Math.max(0, Math.min((tpl.code.box.x / 100) * wMm, maxLeft));
+    out += `<div style="position:absolute;left:${leftMm.toFixed(2)}mm;top:${topMm.toFixed(2)}mm;width:${codeWmm.toFixed(2)}mm;height:${sizeMm.toFixed(2)}mm;display:flex;align-items:center;justify-content:center">${svg.replace("<svg ", `<svg preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%" `)}</div>`;
   }
   return out;
 }

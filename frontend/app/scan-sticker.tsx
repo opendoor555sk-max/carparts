@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { SvgXml } from "react-native-svg";
+import { useRouter } from "expo-router";import { SvgXml } from "react-native-svg";
+import { useAuth } from "@/src/context/AuthContext";
 import * as ImagePicker from "expo-image-picker";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
@@ -105,6 +105,7 @@ function buildLines(raw: { text: string; bold?: boolean }[], aspect: number, has
 export default function ScanSticker() {
   const router = useRouter();
   const { show } = useToast();
+  const { user } = useAuth();
 
   const [busy, setBusy] = useState(false);
   const [tpl, setTpl] = useState<StickerTemplate | null>(null);
@@ -139,6 +140,13 @@ export default function ScanSticker() {
     } catch {}
   }, []);
   useEffect(() => { loadSaved(); }, [loadSaved]);
+  // Only Super Admin may create stickers.
+  useEffect(() => {
+    if (user && user.role !== "super_admin") {
+      show("Only Super Admin can create stickers", "error");
+      router.back();
+    }
+  }, [user, router, show]);
 
   // Re-apply a saved company format's arrangement onto freshly-scanned lines.
   // Lines are matched by their field key (text before ':' with digits stripped),
@@ -315,6 +323,12 @@ export default function ScanSticker() {
     setCodeSize(s);
     setTpl((prev) => (prev && prev.code ? { ...prev, code: { ...prev.code, sizeMm: s } } : prev));
   };
+  const moveCode = (dx: number, dy: number) =>
+    setTpl((prev) => {
+      if (!prev || !prev.code) return prev;
+      const b = prev.code.box;
+      return { ...prev, code: { ...prev.code, box: { ...b, x: Math.max(0, Math.min(99, b.x + dx * nudgeStep)), y: Math.max(0, Math.min(99, b.y + dy * nudgeStep)) } } };
+    });
   const editLine = (idx: number, text: string) =>
     setTpl((prev) => (prev ? { ...prev, lines: prev.lines.map((l, i) => (i === idx ? { ...l, text } : l)) } : prev));
 
@@ -490,7 +504,7 @@ export default function ScanSticker() {
                 (() => {
                   const hpx = Math.min(previewH - 2, (codeSize / layout.h) * previewH);
                   const wpx = codeRatio > 1.3 ? Math.min(PREVIEW_W * 0.6, hpx * codeRatio) : hpx;
-                  const left = PREVIEW_W - wpx - (2 / layout.w) * PREVIEW_W;
+                  const left = Math.max(0, Math.min((tpl.code.box.x / 100) * PREVIEW_W, PREVIEW_W - wpx));
                   const top = Math.max(0, Math.min((tpl.code.box.y / 100) * previewH, previewH - hpx));
                   return (
                     <View style={{ position: "absolute", left, top, width: wpx, height: hpx }}>
@@ -576,6 +590,14 @@ export default function ScanSticker() {
               <Pressable style={styles.sizeBtn} onPress={() => changeCodeSize(1)} testID="code-size-plus">
                 <Ionicons name="add" size={20} color={colors.onSurface} />
               </Pressable>
+            </View>
+
+            <Text style={styles.subHint}>Move code (step {nudgeStep})</Text>
+            <View style={styles.sizeRow}>
+              <Pressable style={styles.sizeBtn} onPress={() => moveCode(-1, 0)} testID="code-left"><Ionicons name="chevron-back" size={20} color={colors.onSurface} /></Pressable>
+              <Pressable style={styles.sizeBtn} onPress={() => moveCode(0, -1)} testID="code-up"><Ionicons name="chevron-up" size={20} color={colors.onSurface} /></Pressable>
+              <Pressable style={styles.sizeBtn} onPress={() => moveCode(0, 1)} testID="code-down"><Ionicons name="chevron-down" size={20} color={colors.onSurface} /></Pressable>
+              <Pressable style={styles.sizeBtn} onPress={() => moveCode(1, 0)} testID="code-right"><Ionicons name="chevron-forward" size={20} color={colors.onSurface} /></Pressable>
             </View>
 
             <Text style={styles.flabel}>ARRANGE — select lines, then move / resize together</Text>

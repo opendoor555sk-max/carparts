@@ -1904,6 +1904,17 @@ class StickerTemplateReq(BaseModel):
 @api.post("/sticker-templates")
 async def save_sticker_template(req: StickerTemplateReq, user=Depends(get_current_user)):
     sid = resolve_store(user, None)
+    pn = (req.part_number or "").strip()
+    now = datetime.now(timezone.utc).isoformat()
+    # One sticker per part number (per store): update existing instead of duplicating.
+    existing = await db.sticker_templates.find_one({"store_id": sid, "part_number": pn}) if pn else None
+    if existing:
+        await db.sticker_templates.update_one(
+            {"id": existing["id"]},
+            {"$set": {"name": req.name or "Sticker", "bg_data_url": req.bg_data_url,
+                      "aspect": req.aspect, "pn_box": req.pn_box, "updated_at": now}},
+        )
+        return await db.sticker_templates.find_one({"id": existing["id"]}, {"_id": 0})
     doc = {
         "id": uuid.uuid4().hex,
         "store_id": sid,
@@ -1911,8 +1922,8 @@ async def save_sticker_template(req: StickerTemplateReq, user=Depends(get_curren
         "bg_data_url": req.bg_data_url,
         "aspect": req.aspect,
         "pn_box": req.pn_box,
-        "part_number": req.part_number,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "part_number": pn,
+        "created_at": now,
     }
     await db.sticker_templates.insert_one(doc)
     doc.pop("_id", None)
