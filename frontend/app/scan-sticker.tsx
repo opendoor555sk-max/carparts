@@ -457,9 +457,39 @@ export default function ScanSticker() {
   const cellW = Math.min(320 / layout.cols, 60);
   const cellH = Math.max(10, cellW / (layout.w / layout.h));
 
+  const renderPreview = () => (
+    <View style={[styles.preview, { width: PREVIEW_W, height: previewH }]}>
+      {tpl!.logo && tpl!.logo.dataUrl ? (
+        <Image source={{ uri: tpl!.logo.dataUrl }} resizeMode="contain" style={{ position: "absolute", left: (tpl!.logo.box.x / 100) * PREVIEW_W, top: (tpl!.logo.box.y / 100) * previewH, width: (tpl!.logo.box.w / 100) * PREVIEW_W, height: (tpl!.logo.box.h / 100) * previewH }} />
+      ) : null}
+      {tpl!.code && codeSvg ? (
+        (() => {
+          const hpx = Math.min(previewH - 2, (codeSize / layout.h) * previewH);
+          const wpx = codeRatio > 1.3 ? Math.min(PREVIEW_W * 0.6, hpx * codeRatio) : hpx;
+          const left = Math.max(0, Math.min((tpl!.code.box.x / 100) * PREVIEW_W, PREVIEW_W - wpx));
+          const top = Math.max(0, Math.min((tpl!.code.box.y / 100) * previewH, previewH - hpx));
+          return (
+            <View style={{ position: "absolute", left, top, width: wpx, height: hpx }}>
+              <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
+            </View>
+          );
+        })()
+      ) : null}
+      {tpl!.lines.map((ln, i) => (
+        <Text key={i} numberOfLines={1} style={{ position: "absolute", left: (ln.x / 100) * PREVIEW_W, top: (ln.y / 100) * previewH, fontSize: Math.max(6, (ln.size / 100) * previewH), fontWeight: ln.bold ? "800" : "500", color: "#000" }}>{ln.text}</Text>
+      ))}
+    </View>
+  );
+
   return (
     <View style={styles.flex}>
       <Header title="AI Sticker Scanner" subtitle="Generate a clean sticker → change part no → print" onBack={() => router.back()} />
+      {tpl && !busy ? (
+        <View style={styles.previewPin}>
+          <Text style={styles.pinLabel}>LIVE PREVIEW (stays here while you edit below)</Text>
+          {renderPreview()}
+        </View>
+      ) : null}
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl }}>
         <View style={styles.pickRow}>
           <Pressable style={styles.pickBtn} onPress={pickGallery} disabled={busy} testID="pick-gallery">
@@ -495,29 +525,6 @@ export default function ScanSticker() {
 
         {tpl ? (
           <>
-            <Text style={styles.section}>PREVIEW (clean generated)</Text>
-            <View style={[styles.preview, { width: PREVIEW_W, height: previewH }]}>
-              {tpl.logo && tpl.logo.dataUrl ? (
-                <Image source={{ uri: tpl.logo.dataUrl }} resizeMode="contain" style={{ position: "absolute", left: (tpl.logo.box.x / 100) * PREVIEW_W, top: (tpl.logo.box.y / 100) * previewH, width: (tpl.logo.box.w / 100) * PREVIEW_W, height: (tpl.logo.box.h / 100) * previewH }} />
-              ) : null}
-              {tpl.code && codeSvg ? (
-                (() => {
-                  const hpx = Math.min(previewH - 2, (codeSize / layout.h) * previewH);
-                  const wpx = codeRatio > 1.3 ? Math.min(PREVIEW_W * 0.6, hpx * codeRatio) : hpx;
-                  const left = Math.max(0, Math.min((tpl.code.box.x / 100) * PREVIEW_W, PREVIEW_W - wpx));
-                  const top = Math.max(0, Math.min((tpl.code.box.y / 100) * previewH, previewH - hpx));
-                  return (
-                    <View style={{ position: "absolute", left, top, width: wpx, height: hpx }}>
-                      <SvgXml xml={codeSvg} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
-                    </View>
-                  );
-                })()
-              ) : null}
-              {tpl.lines.map((ln, i) => (
-                <Text key={i} numberOfLines={1} style={{ position: "absolute", left: (ln.x / 100) * PREVIEW_W, top: (ln.y / 100) * previewH, fontSize: Math.max(6, (ln.size / 100) * previewH), fontWeight: ln.bold ? "800" : "500", color: "#000" }}>{ln.text}</Text>
-              ))}
-            </View>
-
             <Text style={styles.section}>PART NUMBER</Text>
             <TextInput style={styles.input} value={partNumber} onChangeText={applyPn} autoCapitalize="characters" testID="scan-pn" />
 
@@ -727,6 +734,8 @@ const styles = StyleSheet.create({
   flabel: { color: colors.info, fontSize: font.sm - 1, fontWeight: "800", letterSpacing: 0.5, marginTop: spacing.xs },
   hint: { color: colors.info, fontSize: font.sm - 1, lineHeight: 16, marginTop: 2 },
   preview: { backgroundColor: "#fff", borderRadius: radius.sm, alignSelf: "center", overflow: "hidden", borderWidth: 1, borderColor: colors.border },
+  previewPin: { backgroundColor: colors.surface2, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: "center", gap: 4 },
+  pinLabel: { color: colors.brand, fontSize: font.sm - 1, fontWeight: "800", letterSpacing: 0.3 },
   input: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.onSurface, fontSize: font.base },
   lineInput: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.sm },
   lineTopRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginBottom: spacing.xs },

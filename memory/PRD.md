@@ -277,3 +277,6 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - ONE STICKER PER PART NUMBER: POST /api/sticker-templates now upserts by (store_id, part_number) — re-saving the same PN updates instead of duplicating. Verified via curl (2 PNs -> 2 docs; re-save updates name).
 - CODE FREE MOVE: templateInner now positions the code by box.x (left) AND box.y (top) with clamping (was right-aligned). Added "Move code" ◀▲▼▶ pad (moveCode, uses nudgeStep) next to Code size in scan-sticker; preview uses box.x for left too.
 - SUPER ADMIN ONLY: AI Sticker Scanner card on home (index.tsx) shown only when user.role==="super_admin"; scan-sticker route guards & router.back() for non-super-admins. Sticker creation authority = Super Admin only.
+
+## Sticky LIVE PREVIEW (2026-06 fork)
+- User: freeze the sticker preview at top while scrolling/using arrange & nudge buttons below, so edits are visible live. Extracted preview into renderPreview() and moved it OUT of the ScrollView into a pinned panel (styles.previewPin) between Header and ScrollView, shown when tpl && !busy. Controls scroll underneath; preview stays fixed and updates live. Lint clean, screen loads.
