@@ -124,6 +124,7 @@ export default function ScanSticker() {
   const [logos, setLogos] = useState<any[]>([]);
   const [company, setCompany] = useState("Hyundai / Kia");
   const [rawLines, setRawLines] = useState<{ text: string; bold?: boolean }[]>([]);
+  const [manualPn, setManualPn] = useState("");
   const [selLines, setSelLines] = useState<Set<number>>(new Set());
   const [nudgeStep, setNudgeStep] = useState(2);
   const [companyFormats, setCompanyFormats] = useState<Record<string, any>>({});
@@ -272,6 +273,29 @@ export default function ScanSticker() {
   const buildTpl = (rl: { text: string; bold?: boolean }[], aspect: number, hasCode: boolean, ct: CodeType, pn: string, logo: StickerTemplate["logo"], comp: string, sizeMm: number) => {
     const lines = buildLines(rl, aspect, hasCode, !!logo, comp);
     setTpl({ aspect, lines, code: hasCode ? { type: ct, value: pn, box: codeBox(aspect, comp), sizeMm } : null, logo, company: comp });
+  };
+
+  // Create a blank sticker straight from a typed part number (no photo scan needed).
+  const createManual = () => {
+    const pn = manualPn.trim();
+    if (!pn) return show("Enter a part number first", "error");
+    const aspect = 1.6;
+    const comp = company;
+    let ct: CodeType = FORMATTED_COMPANIES.includes(comp) ? "datamatrix" : "qr";
+    const rl = [{ text: pn, bold: true }];
+    setRawLines(rl);
+    buildTpl(rl, aspect, true, ct, pn, null, comp, codeSize);
+    const fmt = companyFormats[comp];
+    if (fmt) {
+      if (fmt.code?.type) ct = fmt.code.type;
+      if (fmt.code?.sizeMm) setCodeSize(fmt.code.sizeMm);
+      setTpl((prev) => (prev ? applyCompanyFormat(prev, fmt) : prev));
+    }
+    setPartNumber(pn);
+    setCodeType(ct);
+    setCellMap({});
+    setManualPn("");
+    show("Blank sticker created — edit & print below", "success");
   };
 
   const applyCompany = (comp: string) => {
@@ -498,6 +522,28 @@ export default function ScanSticker() {
           <Pressable style={styles.pickBtn} onPress={takePhoto} disabled={busy} testID="take-photo">
             <Ionicons name="camera" size={20} color={colors.onBrand} /><Text style={styles.pickText}>Camera</Text>
           </Pressable>
+        </View>
+
+        <View style={styles.manualCard}>
+          <Text style={styles.manualTitle}>OR CREATE BY PART NUMBER (no photo)</Text>
+          <View style={styles.manualRow}>
+            <TextInput
+              style={styles.manualInput}
+              value={manualPn}
+              onChangeText={setManualPn}
+              placeholder="e.g. 39100-2B000"
+              placeholderTextColor={colors.onSurface3}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              onSubmitEditing={createManual}
+              returnKeyType="go"
+              testID="manual-pn-input"
+            />
+            <Pressable style={styles.manualBtn} onPress={createManual} disabled={busy} testID="create-manual">
+              <Ionicons name="add-circle" size={18} color={colors.onBrand} />
+              <Text style={styles.pickText}>Create</Text>
+            </Pressable>
+          </View>
         </View>
 
         {saved.length ? (
@@ -727,6 +773,11 @@ const styles = StyleSheet.create({
   pickRow: { flexDirection: "row", gap: spacing.md },
   pickBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.md },
   pickText: { color: colors.onBrand, fontWeight: "800", fontSize: font.base },
+  manualCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
+  manualTitle: { color: colors.brand, fontSize: font.sm, fontWeight: "800", letterSpacing: 0.5 },
+  manualRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
+  manualInput: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.onSurface, fontSize: font.base },
+  manualBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   busy: { alignItems: "center", gap: spacing.md, paddingVertical: spacing.xl },
   empty: { alignItems: "center", gap: spacing.md, paddingVertical: spacing.xxxl },
   dim: { color: colors.info, fontSize: font.sm, textAlign: "center", paddingHorizontal: spacing.lg, lineHeight: 20 },

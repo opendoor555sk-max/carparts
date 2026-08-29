@@ -13,12 +13,15 @@ import { useToast } from "@/src/context/ToastContext";
 import { Button, Field, Header } from "@/src/components/ui";
 import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
+import { useAuth } from "@/src/context/AuthContext";
 
 export default function BatchBuyWeb() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { company = "All" } = useLocalSearchParams<{ company: string }>();
   const { show } = useToast();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
   const [manual, setManual] = useState("");
   const [counts, setCounts] = useState<{ pn: string; qty: number }[]>([]);
   const [total, setTotal] = useState(0);
@@ -116,7 +119,7 @@ export default function BatchBuyWeb() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Multiple Buy" subtitle={`Total: ${total}  •  ${gps ? "📍 GPS ✓" : "GPS…"}`} onBack={() => router.back()} />
+      <Header title="Multiple Buy" subtitle={isSuperAdmin ? `Total: ${total}  •  ${gps ? "📍 GPS ✓" : "GPS…"}` : `Total: ${total}`} onBack={() => router.back()} />
       <View style={styles.cam}>
         {VideoEl}
         <View style={styles.overlay} pointerEvents="none">
@@ -130,12 +133,14 @@ export default function BatchBuyWeb() {
         </View>
         <Pressable style={styles.addBtn} onPress={() => { addOne(manual); setManual(""); }} testID="batch-add"><Ionicons name="add" size={24} color={colors.onBrand} /></Pressable>
       </View>
-      <View style={styles.gpsStrip}>
-        <Ionicons name="location" size={16} color={gps ? colors.success : colors.warning} />
-        <Text style={[styles.gpsStripText, { color: gps ? colors.success : colors.warning }]} numberOfLines={1}>
-          {gps ? `Live GPS: ${gps}` : "Getting GPS…"}
-        </Text>
-      </View>
+      {isSuperAdmin ? (
+        <View style={styles.gpsStrip}>
+          <Ionicons name="location" size={16} color={gps ? colors.success : colors.warning} />
+          <Text style={[styles.gpsStripText, { color: gps ? colors.success : colors.warning }]} numberOfLines={1}>
+            {gps ? `Live GPS: ${gps}` : "Getting GPS…"}
+          </Text>
+        </View>
+      ) : null}
       <FlatList
         data={counts}
         keyExtractor={(c) => c.pn}

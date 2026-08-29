@@ -280,3 +280,10 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 
 ## Sticky LIVE PREVIEW (2026-06 fork)
 - User: freeze the sticker preview at top while scrolling/using arrange & nudge buttons below, so edits are visible live. Extracted preview into renderPreview() and moved it OUT of the ScrollView into a pinned panel (styles.previewPin) between Header and ScrollView, shown when tpl && !busy. Controls scroll underneath; preview stays fixed and updates live. Lint clean, screen loads.
+
+
+## Session Update (June 2026 fork)
+- Hid GPS UI text from store users (scan/buy/batch-buy/scan.web/batch-buy.web); GPS bar now shows only for super_admin. Background loc.coords tracking untouched.
+- Added "Create by Part Number" manual input in scan-sticker.tsx (create blank sticker without photo).
+- Part detail page (part/[pn].tsx) now shows BOTH Barcode + QR code; Print Barcode Label now prints barcode + QR.
+- SEC-001 & SEC-004 confirmed already fixed in server.py (create_user restricts admin to super_admin; update_user blocks staff editing admin; /admin/users projects out password_hash/password_enc/google keys).

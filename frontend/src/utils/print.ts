@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 
 import { fileUrl } from "@/src/api/client";
 import { barcodeSvg } from "@/src/utils/barcode128";
+import { qrSvg } from "@/src/utils/qr";
 
 export type Branding = {
   name: string;
@@ -175,6 +176,9 @@ export async function printBarcodeLabel(b: Branding, partNumber: string, company
   const body = `<div style="text-align:center;padding:10px">
     ${company ? `<div style="font-size:13px;font-weight:700;margin-bottom:6px">${esc(company)}</div>` : ""}
     ${barcodeSvg(partNumber, { height: 90, moduleWidth: 2 })}
+    <div style="display:flex;align-items:center;justify-content:center;margin-top:12px">
+      <div style="width:120px;height:120px">${qrSvg(partNumber, { margin: 1 })}</div>
+    </div>
   </div>`;
   await printHtml(wrap("Barcode Label", b, body));
 }

@@ -19,6 +19,8 @@ import { api, fileUrl } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { Barcode } from "@/src/components/Barcode";
+import { SvgXml } from "react-native-svg";
+import { codeSvg } from "@/src/utils/codegen";
 import { brandingFromUser, printBarcodeLabel } from "@/src/utils/print";
 import {
   Button,
@@ -271,10 +273,14 @@ export default function PartDetail() {
           </Text>
         </Card>
 
-        {/* Barcode */}
+        {/* Barcode + QR Code */}
         <Card testID="part-barcode">
-          <Text style={styles.cardTitle}>BARCODE</Text>
+          <Text style={styles.cardTitle}>BARCODE & QR CODE</Text>
           <Barcode value={partNumber} height={64} />
+          <View style={styles.qrWrap}>
+            <SvgXml xml={codeSvg("qr", partNumber)} width={120} height={120} />
+            <Text style={styles.qrCaption}>{partNumber}</Text>
+          </View>
           <Button
             title="Print Barcode Label"
             onPress={async () => printBarcodeLabel(await brandingFromUser(user), partNumber, p?.company)}
@@ -638,6 +644,8 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.sm },
   stockLine: { color: colors.onSurface2, fontSize: font.base, marginTop: spacing.sm },
   cardTitle: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1, marginBottom: spacing.md },
+  qrWrap: { alignItems: "center", backgroundColor: "#fff", borderRadius: radius.md, paddingVertical: spacing.md, marginTop: spacing.md },
+  qrCaption: { color: "#000", fontSize: font.sm, fontWeight: "700", marginTop: spacing.xs, letterSpacing: 0.5 },
   row: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md, paddingVertical: 5 },
   rowLabel: { color: colors.info, fontSize: font.base },
   rowValue: { color: colors.onSurface, fontSize: font.base, fontWeight: "700", flexShrink: 1, textAlign: "right" },

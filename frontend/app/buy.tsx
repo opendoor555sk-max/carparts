@@ -337,12 +337,14 @@ export default function Buy() {
                 <Field label="Position" value={position} onChangeText={setPosition} placeholder="P4" testID="loc-position" />
               </View>
             </View>
-            <View style={styles.gpsRow} testID="gps-synced">
-              <Ionicons name={gps ? "location" : "location-outline"} size={14} color={gps ? colors.success : colors.info} />
-              <Text style={[styles.gpsText, { color: gps ? colors.success : colors.info }]}>
-                {gps ? `GPS synced: ${gps}` : "GPS location fetching…"}
-              </Text>
-            </View>
+            {user?.role === "super_admin" ? (
+              <View style={styles.gpsRow} testID="gps-synced">
+                <Ionicons name={gps ? "location" : "location-outline"} size={14} color={gps ? colors.success : colors.info} />
+                <Text style={[styles.gpsText, { color: gps ? colors.success : colors.info }]}>
+                  {gps ? `GPS synced: ${gps}` : "GPS location fetching…"}
+                </Text>
+              </View>
+            ) : null}
           </Card>
 
           {/* Part Photos (6-side) */}

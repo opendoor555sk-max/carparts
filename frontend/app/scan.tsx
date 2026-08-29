@@ -15,6 +15,7 @@ import * as Location from "expo-location";
 import { Button, Field, Header } from "@/src/components/ui";
 import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
+import { useAuth } from "@/src/context/AuthContext";
 
 const MODE_META: Record<string, { title: string; color: string; verb: string }> = {
   search: { title: "SEARCH", color: colors.info, verb: "Search" },
@@ -26,6 +27,8 @@ const MODE_META: Record<string, { title: string; color: string; verb: string }> 
 export default function Scan() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
   const { mode = "search", company = "All" } = useLocalSearchParams<{ mode: string; company: string }>();
   const meta = MODE_META[mode as string] || MODE_META.search;
 
@@ -150,10 +153,12 @@ export default function Scan() {
         subtitle={`Company: ${company}`}
         onBack={() => router.back()}
       />
-      <View style={styles.gpsBar} testID="scan-gps">
-        <Ionicons name="location" size={14} color={gps ? colors.success : colors.info} />
-        <Text style={styles.gpsText}>{gps ? `GPS: ${gps}` : "Getting GPS location…"}</Text>
-      </View>
+      {isSuperAdmin ? (
+        <View style={styles.gpsBar} testID="scan-gps">
+          <Ionicons name="location" size={14} color={gps ? colors.success : colors.info} />
+          <Text style={styles.gpsText}>{gps ? `GPS: ${gps}` : "Getting GPS location…"}</Text>
+        </View>
+      ) : null}
       <View style={{ flex: 1 }}>
         {renderCameraArea()}
 
