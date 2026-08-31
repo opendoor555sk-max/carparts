@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Car Auto Parts Store</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.6/JsBarcode.all.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0D0F; --surface:#15181C; --surface-2:#1C2025;
+    --border:#262B31; --border-light:#33383F;
+    --text:#F5F3EF; --text-muted:#8B92A0; --text-dim:#5B6169;
+    --accent:#FF7A1A; --accent-dim:#7A3D14;
+    --verified:#34D399; --verified-dim:#0F3D2E;
+    --conflict:#FBBF24; --conflict-dim:#3D2F0A;
+    --danger:#EF4444;
+    --font-display:'Barlow Condensed',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-body);}
+  #root{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;
+    background:radial-gradient(ellipse 600px 300px at 50% -10%, rgba(255,122,26,0.08), transparent 60%), var(--bg);}
+
+  .topbar{padding:16px 18px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30;
+    background:rgba(11,13,15,0.94);backdrop-filter:blur(8px);}
+  .topbar-row{display:flex;align-items:center;justify-content:space-between;}
+  .back-btn{width:34px;height:34px;border-radius:9px;background:var(--surface);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;color:var(--text);cursor:pointer;font-size:18px;}
+  .title-block{flex:1;padding:0 12px;}
+  .screen-title{font-family:var(--font-display);font-weight:700;font-size:21px;line-height:1.1;}
+  .screen-sub{font-size:11px;color:var(--text-dim);margin-top:2px;}
+  .brand-row{display:flex;align-items:center;gap:9px;}
+  .brand-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(155deg,var(--accent),#B8540E);
+    display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:700;font-size:13px;color:#100800;}
+
+  .content{flex:1;padding:18px 18px 90px;}
+  .hidden{display:none !important;}
+
+  /* Company chips */
+  .chip-row{display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px;margin-bottom:4px;}
+  .chip-row::-webkit-scrollbar{display:none;}
+  .chip{flex-shrink:0;padding:9px 16px;border-radius:20px;background:var(--surface);border:1px solid var(--border);
+    font-size:13px;font-weight:600;color:var(--text-muted);white-space:nowrap;cursor:pointer;}
+  .chip.active{background:var(--accent);color:#160900;border-color:var(--accent);}
+
+  .section-label{font-size:11px;text-transform:uppercase;letter-spacing:1.3px;color:var(--text-dim);font-weight:600;margin:18px 0 10px;}
+
+  /* Module grid */
+  .module-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .module-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;transition:border-color .15s;}
+  .module-card:active{border-color:var(--accent);}
+  .module-card.wide{grid-column:1/-1;display:flex;align-items:center;gap:14px;}
+  .module-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px;margin-bottom:10px;}
+  .module-icon.search{background:rgba(255,255,255,0.06);border:1.5px solid var(--border-light);}
+  .module-icon.buy{background:var(--verified-dim);border:1.5px solid rgba(52,211,153,.4);}
+  .module-icon.sell{background:var(--accent-dim);border:1.5px solid rgba(255,122,26,.4);}
+  .module-icon.req{background:var(--conflict-dim);border:1.5px solid rgba(251,191,36,.4);}
+  .module-icon.multi{background:var(--verified-dim);border:1.5px solid rgba(52,211,153,.4);margin-bottom:0;}
+  .module-name{font-family:var(--font-display);font-weight:700;font-size:17px;}
+  .module-desc{font-size:11.5px;color:var(--text-dim);margin-top:2px;}
+  .soon-badge{display:inline-block;margin-top:8px;font-size:9.5px;font-weight:700;letter-spacing:0.5px;
+    color:var(--text-dim);background:var(--surface-2);padding:3px 8px;border-radius:5px;}
+
+  /* Search view */
+  .search-hero h1{font-family:var(--font-display);font-size:25px;font-weight:700;margin:0 0 4px;}
+  .search-hero p{color:var(--text-muted);font-size:13px;margin:0 0 18px;line-height:1.5;}
+
+  .scan-plate{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;position:relative;overflow:hidden;}
+  .scan-plate::before{content:'';position:absolute;left:0;right:0;top:0;height:2px;
+    background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanline 2.2s ease-in-out infinite;opacity:0;}
+  .scan-plate.scanning::before{opacity:1;}
+  @keyframes scanline{0%{top:0;opacity:0;}10%{opacity:1;}90%{opacity:1;}100%{top:100%;opacity:0;}}
+
+  .field-label{font-size:11px;text-transform:uppercase;letter-spacing:1.3px;color:var(--text-dim);font-weight:600;margin-bottom:8px;display:block;}
+  .part-input{width:100%;background:var(--bg);border:1.5px solid var(--border-light);border-radius:10px;padding:15px 14px;
+    color:var(--text);font-family:var(--font-mono);font-size:18px;font-weight:600;letter-spacing:1px;text-transform:uppercase;outline:none;}
+  .part-input:focus{border-color:var(--accent);}
+  .part-input::placeholder{color:var(--text-dim);font-weight:500;}
+
+  .gps-chip{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:11.5px;color:var(--text-muted);font-family:var(--font-mono);}
+  .gps-dot{width:6px;height:6px;border-radius:50%;background:var(--text-dim);flex-shrink:0;}
+  .gps-dot.live{background:var(--verified);box-shadow:0 0 0 3px rgba(52,211,153,0.15);}
+
+  .btn{width:100%;padding:15px;border-radius:10px;border:none;font-family:var(--font-display);font-size:17px;font-weight:700;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .btn:active{transform:scale(0.98);}
+  .btn-primary{background:var(--accent);color:#160900;margin-top:14px;}
+  .btn-ghost{background:transparent;border:1.5px solid var(--border-light);color:var(--text);}
+  .btn-verified{background:var(--verified);color:#062017;}
+
+  /* NEW PART style detail */
+  .part-detail{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-top:16px;animation:fadein .3s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  .pd-label{font-size:10.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-dim);font-weight:700;}
+  .pd-partno{font-family:var(--font-mono);font-size:30px;font-weight:700;margin:6px 0 10px;word-break:break-all;}
+  .status-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:5px 11px;
+    border-radius:6px;letter-spacing:0.4px;border:1px solid;}
+  .status-verified{background:var(--verified-dim);color:var(--verified);border-color:rgba(52,211,153,0.35);}
+  .status-new{background:rgba(239,68,68,0.1);color:var(--danger);border-color:rgba(239,68,68,0.35);}
+
+  .codes-box{background:#fff;border-radius:12px;padding:16px;margin-top:16px;text-align:center;}
+  .codes-box canvas, .codes-box svg{max-width:100%;}
+  .codes-box .barcode-label{color:#111;font-family:var(--font-mono);font-size:12px;margin-top:4px;}
+  .qr-wrap{margin-top:14px;display:flex;justify-content:center;}
+  .qr-wrap #qrcanvas{display:inline-block;}
+
+  .confidence-row{margin:18px 0 4px;}
+  .confidence-label{display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:6px;}
+  .confidence-bar-bg{height:6px;border-radius:4px;background:var(--bg);overflow:hidden;}
+  .confidence-bar-fill{height:100%;border-radius:4px;transition:width .5s ease;}
+
+  .badge-row{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0;}
+  .badge{font-size:10.5px;font-weight:700;padding:5px 10px;border-radius:6px;letter-spacing:0.4px;border:1px solid;}
+  .badge-verify{background:var(--conflict-dim);color:var(--conflict);border-color:rgba(251,191,36,.35);}
+  .badge-reject{background:rgba(239,68,68,.1);color:var(--danger);border-color:rgba(239,68,68,.35);}
+  .badge-conflict{background:var(--conflict-dim);color:var(--conflict);border-color:rgba(251,191,36,.35);}
+  .badge-sources{background:var(--verified-dim);color:var(--verified);border-color:rgba(52,211,153,.35);}
+
+  .info-row{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);font-size:14px;}
+  .info-row:last-child{border-bottom:none;}
+  .info-label{color:var(--text-dim);}
+  .info-value{font-weight:600;text-align:right;max-width:62%;}
+
+  .vehicle-list{margin-top:8px;}
+  .vehicle-item{background:var(--surface-2);border-radius:9px;padding:11px 13px;margin-bottom:7px;
+    display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .vehicle-name{font-weight:600;font-size:14px;}
+  .vehicle-meta{font-size:11.5px;color:var(--text-muted);margin-top:2px;}
+  .vehicle-years{font-family:var(--font-mono);font-size:11.5px;color:var(--accent);background:var(--accent-dim);padding:3px 8px;border-radius:5px;flex-shrink:0;}
+
+  .notes-box{background:var(--bg);border-left:3px solid var(--conflict);border-radius:0 8px 8px 0;padding:11px 13px;
+    font-size:12.5px;color:var(--text-muted);line-height:1.55;margin-top:14px;}
+  .notes-box.ok{border-left-color:var(--verified);}
+
+  .sources-list{margin-top:12px;}
+  .sources-list summary{font-size:12px;color:var(--text-dim);cursor:pointer;font-weight:600;letter-spacing:0.3px;}
+  .source-item{font-size:11.5px;color:var(--text-muted);padding:5px 0 5px 9px;border-left:2px solid var(--border-light);margin-top:6px;}
+
+  .action-row{display:flex;gap:10px;margin-top:18px;}
+  .action-row .btn{margin-top:0;}
+  .stub-row{display:flex;gap:10px;margin-top:10px;}
+  .stub-btn{flex:1;padding:13px;border-radius:10px;background:var(--surface-2);border:1px dashed var(--border-light);
+    text-align:center;font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--text-dim);}
+
+  .loading-wrap{display:flex;flex-direction:column;align-items:center;padding:40px 10px;gap:14px;}
+  .spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--border-light);border-top-color:var(--accent);animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-text{font-size:13px;color:var(--text-muted);text-align:center;line-height:1.5;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface-2);
+    border:1px solid var(--verified);color:var(--verified);padding:11px 18px;border-radius:30px;font-size:13px;
+    font-weight:600;white-space:nowrap;z-index:50;box-shadow:0 6px 20px rgba(0,0,0,0.4);
+    animation:toastin .25s ease, toastout .25s ease 2.2s forwards;}
+  @keyframes toastin{from{opacity:0;transform:translate(-50%,10px);}to{opacity:1;transform:translate(-50%,0);}}
+  @keyframes toastout{to{opacity:0;}}
+
+  .footer-note{margin-top:18px;font-size:11px;color:var(--text-dim);text-align:center;line-height:1.6;}
+
+  /* Buy form */
+  .cond-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .cond-chip{padding:9px 14px;border-radius:20px;background:var(--surface-2);border:1px solid var(--border);
+    font-size:12.5px;font-weight:600;color:var(--text-muted);cursor:pointer;}
+  .cond-chip.active{background:var(--accent);color:#160900;border-color:var(--accent);}
+  .form-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .form-input{width:100%;background:var(--bg);border:1.5px solid var(--border-light);border-radius:10px;padding:13px 14px;
+    color:var(--text);font-family:var(--font-body);font-size:14px;outline:none;margin-top:6px;}
+  .form-input:focus{border-color:var(--accent);}
+  .form-group{margin-top:16px;}
+  .stock-badge{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);
+    padding:6px 12px;border-radius:8px;font-size:12.5px;font-family:var(--font-mono);color:var(--text-muted);margin-top:10px;}
+
+  /* Requirement */
+  .prio-grid{display:flex;gap:8px;margin-top:8px;}
+  .prio-chip{flex:1;text-align:center;padding:11px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);
+    font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--text-muted);cursor:pointer;}
+  .prio-chip.active[data-prio="High"]{background:var(--danger);color:#fff;border-color:var(--danger);}
+  .prio-chip.active[data-prio="Medium"]{background:var(--conflict);color:#160900;border-color:var(--conflict);}
+  .prio-chip.active[data-prio="Low"]{background:var(--verified);color:#062017;border-color:var(--verified);}
+  .req-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}
+  .req-item-top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .req-partno{font-family:var(--font-mono);font-weight:700;font-size:16px;}
+  .req-meta{font-size:11.5px;color:var(--text-dim);margin-top:4px;}
+  .prio-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;}
+
+  /* Multiple Buy */
+  .inline-video-wrap{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:3/4;}
+  .inline-video-wrap video{width:100%;height:100%;object-fit:cover;}
+  .inline-scan-frame{position:absolute;left:15%;right:15%;top:30%;bottom:30%;border:2.5px solid var(--accent);
+    border-radius:12px;pointer-events:none;}
+  .inline-scan-frame.flash{border-color:var(--verified);box-shadow:0 0 0 4px rgba(52,211,153,0.3);}
+  .scanned-item{display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);
+    border-radius:9px;padding:10px 13px;margin-bottom:7px;}
+  .scanned-partno{font-family:var(--font-mono);font-weight:700;font-size:14px;}
+  .scanned-qty{font-family:var(--font-mono);font-weight:800;color:var(--accent);background:var(--accent-dim);
+    padding:5px 14px;border-radius:8px;font-size:20px;}
+
+  /* Camera modal */
+  .camera-modal{position:fixed;inset:0;background:#000;z-index:100;display:flex;align-items:center;justify-content:center;}
+  .camera-inner{width:100%;max-width:480px;height:100%;display:flex;flex-direction:column;}
+  .camera-header{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;
+    color:#fff;font-family:var(--font-display);font-weight:700;font-size:17px;background:rgba(0,0,0,.6);z-index:2;}
+  .cam-close{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:16px;cursor:pointer;}
+  .camera-video-wrap{flex:1;position:relative;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;}
+  #scanVideo{width:100%;height:100%;object-fit:cover;}
+  .scan-frame{position:absolute;left:12%;right:12%;top:35%;bottom:35%;border:2.5px solid var(--accent);border-radius:14px;
+    box-shadow:0 0 0 2000px rgba(0,0,0,0.45);pointer-events:none;}
+  .camera-hint{padding:16px;text-align:center;color:#fff;font-size:13px;background:rgba(0,0,0,.6);}
+</style>
+</head>
+<body>
+<div id="root">
+
+  <div class="topbar">
+    <div class="topbar-row" id="topbarHome">
+      <div class="brand-row">
+        <div class="brand-mark">PN</div>
+        <div>
+          <div class="screen-title" style="font-size:19px;">Car Auto Parts Store</div>
+          <div class="screen-sub">Scrap Auto Parts</div>
+        </div>
+      </div>
+      <button class="back-btn" id="openSettings" title="Gemini API Setup">⚙️</button>
+    </div>
+    <div class="topbar-row hidden" id="topbarSearch">
+      <button class="back-btn" id="backFromSearch">‹</button>
+      <div class="title-block">
+        <div class="screen-title">Search</div>
+        <div class="screen-sub" id="searchCompanyLabel">Company: All</div>
+      </div>
+    </div>
+    <div class="topbar-row hidden" id="topbarSettings">
+      <button class="back-btn" id="backFromSettings">‹</button>
+      <div class="title-block">
+        <div class="screen-title">Gemini API Setup</div>
+        <div class="screen-sub">BYO-Key — free tier</div>
+      </div>
+    </div>
+    <div class="topbar-row hidden" id="topbarBuy">
+      <button class="back-btn" id="backFromBuy">‹</button>
+      <div class="title-block">
+        <div class="screen-title">Buy</div>
+        <div class="screen-sub" id="buyPartLabel">Purchase</div>
+      </div>
+    </div>
+    <div class="topbar-row hidden" id="topbarSell">
+      <button class="back-btn" id="backFromSell">‹</button>
+      <div class="title-block">
+        <div class="screen-title">Sell</div>
+        <div class="screen-sub">Sale</div>
+      </div>
+    </div>
+    <div class="topbar-row hidden" id="topbarReq">
+      <button class="back-btn" id="backFromReq">‹</button>
+      <div class="title-block">
+        <div class="screen-title">Requirement</div>
+        <div class="screen-sub">Inquiry / Need</div>
+      </div>
+    </div>
+    <div class="topbar-row hidden" id="topbarInventory">
+      <button class="back-btn" id="backFromInventory">‹</button>
+      <div class="title-block">
+        <div class="screen-title">Inventory</div>
+        <div class="screen-sub">Physical stock units</div>
+      </div>
+    </div>
+    <div class="topbar-row hidden" id="topbarMultiBuy">
+      <button class="back-btn" id="backFromMultiBuy">‹</button>
+      <div class="title-block">
+        <div class="screen-title">Multiple Buy</div>
+        <div class="screen-sub" id="multiBuyTotalLabel">Total: 0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- HOME VIEW -->
+    <div id="view-home">
+      <div class="chip-row" id="companyChips">
+        <div class="chip active" data-company="All">All</div>
+        <div class="chip" data-company="Maruti Suzuki">Maruti Suzuki</div>
+        <div class="chip" data-company="Hyundai">Hyundai</div>
+        <div class="chip" data-company="Tata">Tata</div>
+        <div class="chip" data-company="Mahindra">Mahindra</div>
+        <div class="chip" data-company="Kia">Kia</div>
+        <div class="chip" data-company="Toyota">Toyota</div>
+        <div class="chip" data-company="Honda">Honda</div>
+        <div class="chip" data-company="Nissan">Nissan</div>
+        <div class="chip" data-company="Renault">Renault</div>
+        <div class="chip" data-company="Ford">Ford</div>
+        <div class="chip" data-company="Volkswagen">Volkswagen</div>
+        <div class="chip" data-company="Skoda">Skoda</div>
+        <div class="chip" data-company="MG">MG</div>
+        <div class="chip" data-company="Datsun">Datsun</div>
+        <div class="chip" data-company="Chevrolet">Chevrolet</div>
+      </div>
+
+      <div class="section-label">Modules</div>
+      <div class="module-grid">
+        <div class="module-card" id="openSearch">
+          <div class="module-icon search">🔍</div>
+          <div class="module-name">SEARCH</div>
+          <div class="module-desc">Find part</div>
+        </div>
+        <div class="module-card" id="openBuy">
+          <div class="module-icon buy">⬇️</div>
+          <div class="module-name">BUY</div>
+          <div class="module-desc">Purchase</div>
+        </div>
+        <div class="module-card" id="openSell">
+          <div class="module-icon sell">💰</div>
+          <div class="module-name">SELL</div>
+          <div class="module-desc">Sale</div>
+        </div>
+        <div class="module-card" id="openReq">
+          <div class="module-icon req">➕</div>
+          <div class="module-name">REQUIREMENT</div>
+          <div class="module-desc">Inquiry / Need</div>
+        </div>
+        <div class="module-card wide" id="openInventory">
+          <div class="module-icon multi">📦</div>
+          <div>
+            <div class="module-name">INVENTORY</div>
+            <div class="module-desc">બધા saved parts જુઓ</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-note">
+        અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
+        Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.
+      </div>
+    </div>
+
+    <!-- SEARCH VIEW -->
+    <div id="view-search" class="hidden">
+      <div class="search-hero">
+        <h1>પાર્ટ નંબર નાખો</h1>
+        <p>સ્ક્રેપ પાર્ટ પર છપાયેલો નંબર નાખો — કઈ ગાડી, કયો વેરિયન્ટ, ક્યાં વર્ષોમાં વપરાય છે એ ખબર પડશે.</p>
+      </div>
+
+      <div class="scan-plate" id="scanPlate">
+        <label class="field-label">Part Number</label>
+        <input type="text" class="part-input" id="partInput" placeholder="e.g. 95400-K6610" autocomplete="off" autocapitalize="characters">
+        <button class="btn btn-ghost" id="scanCameraBtn" style="margin-top:10px;">📷 Camera થી Scan કરો (Barcode/QR)</button>
+        <div class="gps-chip">
+          <div class="gps-dot" id="gpsDot"></div>
+          <span id="gpsText">Location capturing...</span>
+        </div>
+        <button class="btn btn-primary" id="searchBtn">🔍 Search Part</button>
+      </div>
+
+      <div id="resultZone"></div>
+    </div>
+
+    <!-- BUY VIEW -->
+    <div id="view-buy" class="hidden">
+      <div class="search-hero">
+        <h1>પાર્ટ ખરીદો (Buy)</h1>
+        <p>Camera ચાલુ રહેશે — દરેક scan = automatic +1. ઘણા parts ભેગા scan કરો, છેલ્લે વિગત ભરીને એકસાથે Confirm કરો.</p>
+      </div>
+
+      <div class="inline-video-wrap" id="buyVideoWrap">
+        <video id="buyScanVideo" autoplay playsinline muted></video>
+        <div class="inline-scan-frame" id="buyScanFrame"></div>
+      </div>
+      <div class="gps-chip" style="margin-top:12px;">
+        <div class="gps-dot" id="buyGpsDot"></div>
+        <span id="buyGpsText">Location capturing...</span>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <input type="text" class="form-input" id="buyManualInput" placeholder="Manual part no. લખો..." style="margin-top:0;">
+        <button class="btn btn-primary" id="buyManualAddBtn" style="width:auto;padding:0 20px;">+</button>
+      </div>
+
+      <div class="section-label">Scanned Items — Total: <span id="buyTotalCount">0</span></div>
+      <div id="buyScannedList"><div class="notes-box">હજુ કંઈ scan નથી થયું — camera ને barcode/QR સામે રાખો, અથવા manually ટાઈપ કરો.</div></div>
+
+      <div class="part-detail" style="margin-top:16px;">
+        <div class="pd-label">બધા scanned parts માટે સામાન્ય વિગત (optional)</div>
+        <div class="form-group" style="margin-top:12px;">
+          <label class="field-label">Category</label>
+          <input type="text" class="form-input" id="buyCategory" placeholder="e.g. Body Control">
+        </div>
+        <div class="form-group">
+          <label class="field-label">Compatible Vehicles</label>
+          <input type="text" class="form-input" id="buyVehicles" placeholder="e.g. Hyundai Creta, Kia Seltos">
+        </div>
+        <div class="form-group">
+          <label class="field-label">Location (Rack → Shelf → Box → Position)</label>
+          <div class="form-row2">
+            <input type="text" class="form-input" id="buyRack" placeholder="Rack e.g. R1">
+            <input type="text" class="form-input" id="buyShelf" placeholder="Shelf e.g. S2">
+          </div>
+          <div class="form-row2" style="margin-top:10px;">
+            <input type="text" class="form-input" id="buyBox" placeholder="Box e.g. B3">
+            <input type="text" class="form-input" id="buyPosition" placeholder="Position e.g. P4">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="field-label">Condition</label>
+          <div class="cond-grid" id="condGrid">
+            <div class="cond-chip active" data-cond="Working">Working</div>
+            <div class="cond-chip" data-cond="Testing">Testing</div>
+            <div class="cond-chip" data-cond="Repairable">Repairable</div>
+            <div class="cond-chip" data-cond="Damaged">Damaged</div>
+            <div class="cond-chip" data-cond="Incomplete">Incomplete</div>
+            <div class="cond-chip" data-cond="Scrap">Scrap</div>
+            <div class="cond-chip" data-cond="Unknown">Unknown</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="field-label">Total Purchase Price (₹) — બધા parts માટે ભેગું</label>
+          <input type="number" class="form-input" id="buyPrice" placeholder="0" inputmode="numeric">
+        </div>
+
+        <button class="btn btn-verified" id="confirmBuyBtn" style="margin-top:20px;">✓ Done — <span id="buyDoneCount">0</span> units Add કરો</button>
+      </div>
+    </div>
+
+    <!-- SELL VIEW -->
+    <div id="view-sell" class="hidden">
+      <div class="search-hero">
+        <h1>પાર્ટ વેચો (Sell)</h1>
+        <p>Scan કરો કે નંબર નાખો — સ્ટોકમાં હોય તો જ વેચી શકાય</p>
+      </div>
+
+      <div class="scan-plate" id="sellScanPlate">
+        <label class="field-label">Part Number</label>
+        <input type="text" class="part-input" id="sellPartInput" placeholder="e.g. 95400-K6610" autocomplete="off" autocapitalize="characters">
+        <button class="btn btn-ghost" id="sellScanCameraBtn" style="margin-top:10px;">📷 Camera થી Scan કરો</button>
+        <div class="gps-chip">
+          <div class="gps-dot" id="sellGpsDot"></div>
+          <span id="sellGpsText">Location capturing...</span>
+        </div>
+        <button class="btn btn-primary" id="sellCheckBtn">🔍 Check Stock</button>
+      </div>
+
+      <div id="sellResultZone"></div>
+    </div>
+
+    <!-- REQUIREMENT VIEW -->
+    <div id="view-req" class="hidden">
+      <div class="search-hero">
+        <h1>Requirement નોંધો</h1>
+        <p>ગ્રાહકને જોઈતો પાર્ટ સ્ટોકમાં ના હોય? અહીં નોંધો — GPS ઓટોમેટિક જોડાશે</p>
+      </div>
+
+      <div class="scan-plate">
+        <label class="field-label">Part Number</label>
+        <input type="text" class="part-input" id="reqPartInput" placeholder="e.g. 95400-K6610" autocomplete="off" autocapitalize="characters">
+        <button class="btn btn-ghost" id="reqScanCameraBtn" style="margin-top:10px;">📷 Camera થી Scan કરો</button>
+        <div class="gps-chip">
+          <div class="gps-dot" id="reqGpsDot"></div>
+          <span id="reqGpsText">Location capturing...</span>
+        </div>
+      </div>
+
+      <div class="part-detail" style="margin-top:16px;">
+        <div class="form-group" style="margin-top:0;">
+          <label class="field-label">Name (optional)</label>
+          <input type="text" class="form-input" id="reqName" placeholder="Part name">
+        </div>
+        <div class="form-group">
+          <label class="field-label">Quantity</label>
+          <input type="number" class="form-input" id="reqQty" placeholder="1" value="1" inputmode="numeric">
+        </div>
+        <div class="form-group">
+          <label class="field-label">Note (optional)</label>
+          <input type="text" class="form-input" id="reqNote" placeholder="Optional">
+        </div>
+        <div class="form-group">
+          <label class="field-label">Priority</label>
+          <div class="prio-grid" id="reqPrioGrid">
+            <div class="prio-chip" data-prio="High">High</div>
+            <div class="prio-chip active" data-prio="Medium">Medium</div>
+            <div class="prio-chip" data-prio="Low">Low</div>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="addReqBtn" style="margin-top:20px;">➕ Add Requirement</button>
+      </div>
+
+      <div class="section-label">Pending Requirements</div>
+      <div id="reqList"></div>
+    </div>
+
+    <!-- INVENTORY VIEW -->
+    <div id="view-inventory" class="hidden">
+      <div class="search-hero">
+        <h1>Inventory</h1>
+        <p>તમારા ફોનમાં સેવ થયેલા બધા parts — Buy કરેલા, હાલનો stock</p>
+      </div>
+
+      <div class="scan-plate" style="padding:12px 16px;">
+        <input type="text" class="form-input" id="invFilterInput" placeholder="🔍 Part number, category, vehicle થી filter કરો..." style="margin-top:0;">
+      </div>
+
+      <div class="section-label" id="invCount">0 items</div>
+      <div id="invList"></div>
+    </div>
+
+    <!-- MULTIPLE BUY VIEW -->
+    <div id="view-multibuy" class="hidden">
+      <div class="search-hero">
+        <h1>Multiple Buy</h1>
+        <p>Camera ચાલુ રહેશે — દરેક barcode/QR scan = automatic +1. છેલ્લે "Done" દબાવીને બધું એકસાથે save કરો.</p>
+      </div>
+
+      <div class="inline-video-wrap" id="multiVideoWrap">
+        <video id="multiScanVideo" autoplay playsinline muted></video>
+        <div class="inline-scan-frame" id="multiScanFrame"></div>
+      </div>
+      <div class="gps-chip" style="margin-top:12px;">
+        <div class="gps-dot" id="multiGpsDot"></div>
+        <span id="multiGpsText">Location capturing...</span>
+      </div>
+
+      <div class="section-label">Scanned Items — Total: <span id="multiTotalCount">0</span></div>
+      <div id="multiScannedList"><div class="notes-box">હજુ કંઈ scan નથી થયું — camera ને barcode/QR સામે રાખો.</div></div>
+
+      <button class="btn btn-verified" id="multiDoneBtn" style="margin-top:18px;">✓ Done — <span id="multiDoneCount">0</span> units add કરો</button>
+    </div>
+
+    <!-- SETTINGS VIEW -->
+    <div id="view-settings" class="hidden">
+      <div class="search-hero">
+        <h1>Gemini API Key</h1>
+        <p>તમારી પોતાની ફ્રી Google Gemini key વાપરો — AI ને real internet search કરવા માટે જરૂરી. Card નથી જોઈતું, ફ્રી tier પુષ્કળ છે.</p>
+      </div>
+
+      <div class="scan-plate">
+        <label class="field-label">Gemini API Key (AIza...)</label>
+        <input type="text" class="part-input" id="geminiKeyInput" placeholder="AIzaSy..." style="text-transform:none;font-size:14px;" autocomplete="off">
+        <button class="btn btn-primary" id="saveKeyBtn">💾 Save Key</button>
+      </div>
+
+      <div class="part-detail" style="margin-top:16px;">
+        <div class="pd-label">Key કેવી રીતે મેળવવી (ફ્રી, 5 મિનિટ)</div>
+        <div class="notes-box ok" style="margin-top:12px;">
+          1️⃣ aistudio.google.com/app/apikey ખોલો<br>
+          2️⃣ Google (Gmail) થી sign in કરો<br>
+          3️⃣ "Create API key" દબાવો<br>
+          4️⃣ Key copy કરો (AIza... થી શરૂ થાય)<br>
+          5️⃣ ઉપર paste કરીને Save કરો
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- CAMERA SCAN MODAL -->
+<div id="cameraModal" class="camera-modal hidden">
+  <div class="camera-inner">
+    <div class="camera-header">
+      <span>Barcode / QR Scan કરો</span>
+      <button id="closeCameraBtn" class="cam-close">✕</button>
+    </div>
+    <div class="camera-video-wrap">
+      <video id="scanVideo" autoplay playsinline muted></video>
+      <div class="scan-frame"></div>
+    </div>
+    <div class="camera-hint" id="cameraHint">Barcode અથવા QR ને frame ની અંદર રાખો</div>
+  </div>
+</div>
+
+<script>
+/* ============ STATE ============ */
+let currentGPS = null;
+let currentPart = null;
+let selectedCompany = 'All';
+
+/* ============ NAV ============ */
+document.getElementById('openSearch').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-search').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarSearch').classList.remove('hidden');
+  document.getElementById('searchCompanyLabel').textContent = 'Company: ' + selectedCompany;
+  document.getElementById('partInput').focus();
+});
+document.getElementById('backFromSearch').addEventListener('click', ()=>{
+  document.getElementById('view-search').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarSearch').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+document.getElementById('openSettings').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-settings').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarSettings').classList.remove('hidden');
+  document.getElementById('geminiKeyInput').value = localStorage.getItem('gemini_api_key') || '';
+});
+document.getElementById('backFromSettings').addEventListener('click', ()=>{
+  document.getElementById('view-settings').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarSettings').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+document.getElementById('saveKeyBtn').addEventListener('click', ()=>{
+  const key = document.getElementById('geminiKeyInput').value.trim();
+  if(!key){ showToast('⚠️ Key નાખો'); return; }
+  localStorage.setItem('gemini_api_key', key);
+  showToast('✓ Key saved');
+});
+
+document.querySelectorAll('.module-card:not(#openSearch):not(#openBuy):not(#openSell):not(#openReq):not(#openInventory):not(#openMultiBuy)').forEach(c=>{
+  c.addEventListener('click', ()=> showToast('આ મોડ્યુલ પછીથી બનાવીશું'));
+});
+
+document.querySelectorAll('#companyChips .chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#companyChips .chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    selectedCompany = chip.dataset.company;
+  });
+});
+
+/* ============ GPS ============ */
+function captureGPS(){
+  const dot = document.getElementById('gpsDot');
+  const txt = document.getElementById('gpsText');
+  if(!navigator.geolocation){ txt.textContent = 'GPS not supported'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      currentGPS = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      dot.classList.add('live');
+      txt.textContent = `GPS: ${currentGPS.lat.toFixed(6)}, ${currentGPS.lng.toFixed(6)}`;
+    },
+    ()=>{ txt.textContent = 'Location permission needed'; },
+    {enableHighAccuracy:true, timeout:8000}
+  );
+}
+captureGPS();
+
+/* ============ STORAGE (localStorage — this device only) ============ */
+async function getPart(partNo){
+  try{
+    const raw = localStorage.getItem('part:'+partNo);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+async function savePart(data){
+  try{ localStorage.setItem('part:'+data.partNumber, JSON.stringify(data)); return true; }
+  catch(e){ return false; }
+}
+
+/* ============ AI LOOKUP (Google Gemini, free tier, BYO key) ============ */
+async function aiLookupPart(partNo, company){
+  const apiKey = localStorage.getItem('gemini_api_key');
+  if(!apiKey){
+    const err = new Error('પહેલા ⚙️ Settings માં જઈ Gemini API key નાખો અને Save કરો');
+    err.needsKey = true;
+    throw err;
+  }
+
+  const companyHint = company && company!=='All' ? ` The user indicates it may be a ${company} vehicle, but verify independently rather than assuming this is correct.` : '';
+  const systemPrompt = `You are an automotive spare-parts identification research assistant specializing in Indian-market vehicles (Maruti Suzuki, Hyundai, Tata, Kia, Mahindra, Honda, Toyota, etc). Given an OEM part number, use web search to determine which vehicle make(s), model(s), variant(s), and model years use this exact part number.${companyHint}
+
+Be strict about exact-match vs similar-but-different part numbers (a number differing by even one character is usually a DIFFERENT part for a different vehicle platform — do not conflate them).
+
+Respond with ONLY a raw JSON object, no markdown fences, no preamble, in exactly this structure:
+{
+  "category": "short category e.g. Electrical / Body Control / Engine / Suspension / Brakes / Interior / Lighting",
+  "name": "short descriptive part name",
+  "vehicles": [{"make":"", "model":"", "variant":"", "years":""}],
+  "confidence": 0,
+  "status": "high_confidence" | "conflict" | "not_found",
+  "notes": "1-3 sentence honest explanation of what you found and any uncertainty or conflicts. If unable to find a confident exact match, say so plainly, set status accordingly, and keep confidence below 50 — never report high confidence for an uncertain result.",
+  "sources": ["source name or domain 1", "source name or domain 2"]
+}`;
+
+  const modelsToTry = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
+  let lastError = null;
+  for(const model of modelsToTry){
+    try{
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          systemInstruction: {parts:[{text: systemPrompt}]},
+          contents: [{role:"user", parts:[{text:`Part number: ${partNo}`}]}],
+          tools: [{google_search: {}}]
+        })
+      });
+      const data = await response.json();
+      if(data.error){
+        lastError = new Error(data.error.message || 'Gemini API error');
+        continue; // try next model
+      }
+      const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+      const fullText = parts.map(p=>p.text||'').join('\n').trim();
+      const cleaned = fullText.replace(/```json|```/g,'').trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if(!jsonMatch){ lastError = new Error('AI એ સમજી શકાય એવો જવાબ ના આપ્યો'); continue; }
+      return JSON.parse(jsonMatch[0]);
+    }catch(e){ lastError = e; continue; }
+  }
+  throw lastError || new Error('બધા models નિષ્ફળ ગયા');
+}
+
+/* ============ GLOBAL CAMERA SAFETY ============ */
+function stopAllCameraStreams(){
+  if(typeof scanStream !== 'undefined' && scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; }
+  if(typeof scanInterval !== 'undefined' && scanInterval){ clearInterval(scanInterval); scanInterval=null; }
+  if(typeof multiStream !== 'undefined' && multiStream){ multiStream.getTracks().forEach(t=>t.stop()); multiStream=null; }
+  if(typeof multiScanInterval !== 'undefined' && multiScanInterval){ clearInterval(multiScanInterval); multiScanInterval=null; }
+  const modal = document.getElementById('cameraModal');
+  if(modal) modal.classList.add('hidden');
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) stopAllCameraStreams(); });
+window.addEventListener('pagehide', stopAllCameraStreams);
+
+/* ============ CAMERA SCAN (Barcode/QR) ============ */
+let scanStream = null;
+let scanInterval = null;
+
+let scanTargetInputId = 'partInput';
+
+async function openCameraScan(targetInputId){
+  scanTargetInputId = targetInputId || 'partInput';
+  const modal = document.getElementById('cameraModal');
+  const video = document.getElementById('scanVideo');
+  const hint = document.getElementById('cameraHint');
+  modal.classList.remove('hidden');
+
+  if(!('BarcodeDetector' in window)){
+    hint.textContent = '⚠️ આ બ્રાઉઝર camera-scan સપોર્ટ નથી કરતું. Chrome (Android) વાપરો, અથવા manual નંબર નાખો.';
+    return;
+  }
+
+  try{
+    scanStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject = scanStream;
+    await video.play();
+  }catch(e){
+    hint.textContent = '⚠️ Camera access ના મળી. Permission આપો અથવા manual નંબર નાખો.';
+    return;
+  }
+
+  const detector = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','code_93','codabar','data_matrix','upc_a','upc_e','itf']});
+
+  scanInterval = setInterval(async ()=>{
+    try{
+      const codes = await detector.detect(video);
+      if(codes && codes.length){
+        const value = (codes[0].rawValue || '').trim();
+        if(value){
+          closeCameraScan();
+          const input = document.getElementById(scanTargetInputId);
+          const extracted = extractPartNumber(value);
+          input.value = extracted.toUpperCase();
+          input.focus();
+          input.select();
+          if(extracted !== value){
+            if(scanTargetInputId === 'partInput') showRawScanNote(value);
+            showToast('✓ Part number ઓટોમેટિક કાઢ્યો — ચેક કરી લો');
+          } else {
+            showToast('✓ Scan થયું — જરૂર મુજબ edit કરીને Search દબાવો');
+          }
+        }
+      }
+    }catch(e){ /* detection frame skip, ignore */ }
+  }, 350);
+}
+
+function closeCameraScan(){
+  document.getElementById('cameraModal').classList.add('hidden');
+  if(scanInterval){ clearInterval(scanInterval); scanInterval=null; }
+  if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; }
+}
+
+document.getElementById('scanCameraBtn').addEventListener('click', openCameraScan);
+document.getElementById('closeCameraBtn').addEventListener('click', closeCameraScan);
+
+/* ============ PART NUMBER EXTRACTION from raw scan ============ */
+function extractPartNumber(raw){
+  const clean = raw.replace(/[\x00-\x1F]/g, ''); // strip control chars (GS separators etc)
+  // Hyundai/Kia style: 5 digits + optional dash + 1 letter + 4 digits  e.g. 95400K6610
+  let m = clean.match(/\d{5}-?[A-Z]\d{4}/);
+  if(m) return m[0].replace('-','');
+  // Toyota/Maruti style: 5 digits + optional dash + 5 alphanumeric e.g. 90915YZZD4
+  m = clean.match(/\d{5}-?[A-Z0-9]{5}\b/);
+  if(m) return m[0].replace('-','');
+  // Generic: digits-letters block of 8-12 chars after a single-letter DI marker like P or 1P
+  m = clean.match(/(?:^|[^0-9A-Z])(\d{4,6}[A-Z0-9]{3,7})(?=[A-Z][A-Z0-9]{0,3}\d|$)/);
+  if(m) return m[1];
+  return raw; // fallback: no confident extraction, keep raw for manual edit
+}
+
+function showRawScanNote(raw){
+  let note = document.getElementById('rawScanNote');
+  if(!note){
+    note = document.createElement('div');
+    note.id = 'rawScanNote';
+    note.style.cssText = 'margin-top:10px;font-size:11px;color:var(--text-dim);line-height:1.5;word-break:break-all;background:var(--surface-2);padding:8px 10px;border-radius:8px;';
+    document.getElementById('scanPlate').appendChild(note);
+  }
+  note.innerHTML = `<b style="color:var(--text-muted);">Full scanned data:</b><br>${raw}<br><span style="color:var(--accent);">ઉપર auto-detected નંબર ખોટો લાગે તો અહીંથી copy કરી manually edit કરો.</span>`;
+}
+
+/* ============ MULTIPLE BUY MODULE (legacy, no longer linked from home — merged into Buy) ============ */
+let multiStream = null;
+let multiScanInterval = null;
+let multiGPS = null;
+let multiSession = {}; // partNumber -> count
+let lastMultiScanValue = '';
+let lastMultiScanTime = 0;
+
+document.getElementById('backFromMultiBuy').addEventListener('click', ()=>{
+  stopMultiScanCamera();
+  document.getElementById('view-multibuy').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarMultiBuy').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+function captureMultiGPS(){
+  const dot = document.getElementById('multiGpsDot');
+  const txt = document.getElementById('multiGpsText');
+  if(!navigator.geolocation){ txt.textContent='GPS not supported'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      multiGPS = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      dot.classList.add('live');
+      txt.textContent = `Live GPS: ${multiGPS.lat.toFixed(6)}, ${multiGPS.lng.toFixed(6)}`;
+    },
+    ()=>{ txt.textContent='Location permission needed'; },
+    {enableHighAccuracy:true, timeout:8000}
+  );
+}
+
+async function startMultiScanCamera(){
+  const video = document.getElementById('multiScanVideo');
+  if(!('BarcodeDetector' in window)){
+    showToast('⚠️ Camera scan સપોર્ટ નથી — manual નંબર વાપરો');
+    return;
+  }
+  try{
+    multiStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject = multiStream;
+    await video.play();
+  }catch(e){
+    showToast('⚠️ Camera access ના મળી — manual નંબર વાપરો');
+    return;
+  }
+
+  const detector = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','code_93','codabar','data_matrix','upc_a','upc_e','itf']});
+  multiScanInterval = setInterval(async ()=>{
+    try{
+      const codes = await detector.detect(video);
+      if(codes && codes.length){
+        const raw = (codes[0].rawValue||'').trim();
+        if(!raw) return;
+        const now = Date.now();
+        const codeChanged = raw !== lastMultiScanValue;
+        const cooldownPassed = (now - lastMultiScanTime) > 700; // guards against motion-blur double-fire
+        if(codeChanged && cooldownPassed){
+          lastMultiScanValue = raw;
+          lastMultiScanTime = now;
+          const pn = extractPartNumber(raw).toUpperCase();
+          addMultiScan(pn);
+          flashMultiFrame();
+        } else if(codeChanged && !cooldownPassed){
+          // code changed too fast after last count — likely blur artifact, don't count but do update tracking so a genuine new code isn't stuck
+          lastMultiScanValue = raw;
+        }
+      } else {
+        lastMultiScanValue = ''; // code left the frame — next appearance (even same value) will count as new
+      }
+    }catch(e){}
+  }, 350);
+}
+
+function stopMultiScanCamera(){
+  if(multiScanInterval){ clearInterval(multiScanInterval); multiScanInterval=null; }
+  if(multiStream){ multiStream.getTracks().forEach(t=>t.stop()); multiStream=null; }
+}
+
+function flashMultiFrame(){
+  const frame = document.getElementById('multiScanFrame');
+  frame.classList.add('flash');
+  setTimeout(()=>frame.classList.remove('flash'), 400);
+}
+
+function addMultiScan(pn){
+  if(!pn) return;
+  multiSession[pn] = (multiSession[pn]||0) + 1;
+  renderMultiList();
+}
+
+function renderMultiList(){
+  const wrap = document.getElementById('multiScannedList');
+  const keys = Object.keys(multiSession);
+  let total = 0;
+  keys.forEach(k=> total += multiSession[k]);
+
+  document.getElementById('multiTotalCount').textContent = total;
+  document.getElementById('multiDoneCount').textContent = total;
+  document.getElementById('multiBuyTotalLabel').textContent = 'Total: ' + total;
+
+  if(keys.length===0){
+    wrap.innerHTML = `<div class="notes-box">હજુ કંઈ scan નથી થયું — camera ને barcode/QR સામે રાખો.</div>`;
+    return;
+  }
+  wrap.innerHTML = keys.map(pn=>`
+    <div class="scanned-item">
+      <span class="scanned-partno">${pn}</span>
+      <span class="scanned-qty">×${multiSession[pn]}</span>
+    </div>`).join('');
+}
+
+document.getElementById('multiDoneBtn').addEventListener('click', ()=>{
+  const keys = Object.keys(multiSession);
+  if(keys.length===0){ showToast('⚠️ કંઈ scan નથી થયું'); return; }
+
+  keys.forEach(pn=>{
+    const existing = getInventory(pn) || {qty:0, purchases:[]};
+    existing.qty += multiSession[pn];
+    existing.purchases.push({
+      qty: multiSession[pn], gps: multiGPS, date: new Date().toISOString(), via: 'Multiple Buy'
+    });
+    localStorage.setItem('inv:'+pn, JSON.stringify(existing));
+  });
+
+  const total = keys.reduce((s,k)=>s+multiSession[k],0);
+  showToast(`✓ ${total} units, ${keys.length} parts માટે add થયું`);
+  multiSession = {};
+  renderMultiList();
+});
+
+/* ============ INVENTORY MODULE ============ */
+document.getElementById('openInventory').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-inventory').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarInventory').classList.remove('hidden');
+  document.getElementById('invFilterInput').value = '';
+  renderInventoryList();
+});
+document.getElementById('backFromInventory').addEventListener('click', ()=>{
+  document.getElementById('view-inventory').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarInventory').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+function getAllInventory(){
+  const list = [];
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('inv:')){
+      try{
+        const data = JSON.parse(localStorage.getItem(k));
+        data.partNumber = k.slice(4);
+        list.push(data);
+      }catch(e){}
+    }
+  }
+  return list.sort((a,b)=> a.partNumber.localeCompare(b.partNumber));
+}
+
+function renderInventoryList(filterText){
+  const wrap = document.getElementById('invList');
+  const countEl = document.getElementById('invCount');
+  let items = getAllInventory();
+
+  if(filterText){
+    const f = filterText.toLowerCase();
+    items = items.filter(it =>
+      it.partNumber.toLowerCase().includes(f) ||
+      (it.category||'').toLowerCase().includes(f) ||
+      (it.vehicles||'').toLowerCase().includes(f)
+    );
+  }
+
+  countEl.textContent = `${items.length} items`;
+
+  if(items.length===0){
+    wrap.innerHTML = `<div class="notes-box">હજુ કોઈ part inventory માં નથી. Buy module થી ઉમેરો.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = items.map(it=>{
+    const loc = [it.location?.rack, it.location?.shelf, it.location?.box, it.location?.position].filter(Boolean).join(' → ');
+    const stockColor = it.qty > 0 ? 'var(--verified)' : 'var(--text-dim)';
+    return `
+    <div class="req-item">
+      <div class="req-item-top">
+        <div>
+          <div class="req-partno">${it.partNumber}</div>
+          <div class="req-meta">${it.category ? it.category+' • ' : ''}${it.vehicles || 'Vehicle unknown'}</div>
+          ${loc ? `<div class="req-meta">📍 ${loc}</div>` : ''}
+          ${it.condition ? `<div class="req-meta">Condition: ${it.condition}</div>` : ''}
+        </div>
+        <span class="status-pill" style="color:${stockColor};border-color:${stockColor};background:transparent;">${it.qty} in stock</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('invFilterInput').addEventListener('input', e=>{
+  renderInventoryList(e.target.value.trim());
+});
+
+/* ============ REQUIREMENT MODULE ============ */
+let reqGPS = null;
+let selectedPrio = 'Medium';
+
+document.getElementById('openReq').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-req').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarReq').classList.remove('hidden');
+  document.getElementById('reqPartInput').focus();
+  captureReqGPS();
+  renderReqList();
+});
+document.getElementById('backFromReq').addEventListener('click', ()=>{
+  document.getElementById('view-req').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarReq').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+function captureReqGPS(){
+  const dot = document.getElementById('reqGpsDot');
+  const txt = document.getElementById('reqGpsText');
+  if(!navigator.geolocation){ txt.textContent='GPS not supported'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      reqGPS = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      dot.classList.add('live');
+      txt.textContent = `GPS: ${reqGPS.lat.toFixed(6)}, ${reqGPS.lng.toFixed(6)}`;
+    },
+    ()=>{ txt.textContent='Location permission needed'; },
+    {enableHighAccuracy:true, timeout:8000}
+  );
+}
+
+document.getElementById('reqScanCameraBtn').addEventListener('click', ()=>{
+  openCameraScan('reqPartInput');
+});
+
+document.querySelectorAll('#reqPrioGrid .prio-chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#reqPrioGrid .prio-chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    selectedPrio = chip.dataset.prio;
+  });
+});
+
+function getAllRequirements(){
+  const list = [];
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('req:')){
+      try{ list.push(JSON.parse(localStorage.getItem(k))); }catch(e){}
+    }
+  }
+  return list.sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+document.getElementById('addReqBtn').addEventListener('click', ()=>{
+  const pn = document.getElementById('reqPartInput').value.trim().toUpperCase();
+  if(!pn){ showToast('⚠️ પાર્ટ નંબર નાખો'); document.getElementById('reqPartInput').focus(); return; }
+
+  const id = 'req:' + pn + ':' + Date.now();
+  const reqData = {
+    id, partNumber: pn,
+    name: document.getElementById('reqName').value.trim(),
+    qty: document.getElementById('reqQty').value || 1,
+    note: document.getElementById('reqNote').value.trim(),
+    priority: selectedPrio,
+    status: 'Pending',
+    gps: reqGPS,
+    createdAt: new Date().toISOString()
+  };
+  localStorage.setItem(id, JSON.stringify(reqData));
+  showToast(`✓ ${pn} Requirement ઉમેરાયો`);
+
+  document.getElementById('reqPartInput').value='';
+  document.getElementById('reqName').value='';
+  document.getElementById('reqNote').value='';
+  document.getElementById('reqQty').value='1';
+  document.getElementById('reqPartInput').focus();
+  renderReqList();
+});
+
+function prioColor(p){ return p==='High' ? 'var(--danger)' : p==='Low' ? 'var(--verified)' : 'var(--conflict)'; }
+
+function renderReqList(){
+  const wrap = document.getElementById('reqList');
+  const items = getAllRequirements().filter(r=>r.status==='Pending');
+  if(items.length===0){
+    wrap.innerHTML = `<div class="notes-box">હજુ કોઈ requirement નોંધાયો નથી.</div>`;
+    return;
+  }
+  wrap.innerHTML = items.map(r=>`
+    <div class="req-item">
+      <div class="req-item-top">
+        <div>
+          <div class="req-partno">${r.partNumber}</div>
+          <div class="req-meta">${r.name ? r.name+' • ' : ''}Qty: ${r.qty}${r.note ? ' • '+r.note : ''}</div>
+          <div class="req-meta"><span class="prio-dot" style="background:${prioColor(r.priority)};"></span>${r.priority} priority</div>
+        </div>
+        <button class="btn btn-verified" style="width:auto;padding:8px 14px;font-size:12px;" onclick="markReqDone('${r.id}')">✓ Done</button>
+      </div>
+    </div>`).join('');
+}
+
+function markReqDone(id){
+  try{
+    const r = JSON.parse(localStorage.getItem(id));
+    r.status = 'Completed';
+    localStorage.setItem(id, JSON.stringify(r));
+    showToast('✓ Requirement પૂરો થયો');
+    renderReqList();
+  }catch(e){}
+}
+
+/* ============ SELL MODULE ============ */
+let sellGPS = null;
+
+document.getElementById('openSell').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-sell').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarSell').classList.remove('hidden');
+  document.getElementById('sellPartInput').focus();
+  captureSellGPS();
+});
+document.getElementById('backFromSell').addEventListener('click', ()=>{
+  document.getElementById('view-sell').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarSell').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+function captureSellGPS(){
+  const dot = document.getElementById('sellGpsDot');
+  const txt = document.getElementById('sellGpsText');
+  if(!navigator.geolocation){ txt.textContent='GPS not supported'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      sellGPS = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      dot.classList.add('live');
+      txt.textContent = `GPS: ${sellGPS.lat.toFixed(6)}, ${sellGPS.lng.toFixed(6)}`;
+    },
+    ()=>{ txt.textContent='Location permission needed'; },
+    {enableHighAccuracy:true, timeout:8000}
+  );
+}
+
+document.getElementById('sellScanCameraBtn').addEventListener('click', ()=>{
+  openCameraScan('sellPartInput');
+});
+document.getElementById('sellPartInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkSellStock(); });
+document.getElementById('sellCheckBtn').addEventListener('click', checkSellStock);
+
+function checkSellStock(){
+  const pn = document.getElementById('sellPartInput').value.trim().toUpperCase();
+  const zone = document.getElementById('sellResultZone');
+  if(!pn){ document.getElementById('sellPartInput').focus(); return; }
+
+  const inv = getInventory(pn);
+  const qty = inv ? inv.qty : 0;
+
+  if(qty <= 0){
+    zone.innerHTML = `
+      <div class="part-detail">
+        <div class="pd-partno">${pn}</div>
+        <div class="status-pill status-new">✕ NO STOCK</div>
+        <div class="notes-box" style="margin-top:14px;">This part number is not in stock — cannot sell.</div>
+      </div>`;
+    return;
+  }
+
+  zone.innerHTML = `
+    <div class="part-detail">
+      <div class="pd-partno">${pn}</div>
+      <div class="status-pill status-verified">✓ IN STOCK</div>
+      <div class="stock-badge" style="margin-top:12px;">📦 Available: ${qty} units</div>
+
+      <div class="info-row" style="margin-top:14px;"><span class="info-label">Category</span><span class="info-value">${inv.category||'—'}</span></div>
+      <div class="info-row"><span class="info-label">Vehicles</span><span class="info-value">${inv.vehicles||'—'}</span></div>
+      <div class="info-row"><span class="info-label">Location</span><span class="info-value">${[inv.location?.rack,inv.location?.shelf,inv.location?.box,inv.location?.position].filter(Boolean).join(' → ')||'—'}</span></div>
+
+      <div class="form-group">
+        <label class="field-label">Sale Price (₹)</label>
+        <input type="number" class="form-input" id="sellPrice" placeholder="0" inputmode="numeric">
+      </div>
+
+      <button class="btn btn-primary" id="confirmSellBtn" style="margin-top:18px;">💰 Confirm Sell (Stock -1)</button>
+    </div>`;
+
+  document.getElementById('confirmSellBtn').addEventListener('click', ()=>{
+    const inv2 = getInventory(pn);
+    if(!inv2 || inv2.qty <= 0){ showToast('⚠️ Stock ખતમ થઈ ગયો'); checkSellStock(); return; }
+    inv2.qty -= 1;
+    const salePrice = document.getElementById('sellPrice').value || 0;
+    inv2.sales = inv2.sales || [];
+    inv2.sales.push({price: salePrice, gps: sellGPS, date: new Date().toISOString()});
+    localStorage.setItem('inv:'+pn, JSON.stringify(inv2));
+    showToast(`✓ ${pn} વેચાયો — ₹${salePrice} (બાકી stock: ${inv2.qty})`);
+    document.getElementById('sellPartInput').value = '';
+    zone.innerHTML = '';
+    document.getElementById('sellPartInput').focus();
+  });
+}
+
+/* ============ BUY MODULE (continuous batch scan) ============ */
+let buyGPS = null;
+let selectedCondition = 'Working';
+let buyStream = null;
+let buyScanInterval = null;
+let buySession = {};
+let lastBuyScanValue = '';
+let lastBuyScanTime = 0;
+
+document.getElementById('openBuy').addEventListener('click', async ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-buy').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarBuy').classList.remove('hidden');
+  buySession = {};
+  renderBuyList();
+  captureBuyGPS();
+  await startBuyScanCamera();
+});
+document.getElementById('backFromBuy').addEventListener('click', ()=>{
+  stopBuyScanCamera();
+  document.getElementById('view-buy').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarBuy').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+function captureBuyGPS(){
+  const dot = document.getElementById('buyGpsDot');
+  const txt = document.getElementById('buyGpsText');
+  if(!navigator.geolocation){ txt.textContent='GPS not supported'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      buyGPS = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      dot.classList.add('live');
+      txt.textContent = `GPS: ${buyGPS.lat.toFixed(6)}, ${buyGPS.lng.toFixed(6)}`;
+    },
+    ()=>{ txt.textContent='Location permission needed'; },
+    {enableHighAccuracy:true, timeout:8000}
+  );
+}
+
+async function startBuyScanCamera(){
+  const video = document.getElementById('buyScanVideo');
+  if(!('BarcodeDetector' in window)){
+    showToast('⚠️ Camera scan સપોર્ટ નથી — manual નંબર વાપરો');
+    return;
+  }
+  try{
+    buyStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject = buyStream;
+    await video.play();
+  }catch(e){
+    showToast('⚠️ Camera access ના મળી — manual નંબર વાપરો');
+    return;
+  }
+  const detector = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','code_93','codabar','data_matrix','upc_a','upc_e','itf']});
+  buyScanInterval = setInterval(async ()=>{
+    try{
+      const codes = await detector.detect(video);
+      if(codes && codes.length){
+        const raw = (codes[0].rawValue||'').trim();
+        if(!raw) return;
+        const now = Date.now();
+        const codeChanged = raw !== lastBuyScanValue;
+        const cooldownPassed = (now - lastBuyScanTime) > 700;
+        if(codeChanged && cooldownPassed){
+          lastBuyScanValue = raw; lastBuyScanTime = now;
+          const pn = extractPartNumber(raw).toUpperCase();
+          addBuyScan(pn);
+          flashBuyFrame();
+        } else if(codeChanged && !cooldownPassed){
+          lastBuyScanValue = raw;
+        }
+      } else {
+        lastBuyScanValue = '';
+      }
+    }catch(e){}
+  }, 350);
+}
+
+function stopBuyScanCamera(){
+  if(buyScanInterval){ clearInterval(buyScanInterval); buyScanInterval=null; }
+  if(buyStream){ buyStream.getTracks().forEach(t=>t.stop()); buyStream=null; }
+}
+
+function flashBuyFrame(){
+  const frame = document.getElementById('buyScanFrame');
+  if(!frame) return;
+  frame.classList.add('flash');
+  setTimeout(()=>frame.classList.remove('flash'), 400);
+}
+
+function addBuyScan(pn){
+  if(!pn) return;
+  buySession[pn] = (buySession[pn]||0) + 1;
+  renderBuyList();
+}
+
+function renderBuyList(){
+  const wrap = document.getElementById('buyScannedList');
+  const keys = Object.keys(buySession);
+  let total = 0;
+  keys.forEach(k=> total += buySession[k]);
+  document.getElementById('buyTotalCount').textContent = total;
+  document.getElementById('buyDoneCount').textContent = total;
+
+  if(keys.length===0){
+    wrap.innerHTML = `<div class="notes-box">હજુ કંઈ scan નથી થયું — camera ને barcode/QR સામે રાખો, અથવા manually ટાઈપ કરો.</div>`;
+    return;
+  }
+  wrap.innerHTML = keys.map(pn=>`
+    <div class="scanned-item">
+      <span class="scanned-partno">${pn}</span>
+      <span class="scanned-qty">×${buySession[pn]}</span>
+    </div>`).join('');
+}
+
+document.getElementById('buyManualAddBtn').addEventListener('click', ()=>{
+  const input = document.getElementById('buyManualInput');
+  const pn = input.value.trim().toUpperCase();
+  if(!pn){ input.focus(); return; }
+  addBuyScan(pn);
+  input.value=''; input.focus();
+});
+document.getElementById('buyManualInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter') document.getElementById('buyManualAddBtn').click();
+});
+
+document.querySelectorAll('#condGrid .cond-chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#condGrid .cond-chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    selectedCondition = chip.dataset.cond;
+  });
+});
+
+function getInventory(pn){
+  try{
+    const raw = localStorage.getItem('inv:'+pn);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+document.getElementById('confirmBuyBtn').addEventListener('click', ()=>{
+  const keys = Object.keys(buySession);
+  if(keys.length===0){ showToast('⚠️ કંઈ scan/add નથી થયું'); return; }
+
+  const category = document.getElementById('buyCategory').value.trim();
+  const vehicles = document.getElementById('buyVehicles').value.trim();
+  const location = {
+    rack: document.getElementById('buyRack').value.trim(),
+    shelf: document.getElementById('buyShelf').value.trim(),
+    box: document.getElementById('buyBox').value.trim(),
+    position: document.getElementById('buyPosition').value.trim()
+  };
+  const totalPrice = document.getElementById('buyPrice').value || 0;
+
+  keys.forEach(pn=>{
+    const existing = getInventory(pn) || {qty:0, purchases:[]};
+    existing.qty += buySession[pn];
+    if(category) existing.category = category;
+    if(vehicles) existing.vehicles = vehicles;
+    if(location.rack || location.shelf || location.box || location.position) existing.location = location;
+    existing.condition = selectedCondition;
+    existing.purchases.push({
+      qty: buySession[pn], price: totalPrice, condition: selectedCondition, gps: buyGPS, date: new Date().toISOString()
+    });
+    localStorage.setItem('inv:'+pn, JSON.stringify(existing));
+  });
+
+  const total = keys.reduce((s,k)=>s+buySession[k],0);
+  showToast(`✓ ${total} units, ${keys.length} parts — Inventory માં ઉમેરાયું`);
+  buySession = {};
+  renderBuyList();
+  document.getElementById('buyPrice').value='';
+});
+
+/* ============ SEARCH FLOW ============ */
+document.getElementById('searchBtn').addEventListener('click', doSearch);
+document.getElementById('partInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
+
+async function doSearch(){
+  const input = document.getElementById('partInput');
+  const partNo = input.value.trim().toUpperCase();
+  if(!partNo){ input.focus(); return; }
+
+  const zone = document.getElementById('resultZone');
+  const plate = document.getElementById('scanPlate');
+  plate.classList.add('scanning');
+  zone.innerHTML = `<div class="loading-wrap"><div class="spinner"></div><div class="loading-text">ડેટાબેઝ ચેક કરું છું...</div></div>`;
+
+  const existing = await getPart(partNo);
+  if(existing){
+    plate.classList.remove('scanning');
+    renderResult(existing, true);
+    return;
+  }
+
+  zone.innerHTML = `<div class="loading-wrap"><div class="spinner"></div><div class="loading-text" id="loadingStageTxt">🔎 ડેટાબેઝમાં નથી — વેબ પર શોધવાનું શરૂ કરું છું...</div></div>`;
+
+  const stages = [
+    '🌐 Multiple parts websites ચેક કરું છું...',
+    '🚗 Vehicle catalogs સાથે match કરું છું...',
+    '⚖️ Sources compare કરી confidence નક્કી કરું છું...',
+    '✍️ પરિણામ તૈયાર કરું છું...'
+  ];
+  let stageIdx = 0;
+  const stageTimer = setInterval(()=>{
+    const el = document.getElementById('loadingStageTxt');
+    if(el && stageIdx < stages.length){ el.textContent = stages[stageIdx]; stageIdx++; }
+  }, 3500);
+
+  try{
+    const result = await aiLookupPart(partNo, selectedCompany);
+    clearInterval(stageTimer);
+    result.partNumber = partNo;
+    result.gps = currentGPS;
+    result.searchedAt = new Date().toISOString();
+    currentPart = result;
+    plate.classList.remove('scanning');
+    renderResult(result, false);
+  }catch(e){
+    clearInterval(stageTimer);
+    plate.classList.remove('scanning');
+    if(e.needsKey){
+      zone.innerHTML = `<div class="part-detail"><div class="notes-box">⚠️ ${e.message}</div>
+        <button class="btn btn-primary" id="goSettingsBtn" style="margin-top:14px;">⚙️ Settings ખોલો</button></div>`;
+      document.getElementById('goSettingsBtn').addEventListener('click', ()=>{
+        document.getElementById('view-search').classList.add('hidden');
+        document.getElementById('view-settings').classList.remove('hidden');
+        document.getElementById('topbarSearch').classList.add('hidden');
+        document.getElementById('topbarSettings').classList.remove('hidden');
+      });
+    } else {
+      zone.innerHTML = `<div class="part-detail"><div class="notes-box">⚠️ AI lookup નિષ્ફળ ગયું: ${e.message}. ફરી પ્રયત્ન કરો.</div></div>`;
+    }
+  }
+}
+
+function statusPill(status, verified){
+  if(verified) return `<span class="status-pill status-verified">✓ VERIFIED IN DB</span>`;
+  if(status==='high_confidence') return `<span class="status-pill status-verified">✓ HIGH CONFIDENCE</span>`;
+  return `<span class="status-pill status-new">NEW PART</span>`;
+}
+
+function renderResult(r, isVerified){
+  const zone = document.getElementById('resultZone');
+  const barColor = r.confidence>=70 ? 'var(--verified)' : r.confidence>=40 ? 'var(--conflict)' : 'var(--danger)';
+
+  const vehiclesHtml = (r.vehicles||[]).map(v=>`
+    <div class="vehicle-item">
+      <div>
+        <div class="vehicle-name">${v.make||''} ${v.model||''}</div>
+        <div class="vehicle-meta">${v.variant||'—'}</div>
+      </div>
+      <div class="vehicle-years">${v.years||'—'}</div>
+    </div>`).join('') || `<div class="notes-box">કોઈ ચોક્કસ ગાડી મળી નથી.</div>`;
+
+  const sourcesHtml = (r.sources||[]).map(s=>`<div class="source-item">${s}</div>`).join('');
+
+  const badgesHtml = isVerified ? '' : `
+    <div class="badge-row">
+      ${r.status==='conflict' ? '<span class="badge badge-conflict">⚠ Information Conflict</span>' : ''}
+      ${r.status!=='high_confidence' ? '<span class="badge badge-verify">Requires Verification</span>' : ''}
+      ${(r.sources && r.sources.length) ? '<span class="badge badge-sources">🌐 Live web sources</span>' : ''}
+    </div>`;
+
+  zone.innerHTML = `
+    <div class="part-detail">
+      <div class="pd-label">Part Master</div>
+      <div class="pd-partno">${r.partNumber}</div>
+      ${statusPill(r.status, isVerified)}
+
+      <div class="codes-box">
+        <svg id="barcodeSvg"></svg>
+        <div class="qr-wrap"><div id="qrcanvas"></div></div>
+        <div class="barcode-label">${r.partNumber}</div>
+      </div>
+
+      ${!isVerified ? `
+      <div class="confidence-row">
+        <div class="confidence-label"><span>AI Confidence</span><span>${r.confidence}%</span></div>
+        <div class="confidence-bar-bg"><div class="confidence-bar-fill" style="width:${r.confidence}%;background:${barColor};"></div></div>
+      </div>
+      ${badgesHtml}` : ''}
+
+      <div style="margin-top:16px;">
+        <div class="info-row"><span class="info-label">Category</span><span class="info-value">${r.category||'—'}</span></div>
+        <div class="info-row"><span class="info-label">Name</span><span class="info-value">${r.name||'—'}</span></div>
+      </div>
+
+      <label class="field-label" style="margin-top:16px;display:block;">Fits Vehicles</label>
+      <div class="vehicle-list">${vehiclesHtml}</div>
+
+      ${r.notes ? `<div class="notes-box ${isVerified?'ok':''}">${r.notes}</div>` : ''}
+      ${(!isVerified && sourcesHtml) ? `<details class="sources-list"><summary>Sources (${(r.sources||[]).length})</summary>${sourcesHtml}</details>` : ''}
+
+      <div class="stub-row">
+        <div class="stub-btn">⬇️ Buy</div>
+        <div class="stub-btn">💰 Sell</div>
+      </div>
+
+      <div class="action-row">
+        ${isVerified ? `
+          <button class="btn btn-ghost" id="newSearchBtn" style="flex:1;">🔍 New Search</button>
+        ` : `
+          <button class="btn btn-ghost" id="rejectBtn" style="flex:1;">Reject / Retry</button>
+          <button class="btn ${r.status==='high_confidence'?'btn-verified':'btn-primary'}" id="confirmBtn" style="flex:1;">
+            ${r.status==='high_confidence' ? '✓ Confirm & Save' : '⚠ Save Unverified'}
+          </button>
+        `}
+      </div>
+    </div>
+  `;
+
+  // Render barcode + QR
+  try{
+    JsBarcode("#barcodeSvg", r.partNumber, {format:"CODE128", displayValue:false, height:50, margin:6, background:"#ffffff", lineColor:"#000000"});
+  }catch(e){}
+  document.getElementById('qrcanvas').innerHTML = '';
+  try{ new QRCode(document.getElementById('qrcanvas'), {text:r.partNumber, width:110, height:110, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){}
+
+  if(isVerified){
+    document.getElementById('newSearchBtn').addEventListener('click', ()=>{
+      zone.innerHTML=''; document.getElementById('partInput').value=''; document.getElementById('partInput').focus();
+    });
+  } else {
+    document.getElementById('confirmBtn').addEventListener('click', async ()=>{
+      currentPart.verified = (r.status==='high_confidence');
+      await savePart(currentPart);
+      showToast(currentPart.verified ? '✓ Verified & saved to database' : '⚠ Saved as unverified');
+      renderResult(currentPart, true);
+    });
+    document.getElementById('rejectBtn').addEventListener('click', ()=>{
+      zone.innerHTML=''; document.getElementById('partInput').focus();
+    });
+  }
+}
+
+function showToast(msg){
+  const t = document.createElement('div');
+  t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2500);
+}
+</script>
+</body>
+</html>
