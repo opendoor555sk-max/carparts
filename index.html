@@ -348,6 +348,10 @@
         <label class="field-label">Part Number</label>
         <input type="text" class="part-input" id="partInput" placeholder="e.g. 95400-K6610" autocomplete="off" autocapitalize="characters">
         <button class="btn btn-ghost" id="scanCameraBtn" style="margin-top:10px;">📷 Camera થી Scan કરો (Barcode/QR)</button>
+        <label class="btn btn-primary" style="margin-top:10px;display:flex;">
+          📸 ફોટો પાડીને Scan કરો
+          <input type="file" id="photoScanInput" accept="image/*" capture="environment" style="display:none;">
+        </label>
         <div class="gps-chip">
           <div class="gps-dot" id="gpsDot"></div>
           <span id="gpsText">Location capturing...</span>
@@ -378,6 +382,10 @@
         <input type="text" class="form-input" id="buyManualInput" placeholder="Manual part no. લખો..." style="margin-top:0;">
         <button class="btn btn-primary" id="buyManualAddBtn" style="width:auto;padding:0 20px;">+</button>
       </div>
+      <label class="btn btn-primary" style="margin-top:10px;display:flex;">
+        📸 ફોટો પાડીને Scan કરો (દરેક ફોટો = +1)
+        <input type="file" id="buyPhotoScanInput" accept="image/*" capture="environment" style="display:none;">
+      </label>
 
       <div class="section-label">Scanned Items — Total: <span id="buyTotalCount">0</span></div>
       <div id="buyScannedList"><div class="notes-box">હજુ કંઈ scan નથી થયું — camera ને barcode/QR સામે રાખો, અથવા manually ટાઈપ કરો.</div></div>
@@ -499,6 +507,7 @@
 
       <div class="scan-plate" style="padding:12px 16px;">
         <input type="text" class="form-input" id="invFilterInput" placeholder="🔍 Part number, category, vehicle થી filter કરો..." style="margin-top:0;">
+        <button class="btn btn-ghost" id="invScanCameraBtn" style="margin-top:10px;">📷 Camera થી Scan કરીને શોધો</button>
       </div>
 
       <div class="section-label" id="invCount">0 items</div>
@@ -722,6 +731,58 @@ function stopAllCameraStreams(){
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) stopAllCameraStreams(); });
 window.addEventListener('pagehide', stopAllCameraStreams);
 
+/* ============ PHOTO-CAPTURE SCAN (works even if live preview is broken) ============ */
+async function scanPhotoFile(file, onSuccess, onFail){
+  if(!file) return;
+  if(!('BarcodeDetector' in window)){
+    onFail('⚠️ આ બ્રાઉઝર scan સપોર્ટ નથી કરતું');
+    return;
+  }
+  try{
+    const bitmap = await createImageBitmap(file);
+    const detector = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','code_93','codabar','data_matrix','upc_a','upc_e','itf']});
+    const codes = await detector.detect(bitmap);
+    if(codes && codes.length){
+      onSuccess((codes[0].rawValue||'').trim());
+    } else {
+      onFail('⚠️ ફોટોમાં કોઈ barcode/QR ના મળ્યો — ફરી પાડો, પાર્ટ નંબર clear દેખાય એમ');
+    }
+  }catch(e){
+    onFail('⚠️ ફોટો process ના થયો: ' + e.message);
+  }
+}
+
+document.getElementById('photoScanInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = ''; // reset so same photo can be retaken
+  showToast('⏳ Scan કરું છું...');
+  await scanPhotoFile(file,
+    (raw)=>{
+      const input = document.getElementById(scanTargetInputId || 'partInput');
+      const extracted = extractPartNumber(raw);
+      input.value = extracted.toUpperCase();
+      input.focus(); input.select();
+      if(extracted !== raw) showRawScanNote(raw);
+      showToast('✓ Scan થયું');
+    },
+    (msg)=> showToast(msg)
+  );
+});
+
+document.getElementById('buyPhotoScanInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  showToast('⏳ Scan કરું છું...');
+  await scanPhotoFile(file,
+    (raw)=>{
+      const pn = extractPartNumber(raw).toUpperCase();
+      addBuyScan(pn);
+      showToast(`✓ ${pn} ઉમેરાયું`);
+    },
+    (msg)=> showToast(msg)
+  );
+});
+
 /* ============ CAMERA SCAN (Barcode/QR) ============ */
 let scanStream = null;
 let scanInterval = null;
@@ -741,7 +802,13 @@ async function openCameraScan(targetInputId){
   }
 
   try{
-    scanStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    if(modal.classList.contains('hidden')){
+      // user already closed the scanner before permission resolved — release immediately, don't leave camera locked
+      stream.getTracks().forEach(t=>t.stop());
+      return;
+    }
+    scanStream = stream;
     video.srcObject = scanStream;
     await video.play();
   }catch(e){
@@ -767,7 +834,10 @@ async function openCameraScan(targetInputId){
             if(scanTargetInputId === 'partInput') showRawScanNote(value);
             showToast('✓ Part number ઓટોમેટિક કાઢ્યો — ચેક કરી લો');
           } else {
-            showToast('✓ Scan થયું — જરૂર મુજબ edit કરીને Search દબાવો');
+            showToast('✓ Scan થયું');
+          }
+          if(scanTargetInputId === 'invFilterInput'){
+            renderInventoryList(input.value.trim());
           }
         }
       }
@@ -1013,6 +1083,9 @@ function renderInventoryList(filterText){
 
 document.getElementById('invFilterInput').addEventListener('input', e=>{
   renderInventoryList(e.target.value.trim());
+});
+document.getElementById('invScanCameraBtn').addEventListener('click', ()=>{
+  openCameraScan('invFilterInput');
 });
 
 /* ============ REQUIREMENT MODULE ============ */
@@ -1273,7 +1346,13 @@ async function startBuyScanCamera(){
     return;
   }
   try{
-    buyStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    if(document.getElementById('view-buy').classList.contains('hidden')){
+      // user already navigated away before permission resolved — release immediately
+      stream.getTracks().forEach(t=>t.stop());
+      return;
+    }
+    buyStream = stream;
     video.srcObject = buyStream;
     await video.play();
   }catch(e){
@@ -1335,11 +1414,23 @@ function renderBuyList(){
     wrap.innerHTML = `<div class="notes-box">હજુ કંઈ scan નથી થયું — camera ને barcode/QR સામે રાખો, અથવા manually ટાઈપ કરો.</div>`;
     return;
   }
-  wrap.innerHTML = keys.map(pn=>`
-    <div class="scanned-item">
-      <span class="scanned-partno">${pn}</span>
+  wrap.innerHTML = `<div class="notes-box" style="margin-bottom:10px;">💡 કોઈ પાર્ટ નંબર ખોટો/અલગ દેખાય (scan noise) તો એના પર ટેપ કરીને સાચો કરો — સાચા નંબર સાથે merge થઈ જશે.</div>` +
+    keys.map(pn=>`
+    <div class="scanned-item" style="cursor:pointer;" onclick="editBuyScanItem('${pn.replace(/'/g,"\\'")}')">
+      <span class="scanned-partno">${pn} ✏️</span>
       <span class="scanned-qty">×${buySession[pn]}</span>
     </div>`).join('');
+}
+
+function editBuyScanItem(oldPn){
+  const newPn = window.prompt('સાચો Part Number લખો:', oldPn);
+  if(newPn === null) return; // cancelled
+  const cleaned = newPn.trim().toUpperCase();
+  if(!cleaned){ delete buySession[oldPn]; renderBuyList(); return; }
+  const qty = buySession[oldPn];
+  delete buySession[oldPn];
+  buySession[cleaned] = (buySession[cleaned] || 0) + qty;
+  renderBuyList();
 }
 
 document.getElementById('buyManualAddBtn').addEventListener('click', ()=>{
