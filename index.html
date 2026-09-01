@@ -375,7 +375,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-critical-search-scan-fix</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-PS-pattern-extraction</span>
       </div>
     </div>
 
@@ -970,8 +970,15 @@ document.getElementById('closeCameraBtn').addEventListener('click', closeCameraS
 /* ============ PART NUMBER EXTRACTION from raw scan ============ */
 function extractPartNumber(raw){
   const clean = raw.replace(/[\x00-\x1F]/g, ''); // strip control chars (GS separators etc)
+
+  // ISO 15434 automotive labels commonly wrap the Part Number field between
+  // a 'P' Data Identifier and the next 'S' (Serial/Supplier) identifier — confirmed
+  // across multiple real labels (e.g. "P95400K6610S", "P954B0CCAB0S"). Check this FIRST.
+  let m = clean.match(/P([0-9][A-Z0-9]{7,13})S/);
+  if(m) return m[1];
+
   // Hyundai/Kia style: 5 digits + optional dash + 1 letter + 4 digits  e.g. 95400K6610
-  let m = clean.match(/\d{5}-?[A-Z]\d{4}/);
+  m = clean.match(/\d{5}-?[A-Z]\d{4}/);
   if(m) return m[0].replace('-','');
   // Toyota/Maruti/Suzuki style: 5 digits + optional dash + 5 alphanumeric e.g. 90915YZZD4, 95400BVLB0
   m = clean.match(/\d{5}-?[A-Z0-9]{5}/);
