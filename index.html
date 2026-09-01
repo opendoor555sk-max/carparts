@@ -739,7 +739,8 @@ async function scanPhotoFile(file, onSuccess, onFail){
     return;
   }
   try{
-    const bitmap = await createImageBitmap(file);
+    const originalBitmap = await createImageBitmap(file);
+    const bitmap = await resizeForScan(originalBitmap);
     const detector = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','code_93','codabar','data_matrix','upc_a','upc_e','itf']});
     const codes = await detector.detect(bitmap);
     if(codes && codes.length){
@@ -750,6 +751,18 @@ async function scanPhotoFile(file, onSuccess, onFail){
   }catch(e){
     onFail('⚠️ ફોટો process ના થયો: ' + e.message);
   }
+}
+
+async function resizeForScan(bitmap){
+  const MAX_DIM = 1400; // enough resolution for barcode reading, much faster than full 4000px+ phone photos
+  const scale = Math.min(1, MAX_DIM / Math.max(bitmap.width, bitmap.height));
+  if(scale >= 1) return bitmap; // already small enough
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return await createImageBitmap(canvas);
 }
 
 document.getElementById('photoScanInput').addEventListener('change', async (e)=>{
@@ -860,8 +873,8 @@ function extractPartNumber(raw){
   // Hyundai/Kia style: 5 digits + optional dash + 1 letter + 4 digits  e.g. 95400K6610
   let m = clean.match(/\d{5}-?[A-Z]\d{4}/);
   if(m) return m[0].replace('-','');
-  // Toyota/Maruti style: 5 digits + optional dash + 5 alphanumeric e.g. 90915YZZD4
-  m = clean.match(/\d{5}-?[A-Z0-9]{5}\b/);
+  // Toyota/Maruti/Suzuki style: 5 digits + optional dash + 5 alphanumeric e.g. 90915YZZD4, 95400BVLB0
+  m = clean.match(/\d{5}-?[A-Z0-9]{5}/);
   if(m) return m[0].replace('-','');
   // Generic: digits-letters block of 8-12 chars after a single-letter DI marker like P or 1P
   m = clean.match(/(?:^|[^0-9A-Z])(\d{4,6}[A-Z0-9]{3,7})(?=[A-Z][A-Z0-9]{0,3}\d|$)/);
