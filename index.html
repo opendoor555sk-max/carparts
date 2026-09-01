@@ -215,6 +215,28 @@
   .scan-frame{position:absolute;left:12%;right:12%;top:35%;bottom:35%;border:2.5px solid var(--accent);border-radius:14px;
     box-shadow:0 0 0 2000px rgba(0,0,0,0.45);pointer-events:none;}
   .camera-hint{padding:16px;text-align:center;color:#fff;font-size:13px;background:rgba(0,0,0,.6);}
+
+  /* Sticker Scanner */
+  .sticker-preview{background:#fff;border-radius:10px;padding:18px;margin-top:14px;min-height:140px;
+    color:#111;font-family:'IBM Plex Mono',monospace;position:relative;}
+  .sticker-preview .st-line{font-size:13px;line-height:1.5;margin-bottom:3px;word-break:break-word;}
+  .sticker-preview .st-partno{font-size:17px;font-weight:700;}
+  .sticker-codes{display:flex;justify-content:flex-end;margin-top:8px;}
+  .sticker-upload-photo{width:100%;max-height:200px;object-fit:contain;border-radius:8px;margin-top:12px;background:#000;}
+  .format-chips{display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding-bottom:2px;}
+  .format-chip{flex-shrink:0;padding:8px 14px;border-radius:20px;background:var(--surface-2);border:1px solid var(--border);
+    font-size:12.5px;font-weight:600;color:var(--text-muted);white-space:nowrap;cursor:pointer;}
+  .format-chip.active{background:var(--accent);color:#160900;border-color:var(--accent);}
+  .st-textline-row{display:flex;gap:8px;align-items:center;margin-top:8px;}
+  .st-textline-row input{flex:1;}
+  .st-del-btn{background:none;border:none;color:var(--danger);font-size:18px;padding:4px 8px;cursor:pointer;}
+  .saved-sticker-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);
+    padding:7px 12px;border-radius:8px;font-family:var(--font-mono);font-size:12.5px;margin:4px 6px 0 0;cursor:pointer;}
+  @media print{
+    body *{visibility:hidden;}
+    #printableSticker, #printableSticker *{visibility:visible;}
+    #printableSticker{position:absolute;top:0;left:0;width:100%;}
+  }
 </style>
 </head>
 <body>
@@ -280,6 +302,13 @@
         <div class="screen-sub" id="multiBuyTotalLabel">Total: 0</div>
       </div>
     </div>
+    <div class="topbar-row hidden" id="topbarSticker">
+      <button class="back-btn" id="backFromSticker">‹</button>
+      <div class="title-block">
+        <div class="screen-title">Sticker Scanner</div>
+        <div class="screen-sub">સાફ sticker → edit → print</div>
+      </div>
+    </div>
   </div>
 
   <div class="content">
@@ -334,12 +363,19 @@
             <div class="module-desc">બધા saved parts જુઓ</div>
           </div>
         </div>
+        <div class="module-card wide" id="openSticker">
+          <div class="module-icon multi">🏷️</div>
+          <div>
+            <div class="module-name">STICKER SCANNER</div>
+            <div class="module-desc">સાફ sticker બનાવો → edit → print</div>
+          </div>
+        </div>
       </div>
 
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-thick-flash</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-critical-search-scan-fix</span>
       </div>
     </div>
 
@@ -544,6 +580,39 @@
       <button class="btn btn-verified" id="multiDoneBtn" style="margin-top:18px;">✓ Done — <span id="multiDoneCount">0</span> units add કરો</button>
     </div>
 
+    <!-- STICKER SCANNER VIEW -->
+    <div id="view-sticker" class="hidden">
+      <div class="search-hero">
+        <h1>Sticker Scanner</h1>
+        <p>જૂનું sticker નો ફોટો પાડો, ટેક્સ્ટ manually ટાઈપ કરો (ફોટો સાથે reference માટે) — સાફ, નવું sticker બને, print કરો.</p>
+      </div>
+
+      <div class="scan-plate">
+        <label class="field-label">Photo (optional — reference માટે)</label>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <label class="btn btn-ghost" style="display:flex;flex:1;">
+            🖼️ Gallery
+            <input type="file" id="stickerGalleryInput" accept="image/*" style="display:none;">
+          </label>
+          <label class="btn btn-ghost" style="display:flex;flex:1;">
+            📷 Camera
+            <input type="file" id="stickerCameraInput" accept="image/*" capture="environment" style="display:none;">
+          </label>
+        </div>
+        <img id="stickerPhotoPreview" class="sticker-upload-photo hidden">
+
+        <label class="field-label" style="margin-top:16px;">અથવા સીધો Part Number નાખો</label>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <input type="text" class="form-input" id="stickerPartInput" placeholder="e.g. 39100-2B000" style="margin-top:0;">
+          <button class="btn btn-primary" id="stickerCreateBtn" style="width:auto;padding:0 20px;">Create</button>
+        </div>
+      </div>
+
+      <div id="stickerSavedList" style="margin-top:14px;"></div>
+
+      <div id="stickerEditorZone"></div>
+    </div>
+
     <!-- SETTINGS VIEW -->
     <div id="view-settings" class="hidden">
       <div class="search-hero">
@@ -631,7 +700,7 @@ document.getElementById('saveKeyBtn').addEventListener('click', ()=>{
   showToast('✓ Key saved');
 });
 
-document.querySelectorAll('.module-card:not(#openSearch):not(#openBuy):not(#openSell):not(#openReq):not(#openInventory):not(#openMultiBuy)').forEach(c=>{
+document.querySelectorAll('.module-card:not(#openSearch):not(#openBuy):not(#openSell):not(#openReq):not(#openInventory):not(#openMultiBuy):not(#openSticker)').forEach(c=>{
   c.addEventListener('click', ()=> showToast('આ મોડ્યુલ પછીથી બનાવીશું'));
 });
 
@@ -828,7 +897,7 @@ let scanInterval = null;
 let scanTargetInputId = 'partInput';
 
 async function openCameraScan(targetInputId){
-  scanTargetInputId = targetInputId || 'partInput';
+  scanTargetInputId = (typeof targetInputId === 'string' && targetInputId) ? targetInputId : 'partInput';
   const modal = document.getElementById('cameraModal');
   const video = document.getElementById('scanVideo');
   const hint = document.getElementById('cameraHint');
@@ -895,7 +964,7 @@ function closeCameraScan(){
   if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; }
 }
 
-document.getElementById('scanCameraBtn').addEventListener('click', openCameraScan);
+document.getElementById('scanCameraBtn').addEventListener('click', ()=> openCameraScan());
 document.getElementById('closeCameraBtn').addEventListener('click', closeCameraScan);
 
 /* ============ PART NUMBER EXTRACTION from raw scan ============ */
@@ -922,6 +991,210 @@ function showRawScanNote(raw){
     document.getElementById('scanPlate').appendChild(note);
   }
   note.innerHTML = `<b style="color:var(--text-muted);">Full scanned data:</b><br>${raw}<br><span style="color:var(--accent);">ઉપર auto-detected નંબર ખોટો લાગે તો અહીંથી copy કરી manually edit કરો.</span>`;
+}
+
+/* ============ STICKER SCANNER MODULE ============ */
+let stickerLines = [];
+let stickerFormat = 'Generic';
+let stickerPhotoDataUrl = null;
+
+const STICKER_FORMATS = ['Generic', 'Hyundai / Kia', 'Maruti Suzuki', 'Tata', 'Mahindra', 'Toyota', 'Honda'];
+
+document.getElementById('openSticker').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-sticker').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarSticker').classList.remove('hidden');
+  renderStickerSavedList();
+  document.getElementById('stickerEditorZone').innerHTML = '';
+  document.getElementById('stickerPhotoPreview').classList.add('hidden');
+  document.getElementById('stickerPartInput').value = '';
+});
+document.getElementById('backFromSticker').addEventListener('click', ()=>{
+  document.getElementById('view-sticker').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarSticker').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+function readFileAsDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleStickerPhoto(file){
+  if(!file) return;
+  stickerPhotoDataUrl = await readFileAsDataUrl(file);
+  const img = document.getElementById('stickerPhotoPreview');
+  img.src = stickerPhotoDataUrl;
+  img.classList.remove('hidden');
+  // start with one empty editable line pre-filled with a hint, user types what they read off the photo
+  stickerLines = [''];
+  stickerFormat = 'Generic';
+  openStickerEditor();
+  showToast('📷 ફોટો ઉમેરાયો — નીચે ટેક્સ્ટ manually ટાઈપ કરો (ફોટો જોઈને)');
+}
+document.getElementById('stickerGalleryInput').addEventListener('change', e=> handleStickerPhoto(e.target.files[0]));
+document.getElementById('stickerCameraInput').addEventListener('change', e=> handleStickerPhoto(e.target.files[0]));
+
+document.getElementById('stickerCreateBtn').addEventListener('click', ()=>{
+  const pn = document.getElementById('stickerPartInput').value.trim().toUpperCase();
+  if(!pn){ showToast('⚠️ Part number નાખો'); return; }
+  stickerPhotoDataUrl = null;
+  document.getElementById('stickerPhotoPreview').classList.add('hidden');
+  stickerLines = [pn];
+  stickerFormat = 'Generic';
+  openStickerEditor();
+});
+
+function openStickerEditor(){
+  const zone = document.getElementById('stickerEditorZone');
+  zone.innerHTML = `
+    <div class="part-detail" style="margin-top:16px;">
+      <div class="pd-label">LIVE PREVIEW</div>
+      <div class="sticker-preview" id="stickerPreviewBox"></div>
+
+      ${stickerPhotoDataUrl ? `<img src="${stickerPhotoDataUrl}" class="sticker-upload-photo" style="margin-top:14px;"><div class="notes-box" style="margin-top:8px;">ઉપરનો ફોટો જોઈને, નીચે સાચી લાઈનો ટાઈપ કરો</div>` : ''}
+
+      <label class="field-label" style="margin-top:16px;display:block;">Text Lines (edit/add/remove)</label>
+      <div id="stickerLinesWrap"></div>
+      <button class="btn btn-ghost" id="addStickerLineBtn" style="margin-top:10px;">➕ Line ઉમેરો</button>
+
+      <label class="field-label" style="margin-top:16px;display:block;">Company Format</label>
+      <div class="format-chips" id="stickerFormatChips"></div>
+
+      <div class="action-row" style="margin-top:18px;">
+        <button class="btn btn-ghost" id="saveStickerBtn" style="flex:1;">💾 Save</button>
+        <button class="btn btn-primary" id="printStickerBtn" style="flex:1;">🖨️ Print</button>
+      </div>
+    </div>
+  `;
+  renderStickerLines();
+  renderStickerFormatChips();
+  renderStickerPreview();
+
+  document.getElementById('addStickerLineBtn').addEventListener('click', ()=>{
+    stickerLines.push('');
+    renderStickerLines();
+    renderStickerPreview();
+  });
+  document.getElementById('saveStickerBtn').addEventListener('click', saveCurrentSticker);
+  document.getElementById('printStickerBtn').addEventListener('click', printCurrentSticker);
+}
+
+function renderStickerLines(){
+  const wrap = document.getElementById('stickerLinesWrap');
+  wrap.innerHTML = stickerLines.map((line, i)=>`
+    <div class="st-textline-row">
+      <input type="text" class="form-input" style="margin-top:0;" value="${line.replace(/"/g,'&quot;')}" oninput="updateStickerLine(${i}, this.value)" placeholder="લાઈન ${i+1}">
+      <button class="st-del-btn" onclick="removeStickerLine(${i})">✕</button>
+    </div>`).join('');
+}
+
+function updateStickerLine(i, val){
+  stickerLines[i] = val;
+  renderStickerPreview();
+}
+function removeStickerLine(i){
+  stickerLines.splice(i,1);
+  renderStickerLines();
+  renderStickerPreview();
+}
+
+function renderStickerFormatChips(){
+  const wrap = document.getElementById('stickerFormatChips');
+  wrap.innerHTML = STICKER_FORMATS.map(f=>`
+    <div class="format-chip ${f===stickerFormat?'active':''}" onclick="setStickerFormat('${f}')">${f}</div>
+  `).join('');
+}
+function setStickerFormat(f){
+  stickerFormat = f;
+  renderStickerFormatChips();
+  renderStickerPreview();
+}
+
+function guessStickerPartNumber(){
+  // use first non-empty line as the "part number" for barcode/QR encoding
+  return (stickerLines.find(l=>l.trim()) || 'PARTNO').trim();
+}
+
+function renderStickerPreview(){
+  const box = document.getElementById('stickerPreviewBox');
+  if(!box) return;
+  const pn = guessStickerPartNumber();
+  const companyHeader = stickerFormat !== 'Generic' ? `<div class="st-line" style="font-weight:800;font-size:15px;margin-bottom:6px;">${stickerFormat.toUpperCase()}</div>` : '';
+  box.innerHTML = `
+    ${companyHeader}
+    <div style="display:flex;justify-content:space-between;gap:12px;">
+      <div style="flex:1;min-width:0;">
+        ${stickerLines.map((l,i)=> i===0 ? `<div class="st-line st-partno">${l||'&nbsp;'}</div>` : `<div class="st-line">${l||'&nbsp;'}</div>`).join('')}
+      </div>
+      <div style="flex-shrink:0;text-align:center;">
+        <div id="stickerQrHolder"></div>
+      </div>
+    </div>
+    <div class="sticker-codes"><svg id="stickerBarcodeSvg"></svg></div>
+  `;
+  try{ JsBarcode("#stickerBarcodeSvg", pn, {format:"CODE128", displayValue:false, height:36, margin:4, background:"#ffffff", lineColor:"#000000"}); }catch(e){}
+  const qrHolder = document.getElementById('stickerQrHolder');
+  qrHolder.innerHTML = '';
+  try{ new QRCode(qrHolder, {text:pn, width:70, height:70, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){}
+}
+
+function saveCurrentSticker(){
+  const pn = guessStickerPartNumber();
+  const data = {partNumber:pn, lines: stickerLines.slice(), format: stickerFormat, savedAt: new Date().toISOString()};
+  localStorage.setItem('sticker:'+pn, JSON.stringify(data));
+  showToast(`✓ "${pn}" sticker saved`);
+  renderStickerSavedList();
+}
+
+function printCurrentSticker(){
+  const box = document.getElementById('stickerPreviewBox');
+  let printArea = document.getElementById('printableSticker');
+  if(!printArea){
+    printArea = document.createElement('div');
+    printArea.id = 'printableSticker';
+    printArea.style.cssText = 'position:fixed;top:-9999px;left:-9999px;background:#fff;padding:16px;';
+    document.body.appendChild(printArea);
+  }
+  printArea.innerHTML = box.innerHTML;
+  window.print();
+}
+
+function getAllSavedStickers(){
+  const list = [];
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('sticker:')){
+      try{ list.push(JSON.parse(localStorage.getItem(k))); }catch(e){}
+    }
+  }
+  return list.sort((a,b)=> new Date(b.savedAt)-new Date(a.savedAt));
+}
+
+function renderStickerSavedList(){
+  const wrap = document.getElementById('stickerSavedList');
+  const items = getAllSavedStickers();
+  if(items.length===0){ wrap.innerHTML=''; return; }
+  wrap.innerHTML = `<label class="field-label" style="display:block;margin-bottom:6px;">Saved Stickers (tap to reuse)</label>` +
+    items.map(it=>`<span class="saved-sticker-chip" onclick="loadSavedSticker('${it.partNumber.replace(/'/g,"\\'")}')">🏷️ ${it.partNumber}</span>`).join('');
+}
+
+function loadSavedSticker(pn){
+  try{
+    const data = JSON.parse(localStorage.getItem('sticker:'+pn));
+    stickerLines = data.lines.slice();
+    stickerFormat = data.format || 'Generic';
+    stickerPhotoDataUrl = null;
+    document.getElementById('stickerPhotoPreview').classList.add('hidden');
+    openStickerEditor();
+  }catch(e){}
 }
 
 /* ============ MULTIPLE BUY MODULE (legacy, no longer linked from home — merged into Buy) ============ */
