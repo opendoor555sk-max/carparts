@@ -334,7 +334,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-08-31-inventory-delete</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-08-31-photoscan-all-modules</span>
       </div>
     </div>
 
@@ -444,6 +444,7 @@
         <label class="field-label">Part Number</label>
         <input type="text" class="part-input" id="sellPartInput" placeholder="e.g. 95400-K6610" autocomplete="off" autocapitalize="characters">
         <button class="btn btn-ghost" id="sellScanCameraBtn" style="margin-top:10px;">📷 Camera થી Scan કરો</button>
+        <button class="btn btn-primary" id="sellPhotoScanBtn" style="margin-top:10px;">📸 ફોટો પાડીને Scan કરો</button>
         <div class="gps-chip">
           <div class="gps-dot" id="sellGpsDot"></div>
           <span id="sellGpsText">Location capturing...</span>
@@ -465,6 +466,7 @@
         <label class="field-label">Part Number</label>
         <input type="text" class="part-input" id="reqPartInput" placeholder="e.g. 95400-K6610" autocomplete="off" autocapitalize="characters">
         <button class="btn btn-ghost" id="reqScanCameraBtn" style="margin-top:10px;">📷 Camera થી Scan કરો</button>
+        <button class="btn btn-primary" id="reqPhotoScanBtn" style="margin-top:10px;">📸 ફોટો પાડીને Scan કરો</button>
         <div class="gps-chip">
           <div class="gps-dot" id="reqGpsDot"></div>
           <span id="reqGpsText">Location capturing...</span>
@@ -795,6 +797,15 @@ document.getElementById('buyPhotoScanInput').addEventListener('change', async (e
     },
     (msg)=> showToast(msg)
   );
+});
+
+document.getElementById('sellPhotoScanBtn').addEventListener('click', ()=>{
+  scanTargetInputId = 'sellPartInput';
+  document.getElementById('photoScanInput').click();
+});
+document.getElementById('reqPhotoScanBtn').addEventListener('click', ()=>{
+  scanTargetInputId = 'reqPartInput';
+  document.getElementById('photoScanInput').click();
 });
 
 /* ============ CAMERA SCAN (Barcode/QR) ============ */
