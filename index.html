@@ -232,6 +232,18 @@
   .st-del-btn{background:none;border:none;color:var(--danger);font-size:18px;padding:4px 8px;cursor:pointer;}
   .saved-sticker-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);
     padding:7px 12px;border-radius:8px;font-family:var(--font-mono);font-size:12.5px;margin:4px 6px 0 0;cursor:pointer;}
+
+  /* Reports */
+  .report-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:9px;}
+  .report-row-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .report-partno{font-family:var(--font-mono);font-weight:700;font-size:15px;}
+  .report-meta{font-size:11.5px;color:var(--text-dim);margin-top:3px;}
+  .report-price{font-family:var(--font-mono);font-weight:700;color:var(--verified);font-size:15px;white-space:nowrap;}
+  .report-actions{display:flex;gap:8px;margin-top:10px;}
+  .report-action-btn{flex:1;padding:8px;border-radius:8px;border:1px solid var(--border-light);background:var(--surface-2);
+    color:var(--text-muted);font-size:11.5px;font-weight:700;text-align:center;cursor:pointer;}
+  .report-action-btn.danger{color:var(--danger);border-color:rgba(239,68,68,.3);}
+  .report-edit-form{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
   @media print{
     body *{visibility:hidden;}
     #printableSticker, #printableSticker *{visibility:visible;}
@@ -309,6 +321,13 @@
         <div class="screen-sub">સાફ sticker → edit → print</div>
       </div>
     </div>
+    <div class="topbar-row hidden" id="topbarReports">
+      <button class="back-btn" id="backFromReports">‹</button>
+      <div class="title-block">
+        <div class="screen-title" id="reportsTitle">Reports</div>
+        <div class="screen-sub">Purchases • Sales • Stock</div>
+      </div>
+    </div>
   </div>
 
   <div class="content">
@@ -370,12 +389,19 @@
             <div class="module-desc">સાફ sticker બનાવો → edit → print</div>
           </div>
         </div>
+        <div class="module-card wide" id="openReports">
+          <div class="module-icon multi">📊</div>
+          <div>
+            <div class="module-name">REPORTS</div>
+            <div class="module-desc">Purchases • Sales • Stock — edit/cancel/delete + Print</div>
+          </div>
+        </div>
       </div>
 
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-PS-pattern-extraction</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-reports-module</span>
       </div>
     </div>
 
@@ -435,6 +461,27 @@
       <div class="part-detail" style="margin-top:16px;">
         <div class="pd-label">બધા scanned parts માટે સામાન્ય વિગત (optional)</div>
         <div class="form-group" style="margin-top:12px;">
+          <label class="field-label">Company</label>
+          <div class="chip-row" id="buyCompanyChips" style="margin-top:6px;">
+            <div class="chip active" data-company="All">All</div>
+            <div class="chip" data-company="Maruti Suzuki">Maruti Suzuki</div>
+            <div class="chip" data-company="Hyundai">Hyundai</div>
+            <div class="chip" data-company="Tata">Tata</div>
+            <div class="chip" data-company="Mahindra">Mahindra</div>
+            <div class="chip" data-company="Kia">Kia</div>
+            <div class="chip" data-company="Toyota">Toyota</div>
+            <div class="chip" data-company="Honda">Honda</div>
+            <div class="chip" data-company="Nissan">Nissan</div>
+            <div class="chip" data-company="Renault">Renault</div>
+            <div class="chip" data-company="Ford">Ford</div>
+            <div class="chip" data-company="Volkswagen">Volkswagen</div>
+            <div class="chip" data-company="Skoda">Skoda</div>
+            <div class="chip" data-company="MG">MG</div>
+            <div class="chip" data-company="Datsun">Datsun</div>
+            <div class="chip" data-company="Chevrolet">Chevrolet</div>
+          </div>
+        </div>
+        <div class="form-group">
           <label class="field-label">Category</label>
           <input type="text" class="form-input" id="buyCategory" placeholder="e.g. Body Control">
         </div>
@@ -613,6 +660,44 @@
       <div id="stickerEditorZone"></div>
     </div>
 
+    <!-- REPORTS VIEW -->
+    <div id="view-reports" class="hidden">
+      <div class="chip-row" id="reportsTabRow">
+        <div class="chip active" data-tab="purchases">Purchases</div>
+        <div class="chip" data-tab="sales">Sales</div>
+        <div class="chip" data-tab="stock">Stock Report</div>
+      </div>
+
+      <div class="section-label">Date</div>
+      <div class="chip-row" id="reportsDateChips">
+        <div class="chip active" data-date="all">All</div>
+        <div class="chip" data-date="today">Today</div>
+        <div class="chip" data-date="month">This Month</div>
+        <div class="chip" data-date="year">This Year</div>
+      </div>
+
+      <div class="section-label">Company</div>
+      <div class="chip-row" id="reportsCompanyChips">
+        <div class="chip active" data-company="All">All</div>
+        <div class="chip" data-company="Maruti Suzuki">Maruti Suzuki</div>
+        <div class="chip" data-company="Hyundai">Hyundai</div>
+        <div class="chip" data-company="Tata">Tata</div>
+        <div class="chip" data-company="Mahindra">Mahindra</div>
+        <div class="chip" data-company="Kia">Kia</div>
+        <div class="chip" data-company="Toyota">Toyota</div>
+        <div class="chip" data-company="Honda">Honda</div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;">
+        <div class="section-label" id="reportsCount" style="margin:0;">0 items</div>
+        <div id="reportsTotal" style="font-family:var(--font-mono);color:var(--verified);font-weight:700;"></div>
+      </div>
+
+      <button class="btn btn-ghost" id="printReportBtn" style="margin-top:10px;">🖨️ Print Report</button>
+
+      <div id="reportsList" style="margin-top:14px;"></div>
+    </div>
+
     <!-- SETTINGS VIEW -->
     <div id="view-settings" class="hidden">
       <div class="search-hero">
@@ -700,7 +785,7 @@ document.getElementById('saveKeyBtn').addEventListener('click', ()=>{
   showToast('✓ Key saved');
 });
 
-document.querySelectorAll('.module-card:not(#openSearch):not(#openBuy):not(#openSell):not(#openReq):not(#openInventory):not(#openMultiBuy):not(#openSticker)').forEach(c=>{
+document.querySelectorAll('.module-card:not(#openSearch):not(#openBuy):not(#openSell):not(#openReq):not(#openInventory):not(#openMultiBuy):not(#openSticker):not(#openReports)').forEach(c=>{
   c.addEventListener('click', ()=> showToast('આ મોડ્યુલ પછીથી બનાવીશું'));
 });
 
@@ -999,6 +1084,247 @@ function showRawScanNote(raw){
   }
   note.innerHTML = `<b style="color:var(--text-muted);">Full scanned data:</b><br>${raw}<br><span style="color:var(--accent);">ઉપર auto-detected નંબર ખોટો લાગે તો અહીંથી copy કરી manually edit કરો.</span>`;
 }
+
+/* ============ REPORTS MODULE ============ */
+let reportsTab = 'purchases';
+let reportsDate = 'all';
+let reportsCompany = 'All';
+const REPORT_TITLES = {purchases:'Purchases', sales:'Sales', stock:'Stock Report'};
+
+document.getElementById('openReports').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-reports').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarReports').classList.remove('hidden');
+  renderReportsList();
+});
+document.getElementById('backFromReports').addEventListener('click', ()=>{
+  document.getElementById('view-reports').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarReports').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+document.querySelectorAll('#reportsTabRow .chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#reportsTabRow .chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    reportsTab = chip.dataset.tab;
+    document.getElementById('reportsTitle').textContent = REPORT_TITLES[reportsTab];
+    renderReportsList();
+  });
+});
+document.querySelectorAll('#reportsDateChips .chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#reportsDateChips .chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    reportsDate = chip.dataset.date;
+    renderReportsList();
+  });
+});
+document.querySelectorAll('#reportsCompanyChips .chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#reportsCompanyChips .chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    reportsCompany = chip.dataset.company;
+    renderReportsList();
+  });
+});
+
+function isInDateRange(isoDate, filter){
+  if(filter==='all') return true;
+  const d = new Date(isoDate);
+  const now = new Date();
+  if(filter==='today') return d.toDateString()===now.toDateString();
+  if(filter==='month') return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+  if(filter==='year') return d.getFullYear()===now.getFullYear();
+  return true;
+}
+
+function getAllTransactions(type){
+  const list = [];
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('inv:')){
+      try{
+        const inv = JSON.parse(localStorage.getItem(k));
+        const pn = k.slice(4);
+        const arr = inv[type] || [];
+        arr.forEach(txn=> list.push({...txn, partNumber: pn}));
+      }catch(e){}
+    }
+  }
+  return list.sort((a,b)=> new Date(b.date) - new Date(a.date));
+}
+
+function renderReportsList(){
+  const wrap = document.getElementById('reportsList');
+  const countEl = document.getElementById('reportsCount');
+  const totalEl = document.getElementById('reportsTotal');
+
+  if(reportsTab === 'stock'){
+    renderStockReportList();
+    return;
+  }
+
+  let items = getAllTransactions(reportsTab);
+  items = items.filter(it => isInDateRange(it.date, reportsDate));
+  if(reportsCompany !== 'All') items = items.filter(it => (it.company||'') === reportsCompany);
+
+  countEl.textContent = `${items.length} items`;
+  const totalAmt = items.reduce((s,it)=> s + (Number(it.price)||0), 0);
+  totalEl.textContent = totalAmt>0 ? `Total ₹${totalAmt}` : '';
+
+  if(items.length===0){
+    wrap.innerHTML = `<div class="notes-box">કંઈ ${REPORT_TITLES[reportsTab]} entry મળી નથી.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = items.map(it=>`
+    <div class="report-row" id="row_${it.id}">
+      <div class="report-row-top">
+        <div>
+          <div class="report-partno">${it.partNumber}</div>
+          <div class="report-meta">${it.company||'—'} • ${it.category||'—'} • Qty: ${it.qty}</div>
+          <div class="report-meta">${new Date(it.date).toLocaleString('en-IN', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        <div class="report-price">₹${it.price||0}</div>
+      </div>
+      <div class="report-actions">
+        <div class="report-action-btn" onclick="toggleEditTransaction('${it.partNumber}','${reportsTab}','${it.id}')">✏️ Edit</div>
+        <div class="report-action-btn danger" onclick="deleteTransaction('${it.partNumber}','${reportsTab}','${it.id}')">🗑️ Delete / Cancel</div>
+      </div>
+      <div id="editform_${it.id}"></div>
+    </div>`).join('');
+}
+
+function toggleEditTransaction(pn, type, txnId){
+  const holder = document.getElementById('editform_'+txnId);
+  if(holder.innerHTML){ holder.innerHTML=''; return; }
+  const inv = getInventory(pn);
+  const txn = (inv[type]||[]).find(t=>t.id===txnId);
+  if(!txn) return;
+  holder.innerHTML = `
+    <div class="report-edit-form">
+      <label class="field-label">Quantity</label>
+      <input type="number" class="form-input" id="edit_qty_${txnId}" value="${txn.qty}">
+      <label class="field-label" style="margin-top:10px;display:block;">Price (₹)</label>
+      <input type="number" class="form-input" id="edit_price_${txnId}" value="${txn.price||0}">
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="saveEditTransaction('${pn}','${type}','${txnId}')">💾 Save</button>
+    </div>`;
+}
+
+function saveEditTransaction(pn, type, txnId){
+  const inv = getInventory(pn);
+  const txn = (inv[type]||[]).find(t=>t.id===txnId);
+  if(!txn) return;
+  const newQty = parseInt(document.getElementById('edit_qty_'+txnId).value, 10) || txn.qty;
+  const newPrice = document.getElementById('edit_price_'+txnId).value || 0;
+  const qtyDiff = newQty - txn.qty;
+  // adjust overall stock: purchase increases stock, sale decreases stock
+  inv.qty += (type==='purchases') ? qtyDiff : -qtyDiff;
+  if(inv.qty < 0) inv.qty = 0;
+  txn.qty = newQty;
+  txn.price = newPrice;
+  localStorage.setItem('inv:'+pn, JSON.stringify(inv));
+  showToast('✓ Updated');
+  renderReportsList();
+}
+
+function deleteTransaction(pn, type, txnId){
+  const ok = window.confirm('આ entry ને DELETE/CANCEL કરવી છે? Stock પણ automatic reverse થશે. (Undo નહીં થાય)');
+  if(!ok) return;
+  const inv = getInventory(pn);
+  const idx = (inv[type]||[]).findIndex(t=>t.id===txnId);
+  if(idx===-1) return;
+  const txn = inv[type][idx];
+  // reverse stock effect: deleting a purchase removes that stock; deleting a sale gives stock back
+  inv.qty += (type==='purchases') ? -txn.qty : txn.qty;
+  if(inv.qty < 0) inv.qty = 0;
+  inv[type].splice(idx,1);
+  localStorage.setItem('inv:'+pn, JSON.stringify(inv));
+  showToast('🗑️ Entry deleted, stock updated');
+  renderReportsList();
+}
+
+function renderStockReportList(){
+  const wrap = document.getElementById('reportsList');
+  const countEl = document.getElementById('reportsCount');
+  const totalEl = document.getElementById('reportsTotal');
+  let items = getAllInventory();
+  if(reportsCompany !== 'All') items = items.filter(it => (it.company||'') === reportsCompany);
+
+  countEl.textContent = `${items.length} items`;
+  totalEl.textContent = '';
+
+  if(items.length===0){
+    wrap.innerHTML = `<div class="notes-box">કંઈ stock નથી.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = items.map(it=>{
+    const loc = [it.location?.rack, it.location?.shelf, it.location?.box, it.location?.position].filter(Boolean).join(' → ');
+    const stockColor = it.qty > 0 ? 'var(--verified)' : 'var(--text-dim)';
+    return `
+    <div class="report-row">
+      <div class="report-row-top">
+        <div>
+          <div class="report-partno">${it.partNumber}</div>
+          <div class="report-meta">${it.company||'—'} • ${it.category||'—'}</div>
+          ${loc ? `<div class="report-meta">📍 ${loc}</div>` : ''}
+        </div>
+        <span class="status-pill" style="color:${stockColor};border-color:${stockColor};background:transparent;">${it.qty} in stock</span>
+      </div>
+      <div class="report-actions">
+        <div class="report-action-btn" onclick="toggleEditStockItem('${it.partNumber}')">✏️ Edit</div>
+        <div class="report-action-btn danger" onclick="deleteInventoryItem('${it.partNumber}'); renderReportsList();">🗑️ Delete</div>
+      </div>
+      <div id="editstock_${it.partNumber.replace(/[^a-zA-Z0-9]/g,'_')}"></div>
+    </div>`;
+  }).join('');
+}
+
+function toggleEditStockItem(pn){
+  const safeId = pn.replace(/[^a-zA-Z0-9]/g,'_');
+  const holder = document.getElementById('editstock_'+safeId);
+  if(holder.innerHTML){ holder.innerHTML=''; return; }
+  const inv = getInventory(pn);
+  holder.innerHTML = `
+    <div class="report-edit-form">
+      <label class="field-label">Category</label>
+      <input type="text" class="form-input" id="stkedit_cat_${safeId}" value="${(inv.category||'').replace(/"/g,'&quot;')}">
+      <label class="field-label" style="margin-top:10px;display:block;">Vehicles</label>
+      <input type="text" class="form-input" id="stkedit_veh_${safeId}" value="${(inv.vehicles||'').replace(/"/g,'&quot;')}">
+      <label class="field-label" style="margin-top:10px;display:block;">Stock Qty</label>
+      <input type="number" class="form-input" id="stkedit_qty_${safeId}" value="${inv.qty}">
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="saveEditStockItem('${pn}')">💾 Save</button>
+    </div>`;
+}
+
+function saveEditStockItem(pn){
+  const safeId = pn.replace(/[^a-zA-Z0-9]/g,'_');
+  const inv = getInventory(pn);
+  inv.category = document.getElementById('stkedit_cat_'+safeId).value.trim();
+  inv.vehicles = document.getElementById('stkedit_veh_'+safeId).value.trim();
+  inv.qty = parseInt(document.getElementById('stkedit_qty_'+safeId).value, 10) || 0;
+  localStorage.setItem('inv:'+pn, JSON.stringify(inv));
+  showToast('✓ Stock updated');
+  renderReportsList();
+}
+
+document.getElementById('printReportBtn').addEventListener('click', ()=>{
+  const box = document.getElementById('reportsList');
+  let printArea = document.getElementById('printableSticker');
+  if(!printArea){
+    printArea = document.createElement('div');
+    printArea.id = 'printableSticker';
+    printArea.style.cssText = 'position:fixed;top:-9999px;left:-9999px;background:#fff;color:#000;padding:16px;';
+    document.body.appendChild(printArea);
+  }
+  printArea.innerHTML = `<h2>${REPORT_TITLES[reportsTab]} Report</h2>` + box.innerHTML.replace(/color:var\(--[a-z-]+\)/g,'color:#000');
+  window.print();
+});
 
 /* ============ STICKER SCANNER MODULE ============ */
 let stickerLines = [];
@@ -1651,7 +1977,7 @@ function checkSellStock(){
     inv2.qty -= sellQty;
     const salePrice = document.getElementById('sellPrice').value || 0;
     inv2.sales = inv2.sales || [];
-    inv2.sales.push({qty: sellQty, price: salePrice, gps: sellGPS, date: new Date().toISOString()});
+    inv2.sales.push({id: 'txn_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), qty: sellQty, price: salePrice, company: inv2.company||'', category: inv2.category||'', gps: sellGPS, date: new Date().toISOString()});
     localStorage.setItem('inv:'+pn, JSON.stringify(inv2));
     showToast(`✓ ${pn} — ${sellQty} units વેચાયા — ₹${salePrice} (બાકી stock: ${inv2.qty})`);
     document.getElementById('sellPartInput').value = '';
@@ -1831,6 +2157,15 @@ function getInventory(pn){
   }catch(e){ return null; }
 }
 
+let selectedBuyCompany = 'All';
+document.querySelectorAll('#buyCompanyChips .chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#buyCompanyChips .chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    selectedBuyCompany = chip.dataset.company;
+  });
+});
+
 document.getElementById('confirmBuyBtn').addEventListener('click', ()=>{
   const keys = Object.keys(buySession);
   if(keys.length===0){ showToast('⚠️ કંઈ scan/add નથી થયું'); return; }
@@ -1846,14 +2181,18 @@ document.getElementById('confirmBuyBtn').addEventListener('click', ()=>{
   const totalPrice = document.getElementById('buyPrice').value || 0;
 
   keys.forEach(pn=>{
-    const existing = getInventory(pn) || {qty:0, purchases:[]};
+    const existing = getInventory(pn) || {qty:0, purchases:[], sales:[]};
     existing.qty += buySession[pn];
     if(category) existing.category = category;
     if(vehicles) existing.vehicles = vehicles;
     if(location.rack || location.shelf || location.box || location.position) existing.location = location;
     existing.condition = selectedCondition;
+    existing.company = selectedBuyCompany;
+    existing.purchases = existing.purchases || [];
     existing.purchases.push({
-      qty: buySession[pn], price: totalPrice, condition: selectedCondition, gps: buyGPS, date: new Date().toISOString()
+      id: 'txn_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+      qty: buySession[pn], price: totalPrice, condition: selectedCondition, company: selectedBuyCompany,
+      category: category, gps: buyGPS, date: new Date().toISOString()
     });
     localStorage.setItem('inv:'+pn, JSON.stringify(existing));
   });
