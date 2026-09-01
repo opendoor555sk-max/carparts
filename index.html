@@ -195,8 +195,9 @@
   .inline-video-wrap{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:3/4;}
   .inline-video-wrap video{width:100%;height:100%;object-fit:cover;}
   .inline-scan-frame{position:absolute;left:15%;right:15%;top:30%;bottom:30%;border:2.5px solid var(--accent);
-    border-radius:12px;pointer-events:none;}
-  .inline-scan-frame.flash{border-color:var(--verified);box-shadow:0 0 0 4px rgba(52,211,153,0.3);}
+    border-radius:12px;pointer-events:none;transition:border-width .1s;}
+  .inline-scan-frame.flash{border-color:var(--verified);border-width:16px;
+    box-shadow:0 0 0 12px rgba(52,211,153,0.5), 0 0 40px 10px rgba(52,211,153,0.6);}
   .scanned-item{display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);
     border-radius:9px;padding:10px 13px;margin-bottom:7px;}
   .scanned-partno{font-family:var(--font-mono);font-weight:700;font-size:14px;}
@@ -338,7 +339,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-08-31-pwa-manifest</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-thick-flash</span>
       </div>
     </div>
 
@@ -1004,7 +1005,7 @@ function stopMultiScanCamera(){
 function flashMultiFrame(){
   const frame = document.getElementById('multiScanFrame');
   frame.classList.add('flash');
-  setTimeout(()=>frame.classList.remove('flash'), 400);
+  setTimeout(()=>frame.classList.remove("flash"), 900);
 }
 
 function addMultiScan(pn){
@@ -1483,7 +1484,8 @@ function flashBuyFrame(){
   const frame = document.getElementById('buyScanFrame');
   if(!frame) return;
   frame.classList.add('flash');
-  setTimeout(()=>frame.classList.remove('flash'), 400);
+  if(navigator.vibrate) navigator.vibrate(120);
+  setTimeout(()=>frame.classList.remove("flash"), 900);
 }
 
 function addBuyScan(pn){
