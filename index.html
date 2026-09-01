@@ -830,10 +830,16 @@ async function openCameraScan(targetInputId){
   }
 
   const detector = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','code_93','codabar','data_matrix','upc_a','upc_e','itf']});
+  const detectCanvas = document.createElement('canvas');
+  const detectCtx = detectCanvas.getContext('2d', {willReadFrequently:true});
 
   scanInterval = setInterval(async ()=>{
     try{
-      const codes = await detector.detect(video);
+      if(!video.videoWidth || !video.videoHeight) return; // stream not ready yet
+      detectCanvas.width = video.videoWidth;
+      detectCanvas.height = video.videoHeight;
+      detectCtx.drawImage(video, 0, 0);
+      const codes = await detector.detect(detectCanvas);
       if(codes && codes.length){
         const value = (codes[0].rawValue || '').trim();
         if(value){
@@ -1287,22 +1293,51 @@ function checkSellStock(){
       <div class="info-row"><span class="info-label">Location</span><span class="info-value">${[inv.location?.rack,inv.location?.shelf,inv.location?.box,inv.location?.position].filter(Boolean).join(' → ')||'—'}</span></div>
 
       <div class="form-group">
-        <label class="field-label">Sale Price (₹)</label>
+        <label class="field-label">Sell Quantity (max ${qty})</label>
+        <input type="number" class="form-input" id="sellQty" value="1" min="1" max="${qty}" inputmode="numeric">
+      </div>
+
+      <div class="form-group">
+        <label class="field-label">Sale Price (₹) — કુલ</label>
         <input type="number" class="form-input" id="sellPrice" placeholder="0" inputmode="numeric">
       </div>
 
-      <button class="btn btn-primary" id="confirmSellBtn" style="margin-top:18px;">💰 Confirm Sell (Stock -1)</button>
+      <div id="sellQtyError"></div>
+
+      <button class="btn btn-primary" id="confirmSellBtn" style="margin-top:18px;">💰 Confirm Sell</button>
     </div>`;
 
-  document.getElementById('confirmSellBtn').addEventListener('click', ()=>{
+  const confirmBtn = document.getElementById('confirmSellBtn');
+  confirmBtn.addEventListener('click', ()=>{
+    if(confirmBtn.disabled) return; // guard against double-tap causing double-sell
+
     const inv2 = getInventory(pn);
-    if(!inv2 || inv2.qty <= 0){ showToast('⚠️ Stock ખતમ થઈ ગયો'); checkSellStock(); return; }
-    inv2.qty -= 1;
+    const currentStock = inv2 ? inv2.qty : 0;
+    const sellQtyInput = document.getElementById('sellQty');
+    let sellQty = parseInt(sellQtyInput.value, 10);
+    const errBox = document.getElementById('sellQtyError');
+
+    if(!sellQty || sellQty < 1){
+      errBox.innerHTML = `<div class="notes-box" style="border-left-color:var(--danger);">⚠️ ઓછામાં ઓછું 1 quantity નાખો.</div>`;
+      return;
+    }
+    if(currentStock <= 0){
+      showToast('⚠️ Stock ખતમ થઈ ગયો'); checkSellStock(); return;
+    }
+    if(sellQty > currentStock){
+      errBox.innerHTML = `<div class="notes-box" style="border-left-color:var(--danger);">⚠️ સ્ટોકમાં ફક્ત ${currentStock} જ છે — એટલાથી વધારે વેચી ના શકાય.</div>`;
+      return;
+    }
+
+    confirmBtn.disabled = true;
+    confirmBtn.style.opacity = '0.5';
+
+    inv2.qty -= sellQty;
     const salePrice = document.getElementById('sellPrice').value || 0;
     inv2.sales = inv2.sales || [];
-    inv2.sales.push({price: salePrice, gps: sellGPS, date: new Date().toISOString()});
+    inv2.sales.push({qty: sellQty, price: salePrice, gps: sellGPS, date: new Date().toISOString()});
     localStorage.setItem('inv:'+pn, JSON.stringify(inv2));
-    showToast(`✓ ${pn} વેચાયો — ₹${salePrice} (બાકી stock: ${inv2.qty})`);
+    showToast(`✓ ${pn} — ${sellQty} units વેચાયા — ₹${salePrice} (બાકી stock: ${inv2.qty})`);
     document.getElementById('sellPartInput').value = '';
     zone.innerHTML = '';
     document.getElementById('sellPartInput').focus();
@@ -1373,9 +1408,16 @@ async function startBuyScanCamera(){
     return;
   }
   const detector = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','code_93','codabar','data_matrix','upc_a','upc_e','itf']});
+  const buyDetectCanvas = document.createElement('canvas');
+  const buyDetectCtx = buyDetectCanvas.getContext('2d', {willReadFrequently:true});
+
   buyScanInterval = setInterval(async ()=>{
     try{
-      const codes = await detector.detect(video);
+      if(!video.videoWidth || !video.videoHeight) return;
+      buyDetectCanvas.width = video.videoWidth;
+      buyDetectCanvas.height = video.videoHeight;
+      buyDetectCtx.drawImage(video, 0, 0);
+      const codes = await detector.detect(buyDetectCanvas);
       if(codes && codes.length){
         const raw = (codes[0].rawValue||'').trim();
         if(!raw) return;
