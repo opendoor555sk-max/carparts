@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Car Auto Parts Store</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#FF7A1A">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.6/JsBarcode.all.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -334,7 +338,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-08-31-photoscan-all-modules</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-08-31-pwa-manifest</span>
       </div>
     </div>
 
@@ -743,9 +747,17 @@ async function scanPhotoFile(file, onSuccess, onFail){
   }
   try{
     const originalBitmap = await createImageBitmap(file);
-    const bitmap = await resizeForScan(originalBitmap);
     const detector = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','code_93','codabar','data_matrix','upc_a','upc_e','itf']});
-    const codes = await detector.detect(bitmap);
+
+    // Try 1: resized (fast)
+    const resized = await resizeForScan(originalBitmap);
+    let codes = await detector.detect(resized);
+
+    // Try 2: if resized didn't find anything, retry on full original resolution (slower but more accurate)
+    if(!codes || codes.length===0){
+      codes = await detector.detect(originalBitmap);
+    }
+
     if(codes && codes.length){
       onSuccess((codes[0].rawValue||'').trim());
     } else {
@@ -757,7 +769,7 @@ async function scanPhotoFile(file, onSuccess, onFail){
 }
 
 async function resizeForScan(bitmap){
-  const MAX_DIM = 1400; // enough resolution for barcode reading, much faster than full 4000px+ phone photos
+  const MAX_DIM = 1800; // enough resolution for barcode reading, faster than full 4000px+ phone photos, with full-res fallback if this misses
   const scale = Math.min(1, MAX_DIM / Math.max(bitmap.width, bitmap.height));
   if(scale >= 1) return bitmap; // already small enough
   const canvas = document.createElement('canvas');
@@ -1738,6 +1750,12 @@ function showToast(msg){
   t.className='toast'; t.textContent=msg;
   document.body.appendChild(t);
   setTimeout(()=>t.remove(), 2500);
+}
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
 }
 </script>
 </body>
