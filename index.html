@@ -334,7 +334,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-08-31-canvas-scan-fix</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-08-31-inventory-delete</span>
       </div>
     </div>
 
@@ -1062,6 +1062,14 @@ function getAllInventory(){
   return list.sort((a,b)=> a.partNumber.localeCompare(b.partNumber));
 }
 
+function deleteInventoryItem(pn){
+  const ok = window.confirm(`"${pn}" ને Inventory માંથી કાયમ માટે DELETE કરવું છે? (Undo નહીં થાય)`);
+  if(!ok) return;
+  localStorage.removeItem('inv:'+pn);
+  showToast(`🗑️ ${pn} delete થયું`);
+  renderInventoryList(document.getElementById('invFilterInput').value.trim());
+}
+
 function renderInventoryList(filterText){
   const wrap = document.getElementById('invList');
   const countEl = document.getElementById('invCount');
@@ -1095,7 +1103,10 @@ function renderInventoryList(filterText){
           ${loc ? `<div class="req-meta">📍 ${loc}</div>` : ''}
           ${it.condition ? `<div class="req-meta">Condition: ${it.condition}</div>` : ''}
         </div>
-        <span class="status-pill" style="color:${stockColor};border-color:${stockColor};background:transparent;">${it.qty} in stock</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          <span class="status-pill" style="color:${stockColor};border-color:${stockColor};background:transparent;">${it.qty} in stock</span>
+          <button onclick="deleteInventoryItem('${it.partNumber.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--danger);font-size:11px;font-weight:700;padding:2px 4px;cursor:pointer;">🗑️ Delete</button>
+        </div>
       </div>
     </div>`;
   }).join('');
