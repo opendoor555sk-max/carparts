@@ -447,7 +447,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-ai-speed-fix</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-white-strip-fix</span>
       </div>
     </div>
 
@@ -2056,7 +2056,7 @@ function renderContinentalTemplate(box, pn){
     </div>
   `;
   const qrHolder = document.getElementById('stickerQrHolder');
-  if(qrHolder){ qrHolder.innerHTML=''; try{ new QRCode(qrHolder, {text:pn, width:50, height:50, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){} }
+  if(qrHolder){ qrHolder.innerHTML=''; try{ new QRCode(qrHolder, {text:pn, width:50, height:50, colorDark:"#000000", colorLight:"#f4f4ef"}); }catch(e){} }
   try{ JsBarcode("#stickerBarcodeSvg", pn, {format:"CODE128", displayValue:true, height:30, margin:2, fontSize:10, background:"#f4f4ef", lineColor:"#000000"}); }catch(e){}
 }
 
@@ -2153,7 +2153,7 @@ function renderGenericGridTemplate(box, pn){
       <svg id="stickerBarcodeSvg"></svg>
     </div>`;
 
-  try{ JsBarcode("#stickerBarcodeSvg", pn, {format:"CODE128", displayValue:false, height:24, margin:2, background:"#ffffff", lineColor:"#000000"}); }catch(e){}
+  try{ JsBarcode("#stickerBarcodeSvg", pn, {format:"CODE128", displayValue:false, height:24, margin:2, background:"transparent", lineColor:"#000000"}); }catch(e){}
   const qrHolder = document.getElementById('stickerQrHolder');
   if(qrHolder){ qrHolder.innerHTML=''; try{ new QRCode(qrHolder, {text:pn, width:40, height:40, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){} }
 }
