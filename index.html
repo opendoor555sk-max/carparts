@@ -217,10 +217,9 @@
   .camera-hint{padding:16px;text-align:center;color:#fff;font-size:13px;background:rgba(0,0,0,.6);}
 
   /* Sticker Scanner */
-  .sticker-preview{background:#fff;border-radius:10px;padding:18px;margin-top:14px;min-height:140px;
-    color:#111;font-family:'IBM Plex Mono',monospace;position:relative;}
-  .sticker-preview .st-line{font-size:13px;line-height:1.5;margin-bottom:3px;word-break:break-word;}
-  .sticker-preview .st-partno{font-size:17px;font-weight:700;}
+  .sticker-preview{background:#fff;border-radius:6px;padding:6px;margin-top:14px;
+    color:#111;font-family:'IBM Plex Mono',monospace;position:relative;overflow:hidden;}
+  .sticker-preview .st-line{font-size:9px;line-height:1.25;word-break:break-word;}
   .sticker-codes{display:flex;justify-content:flex-end;margin-top:8px;}
   .sticker-upload-photo{width:100%;max-height:200px;object-fit:contain;border-radius:8px;margin-top:12px;background:#000;}
   .format-chips{display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding-bottom:2px;}
@@ -232,6 +231,24 @@
   .st-del-btn{background:none;border:none;color:var(--danger);font-size:18px;padding:4px 8px;cursor:pointer;}
   .saved-sticker-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);
     padding:7px 12px;border-radius:8px;font-family:var(--font-mono);font-size:12.5px;margin:4px 6px 0 0;cursor:pointer;}
+
+  /* Hyundai/Kia dedicated label template (matches manufacturer reference design) */
+  .hk-label{background:#fff;padding:4% 6%;display:flex;flex-direction:column;justify-content:space-between;font-family:Arial,Helvetica,sans-serif;color:#111;height:100%;}
+  .hk-top-row{display:flex;justify-content:space-between;align-items:flex-start;}
+  .hk-brand{display:flex;align-items:center;gap:6px;}
+  .hk-brand .hk-hyundai{font-weight:800;font-size:clamp(9px,3.4vw,15px);color:#002c5f;letter-spacing:0.3px;}
+  .hk-brand .hk-divider{width:1px;height:clamp(10px,3.8vw,17px);background:#999;}
+  .hk-brand .hk-kia{font-weight:900;font-size:clamp(10px,3.7vw,16px);color:#05141f;letter-spacing:0.5px;font-style:italic;}
+  .hk-company{font-size:clamp(8px,3.1vw,13px);font-weight:700;margin-top:6px;color:#111;}
+  .hk-qr{width:clamp(30px,14vw,60px);aspect-ratio:1/1;flex-shrink:0;}
+  .hk-content-row{display:flex;justify-content:space-between;gap:4%;}
+  .hk-col p{margin:0.5px 0;font-size:clamp(6px,2.4vw,10px);font-weight:400;color:#111;line-height:1.35;}
+  .hk-col .hk-bold-line{font-weight:700;}
+  .hk-center-line{text-align:center;font-size:clamp(8px,3vw,12px);font-weight:700;}
+  .hk-footer{text-align:center;font-size:clamp(5.5px,2vw,8px);font-weight:600;letter-spacing:0.3px;color:#111;}
+  .logo-box{border:1.5px dashed #999;border-radius:4px;display:flex;align-items:center;justify-content:center;
+    position:relative;overflow:hidden;cursor:pointer;
+    color:#999;font-size:8px;font-family:Arial,sans-serif;background:#fafafa;}
 
   /* Reports */
   .report-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:9px;}
@@ -247,7 +264,7 @@
   @media print{
     body *{visibility:hidden;}
     #printableSticker, #printableSticker *{visibility:visible;}
-    #printableSticker{position:absolute;top:0;left:0;width:100%;}
+    #printableSticker{position:absolute;top:0;left:0;}
   }
 </style>
 </head>
@@ -401,7 +418,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-ai-sticker-vision</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-simple-logo-upload</span>
       </div>
     </div>
 
@@ -1319,17 +1336,31 @@ document.getElementById('printReportBtn').addEventListener('click', ()=>{
   if(!printArea){
     printArea = document.createElement('div');
     printArea.id = 'printableSticker';
-    printArea.style.cssText = 'position:fixed;top:-9999px;left:-9999px;background:#fff;color:#000;padding:16px;';
     document.body.appendChild(printArea);
   }
+  printArea.style.cssText = 'position:fixed;top:-9999px;left:-9999px;background:#fff;color:#000;padding:16px;width:auto;height:auto;';
   printArea.innerHTML = `<h2>${REPORT_TITLES[reportsTab]} Report</h2>` + box.innerHTML.replace(/color:var\(--[a-z-]+\)/g,'color:#000');
   window.print();
 });
 
 /* ============ STICKER SCANNER MODULE ============ */
-let stickerLines = [];
+let stickerLines = []; // array of {text, position} objects, position: one of 9 grid zones
 let stickerFormat = 'Generic';
 let stickerPhotoDataUrl = null;
+let stickerLogoDataUrl = null;
+let stickerWidthMM = 70;
+let stickerHeightMM = 45;
+const STICKER_POSITIONS = ['top-left','top-center','top-right','mid-left','center','mid-right','bottom-left','bottom-center','bottom-right'];
+const LABEL_SIZE_CHART = {
+  '01P': {count:1, w:210, h:297}, '02L': {count:2, w:200, h:146}, '04P': {count:4, w:100, h:145},
+  '06L': {count:6, w:99, h:93}, '08L': {count:8, w:100, h:72}, '08LA': {count:8, w:90, h:55},
+  '12L': {count:12, w:100, h:44}, '15L': {count:15, w:61, h:21}, '16L': {count:16, w:99, h:34},
+  '18L': {count:18, w:63.5, h:46.6}, '21L': {count:21, w:63.5, h:38}, '22L': {count:22, w:100, h:24},
+  '24L': {count:24, w:64, h:34}, '30L': {count:30, w:67, h:27.5}, '30P': {count:30, w:39, h:47.5},
+  '32P': {count:32, w:25, h:70}, '40L': {count:40, w:39, h:35}, '40P': {count:40, w:18, h:73},
+  '48L': {count:48, w:48, h:24}, '56L': {count:56, w:48, h:20}, '65L': {count:65, w:38, h:21},
+  '84L': {count:84, w:46, h:11}, '110L': {count:110, w:35, h:10}
+};
 
 const STICKER_FORMATS = ['Generic', 'Hyundai / Kia', 'Maruti Suzuki', 'Tata', 'Mahindra', 'Toyota', 'Honda'];
 
@@ -1366,10 +1397,11 @@ async function handleStickerPhoto(file){
   const img = document.getElementById('stickerPhotoPreview');
   img.src = stickerPhotoDataUrl;
   img.classList.remove('hidden');
+  stickerLogoDataUrl = null;
 
   const apiKey = localStorage.getItem('gemini_api_key');
   if(!apiKey){
-    stickerLines = [''];
+    stickerLines = [{text:'', position:'center'}];
     stickerFormat = 'Generic';
     openStickerEditor();
     showToast('⚠️ ⚙️ Settings માં Gemini key નાખો — auto-read માટે જરૂરી. હમણાં manually ટાઈપ કરો.');
@@ -1378,13 +1410,16 @@ async function handleStickerPhoto(file){
 
   showToast('⏳ AI ફોટો વાંચી રહ્યું છે... (થોડી સેકંડ)');
   try{
-    const lines = await geminiReadSticker(stickerPhotoDataUrl, apiKey);
-    stickerLines = lines.length ? lines : [''];
-    stickerFormat = 'Generic';
+    const result = await geminiReadSticker(stickerPhotoDataUrl, apiKey);
+    stickerLines = result.lines.length ? result.lines : [{text:'', position:'center'}];
+    stickerWidthMM = result.widthMM;
+    stickerHeightMM = result.heightMM;
+    const allText = stickerLines.map(l=>l.text).join(' ').toUpperCase();
+    stickerFormat = (allText.includes('HYUNDAI') || allText.includes('KIA') || allText.includes('HKMC')) ? 'Hyundai / Kia' : 'Generic';
     openStickerEditor();
-    showToast('✓ AI એ ટેક્સ્ટ વાંચ્યું — ચેક/edit કરી લો');
+    showToast('✓ AI એ ટેક્સ્ટ + position વાંચ્યું — logo ✂️ crop કરો, ચેક/edit કરી લો');
   }catch(e){
-    stickerLines = [''];
+    stickerLines = [{text:'', position:'center'}];
     stickerFormat = 'Generic';
     openStickerEditor();
     showToast('⚠️ AI read નિષ્ફળ (' + e.message + ') — manually ટાઈપ કરો');
@@ -1398,7 +1433,18 @@ async function geminiReadSticker(dataUrl, apiKey){
   const mimeMatch = dataUrl.match(/^data:(image\/[a-z]+);/);
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
-  const prompt = `This is a photo of an automotive spare part label/sticker. Read EVERY line of text visible on it exactly as printed (part numbers, model codes, company name, lot numbers, dates, certification marks — everything, in top-to-bottom reading order). Respond with ONLY a raw JSON array of strings, one string per line, no markdown, no explanation. Example: ["CONTINENTAL IB61","95400-K6610","MADE IN INDIA"]`;
+  const prompt = `This is a photo of an automotive spare part label/sticker. Read EVERY line of text visible on it exactly as printed (part numbers, model codes, company name, lot numbers, dates, certification marks — everything). For each line, also identify its approximate position on the label using ONE of these 9 zones: "top-left","top-center","top-right","mid-left","center","mid-right","bottom-left","bottom-center","bottom-right" — matching where that text actually appears on the original label. Also estimate the label's approximate physical size in millimeters (typical automotive labels are 40-100mm wide).
+
+Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure:
+{
+  "widthMM": 70,
+  "heightMM": 45,
+  "lines": [
+    {"text": "CONTINENTAL", "position": "top-left"},
+    {"text": "95400-K6610", "position": "top-right"},
+    {"text": "MADE IN INDIA", "position": "bottom-center"}
+  ]
+}`;
 
   const models = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
   let lastError = null;
@@ -1420,10 +1466,16 @@ async function geminiReadSticker(dataUrl, apiKey){
       const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
       const text = parts.map(p=>p.text||'').join('\n').trim();
       const cleaned = text.replace(/```json|```/g,'').trim();
-      const arrMatch = cleaned.match(/\[[\s\S]*\]/);
-      if(!arrMatch){ lastError = new Error('AI જવાબ સમજાયો નહીં'); continue; }
-      const arr = JSON.parse(arrMatch[0]);
-      if(Array.isArray(arr) && arr.length) return arr.map(String);
+      const objMatch = cleaned.match(/\{[\s\S]*\}/);
+      if(!objMatch){ lastError = new Error('AI જવાબ સમજાયો નહીં'); continue; }
+      const result = JSON.parse(objMatch[0]);
+      if(result.lines && Array.isArray(result.lines) && result.lines.length){
+        return {
+          lines: result.lines.map(l=>({text:String(l.text||''), position: STICKER_POSITIONS.includes(l.position)?l.position:'center'})),
+          widthMM: Number(result.widthMM) || 70,
+          heightMM: Number(result.heightMM) || 45
+        };
+      }
       lastError = new Error('ખાલી પરિણામ');
     }catch(e){ lastError = e; }
   }
@@ -1434,9 +1486,11 @@ document.getElementById('stickerCreateBtn').addEventListener('click', ()=>{
   const pn = document.getElementById('stickerPartInput').value.trim().toUpperCase();
   if(!pn){ showToast('⚠️ Part number નાખો'); return; }
   stickerPhotoDataUrl = null;
+  stickerLogoDataUrl = null;
   document.getElementById('stickerPhotoPreview').classList.add('hidden');
-  stickerLines = [pn];
+  stickerLines = [{text:pn, position:'center'}];
   stickerFormat = 'Generic';
+  stickerWidthMM = 70; stickerHeightMM = 45;
   openStickerEditor();
 });
 
@@ -1444,12 +1498,35 @@ function openStickerEditor(){
   const zone = document.getElementById('stickerEditorZone');
   zone.innerHTML = `
     <div class="part-detail" style="margin-top:16px;">
-      <div class="pd-label">LIVE PREVIEW</div>
-      <div class="sticker-preview" id="stickerPreviewBox"></div>
+      <div class="pd-label">LIVE PREVIEW (મૂળ sticker જેવું જ)</div>
+      <div class="sticker-preview" id="stickerPreviewBox" style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:2px;"></div>
 
-      ${stickerPhotoDataUrl ? `<img src="${stickerPhotoDataUrl}" class="sticker-upload-photo" style="margin-top:14px;"><div class="notes-box" style="margin-top:8px;">ઉપરનો ફોટો જોઈને, નીચે સાચી લાઈનો ટાઈપ કરો</div>` : ''}
+      <label class="field-label" style="margin-top:16px;display:block;">Logo — ટેપ કરીને upload કરો</label>
+      <div class="logo-box" id="logoBox" style="width:110px;height:44px;margin-top:6px;">
+        ${stickerLogoDataUrl ? `<img src="${stickerLogoDataUrl}" style="width:100%;height:100%;object-fit:contain;">` : `<span>Tap to add logo</span>`}
+        <input type="file" accept="image/*" id="logoInput" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
+      </div>
+      ${stickerLogoDataUrl ? `<button class="btn btn-ghost" id="clearLogoBtn" style="margin-top:8px;">✕ Logo કાઢો</button>` : ''}
 
-      <label class="field-label" style="margin-top:16px;display:block;">Text Lines (edit/add/remove)</label>
+      <div class="form-row2" style="margin-top:16px;">
+        <div>
+          <label class="field-label">Width (mm)</label>
+          <input type="number" class="form-input" id="stickerWidthInput" value="${stickerWidthMM}">
+        </div>
+        <div>
+          <label class="field-label">Height (mm)</label>
+          <input type="number" class="form-input" id="stickerHeightInput" value="${stickerHeightMM}">
+        </div>
+      </div>
+
+      <label class="field-label" style="margin-top:14px;display:block;">Standard Label Code (A4 sheet) — તાપ કરો size auto-set માટે</label>
+      <div class="format-chips" id="labelCodeChips">
+        ${Object.keys(LABEL_SIZE_CHART).map(code=>`<div class="format-chip" onclick="applyLabelCode('${code}')">${code} (${LABEL_SIZE_CHART[code].count})</div>`).join('')}
+      </div>
+
+      ${stickerPhotoDataUrl ? `<label class="field-label" style="margin-top:16px;display:block;">Original Photo (reference)</label><img src="${stickerPhotoDataUrl}" class="sticker-upload-photo">` : ''}
+
+      <label class="field-label" style="margin-top:16px;display:block;">Text Lines — position પસંદ કરો (મૂળ sticker પર જ્યાં હોય ત્યાં)</label>
       <div id="stickerLinesWrap"></div>
       <button class="btn btn-ghost" id="addStickerLineBtn" style="margin-top:10px;">➕ Line ઉમેરો</button>
 
@@ -1466,8 +1543,24 @@ function openStickerEditor(){
   renderStickerFormatChips();
   renderStickerPreview();
 
+  document.getElementById('logoInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      stickerLogoDataUrl = ev.target.result;
+      openStickerEditor();
+    };
+    reader.readAsDataURL(file);
+  });
+  const clearBtn = document.getElementById('clearLogoBtn');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{ stickerLogoDataUrl=null; openStickerEditor(); });
+
+  document.getElementById('stickerWidthInput').addEventListener('input', e=>{ stickerWidthMM = Number(e.target.value)||70; renderStickerPreview(); });
+  document.getElementById('stickerHeightInput').addEventListener('input', e=>{ stickerHeightMM = Number(e.target.value)||45; renderStickerPreview(); });
+
   document.getElementById('addStickerLineBtn').addEventListener('click', ()=>{
-    stickerLines.push('');
+    stickerLines.push({text:'', position:'center'});
     renderStickerLines();
     renderStickerPreview();
   });
@@ -1478,16 +1571,17 @@ function openStickerEditor(){
 function renderStickerLines(){
   const wrap = document.getElementById('stickerLinesWrap');
   wrap.innerHTML = stickerLines.map((line, i)=>`
-    <div class="st-textline-row">
-      <input type="text" class="form-input" style="margin-top:0;" value="${line.replace(/"/g,'&quot;')}" oninput="updateStickerLine(${i}, this.value)" placeholder="લાઈન ${i+1}">
+    <div class="st-textline-row" style="flex-wrap:wrap;">
+      <input type="text" class="form-input" style="margin-top:0;flex:2;" value="${(line.text||'').replace(/"/g,'&quot;')}" oninput="updateStickerLineText(${i}, this.value)" placeholder="લાઈન ${i+1}">
+      <select class="form-input" style="margin-top:0;flex:1;min-width:110px;" onchange="updateStickerLinePosition(${i}, this.value)">
+        ${STICKER_POSITIONS.map(p=>`<option value="${p}" ${line.position===p?'selected':''}>${p}</option>`).join('')}
+      </select>
       <button class="st-del-btn" onclick="removeStickerLine(${i})">✕</button>
     </div>`).join('');
 }
 
-function updateStickerLine(i, val){
-  stickerLines[i] = val;
-  renderStickerPreview();
-}
+function updateStickerLineText(i, val){ stickerLines[i].text = val; renderStickerPreview(); }
+function updateStickerLinePosition(i, val){ stickerLines[i].position = val; renderStickerPreview(); }
 function removeStickerLine(i){
   stickerLines.splice(i,1);
   renderStickerLines();
@@ -1507,36 +1601,121 @@ function setStickerFormat(f){
 }
 
 function guessStickerPartNumber(){
-  // use first non-empty line as the "part number" for barcode/QR encoding
-  return (stickerLines.find(l=>l.trim()) || 'PARTNO').trim();
+  const found = stickerLines.find(l=> (l.text||'').trim());
+  return found ? found.text.trim() : 'PARTNO';
 }
+
+const POS_GRID_MAP = {
+  'top-left':'1/1', 'top-center':'1/2', 'top-right':'1/3',
+  'mid-left':'2/1', 'center':'2/2', 'mid-right':'2/3',
+  'bottom-left':'3/1', 'bottom-center':'3/2', 'bottom-right':'3/3'
+};
+const POS_ALIGN_MAP = {
+  'top-left':'flex-start;text-align:left', 'top-center':'flex-start;text-align:center', 'top-right':'flex-start;text-align:right',
+  'mid-left':'center;text-align:left', 'center':'center;text-align:center', 'mid-right':'center;text-align:right',
+  'bottom-left':'flex-end;text-align:left', 'bottom-center':'flex-end;text-align:center', 'bottom-right':'flex-end;text-align:right'
+};
 
 function renderStickerPreview(){
   const box = document.getElementById('stickerPreviewBox');
   if(!box) return;
   const pn = guessStickerPartNumber();
-  const companyHeader = stickerFormat !== 'Generic' ? `<div class="st-line" style="font-weight:800;font-size:15px;margin-bottom:6px;">${stickerFormat.toUpperCase()}</div>` : '';
+
+  box.style.width = '100%';
+  box.style.aspectRatio = `${stickerWidthMM} / ${stickerHeightMM}`;
+
+  if(stickerFormat === 'Hyundai / Kia'){
+    renderHyundaiKiaTemplate(box, pn);
+    return;
+  }
+  renderGenericGridTemplate(box, pn);
+}
+
+function renderHyundaiKiaTemplate(box, pn){
+  box.style.display = 'block';
+  box.style.padding = '0';
+
+  // left column = mid-left lines, right column = mid-right lines, top-left extra text = company line, bottom-center = big center line, bottom-left/right = footer
+  const leftLines = stickerLines.filter(l=>l.position==='mid-left').map(l=>l.text);
+  const rightLines = stickerLines.filter(l=>l.position==='mid-right').map(l=>l.text);
+  const companyLine = (stickerLines.find(l=>l.position==='top-left')||{}).text || '';
+  const centerLine = (stickerLines.find(l=>l.position==='bottom-center')||{}).text || '';
+  const footerLine = stickerLines.filter(l=>l.position==='bottom-left'||l.position==='bottom-right').map(l=>l.text).join(' • ');
+
+  const logoHtml = stickerLogoDataUrl
+    ? `<img src="${stickerLogoDataUrl}" style="max-height:100%;max-width:100%;object-fit:contain;">`
+    : stickerPhotoDataUrl
+      ? `<div class="logo-box" style="width:80px;height:32px;">logo here</div>`
+      : `<div class="hk-brand"><span class="hk-hyundai">HYUNDAI</span><div class="hk-divider"></div><span class="hk-kia">KIA</span></div>`;
+
   box.innerHTML = `
-    ${companyHeader}
-    <div style="display:flex;justify-content:space-between;gap:12px;">
-      <div style="flex:1;min-width:0;">
-        ${stickerLines.map((l,i)=> i===0 ? `<div class="st-line st-partno">${l||'&nbsp;'}</div>` : `<div class="st-line">${l||'&nbsp;'}</div>`).join('')}
+    <div class="hk-label">
+      <div class="hk-top-row">
+        <div>
+          ${logoHtml}
+          <div class="hk-company">${companyLine || ''}</div>
+        </div>
+        <div class="hk-qr" id="stickerQrHolder"></div>
       </div>
-      <div style="flex-shrink:0;text-align:center;">
-        <div id="stickerQrHolder"></div>
+      <div class="hk-content-row">
+        <div class="hk-col">${leftLines.map(t=>`<p>${t}</p>`).join('')}</div>
+        <div class="hk-col">${rightLines.map((t,i)=>`<p class="${i===1?'hk-bold-line':''}">${t}</p>`).join('')}</div>
+      </div>
+      <div>
+        ${centerLine ? `<div class="hk-center-line">${centerLine}</div>` : ''}
+        ${footerLine ? `<div class="hk-footer">${footerLine}</div>` : ''}
       </div>
     </div>
-    <div class="sticker-codes"><svg id="stickerBarcodeSvg"></svg></div>
   `;
-  try{ JsBarcode("#stickerBarcodeSvg", pn, {format:"CODE128", displayValue:false, height:36, margin:4, background:"#ffffff", lineColor:"#000000"}); }catch(e){}
   const qrHolder = document.getElementById('stickerQrHolder');
-  qrHolder.innerHTML = '';
-  try{ new QRCode(qrHolder, {text:pn, width:70, height:70, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){}
+  if(qrHolder){ qrHolder.innerHTML=''; try{ new QRCode(qrHolder, {text:pn, width:60, height:60, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){} }
+}
+
+function renderGenericGridTemplate(box, pn){
+  box.style.display = 'grid';
+  box.style.gridTemplateColumns = '1fr 1fr 1fr';
+  box.style.gridTemplateRows = '1fr 1fr 1fr';
+  box.style.gap = '2px';
+  box.style.padding = '6px';
+
+  // group lines by grid cell
+  const cells = {};
+  stickerLines.forEach(l=>{
+    const key = l.position || 'center';
+    if(!cells[key]) cells[key] = [];
+    cells[key].push(l.text || '');
+  });
+
+  let html = '';
+  Object.keys(POS_GRID_MAP).forEach(pos=>{
+    const [r,c] = POS_GRID_MAP[pos].split('/');
+    const [justify, textAlign] = POS_ALIGN_MAP[pos].split(';text-align:');
+    const content = (cells[pos]||[]).map(t=>`<div class="st-line">${t||''}</div>`).join('');
+    if(content){
+      html += `<div style="grid-row:${r};grid-column:${c};display:flex;flex-direction:column;justify-content:${justify};align-items:${textAlign==='left'?'flex-start':textAlign==='right'?'flex-end':'center'};text-align:${textAlign};overflow:hidden;padding:2px;">${content}</div>`;
+    }
+  });
+
+  const logoHtml = stickerLogoDataUrl
+    ? `<img src="${stickerLogoDataUrl}" style="grid-row:1;grid-column:1;max-width:100%;max-height:100%;object-fit:contain;justify-self:start;align-self:start;">`
+    : stickerPhotoDataUrl
+      ? `<div class="logo-box" style="grid-row:1;grid-column:1;width:60px;height:26px;justify-self:start;align-self:start;">logo here</div>`
+      : '';
+
+  box.innerHTML = html + logoHtml +
+    `<div style="grid-row:3;grid-column:1/4;display:flex;justify-content:center;align-items:flex-end;gap:8px;">
+      <div id="stickerQrHolder"></div>
+      <svg id="stickerBarcodeSvg"></svg>
+    </div>`;
+
+  try{ JsBarcode("#stickerBarcodeSvg", pn, {format:"CODE128", displayValue:false, height:24, margin:2, background:"#ffffff", lineColor:"#000000"}); }catch(e){}
+  const qrHolder = document.getElementById('stickerQrHolder');
+  if(qrHolder){ qrHolder.innerHTML=''; try{ new QRCode(qrHolder, {text:pn, width:40, height:40, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){} }
 }
 
 function saveCurrentSticker(){
   const pn = guessStickerPartNumber();
-  const data = {partNumber:pn, lines: stickerLines.slice(), format: stickerFormat, savedAt: new Date().toISOString()};
+  const data = {partNumber:pn, lines: stickerLines.slice(), format: stickerFormat, widthMM: stickerWidthMM, heightMM: stickerHeightMM, logo: stickerLogoDataUrl, savedAt: new Date().toISOString()};
   localStorage.setItem('sticker:'+pn, JSON.stringify(data));
   showToast(`✓ "${pn}" sticker saved`);
   renderStickerSavedList();
@@ -1548,9 +1727,9 @@ function printCurrentSticker(){
   if(!printArea){
     printArea = document.createElement('div');
     printArea.id = 'printableSticker';
-    printArea.style.cssText = 'position:fixed;top:-9999px;left:-9999px;background:#fff;padding:16px;';
     document.body.appendChild(printArea);
   }
+  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;background:#fff;width:${stickerWidthMM}mm;height:${stickerHeightMM}mm;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:1mm;padding:2mm;box-sizing:border-box;color:#111;font-family:'IBM Plex Mono',monospace;`;
   printArea.innerHTML = box.innerHTML;
   window.print();
 }
@@ -1579,6 +1758,9 @@ function loadSavedSticker(pn){
     const data = JSON.parse(localStorage.getItem('sticker:'+pn));
     stickerLines = data.lines.slice();
     stickerFormat = data.format || 'Generic';
+    stickerWidthMM = data.widthMM || 70;
+    stickerHeightMM = data.heightMM || 45;
+    stickerLogoDataUrl = data.logo || null;
     stickerPhotoDataUrl = null;
     document.getElementById('stickerPhotoPreview').classList.add('hidden');
     openStickerEditor();
