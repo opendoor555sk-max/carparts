@@ -430,7 +430,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-continental-custom-formats</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-huggingface-fallback</span>
       </div>
     </div>
 
@@ -750,6 +750,28 @@
           5️⃣ ઉપર paste કરીને Save કરો
         </div>
       </div>
+
+      <div class="search-hero" style="margin-top:24px;">
+        <h1>Hugging Face API Key</h1>
+        <p>Sticker Scanner ના AI-read માટે backup — Gemini quota ખતમ થાય તો આ આપોઆપ વપરાય. ફ્રી, card જરૂરી નથી.</p>
+      </div>
+
+      <div class="scan-plate">
+        <label class="field-label">Hugging Face Token (hf_...)</label>
+        <input type="text" class="part-input" id="hfKeyInput" placeholder="hf_..." style="text-transform:none;font-size:14px;" autocomplete="off">
+        <button class="btn btn-primary" id="saveHfKeyBtn">💾 Save Key</button>
+      </div>
+
+      <div class="part-detail" style="margin-top:16px;">
+        <div class="pd-label">Key કેવી રીતે મેળવવી (ફ્રી)</div>
+        <div class="notes-box ok" style="margin-top:12px;">
+          1️⃣ huggingface.co/settings/tokens ખોલો<br>
+          2️⃣ "New token" દબાવો<br>
+          3️⃣ Type: "Inference" પસંદ કરો<br>
+          4️⃣ Token copy કરો (hf_... થી શરૂ થાય)<br>
+          5️⃣ ઉપર paste કરીને Save કરો
+        </div>
+      </div>
     </div>
 
   </div>
@@ -800,6 +822,7 @@ document.getElementById('openSettings').addEventListener('click', ()=>{
   document.getElementById('topbarHome').classList.add('hidden');
   document.getElementById('topbarSettings').classList.remove('hidden');
   document.getElementById('geminiKeyInput').value = localStorage.getItem('gemini_api_key') || '';
+  document.getElementById('hfKeyInput').value = localStorage.getItem('hf_api_key') || '';
 });
 document.getElementById('backFromSettings').addEventListener('click', ()=>{
   document.getElementById('view-settings').classList.add('hidden');
@@ -812,6 +835,12 @@ document.getElementById('saveKeyBtn').addEventListener('click', ()=>{
   if(!key){ showToast('⚠️ Key નાખો'); return; }
   localStorage.setItem('gemini_api_key', key);
   showToast('✓ Key saved');
+});
+document.getElementById('saveHfKeyBtn').addEventListener('click', ()=>{
+  const key = document.getElementById('hfKeyInput').value.trim();
+  if(!key){ showToast('⚠️ Key નાખો'); return; }
+  localStorage.setItem('hf_api_key', key);
+  showToast('✓ Hugging Face Key saved');
 });
 
 document.querySelectorAll('.module-card:not(#openSearch):not(#openBuy):not(#openSell):not(#openReq):not(#openInventory):not(#openMultiBuy):not(#openSticker):not(#openReports)').forEach(c=>{
@@ -1422,18 +1451,33 @@ async function handleStickerPhoto(file){
   img.classList.remove('hidden');
   stickerLogoDataUrl = null;
 
-  const apiKey = localStorage.getItem('gemini_api_key');
-  if(!apiKey){
+  const geminiKey = localStorage.getItem('gemini_api_key');
+  const hfKey = localStorage.getItem('hf_api_key');
+
+  if(!geminiKey && !hfKey){
     stickerLines = [{text:'', position:'center'}];
     stickerFormat = 'Generic';
     openStickerEditor();
-    showToast('⚠️ ⚙️ Settings માં Gemini key નાખો — auto-read માટે જરૂરી. હમણાં manually ટાઈપ કરો.');
+    showToast('⚠️ ⚙️ Settings માં Gemini કે Hugging Face key નાખો — auto-read માટે જરૂરી. હમણાં manually ટાઈપ કરો.');
     return;
   }
 
   showToast('⏳ AI ફોટો વાંચી રહ્યું છે... (થોડી સેકંડ)');
-  try{
-    const result = await geminiReadSticker(stickerPhotoDataUrl, apiKey);
+  let result = null;
+  let lastError = null;
+
+  if(geminiKey){
+    try{ result = await geminiReadSticker(stickerPhotoDataUrl, geminiKey); }
+    catch(e){ lastError = e; }
+  }
+
+  if(!result && hfKey){
+    if(geminiKey) showToast('⏳ Gemini નિષ્ફળ — Hugging Face થી ટ્રાય કરું છું...');
+    try{ result = await hfReadSticker(stickerPhotoDataUrl, hfKey); }
+    catch(e){ lastError = e; }
+  }
+
+  if(result){
     stickerLines = result.lines.length ? result.lines : [{text:'', position:'center'}];
     stickerWidthMM = result.widthMM;
     stickerHeightMM = result.heightMM;
@@ -1441,11 +1485,11 @@ async function handleStickerPhoto(file){
     stickerFormat = (allText.includes('HYUNDAI') || allText.includes('KIA') || allText.includes('HKMC')) ? 'Hyundai / Kia' : 'Generic';
     openStickerEditor();
     showToast('✓ AI એ ટેક્સ્ટ + position વાંચ્યું — logo ✂️ crop કરો, ચેક/edit કરી લો');
-  }catch(e){
+  } else {
     stickerLines = [{text:'', position:'center'}];
     stickerFormat = 'Generic';
     openStickerEditor();
-    showToast('⚠️ AI read નિષ્ફળ (' + e.message + ') — manually ટાઈપ કરો');
+    showToast('⚠️ AI read નિષ્ફળ (' + (lastError ? lastError.message : 'unknown') + ') — manually ટાઈપ કરો');
   }
 }
 document.getElementById('stickerGalleryInput').addEventListener('change', e=> handleStickerPhoto(e.target.files[0]));
@@ -1503,6 +1547,41 @@ Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure
     }catch(e){ lastError = e; }
   }
   throw lastError || new Error('બધા models નિષ્ફળ');
+}
+
+async function hfReadSticker(dataUrl, hfToken){
+  const prompt = `This is a photo of an automotive spare part label/sticker. Read EVERY line of text visible on it exactly as printed (part numbers, model codes, company name, lot numbers, dates, certification marks — everything). For each line, also identify its approximate position on the label using ONE of these 9 zones: "top-left","top-center","top-right","mid-left","center","mid-right","bottom-left","bottom-center","bottom-right" — matching where that text actually appears on the original label. Also estimate the label's approximate physical size in millimeters (typical automotive labels are 40-100mm wide).
+
+Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure:
+{"widthMM": 70, "heightMM": 45, "lines": [{"text": "CONTINENTAL", "position": "top-left"}, {"text": "95400-K6610", "position": "top-right"}]}`;
+
+  const response = await fetch('https://router.huggingface.co/v1/chat/completions', {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "Authorization": `Bearer ${hfToken}`},
+    body: JSON.stringify({
+      model: "meta-llama/Llama-3.2-11B-Vision-Instruct",
+      messages: [{
+        role: "user",
+        content: [
+          {type: "text", text: prompt},
+          {type: "image_url", image_url: {url: dataUrl}}
+        ]
+      }]
+    })
+  });
+  const data = await response.json();
+  if(data.error) throw new Error(data.error.message || 'Hugging Face error');
+  const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+  const cleaned = text.replace(/```json|```/g,'').trim();
+  const objMatch = cleaned.match(/\{[\s\S]*\}/);
+  if(!objMatch) throw new Error('AI જવાબ સમજાયો નહીં');
+  const result = JSON.parse(objMatch[0]);
+  if(!(result.lines && Array.isArray(result.lines) && result.lines.length)) throw new Error('ખાલી પરિણામ');
+  return {
+    lines: result.lines.map(l=>({text:String(l.text||''), position: STICKER_POSITIONS.includes(l.position)?l.position:'center'})),
+    widthMM: Number(result.widthMM) || 70,
+    heightMM: Number(result.heightMM) || 45
+  };
 }
 
 document.getElementById('stickerCreateBtn').addEventListener('click', ()=>{
