@@ -233,22 +233,18 @@
     padding:7px 12px;border-radius:8px;font-family:var(--font-mono);font-size:12.5px;margin:4px 6px 0 0;cursor:pointer;}
 
   /* Hyundai/Kia dedicated label template (matches manufacturer reference design) */
-  .hk-label{background:#fff;padding:4% 6%;display:flex;flex-direction:column;justify-content:space-between;font-family:Arial,Helvetica,sans-serif;color:#111;height:100%;}
-  .hk-top-row{display:flex;justify-content:space-between;align-items:flex-start;}
-  .hk-brand{display:flex;align-items:center;gap:6px;}
-  .hk-brand .hk-hyundai{font-weight:800;font-size:clamp(9px,3.4vw,15px);color:#002c5f;letter-spacing:0.3px;}
-  .hk-brand .hk-divider{width:1px;height:clamp(10px,3.8vw,17px);background:#999;}
-  .hk-brand .hk-kia{font-weight:900;font-size:clamp(10px,3.7vw,16px);color:#05141f;letter-spacing:0.5px;font-style:italic;}
-  .hk-company{font-size:clamp(8px,3.1vw,13px);font-weight:700;margin-top:6px;color:#111;}
-  .hk-qr{width:clamp(30px,14vw,60px);aspect-ratio:1/1;flex-shrink:0;}
-  .hk-content-row{display:flex;justify-content:space-between;gap:4%;}
-  .hk-col p{margin:0.5px 0;font-size:clamp(6px,2.4vw,10px);font-weight:400;color:#111;line-height:1.35;}
-  .hk-col .hk-bold-line{font-weight:700;}
-  .hk-center-line{text-align:center;font-size:clamp(8px,3vw,12px);font-weight:700;}
-  .hk-footer{text-align:center;font-size:clamp(5.5px,2vw,8px);font-weight:600;letter-spacing:0.3px;color:#111;}
-  .logo-box{border:1.5px dashed #999;border-radius:4px;display:flex;align-items:center;justify-content:center;
-    position:relative;overflow:hidden;cursor:pointer;
-    color:#999;font-size:8px;font-family:Arial,sans-serif;background:#fafafa;}
+  .label{background:#fff;padding:4% 6%;display:flex;flex-direction:column;justify-content:space-between;font-family:Arial,Helvetica,sans-serif;color:#111;height:100%;}
+  .top-row{display:flex;justify-content:space-between;align-items:flex-start;}
+  .logo-box{border:1px dashed #bbb;border-radius:4px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;overflow:hidden;position:relative;color:#aaa;font-size:clamp(6px,2vw,9px);font-family:Arial,sans-serif;background:#fff;}
+  .logo-box img{width:100%;height:100%;object-fit:contain;}
+  .company{font-size:clamp(8px,3.1vw,13px);font-weight:700;margin-top:6px;color:#111;}
+  .qr{width:clamp(30px,14vw,60px);aspect-ratio:1/1;flex-shrink:0;}
+  .content-row{display:flex;justify-content:space-between;gap:4%;}
+  .col p{margin:0.5px 0;font-size:clamp(6px,2.4vw,10px);font-weight:400;color:#111;line-height:1.35;}
+  .col .bold-line{font-weight:700;}
+  .center-line{text-align:center;font-size:clamp(8px,3vw,12px);font-weight:700;}
+  .footer{text-align:center;font-size:clamp(5.5px,2vw,8px);font-weight:600;letter-spacing:0.3px;color:#111;}
 
   /* Reports */
   .report-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:9px;}
@@ -418,7 +414,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-simple-logo-upload</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-logo-wh-independent</span>
       </div>
     </div>
 
@@ -1348,6 +1344,8 @@ let stickerLines = []; // array of {text, position} objects, position: one of 9 
 let stickerFormat = 'Generic';
 let stickerPhotoDataUrl = null;
 let stickerLogoDataUrl = null;
+let stickerLogoWidthPx = 90;
+let stickerLogoHeightPx = 32;
 let stickerWidthMM = 70;
 let stickerHeightMM = 45;
 const STICKER_POSITIONS = ['top-left','top-center','top-right','mid-left','center','mid-right','bottom-left','bottom-center','bottom-right'];
@@ -1502,11 +1500,22 @@ function openStickerEditor(){
       <div class="sticker-preview" id="stickerPreviewBox" style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:2px;"></div>
 
       <label class="field-label" style="margin-top:16px;display:block;">Logo — ટેપ કરીને upload કરો</label>
-      <div class="logo-box" id="logoBox" style="width:110px;height:44px;margin-top:6px;">
+      <div class="logo-box" id="logoBox" style="width:${stickerLogoWidthPx}px;height:${stickerLogoHeightPx}px;margin-top:6px;">
         ${stickerLogoDataUrl ? `<img src="${stickerLogoDataUrl}" style="width:100%;height:100%;object-fit:contain;">` : `<span>Tap to add logo</span>`}
         <input type="file" accept="image/*" id="logoInput" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
       </div>
-      ${stickerLogoDataUrl ? `<button class="btn btn-ghost" id="clearLogoBtn" style="margin-top:8px;">✕ Logo કાઢો</button>` : ''}
+      ${stickerLogoDataUrl ? `
+      <div class="form-row2" style="margin-top:10px;">
+        <div>
+          <label class="field-label">Logo Width (px)</label>
+          <input type="number" class="form-input" id="logoWidthInput" value="${stickerLogoWidthPx}" min="20" max="300">
+        </div>
+        <div>
+          <label class="field-label">Logo Height (px)</label>
+          <input type="number" class="form-input" id="logoHeightInput" value="${stickerLogoHeightPx}" min="10" max="150">
+        </div>
+      </div>
+      <button class="btn btn-ghost" id="clearLogoBtn" style="margin-top:8px;">✕ Logo કાઢો</button>` : ''}
 
       <div class="form-row2" style="margin-top:16px;">
         <div>
@@ -1555,6 +1564,18 @@ function openStickerEditor(){
   });
   const clearBtn = document.getElementById('clearLogoBtn');
   if(clearBtn) clearBtn.addEventListener('click', ()=>{ stickerLogoDataUrl=null; openStickerEditor(); });
+  const logoWidthInput = document.getElementById('logoWidthInput');
+  const logoHeightInput = document.getElementById('logoHeightInput');
+  if(logoWidthInput) logoWidthInput.addEventListener('input', e=>{
+    stickerLogoWidthPx = Math.max(10, Number(e.target.value)||90);
+    document.getElementById('logoBox').style.width = stickerLogoWidthPx+'px';
+    renderStickerPreview();
+  });
+  if(logoHeightInput) logoHeightInput.addEventListener('input', e=>{
+    stickerLogoHeightPx = Math.max(10, Number(e.target.value)||32);
+    document.getElementById('logoBox').style.height = stickerLogoHeightPx+'px';
+    renderStickerPreview();
+  });
 
   document.getElementById('stickerWidthInput').addEventListener('input', e=>{ stickerWidthMM = Number(e.target.value)||70; renderStickerPreview(); });
   document.getElementById('stickerHeightInput').addEventListener('input', e=>{ stickerHeightMM = Number(e.target.value)||45; renderStickerPreview(); });
@@ -1638,32 +1659,28 @@ function renderHyundaiKiaTemplate(box, pn){
   // left column = mid-left lines, right column = mid-right lines, top-left extra text = company line, bottom-center = big center line, bottom-left/right = footer
   const leftLines = stickerLines.filter(l=>l.position==='mid-left').map(l=>l.text);
   const rightLines = stickerLines.filter(l=>l.position==='mid-right').map(l=>l.text);
-  const companyLine = (stickerLines.find(l=>l.position==='top-left')||{}).text || '';
+  const companyLine = (stickerLines.find(l=>l.position==='top-left')||{}).text || 'HYUNDAI KIA MOTORS';
   const centerLine = (stickerLines.find(l=>l.position==='bottom-center')||{}).text || '';
   const footerLine = stickerLines.filter(l=>l.position==='bottom-left'||l.position==='bottom-right').map(l=>l.text).join(' • ');
 
-  const logoHtml = stickerLogoDataUrl
-    ? `<img src="${stickerLogoDataUrl}" style="max-height:100%;max-width:100%;object-fit:contain;">`
-    : stickerPhotoDataUrl
-      ? `<div class="logo-box" style="width:80px;height:32px;">logo here</div>`
-      : `<div class="hk-brand"><span class="hk-hyundai">HYUNDAI</span><div class="hk-divider"></div><span class="hk-kia">KIA</span></div>`;
+  const logoContent = stickerLogoDataUrl ? `<img src="${stickerLogoDataUrl}">` : `<span>Tap to add logo</span>`;
 
   box.innerHTML = `
-    <div class="hk-label">
-      <div class="hk-top-row">
+    <div class="label" style="height:100%;">
+      <div class="top-row">
         <div>
-          ${logoHtml}
-          <div class="hk-company">${companyLine || ''}</div>
+          <div class="logo-box" style="width:${stickerLogoWidthPx}px;height:${stickerLogoHeightPx}px;">${logoContent}</div>
+          <div class="company">${companyLine}</div>
         </div>
-        <div class="hk-qr" id="stickerQrHolder"></div>
+        <div class="qr" id="stickerQrHolder"></div>
       </div>
-      <div class="hk-content-row">
-        <div class="hk-col">${leftLines.map(t=>`<p>${t}</p>`).join('')}</div>
-        <div class="hk-col">${rightLines.map((t,i)=>`<p class="${i===1?'hk-bold-line':''}">${t}</p>`).join('')}</div>
+      <div class="content-row">
+        <div class="col">${leftLines.map(t=>`<p>${t}</p>`).join('')}</div>
+        <div class="col">${rightLines.map((t,i)=>`<p class="${i===1?'bold-line':''}">${t}</p>`).join('')}</div>
       </div>
       <div>
-        ${centerLine ? `<div class="hk-center-line">${centerLine}</div>` : ''}
-        ${footerLine ? `<div class="hk-footer">${footerLine}</div>` : ''}
+        ${centerLine ? `<div class="center-line">${centerLine}</div>` : ''}
+        ${footerLine ? `<div class="footer">${footerLine}</div>` : ''}
       </div>
     </div>
   `;
@@ -1715,7 +1732,7 @@ function renderGenericGridTemplate(box, pn){
 
 function saveCurrentSticker(){
   const pn = guessStickerPartNumber();
-  const data = {partNumber:pn, lines: stickerLines.slice(), format: stickerFormat, widthMM: stickerWidthMM, heightMM: stickerHeightMM, logo: stickerLogoDataUrl, savedAt: new Date().toISOString()};
+  const data = {partNumber:pn, lines: stickerLines.slice(), format: stickerFormat, widthMM: stickerWidthMM, heightMM: stickerHeightMM, logo: stickerLogoDataUrl, logoWidthPx: stickerLogoWidthPx, logoHeightPx: stickerLogoHeightPx, savedAt: new Date().toISOString()};
   localStorage.setItem('sticker:'+pn, JSON.stringify(data));
   showToast(`✓ "${pn}" sticker saved`);
   renderStickerSavedList();
@@ -1761,6 +1778,8 @@ function loadSavedSticker(pn){
     stickerWidthMM = data.widthMM || 70;
     stickerHeightMM = data.heightMM || 45;
     stickerLogoDataUrl = data.logo || null;
+    stickerLogoWidthPx = data.logoWidthPx || 90;
+    stickerLogoHeightPx = data.logoHeightPx || 32;
     stickerPhotoDataUrl = null;
     document.getElementById('stickerPhotoPreview').classList.add('hidden');
     openStickerEditor();
