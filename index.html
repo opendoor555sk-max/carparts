@@ -401,7 +401,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-reports-module</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-ai-sticker-vision</span>
       </div>
     </div>
 
@@ -1366,14 +1366,69 @@ async function handleStickerPhoto(file){
   const img = document.getElementById('stickerPhotoPreview');
   img.src = stickerPhotoDataUrl;
   img.classList.remove('hidden');
-  // start with one empty editable line pre-filled with a hint, user types what they read off the photo
-  stickerLines = [''];
-  stickerFormat = 'Generic';
-  openStickerEditor();
-  showToast('📷 ફોટો ઉમેરાયો — નીચે ટેક્સ્ટ manually ટાઈપ કરો (ફોટો જોઈને)');
+
+  const apiKey = localStorage.getItem('gemini_api_key');
+  if(!apiKey){
+    stickerLines = [''];
+    stickerFormat = 'Generic';
+    openStickerEditor();
+    showToast('⚠️ ⚙️ Settings માં Gemini key નાખો — auto-read માટે જરૂરી. હમણાં manually ટાઈપ કરો.');
+    return;
+  }
+
+  showToast('⏳ AI ફોટો વાંચી રહ્યું છે... (થોડી સેકંડ)');
+  try{
+    const lines = await geminiReadSticker(stickerPhotoDataUrl, apiKey);
+    stickerLines = lines.length ? lines : [''];
+    stickerFormat = 'Generic';
+    openStickerEditor();
+    showToast('✓ AI એ ટેક્સ્ટ વાંચ્યું — ચેક/edit કરી લો');
+  }catch(e){
+    stickerLines = [''];
+    stickerFormat = 'Generic';
+    openStickerEditor();
+    showToast('⚠️ AI read નિષ્ફળ (' + e.message + ') — manually ટાઈપ કરો');
+  }
 }
 document.getElementById('stickerGalleryInput').addEventListener('change', e=> handleStickerPhoto(e.target.files[0]));
 document.getElementById('stickerCameraInput').addEventListener('change', e=> handleStickerPhoto(e.target.files[0]));
+
+async function geminiReadSticker(dataUrl, apiKey){
+  const base64 = dataUrl.split(',')[1];
+  const mimeMatch = dataUrl.match(/^data:(image\/[a-z]+);/);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+
+  const prompt = `This is a photo of an automotive spare part label/sticker. Read EVERY line of text visible on it exactly as printed (part numbers, model codes, company name, lot numbers, dates, certification marks — everything, in top-to-bottom reading order). Respond with ONLY a raw JSON array of strings, one string per line, no markdown, no explanation. Example: ["CONTINENTAL IB61","95400-K6610","MADE IN INDIA"]`;
+
+  const models = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
+  let lastError = null;
+  for(const model of models){
+    try{
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          contents: [{role:"user", parts:[
+            {text: prompt},
+            {inline_data: {mime_type: mimeType, data: base64}}
+          ]}]
+        })
+      });
+      const data = await response.json();
+      if(data.error){ lastError = new Error(data.error.message||'Gemini error'); continue; }
+      const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+      const text = parts.map(p=>p.text||'').join('\n').trim();
+      const cleaned = text.replace(/```json|```/g,'').trim();
+      const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+      if(!arrMatch){ lastError = new Error('AI જવાબ સમજાયો નહીં'); continue; }
+      const arr = JSON.parse(arrMatch[0]);
+      if(Array.isArray(arr) && arr.length) return arr.map(String);
+      lastError = new Error('ખાલી પરિણામ');
+    }catch(e){ lastError = e; }
+  }
+  throw lastError || new Error('બધા models નિષ્ફળ');
+}
 
 document.getElementById('stickerCreateBtn').addEventListener('click', ()=>{
   const pn = document.getElementById('stickerPartInput').value.trim().toUpperCase();
