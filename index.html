@@ -414,7 +414,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-logo-wh-independent</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-logo-nudge-position</span>
       </div>
     </div>
 
@@ -1346,6 +1346,9 @@ let stickerPhotoDataUrl = null;
 let stickerLogoDataUrl = null;
 let stickerLogoWidthPx = 90;
 let stickerLogoHeightPx = 32;
+let stickerLogoOffsetX = 0;
+let stickerLogoOffsetY = 0;
+let logoNudgeSpeed = 'slow'; // 'slow' = 1px, 'fast' = 8px per tap
 let stickerWidthMM = 70;
 let stickerHeightMM = 45;
 const STICKER_POSITIONS = ['top-left','top-center','top-right','mid-left','center','mid-right','bottom-left','bottom-center','bottom-right'];
@@ -1515,7 +1518,25 @@ function openStickerEditor(){
           <input type="number" class="form-input" id="logoHeightInput" value="${stickerLogoHeightPx}" min="10" max="150">
         </div>
       </div>
-      <button class="btn btn-ghost" id="clearLogoBtn" style="margin-top:8px;">✕ Logo કાઢો</button>` : ''}
+
+      <label class="field-label" style="margin-top:12px;display:block;">Logo Position — ખસેડો</label>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+        <div class="format-chip ${logoNudgeSpeed==='slow'?'active':''}" id="logoSpeedSlowChip" onclick="setLogoNudgeSpeed('slow')">🐢 Slow</div>
+        <div class="format-chip ${logoNudgeSpeed==='fast'?'active':''}" id="logoSpeedFastChip" onclick="setLogoNudgeSpeed('fast')">🐇 Fast</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
+        <div></div>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(0,-1)">⬆️</button>
+        <div></div>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(-1,0)">⬅️</button>
+        <button class="btn btn-ghost" style="padding:0;font-size:10px;" onclick="resetLogoPosition()">Reset</button>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(1,0)">➡️</button>
+        <div></div>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(0,1)">⬇️</button>
+        <div></div>
+      </div>
+
+      <button class="btn btn-ghost" id="clearLogoBtn" style="margin-top:12px;">✕ Logo કાઢો</button>` : ''}
 
       <div class="form-row2" style="margin-top:16px;">
         <div>
@@ -1558,6 +1579,7 @@ function openStickerEditor(){
     const reader = new FileReader();
     reader.onload = (ev)=>{
       stickerLogoDataUrl = ev.target.result;
+      stickerLogoOffsetX = 0; stickerLogoOffsetY = 0;
       openStickerEditor();
     };
     reader.readAsDataURL(file);
@@ -1621,6 +1643,40 @@ function setStickerFormat(f){
   renderStickerPreview();
 }
 
+function setLogoNudgeSpeed(speed){
+  logoNudgeSpeed = speed;
+  const slowChip = document.getElementById('logoSpeedSlowChip');
+  const fastChip = document.getElementById('logoSpeedFastChip');
+  if(slowChip) slowChip.classList.toggle('active', speed==='slow');
+  if(fastChip) fastChip.classList.toggle('active', speed==='fast');
+}
+
+function nudgeLogo(dx, dy){
+  const step = logoNudgeSpeed === 'fast' ? 8 : 1;
+  stickerLogoOffsetX += dx * step;
+  stickerLogoOffsetY += dy * step;
+  renderStickerPreview(); // preview only updates — editing form stays frozen/stable
+}
+
+function resetLogoPosition(){
+  stickerLogoOffsetX = 0;
+  stickerLogoOffsetY = 0;
+  renderStickerPreview();
+}
+
+function applyLabelCode(code){
+  const size = LABEL_SIZE_CHART[code];
+  if(!size) return;
+  stickerWidthMM = size.w;
+  stickerHeightMM = size.h;
+  const wInput = document.getElementById('stickerWidthInput');
+  const hInput = document.getElementById('stickerHeightInput');
+  if(wInput) wInput.value = stickerWidthMM;
+  if(hInput) hInput.value = stickerHeightMM;
+  renderStickerPreview();
+  showToast(`✓ ${code} — ${size.w} x ${size.h} mm set થયું`);
+}
+
 function guessStickerPartNumber(){
   const found = stickerLines.find(l=> (l.text||'').trim());
   return found ? found.text.trim() : 'PARTNO';
@@ -1669,7 +1725,7 @@ function renderHyundaiKiaTemplate(box, pn){
     <div class="label" style="height:100%;">
       <div class="top-row">
         <div>
-          <div class="logo-box" style="width:${stickerLogoWidthPx}px;height:${stickerLogoHeightPx}px;">${logoContent}</div>
+          <div class="logo-box" style="width:${stickerLogoWidthPx}px;height:${stickerLogoHeightPx}px;transform:translate(${stickerLogoOffsetX}px,${stickerLogoOffsetY}px);">${logoContent}</div>
           <div class="company">${companyLine}</div>
         </div>
         <div class="qr" id="stickerQrHolder"></div>
@@ -1714,7 +1770,7 @@ function renderGenericGridTemplate(box, pn){
   });
 
   const logoHtml = stickerLogoDataUrl
-    ? `<img src="${stickerLogoDataUrl}" style="grid-row:1;grid-column:1;max-width:100%;max-height:100%;object-fit:contain;justify-self:start;align-self:start;">`
+    ? `<img src="${stickerLogoDataUrl}" style="grid-row:1;grid-column:1;width:${stickerLogoWidthPx}px;height:${stickerLogoHeightPx}px;object-fit:contain;justify-self:start;align-self:start;transform:translate(${stickerLogoOffsetX}px,${stickerLogoOffsetY}px);">`
     : stickerPhotoDataUrl
       ? `<div class="logo-box" style="grid-row:1;grid-column:1;width:60px;height:26px;justify-self:start;align-self:start;">logo here</div>`
       : '';
@@ -1732,7 +1788,7 @@ function renderGenericGridTemplate(box, pn){
 
 function saveCurrentSticker(){
   const pn = guessStickerPartNumber();
-  const data = {partNumber:pn, lines: stickerLines.slice(), format: stickerFormat, widthMM: stickerWidthMM, heightMM: stickerHeightMM, logo: stickerLogoDataUrl, logoWidthPx: stickerLogoWidthPx, logoHeightPx: stickerLogoHeightPx, savedAt: new Date().toISOString()};
+  const data = {partNumber:pn, lines: stickerLines.slice(), format: stickerFormat, widthMM: stickerWidthMM, heightMM: stickerHeightMM, logo: stickerLogoDataUrl, logoWidthPx: stickerLogoWidthPx, logoHeightPx: stickerLogoHeightPx, logoOffsetX: stickerLogoOffsetX, logoOffsetY: stickerLogoOffsetY, savedAt: new Date().toISOString()};
   localStorage.setItem('sticker:'+pn, JSON.stringify(data));
   showToast(`✓ "${pn}" sticker saved`);
   renderStickerSavedList();
@@ -1780,6 +1836,8 @@ function loadSavedSticker(pn){
     stickerLogoDataUrl = data.logo || null;
     stickerLogoWidthPx = data.logoWidthPx || 90;
     stickerLogoHeightPx = data.logoHeightPx || 32;
+    stickerLogoOffsetX = data.logoOffsetX || 0;
+    stickerLogoOffsetY = data.logoOffsetY || 0;
     stickerPhotoDataUrl = null;
     document.getElementById('stickerPhotoPreview').classList.add('hidden');
     openStickerEditor();
