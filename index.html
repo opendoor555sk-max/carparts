@@ -262,6 +262,23 @@
   .cnt-footer{display:flex;justify-content:space-between;font-size:clamp(4.5px,1.6vw,7px);margin-top:2%;font-family:monospace;}
   .cnt-barcode-area{margin-top:2%;padding-top:2%;border-top:1px dashed #aaa;text-align:center;}
 
+  /* Mobase Yellow Label template */
+  .mb-label{background:#f5cf1b;height:100%;position:relative;overflow:hidden;container-type:inline-size;}
+  .mb-el{position:absolute;}
+  .mb-brand-text{font-weight:800;font-size:2.7cqw;color:#111;white-space:nowrap;}
+  .mb-ce-mark{font-weight:900;font-size:8.5cqw;color:#111;letter-spacing:-1.5px;}
+  .mb-top-mid{font-size:2.4cqw;font-weight:700;color:#111;line-height:1.55;}
+  .mb-top-mid b{font-weight:800;}
+  .mb-pb-mark{border-radius:50%;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;
+    font-size:2.8cqw;font-weight:700;font-style:italic;overflow:hidden;}
+  .mb-row-text{font-size:2.4cqw;font-weight:700;color:#111;}
+  .mb-cert-row{display:flex;align-items:center;gap:4px;}
+  .mb-cnc-mark,.mb-e11-mark{font-weight:900;font-size:2.6cqw;}
+  .mb-e11-mark{border:1.3px solid #111;border-radius:50%;padding:0 4px;display:inline-block;}
+  .mb-qr-host{width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+  .mb-tu11{text-align:right;font-size:2.6cqw;font-weight:700;color:#111;}
+  .mb-footer{text-align:center;font-size:1.9cqw;font-weight:700;color:#111;}
+
   /* Reports */
   .report-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:9px;}
   .report-row-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
@@ -430,7 +447,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-huggingface-fallback</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-mobase-yellow-template</span>
       </div>
     </div>
 
@@ -1414,7 +1431,7 @@ const LABEL_SIZE_CHART = {
   '84L': {count:84, w:46, h:11}, '110L': {count:110, w:35, h:10}
 };
 
-const STICKER_FORMATS = ['Generic', 'Photo Background', 'Hyundai / Kia', 'Continental', 'Maruti Suzuki', 'Tata', 'Mahindra', 'Toyota', 'Honda'];
+const STICKER_FORMATS = ['Generic', 'Photo Background', 'Hyundai / Kia', 'Continental', 'Mobase Yellow', 'Maruti Suzuki', 'Tata', 'Mahindra', 'Toyota', 'Honda'];
 
 document.getElementById('openSticker').addEventListener('click', ()=>{
   stopAllCameraStreams();
@@ -1922,11 +1939,53 @@ function renderStickerPreview(){
     renderContinentalTemplate(box, pn);
     return;
   }
+  if(stickerFormat === 'Mobase Yellow'){
+    renderMobaseTemplate(box, pn);
+    return;
+  }
   if(stickerFormat === 'Photo Background'){
     renderPhotoBackgroundTemplate(box, pn);
     return;
   }
   renderGenericGridTemplate(box, pn);
+}
+
+function renderMobaseTemplate(box, pn){
+  box.style.display = 'block';
+  box.style.padding = '0';
+
+  const brandLines = stickerLines.filter(l=>l.position==='top-left').map(l=>l.text);
+  const unitBlock = stickerLines.filter(l=>l.position==='mid-left').map(l=>l.text);
+  const certBlock = stickerLines.filter(l=>l.position==='mid-right').map(l=>l.text);
+  const footerText = (stickerLines.find(l=>l.position==='bottom-center')||{}).text || '';
+  const tu11Text = (stickerLines.find(l=>l.position==='bottom-right')||{}).text || 'TU11';
+
+  const logoHtml = stickerLogoDataUrl
+    ? `<img src="${stickerLogoDataUrl}" style="width:100%;height:100%;object-fit:contain;">`
+    : `<span>Logo</span>`;
+
+  box.innerHTML = `
+    <div class="mb-label">
+      <div class="mb-el logo-box" style="left:2.5%;top:7.5%;width:30%;height:14%;transform:translate(${stickerLogoOffsetX}px,${stickerLogoOffsetY}px);">${logoHtml}</div>
+      ${brandLines.map((t,i)=>`<div class="mb-el mb-brand-text" style="left:2.5%;top:${20.5+i*8}%;width:60%;">${t}</div>`).join('')}
+      <div class="mb-el mb-ce-mark" style="left:3.5%;top:${20.5+brandLines.length*8+3}%;width:12%;">CE</div>
+
+      <div class="mb-el mb-top-mid" style="left:42%;top:8%;width:38%;">
+        ${unitBlock.map((t,i)=> i===1 ? `<b>${t}</b><br>` : `${t}<br>`).join('')}
+      </div>
+
+      <div class="mb-el mb-pb-mark" style="left:84.5%;top:7%;width:10.5%;height:15%;">Pb</div>
+
+      ${certBlock.map((t,i)=>`<div class="mb-el mb-row-text" style="left:3.75%;top:${44+i*8}%;width:60%;">${t}</div>`).join('')}
+
+      <div class="mb-el" style="left:65.8%;top:55.5%;width:24%;height:33%;"><div class="mb-qr-host" id="stickerQrHolder"></div></div>
+
+      <div class="mb-el mb-tu11" style="left:54%;top:85%;width:20%;">${tu11Text}</div>
+      ${footerText ? `<div class="mb-el mb-footer" style="left:2%;top:91.5%;width:96%;">${footerText}</div>` : ''}
+    </div>
+  `;
+  const qrHolder = document.getElementById('stickerQrHolder');
+  if(qrHolder){ qrHolder.innerHTML=''; try{ new QRCode(qrHolder, {text:pn, width:150, height:150, colorDark:"#000000", colorLight:"#f5cf1b"}); }catch(e){} }
 }
 
 function renderContinentalTemplate(box, pn){
