@@ -246,6 +246,22 @@
   .center-line{text-align:center;font-size:clamp(8px,3vw,12px);font-weight:700;}
   .footer{text-align:center;font-size:clamp(5.5px,2vw,8px);font-weight:600;letter-spacing:0.3px;color:#111;}
 
+  /* Continental label template */
+  .cnt-label{background:#f4f4ef;padding:4% 5%;font-family:Arial,Helvetica,sans-serif;color:#111;height:100%;font-size:clamp(6px,2.2vw,11px);line-height:1.3;overflow:hidden;}
+  .cnt-top-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2%;}
+  .cnt-brand{font-size:clamp(9px,3.2vw,15px);font-weight:800;letter-spacing:0.5px;}
+  .cnt-model{font-size:clamp(8px,2.9vw,13px);font-weight:700;}
+  .cnt-desc{font-size:clamp(6px,2.2vw,10px);}
+  .cnt-qr{width:clamp(26px,12vw,50px);flex-shrink:0;}
+  .cnt-part{text-align:center;font-size:clamp(9px,3.4vw,16px);font-weight:700;letter-spacing:0.5px;margin:2% 0;border:1.5px dashed #888;padding:1% 2%;border-radius:3px;}
+  .cnt-mid-row{display:flex;justify-content:space-between;margin:2% 0;font-size:clamp(5.5px,2vw,9px);}
+  .cnt-e-mark{display:flex;align-items:center;gap:5%;margin:2% 0;font-size:clamp(5.5px,2vw,9px);}
+  .cnt-e-circle{width:clamp(14px,6vw,26px);height:clamp(14px,6vw,26px);border:2px solid #111;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:clamp(5px,2vw,9px);flex-shrink:0;}
+  .cnt-bottom{font-size:clamp(5px,1.8vw,8px);line-height:1.4;margin-top:2%;}
+  .cnt-footer{display:flex;justify-content:space-between;font-size:clamp(4.5px,1.6vw,7px);margin-top:2%;font-family:monospace;}
+  .cnt-barcode-area{margin-top:2%;padding-top:2%;border-top:1px dashed #aaa;text-align:center;}
+
   /* Reports */
   .report-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:9px;}
   .report-row-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
@@ -414,7 +430,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-logo-nudge-position</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-continental-custom-formats</span>
       </div>
     </div>
 
@@ -1342,6 +1358,7 @@ document.getElementById('printReportBtn').addEventListener('click', ()=>{
 /* ============ STICKER SCANNER MODULE ============ */
 let stickerLines = []; // array of {text, position} objects, position: one of 9 grid zones
 let stickerFormat = 'Generic';
+let activeCustomFormatName = null; // tracks which custom (user-saved) format chip is currently selected, if any
 let stickerPhotoDataUrl = null;
 let stickerLogoDataUrl = null;
 let stickerLogoWidthPx = 90;
@@ -1349,6 +1366,11 @@ let stickerLogoHeightPx = 32;
 let stickerLogoOffsetX = 0;
 let stickerLogoOffsetY = 0;
 let logoNudgeSpeed = 'slow'; // 'slow' = 1px, 'fast' = 8px per tap
+let barcodeOverlayX = 0;
+let barcodeOverlayY = 0;
+let barcodeOverlayWidthPx = 130;
+let barcodeOverlayHeightPx = 45;
+let stickerPhotoBgPartNumber = '';
 let stickerWidthMM = 70;
 let stickerHeightMM = 45;
 const STICKER_POSITIONS = ['top-left','top-center','top-right','mid-left','center','mid-right','bottom-left','bottom-center','bottom-right'];
@@ -1363,7 +1385,7 @@ const LABEL_SIZE_CHART = {
   '84L': {count:84, w:46, h:11}, '110L': {count:110, w:35, h:10}
 };
 
-const STICKER_FORMATS = ['Generic', 'Hyundai / Kia', 'Maruti Suzuki', 'Tata', 'Mahindra', 'Toyota', 'Honda'];
+const STICKER_FORMATS = ['Generic', 'Photo Background', 'Hyundai / Kia', 'Continental', 'Maruti Suzuki', 'Tata', 'Mahindra', 'Toyota', 'Honda'];
 
 document.getElementById('openSticker').addEventListener('click', ()=>{
   stopAllCameraStreams();
@@ -1554,11 +1576,39 @@ function openStickerEditor(){
         ${Object.keys(LABEL_SIZE_CHART).map(code=>`<div class="format-chip" onclick="applyLabelCode('${code}')">${code} (${LABEL_SIZE_CHART[code].count})</div>`).join('')}
       </div>
 
-      ${stickerPhotoDataUrl ? `<label class="field-label" style="margin-top:16px;display:block;">Original Photo (reference)</label><img src="${stickerPhotoDataUrl}" class="sticker-upload-photo">` : ''}
+      ${stickerPhotoDataUrl ? `<label class="field-label" style="margin-top:16px;display:block;">Original Photo${stickerFormat==='Photo Background' ? ' (background તરીકે વપરાય છે)' : ' (reference)'}</label><img src="${stickerPhotoDataUrl}" class="sticker-upload-photo">` : ''}
 
+      ${stickerFormat === 'Photo Background' ? `
+      <label class="field-label" style="margin-top:16px;display:block;">Part Number (barcode આ પ્રમાણે બદલાય)</label>
+      <input type="text" class="form-input" id="stickerPhotoBgPnInput" value="${stickerPhotoBgPartNumber}" placeholder="e.g. 95400-K6610">
+
+      <label class="field-label" style="margin-top:16px;display:block;">Barcode Position — ખસેડો</label>
+      <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
+        <div></div>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeBarcode(0,-1)">⬆️</button>
+        <div></div>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeBarcode(-1,0)">⬅️</button>
+        <button class="btn btn-ghost" style="padding:0;font-size:10px;" onclick="resetBarcodePosition()">Reset</button>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeBarcode(1,0)">➡️</button>
+        <div></div>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeBarcode(0,1)">⬇️</button>
+        <div></div>
+      </div>
+      <div class="form-row2" style="margin-top:10px;">
+        <div>
+          <label class="field-label">Barcode Width (px)</label>
+          <input type="number" class="form-input" id="barcodeWidthInput" value="${barcodeOverlayWidthPx}" min="40" max="300">
+        </div>
+        <div>
+          <label class="field-label">Barcode Height (px)</label>
+          <input type="number" class="form-input" id="barcodeHeightInput" value="${barcodeOverlayHeightPx}" min="20" max="150">
+        </div>
+      </div>
+      ` : `
       <label class="field-label" style="margin-top:16px;display:block;">Text Lines — position પસંદ કરો (મૂળ sticker પર જ્યાં હોય ત્યાં)</label>
       <div id="stickerLinesWrap"></div>
       <button class="btn btn-ghost" id="addStickerLineBtn" style="margin-top:10px;">➕ Line ઉમેરો</button>
+      `}
 
       <label class="field-label" style="margin-top:16px;display:block;">Company Format</label>
       <div class="format-chips" id="stickerFormatChips"></div>
@@ -1569,7 +1619,7 @@ function openStickerEditor(){
       </div>
     </div>
   `;
-  renderStickerLines();
+  if(stickerFormat !== 'Photo Background') renderStickerLines();
   renderStickerFormatChips();
   renderStickerPreview();
 
@@ -1599,10 +1649,27 @@ function openStickerEditor(){
     renderStickerPreview();
   });
 
+  const barcodeWidthInput = document.getElementById('barcodeWidthInput');
+  const barcodeHeightInput = document.getElementById('barcodeHeightInput');
+  if(barcodeWidthInput) barcodeWidthInput.addEventListener('input', e=>{
+    barcodeOverlayWidthPx = Math.max(20, Number(e.target.value)||130);
+    renderStickerPreview();
+  });
+  if(barcodeHeightInput) barcodeHeightInput.addEventListener('input', e=>{
+    barcodeOverlayHeightPx = Math.max(10, Number(e.target.value)||45);
+    renderStickerPreview();
+  });
+  const photoBgPnInput = document.getElementById('stickerPhotoBgPnInput');
+  if(photoBgPnInput) photoBgPnInput.addEventListener('input', e=>{
+    stickerPhotoBgPartNumber = e.target.value.trim().toUpperCase();
+    renderStickerPreview();
+  });
+
   document.getElementById('stickerWidthInput').addEventListener('input', e=>{ stickerWidthMM = Number(e.target.value)||70; renderStickerPreview(); });
   document.getElementById('stickerHeightInput').addEventListener('input', e=>{ stickerHeightMM = Number(e.target.value)||45; renderStickerPreview(); });
 
-  document.getElementById('addStickerLineBtn').addEventListener('click', ()=>{
+  const addLineBtn = document.getElementById('addStickerLineBtn');
+  if(addLineBtn) addLineBtn.addEventListener('click', ()=>{
     stickerLines.push({text:'', position:'center'});
     renderStickerLines();
     renderStickerPreview();
@@ -1631,16 +1698,70 @@ function removeStickerLine(i){
   renderStickerPreview();
 }
 
+function getCustomFormats(){
+  try{ return JSON.parse(localStorage.getItem('customStickerFormats')||'[]'); }catch(e){ return []; }
+}
+
 function renderStickerFormatChips(){
   const wrap = document.getElementById('stickerFormatChips');
-  wrap.innerHTML = STICKER_FORMATS.map(f=>`
-    <div class="format-chip ${f===stickerFormat?'active':''}" onclick="setStickerFormat('${f}')">${f}</div>
-  `).join('');
+  const customs = getCustomFormats();
+  wrap.innerHTML =
+    STICKER_FORMATS.map(f=>`<div class="format-chip ${f===stickerFormat?'active':''}" onclick="setStickerFormat('${f}')">${f}</div>`).join('') +
+    customs.map(c=>`<div class="format-chip ${c.name===activeCustomFormatName?'active':''}" style="position:relative;" onclick="loadCustomFormat('${c.name.replace(/'/g,"\\'")}')">🧩 ${c.name} <span onclick="event.stopPropagation();deleteCustomFormat('${c.name.replace(/'/g,"\\'")}')" style="margin-left:4px;color:var(--danger);">✕</span></div>`).join('') +
+    `<div class="format-chip" style="border-color:var(--accent);color:var(--accent);" onclick="saveAsNewCustomFormat()">➕ નવો Format Save કરો</div>`;
 }
 function setStickerFormat(f){
   stickerFormat = f;
+  activeCustomFormatName = null;
+  if(f === 'Photo Background' && !stickerPhotoBgPartNumber){
+    stickerPhotoBgPartNumber = guessStickerPartNumber();
+  }
+  openStickerEditor(); // rebuild — different formats show different controls (text-lines vs barcode-position)
+}
+
+function saveAsNewCustomFormat(){
+  const name = window.prompt('નવા Format નું નામ આપો (દા.ત. "Bosch ECU", "Denso Sensor"):');
+  if(!name || !name.trim()) return;
+  const customs = getCustomFormats();
+  const existing = customs.findIndex(c=>c.name===name.trim());
+  const entry = {
+    name: name.trim(),
+    lines: stickerLines.slice(),
+    widthMM: stickerWidthMM, heightMM: stickerHeightMM,
+    logo: stickerLogoDataUrl, logoWidthPx: stickerLogoWidthPx, logoHeightPx: stickerLogoHeightPx,
+    logoOffsetX: stickerLogoOffsetX, logoOffsetY: stickerLogoOffsetY,
+    baseTemplate: (stickerFormat==='Hyundai / Kia' || stickerFormat==='Continental') ? stickerFormat : 'Generic'
+  };
+  if(existing >= 0) customs[existing] = entry; else customs.push(entry);
+  localStorage.setItem('customStickerFormats', JSON.stringify(customs));
+  activeCustomFormatName = name.trim();
+  showToast(`✓ "${name.trim()}" format saved — હવે dropdown માં દેખાશે`);
+  openStickerEditor();
+}
+
+function loadCustomFormat(name){
+  const customs = getCustomFormats();
+  const c = customs.find(x=>x.name===name);
+  if(!c) return;
+  stickerLines = c.lines.slice();
+  stickerWidthMM = c.widthMM; stickerHeightMM = c.heightMM;
+  stickerLogoDataUrl = c.logo || null;
+  stickerLogoWidthPx = c.logoWidthPx || 90; stickerLogoHeightPx = c.logoHeightPx || 32;
+  stickerLogoOffsetX = c.logoOffsetX || 0; stickerLogoOffsetY = c.logoOffsetY || 0;
+  stickerFormat = c.baseTemplate || 'Generic'; // render using the underlying template shape
+  activeCustomFormatName = name;
+  openStickerEditor();
+  showToast(`✓ "${name}" format loaded — edit કરીને ફરી save કરી શકાય`);
+}
+
+function deleteCustomFormat(name){
+  const ok = window.confirm(`"${name}" format DELETE કરવો છે?`);
+  if(!ok) return;
+  let customs = getCustomFormats();
+  customs = customs.filter(c=>c.name!==name);
+  localStorage.setItem('customStickerFormats', JSON.stringify(customs));
   renderStickerFormatChips();
-  renderStickerPreview();
+  showToast('🗑️ Format deleted');
 }
 
 function setLogoNudgeSpeed(speed){
@@ -1661,6 +1782,19 @@ function nudgeLogo(dx, dy){
 function resetLogoPosition(){
   stickerLogoOffsetX = 0;
   stickerLogoOffsetY = 0;
+  renderStickerPreview();
+}
+
+function nudgeBarcode(dx, dy){
+  const step = logoNudgeSpeed === 'fast' ? 8 : 1;
+  barcodeOverlayX += dx * step;
+  barcodeOverlayY += dy * step;
+  renderStickerPreview();
+}
+
+function resetBarcodePosition(){
+  barcodeOverlayX = 0;
+  barcodeOverlayY = 0;
   renderStickerPreview();
 }
 
@@ -1705,7 +1839,76 @@ function renderStickerPreview(){
     renderHyundaiKiaTemplate(box, pn);
     return;
   }
+  if(stickerFormat === 'Continental'){
+    renderContinentalTemplate(box, pn);
+    return;
+  }
+  if(stickerFormat === 'Photo Background'){
+    renderPhotoBackgroundTemplate(box, pn);
+    return;
+  }
   renderGenericGridTemplate(box, pn);
+}
+
+function renderContinentalTemplate(box, pn){
+  box.style.display = 'block';
+  box.style.padding = '0';
+
+  const topBlock = stickerLines.filter(l=>l.position==='top-left').map(l=>l.text);
+  const midLeft = stickerLines.filter(l=>l.position==='mid-left').map(l=>l.text);
+  const midRight = stickerLines.filter(l=>l.position==='mid-right').map(l=>l.text);
+  const eMarkText = (stickerLines.find(l=>l.position==='bottom-left')||{}).text || '';
+  const bottomInfo = stickerLines.filter(l=>l.position==='bottom-center').map(l=>l.text);
+  const footerText = (stickerLines.find(l=>l.position==='bottom-right')||{}).text || '';
+
+  box.innerHTML = `
+    <div class="cnt-label">
+      <div class="cnt-top-row">
+        <div>
+          ${topBlock.map((t,i)=> i===0 ? `<div class="cnt-brand">${t}</div>` : i===1 ? `<div class="cnt-model">${t}</div>` : `<div class="cnt-desc">${t}</div>`).join('')}
+        </div>
+        <div class="cnt-qr" id="stickerQrHolder"></div>
+      </div>
+
+      <div class="cnt-part">${pn}</div>
+
+      <div class="cnt-mid-row">
+        <div>${midLeft.map(t=>`<div>${t}</div>`).join('')}</div>
+        <div style="text-align:right;">${midRight.map(t=>`<div>${t}</div>`).join('')}</div>
+      </div>
+
+      ${eMarkText ? `<div class="cnt-e-mark"><div class="cnt-e-circle">E11</div><span>${eMarkText}</span></div>` : ''}
+
+      <div class="cnt-bottom">${bottomInfo.map(t=>`<div>${t}</div>`).join('')}</div>
+
+      ${footerText ? `<div class="cnt-footer"><div>${footerText}</div><div>Made in Korea</div></div>` : ''}
+
+      <div class="cnt-barcode-area"><svg id="stickerBarcodeSvg"></svg></div>
+    </div>
+  `;
+  const qrHolder = document.getElementById('stickerQrHolder');
+  if(qrHolder){ qrHolder.innerHTML=''; try{ new QRCode(qrHolder, {text:pn, width:50, height:50, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){} }
+  try{ JsBarcode("#stickerBarcodeSvg", pn, {format:"CODE128", displayValue:true, height:30, margin:2, fontSize:10, background:"#f4f4ef", lineColor:"#000000"}); }catch(e){}
+}
+
+function renderPhotoBackgroundTemplate(box, pn){
+  const barcodeValue = stickerPhotoBgPartNumber || pn;
+  box.style.display = 'block';
+  box.style.padding = '0';
+  box.style.position = 'relative';
+  box.style.backgroundImage = stickerPhotoDataUrl ? `url(${stickerPhotoDataUrl})` : 'none';
+  box.style.backgroundSize = 'contain';
+  box.style.backgroundRepeat = 'no-repeat';
+  box.style.backgroundPosition = 'center';
+
+  box.innerHTML = `
+    <div style="position:absolute;left:calc(50% + ${barcodeOverlayX}px);top:calc(50% + ${barcodeOverlayY}px);
+      transform:translate(-50%,-50%);width:${barcodeOverlayWidthPx}px;height:${barcodeOverlayHeightPx}px;
+      background:#fff;padding:2px;display:flex;align-items:center;justify-content:center;">
+      <svg id="stickerBarcodeSvg" style="width:100%;height:100%;"></svg>
+    </div>
+  `;
+  try{ JsBarcode("#stickerBarcodeSvg", barcodeValue, {format:"CODE128", displayValue:false, height:40, margin:2, background:"#ffffff", lineColor:"#000000"}); }catch(e){}
 }
 
 function renderHyundaiKiaTemplate(box, pn){
@@ -1787,8 +1990,12 @@ function renderGenericGridTemplate(box, pn){
 }
 
 function saveCurrentSticker(){
-  const pn = guessStickerPartNumber();
-  const data = {partNumber:pn, lines: stickerLines.slice(), format: stickerFormat, widthMM: stickerWidthMM, heightMM: stickerHeightMM, logo: stickerLogoDataUrl, logoWidthPx: stickerLogoWidthPx, logoHeightPx: stickerLogoHeightPx, logoOffsetX: stickerLogoOffsetX, logoOffsetY: stickerLogoOffsetY, savedAt: new Date().toISOString()};
+  const pn = stickerFormat==='Photo Background' ? (stickerPhotoBgPartNumber || guessStickerPartNumber()) : guessStickerPartNumber();
+  const data = {partNumber:pn, lines: stickerLines.slice(), format: stickerFormat, widthMM: stickerWidthMM, heightMM: stickerHeightMM,
+    logo: stickerLogoDataUrl, logoWidthPx: stickerLogoWidthPx, logoHeightPx: stickerLogoHeightPx, logoOffsetX: stickerLogoOffsetX, logoOffsetY: stickerLogoOffsetY,
+    photoBg: stickerFormat==='Photo Background' ? stickerPhotoDataUrl : null,
+    photoBgPartNumber: stickerPhotoBgPartNumber, barcodeOverlayX, barcodeOverlayY, barcodeOverlayWidthPx, barcodeOverlayHeightPx,
+    savedAt: new Date().toISOString()};
   localStorage.setItem('sticker:'+pn, JSON.stringify(data));
   showToast(`✓ "${pn}" sticker saved`);
   renderStickerSavedList();
@@ -1838,8 +2045,13 @@ function loadSavedSticker(pn){
     stickerLogoHeightPx = data.logoHeightPx || 32;
     stickerLogoOffsetX = data.logoOffsetX || 0;
     stickerLogoOffsetY = data.logoOffsetY || 0;
-    stickerPhotoDataUrl = null;
-    document.getElementById('stickerPhotoPreview').classList.add('hidden');
+    stickerPhotoBgPartNumber = data.photoBgPartNumber || '';
+    barcodeOverlayX = data.barcodeOverlayX || 0;
+    barcodeOverlayY = data.barcodeOverlayY || 0;
+    barcodeOverlayWidthPx = data.barcodeOverlayWidthPx || 130;
+    barcodeOverlayHeightPx = data.barcodeOverlayHeightPx || 45;
+    stickerPhotoDataUrl = data.format==='Photo Background' ? (data.photoBg || null) : null;
+    if(stickerFormat !== 'Photo Background') document.getElementById('stickerPhotoPreview').classList.add('hidden');
     openStickerEditor();
   }catch(e){}
 }
