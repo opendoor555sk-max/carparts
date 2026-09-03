@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-line-nudge-feature</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-freeform-generic-position</span>
       </div>
     </div>
 
@@ -1654,6 +1654,7 @@ function openStickerEditor(){
     <div class="part-detail" style="margin-top:16px;">
       <div class="pd-label">LIVE PREVIEW (મૂળ sticker જેવું જ)</div>
       <div class="sticker-preview" id="stickerPreviewBox" style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:2px;"></div>
+      <div id="lineNudgePanelWrap"></div>
 
       <label class="field-label" style="margin-top:16px;display:block;">Logo — ટેપ કરીને upload કરો</label>
       <div class="logo-box" id="logoBox" style="width:${stickerLogoWidthPx}px;height:${stickerLogoHeightPx}px;margin-top:6px;">
@@ -1739,7 +1740,6 @@ function openStickerEditor(){
       <label class="field-label" style="margin-top:16px;display:block;">Text Lines — position પસંદ કરો (મૂળ sticker પર જ્યાં હોય ત્યાં)</label>
       <div id="stickerLinesWrap"></div>
       <button class="btn btn-ghost" id="addStickerLineBtn" style="margin-top:10px;">➕ Line ઉમેરો</button>
-      <div id="lineNudgePanelWrap"></div>
       `}
 
       <label class="field-label" style="margin-top:16px;display:block;">Company Format</label>
@@ -1819,9 +1819,6 @@ function renderStickerLines(){
     <div class="st-textline-row" style="flex-wrap:wrap;${selectedLineIndex===i?'background:var(--accent-dim);border-radius:8px;padding:6px;':''}">
       <button class="st-select-btn ${selectedLineIndex===i?'active':''}" onclick="selectStickerLine(${i})" title="Select to move">${selectedLineIndex===i?'☑️':'☐'}</button>
       <input type="text" class="form-input" style="margin-top:0;flex:2;" value="${(line.text||'').replace(/"/g,'&quot;')}" oninput="updateStickerLineText(${i}, this.value)" placeholder="લાઈન ${i+1}">
-      <select class="form-input" style="margin-top:0;flex:1;min-width:110px;" onchange="updateStickerLinePosition(${i}, this.value)">
-        ${STICKER_POSITIONS.map(p=>`<option value="${p}" ${line.position===p?'selected':''}>${p}</option>`).join('')}
-      </select>
       <button class="st-del-btn" onclick="removeStickerLine(${i})">✕</button>
     </div>`).join('');
   renderLineNudgePanel();
@@ -2210,41 +2207,28 @@ function renderHyundaiKiaTemplate(box, pn){
 }
 
 function renderGenericGridTemplate(box, pn){
-  box.style.display = 'grid';
+  box.style.display = 'block';
   box.style.background = 'transparent';
-  box.style.gridTemplateColumns = '1fr 1fr 1fr';
-  box.style.gridTemplateRows = '1fr 1fr 1fr 0.7fr';
-  box.style.gap = '2px';
+  box.style.position = 'relative';
   box.style.padding = '6px';
+  box.style.boxSizing = 'border-box';
 
-  // group lines by grid cell
-  const cells = {};
-  stickerLines.forEach(l=>{
-    const key = l.position || 'center';
-    if(!cells[key]) cells[key] = [];
-    cells[key].push(l);
-  });
-
-  let html = '';
-  Object.keys(POS_GRID_MAP).forEach(pos=>{
-    const [r,c] = POS_GRID_MAP[pos].split('/');
-    const [justify, textAlign] = POS_ALIGN_MAP[pos].split(';text-align:');
-    const lineCount = (cells[pos]||[]).length;
-    const fontSize = lineCount > 4 ? Math.max(5, Math.round(9 - (lineCount-4)*0.6)) : 9;
-    const content = (cells[pos]||[]).map(l=>`<div class="st-line" style="font-size:${fontSize}px;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${l.text||''}</div>`).join('');
-    if(content){
-      html += `<div style="grid-row:${r};grid-column:${c};display:flex;flex-direction:column;justify-content:${justify};align-items:${textAlign==='left'?'flex-start':textAlign==='right'?'flex-end':'center'};text-align:${textAlign};overflow:visible;padding:2px;">${content}</div>`;
-    }
-  });
+  // free-form positioning: each line gets a default cascading spot, plus its own offsetX/offsetY nudge
+  const lineCount = stickerLines.length;
+  const fontSize = lineCount > 10 ? 6 : lineCount > 6 ? 7 : 9;
+  const linesHtml = stickerLines.map((l,i)=>{
+    const defaultTopPct = 6 + i * Math.min(8, 78/Math.max(1,lineCount));
+    return `<div class="st-line" style="position:absolute;left:8%;top:${defaultTopPct}%;width:60%;font-size:${fontSize}px;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${l.text||''}</div>`;
+  }).join('');
 
   const logoHtml = stickerLogoDataUrl
-    ? `<img src="${stickerLogoDataUrl}" style="grid-row:1;grid-column:1;width:${stickerLogoWidthPx}px;height:${stickerLogoHeightPx}px;object-fit:contain;justify-self:start;align-self:start;transform:translate(${stickerLogoOffsetX}px,${stickerLogoOffsetY}px);">`
+    ? `<img src="${stickerLogoDataUrl}" style="position:absolute;left:2%;top:2%;width:${stickerLogoWidthPx}px;height:${stickerLogoHeightPx}px;object-fit:contain;transform:translate(${stickerLogoOffsetX}px,${stickerLogoOffsetY}px);">`
     : stickerPhotoDataUrl
-      ? `<div class="logo-box" style="grid-row:1;grid-column:1;width:60px;height:26px;justify-self:start;align-self:start;">logo here</div>`
+      ? `<div class="logo-box" style="position:absolute;left:2%;top:2%;width:60px;height:26px;">logo here</div>`
       : '';
 
-  box.innerHTML = html + logoHtml +
-    `<div style="grid-row:4;grid-column:1/4;display:flex;justify-content:center;align-items:center;gap:8px;">
+  box.innerHTML = linesHtml + logoHtml +
+    `<div style="position:absolute;left:50%;bottom:2%;transform:translateX(-50%);display:flex;justify-content:center;align-items:center;gap:8px;">
       <div id="stickerQrHolder"></div>
       <svg id="stickerBarcodeSvg"></svg>
     </div>`;
