@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-unitblock-fix</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-font-size-control</span>
       </div>
     </div>
 
@@ -1848,6 +1848,11 @@ function renderLineNudgePanel(){
       <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(0,1)">⬇️</button>
       <div></div>
     </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
+      <span class="field-label" style="margin:0;">Font Size</span>
+      <button type="button" class="btn btn-ghost" style="width:auto;padding:6px 14px;" onclick="adjustSelectedLineFontSize(-1)">A-</button>
+      <button type="button" class="btn btn-ghost" style="width:auto;padding:6px 14px;font-size:16px;" onclick="adjustSelectedLineFontSize(1)">A+</button>
+    </div>
     <button type="button" class="btn btn-ghost" style="margin-top:8px;" onclick="clearLineSelection()">✕ Selection સાફ કરો</button>
   `;
 }
@@ -1890,6 +1895,17 @@ function resetSelectedLinePosition(){
     if(!line) return;
     line.offsetX = 0;
     line.offsetY = 0;
+  });
+  renderStickerPreview();
+}
+
+function adjustSelectedLineFontSize(delta){
+  if(selectedLineIndices.size === 0){ showToast('⚠️ પહેલા કોઈ line select કરો'); return; }
+  selectedLineIndices.forEach(idx=>{
+    const line = stickerLines[idx];
+    if(!line) return;
+    const current = line.fontSize || 9; // 9 is the default base size
+    line.fontSize = Math.max(4, Math.min(24, current + delta));
   });
   renderStickerPreview();
 }
@@ -2095,16 +2111,16 @@ function renderMobaseTemplate(box, pn){
   box.innerHTML = `
     <div class="mb-label">
       <div class="mb-el logo-box" style="left:2.5%;top:7.5%;width:30%;height:14%;transform:translate(${stickerLogoOffsetX}px,${stickerLogoOffsetY}px);">${logoHtml}</div>
-      ${brandLines.map((l,i)=>`<div class="mb-el mb-brand-text" style="left:2.5%;top:${20.5+i*brandGap}%;width:60%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${l.text}</div>`).join('')}
+      ${brandLines.map((l,i)=>`<div class="mb-el mb-brand-text" style="left:2.5%;top:${20.5+i*brandGap}%;width:60%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
       <div class="mb-el mb-ce-mark" style="left:3.5%;top:${20.5+brandLines.length*brandGap+3}%;width:12%;">CE</div>
 
       <div class="mb-el mb-top-mid" style="left:42%;top:8%;width:38%;">
-        ${unitBlock.map((l,i)=>`<span style="display:inline-block;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${i===1 ? `<b>${l.text}</b>` : l.text}</span><br>`).join('')}
+        ${unitBlock.map((l,i)=>`<span style="display:inline-block;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${i===1 ? `<b>${l.text}</b>` : l.text}</span><br>`).join('')}
       </div>
 
       <div class="mb-el mb-pb-mark" style="left:84.5%;top:7%;width:10.5%;height:15%;">Pb</div>
 
-      ${certBlock.map((l,i)=>`<div class="mb-el mb-row-text" style="left:3.75%;top:${44+i*certGap}%;width:60%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${l.text}</div>`).join('')}
+      ${certBlock.map((l,i)=>`<div class="mb-el mb-row-text" style="left:3.75%;top:${44+i*certGap}%;width:60%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
 
       <div class="mb-el" style="left:65.8%;top:55.5%;width:24%;height:33%;"><div class="mb-qr-host" id="stickerQrHolder"></div></div>
 
@@ -2234,10 +2250,11 @@ function renderGenericGridTemplate(box, pn){
 
   // free-form positioning: each line gets a default cascading spot, plus its own offsetX/offsetY nudge
   const lineCount = stickerLines.length;
-  const fontSize = lineCount > 10 ? 6 : lineCount > 6 ? 7 : 9;
+  const autoFontSize = lineCount > 10 ? 6 : lineCount > 6 ? 7 : 9;
   const linesHtml = stickerLines.map((l,i)=>{
     const defaultTopPct = 6 + i * Math.min(8, 78/Math.max(1,lineCount));
-    return `<div class="st-line" style="position:absolute;left:8%;top:${defaultTopPct}%;width:60%;font-size:${fontSize}px;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${l.text||''}</div>`;
+    const fs = l.fontSize || autoFontSize;
+    return `<div class="st-line" style="position:absolute;left:8%;top:${defaultTopPct}%;width:60%;font-size:${fs}px;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${l.text||''}</div>`;
   }).join('');
 
   const logoHtml = stickerLogoDataUrl
