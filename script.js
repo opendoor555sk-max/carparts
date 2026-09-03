@@ -1,0 +1,2318 @@
+/* ============ STATE ============ */
+let currentGPS = null;
+let currentPart = null;
+let selectedCompany = 'All';
+
+/* ============ NAV ============ */
+document.getElementById('openSearch').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-search').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarSearch').classList.remove('hidden');
+  document.getElementById('searchCompanyLabel').textContent = 'Company: ' + selectedCompany;
+  document.getElementById('partInput').focus();
+});
+document.getElementById('backFromSearch').addEventListener('click', ()=>{
+  document.getElementById('view-search').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarSearch').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+document.getElementById('openSettings').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-settings').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarSettings').classList.remove('hidden');
+  document.getElementById('geminiKeyInput').value = localStorage.getItem('gemini_api_key') || '';
+  document.getElementById('hfKeyInput').value = localStorage.getItem('hf_api_key') || '';
+});
+document.getElementById('backFromSettings').addEventListener('click', ()=>{
+  document.getElementById('view-settings').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarSettings').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+document.getElementById('saveKeyBtn').addEventListener('click', ()=>{
+  const key = document.getElementById('geminiKeyInput').value.trim();
+  if(!key){ showToast('⚠️ Key નાખો'); return; }
+  localStorage.setItem('gemini_api_key', key);
+  showToast('✓ Key saved');
+});
+document.getElementById('saveHfKeyBtn').addEventListener('click', ()=>{
+  const key = document.getElementById('hfKeyInput').value.trim();
+  if(!key){ showToast('⚠️ Key નાખો'); return; }
+  localStorage.setItem('hf_api_key', key);
+  showToast('✓ Hugging Face Key saved');
+});
+
+document.querySelectorAll('.module-card:not(#openSearch):not(#openBuy):not(#openSell):not(#openReq):not(#openInventory):not(#openMultiBuy):not(#openSticker):not(#openReports)').forEach(c=>{
+  c.addEventListener('click', ()=> showToast('આ મોડ્યુલ પછીથી બનાવીશું'));
+});
+
+document.querySelectorAll('#companyChips .chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#companyChips .chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    selectedCompany = chip.dataset.company;
+  });
+});
+
+/* ============ GPS ============ */
+function captureGPS(){
+  const dot = document.getElementById('gpsDot');
+  const txt = document.getElementById('gpsText');
+  if(!navigator.geolocation){ txt.textContent = 'GPS not supported'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      currentGPS = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      dot.classList.add('live');
+      txt.textContent = `GPS: ${currentGPS.lat.toFixed(6)}, ${currentGPS.lng.toFixed(6)}`;
+    },
+    ()=>{ txt.textContent = 'Location permission needed'; },
+    {enableHighAccuracy:true, timeout:8000}
+  );
+}
+captureGPS();
+
+/* ============ STORAGE (localStorage — this device only) ============ */
+async function getPart(partNo){
+  try{
+    const raw = localStorage.getItem('part:'+partNo);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+async function savePart(data){
+  try{ localStorage.setItem('part:'+data.partNumber, JSON.stringify(data)); return true; }
+  catch(e){ return false; }
+}
+
+/* ============ AI LOOKUP (Google Gemini, free tier, BYO key) ============ */
+async function aiLookupPart(partNo, company){
+  const apiKey = localStorage.getItem('gemini_api_key');
+  if(!apiKey){
+    const err = new Error('પહેલા ⚙️ Settings માં જઈ Gemini API key નાખો અને Save કરો');
+    err.needsKey = true;
+    throw err;
+  }
+
+  const companyHint = company && company!=='All' ? ` The user indicates it may be a ${company} vehicle, but verify independently rather than assuming this is correct.` : '';
+  const systemPrompt = `You are an automotive spare-parts identification research assistant specializing in Indian-market vehicles (Maruti Suzuki, Hyundai, Tata, Kia, Mahindra, Honda, Toyota, etc). Given an OEM part number, use web search to determine which vehicle make(s), model(s), variant(s), and model years use this exact part number.${companyHint}
+
+Be strict about exact-match vs similar-but-different part numbers (a number differing by even one character is usually a DIFFERENT part for a different vehicle platform — do not conflate them).
+
+Respond with ONLY a raw JSON object, no markdown fences, no preamble, in exactly this structure:
+{
+  "category": "short category e.g. Electrical / Body Control / Engine / Suspension / Brakes / Interior / Lighting",
+  "name": "short descriptive part name",
+  "vehicles": [{"make":"", "model":"", "variant":"", "years":""}],
+  "confidence": 0,
+  "status": "high_confidence" | "conflict" | "not_found",
+  "notes": "1-3 sentence honest explanation of what you found and any uncertainty or conflicts. If unable to find a confident exact match, say so plainly, set status accordingly, and keep confidence below 50 — never report high confidence for an uncertain result.",
+  "sources": ["source name or domain 1", "source name or domain 2"]
+}`;
+
+  const modelsToTry = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
+  let lastError = null;
+  for(const model of modelsToTry){
+    try{
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          systemInstruction: {parts:[{text: systemPrompt}]},
+          contents: [{role:"user", parts:[{text:`Part number: ${partNo}`}]}],
+          tools: [{google_search: {}}]
+        })
+      });
+      const data = await response.json();
+      if(data.error){
+        lastError = new Error(data.error.message || 'Gemini API error');
+        continue; // try next model
+      }
+      const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+      const fullText = parts.map(p=>p.text||'').join('\n').trim();
+      const cleaned = fullText.replace(/```json|```/g,'').trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if(!jsonMatch){ lastError = new Error('AI એ સમજી શકાય એવો જવાબ ના આપ્યો'); continue; }
+      return JSON.parse(jsonMatch[0]);
+    }catch(e){ lastError = e; continue; }
+  }
+  throw lastError || new Error('બધા models નિષ્ફળ ગયા');
+}
+
+/* ============ GLOBAL CAMERA SAFETY ============ */
+function stopAllCameraStreams(){
+  if(typeof scanStream !== 'undefined' && scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; }
+  if(typeof scanInterval !== 'undefined' && scanInterval){ clearInterval(scanInterval); scanInterval=null; }
+  if(typeof multiStream !== 'undefined' && multiStream){ multiStream.getTracks().forEach(t=>t.stop()); multiStream=null; }
+  if(typeof multiScanInterval !== 'undefined' && multiScanInterval){ clearInterval(multiScanInterval); multiScanInterval=null; }
+  const modal = document.getElementById('cameraModal');
+  if(modal) modal.classList.add('hidden');
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) stopAllCameraStreams(); });
+window.addEventListener('pagehide', stopAllCameraStreams);
+
+/* ============ PHOTO-CAPTURE SCAN (works even if live preview is broken) ============ */
+async function scanPhotoFile(file, onSuccess, onFail){
+  if(!file) return;
+  if(!('BarcodeDetector' in window)){
+    onFail('⚠️ આ બ્રાઉઝર scan સપોર્ટ નથી કરતું');
+    return;
+  }
+  try{
+    const originalBitmap = await createImageBitmap(file);
+    const detector = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','code_93','codabar','data_matrix','upc_a','upc_e','itf']});
+
+    // Try 1: resized (fast)
+    const resized = await resizeForScan(originalBitmap);
+    let codes = await detector.detect(resized);
+
+    // Try 2: if resized didn't find anything, retry on full original resolution (slower but more accurate)
+    if(!codes || codes.length===0){
+      codes = await detector.detect(originalBitmap);
+    }
+
+    if(codes && codes.length){
+      onSuccess((codes[0].rawValue||'').trim());
+    } else {
+      onFail('⚠️ ફોટોમાં કોઈ barcode/QR ના મળ્યો — ફરી પાડો, પાર્ટ નંબર clear દેખાય એમ');
+    }
+  }catch(e){
+    onFail('⚠️ ફોટો process ના થયો: ' + e.message);
+  }
+}
+
+async function resizeForScan(bitmap){
+  const MAX_DIM = 1800; // enough resolution for barcode reading, faster than full 4000px+ phone photos, with full-res fallback if this misses
+  const scale = Math.min(1, MAX_DIM / Math.max(bitmap.width, bitmap.height));
+  if(scale >= 1) return bitmap; // already small enough
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return await createImageBitmap(canvas);
+}
+
+document.getElementById('photoScanInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = ''; // reset so same photo can be retaken
+  showToast('⏳ Scan કરું છું...');
+  await scanPhotoFile(file,
+    (raw)=>{
+      const input = document.getElementById(scanTargetInputId || 'partInput');
+      const extracted = extractPartNumber(raw);
+      input.value = extracted.toUpperCase();
+      input.focus(); input.select();
+      if(extracted !== raw) showRawScanNote(raw);
+      showToast('✓ Scan થયું');
+    },
+    (msg)=> showToast(msg)
+  );
+});
+
+document.getElementById('buyPhotoScanInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  showToast('⏳ Scan કરું છું...');
+  await scanPhotoFile(file,
+    (raw)=>{
+      const pn = extractPartNumber(raw).toUpperCase();
+      addBuyScan(pn);
+      showToast(`✓ ${pn} ઉમેરાયું`);
+    },
+    (msg)=> showToast(msg)
+  );
+});
+
+document.getElementById('sellPhotoScanBtn').addEventListener('click', ()=>{
+  scanTargetInputId = 'sellPartInput';
+  document.getElementById('photoScanInput').click();
+});
+document.getElementById('reqPhotoScanBtn').addEventListener('click', ()=>{
+  scanTargetInputId = 'reqPartInput';
+  document.getElementById('photoScanInput').click();
+});
+
+/* ============ CAMERA SCAN (Barcode/QR) ============ */
+let scanStream = null;
+let scanInterval = null;
+
+let scanTargetInputId = 'partInput';
+
+async function openCameraScan(targetInputId){
+  scanTargetInputId = (typeof targetInputId === 'string' && targetInputId) ? targetInputId : 'partInput';
+  const modal = document.getElementById('cameraModal');
+  const video = document.getElementById('scanVideo');
+  const hint = document.getElementById('cameraHint');
+  modal.classList.remove('hidden');
+
+  if(!('BarcodeDetector' in window)){
+    hint.textContent = '⚠️ આ બ્રાઉઝર camera-scan સપોર્ટ નથી કરતું. Chrome (Android) વાપરો, અથવા manual નંબર નાખો.';
+    return;
+  }
+
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    if(modal.classList.contains('hidden')){
+      // user already closed the scanner before permission resolved — release immediately, don't leave camera locked
+      stream.getTracks().forEach(t=>t.stop());
+      return;
+    }
+    scanStream = stream;
+    video.srcObject = scanStream;
+    await video.play();
+  }catch(e){
+    hint.textContent = '⚠️ Camera access ના મળી. Permission આપો અથવા manual નંબર નાખો.';
+    return;
+  }
+
+  const detector = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','code_93','codabar','data_matrix','upc_a','upc_e','itf']});
+  const detectCanvas = document.createElement('canvas');
+  const detectCtx = detectCanvas.getContext('2d', {willReadFrequently:true});
+
+  scanInterval = setInterval(async ()=>{
+    try{
+      if(!video.videoWidth || !video.videoHeight) return; // stream not ready yet
+      detectCanvas.width = video.videoWidth;
+      detectCanvas.height = video.videoHeight;
+      detectCtx.drawImage(video, 0, 0);
+      const codes = await detector.detect(detectCanvas);
+      if(codes && codes.length){
+        const value = (codes[0].rawValue || '').trim();
+        if(value){
+          closeCameraScan();
+          const input = document.getElementById(scanTargetInputId);
+          const extracted = extractPartNumber(value);
+          input.value = extracted.toUpperCase();
+          input.focus();
+          input.select();
+          if(extracted !== value){
+            if(scanTargetInputId === 'partInput') showRawScanNote(value);
+            showToast('✓ Part number ઓટોમેટિક કાઢ્યો — ચેક કરી લો');
+          } else {
+            showToast('✓ Scan થયું');
+          }
+          if(scanTargetInputId === 'invFilterInput'){
+            renderInventoryList(input.value.trim());
+          }
+        }
+      }
+    }catch(e){ /* detection frame skip, ignore */ }
+  }, 350);
+}
+
+function closeCameraScan(){
+  document.getElementById('cameraModal').classList.add('hidden');
+  if(scanInterval){ clearInterval(scanInterval); scanInterval=null; }
+  if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; }
+}
+
+document.getElementById('scanCameraBtn').addEventListener('click', ()=> openCameraScan());
+document.getElementById('closeCameraBtn').addEventListener('click', closeCameraScan);
+
+/* ============ PART NUMBER EXTRACTION from raw scan ============ */
+function extractPartNumber(raw){
+  const clean = raw.replace(/[\x00-\x1F]/g, ''); // strip control chars (GS separators etc)
+
+  // ISO 15434 automotive labels commonly wrap the Part Number field between
+  // a 'P' Data Identifier and the next 'S' (Serial/Supplier) identifier — confirmed
+  // across multiple real labels (e.g. "P95400K6610S", "P954B0CCAB0S"). Check this FIRST.
+  let m = clean.match(/P([0-9][A-Z0-9]{7,13})S/);
+  if(m) return m[1];
+
+  // Hyundai/Kia style: 5 digits + optional dash + 1 letter + 4 digits  e.g. 95400K6610
+  m = clean.match(/\d{5}-?[A-Z]\d{4}/);
+  if(m) return m[0].replace('-','');
+  // Toyota/Maruti/Suzuki style: 5 digits + optional dash + 5 alphanumeric e.g. 90915YZZD4, 95400BVLB0
+  m = clean.match(/\d{5}-?[A-Z0-9]{5}/);
+  if(m) return m[0].replace('-','');
+  // Generic: digits-letters block of 8-12 chars after a single-letter DI marker like P or 1P
+  m = clean.match(/(?:^|[^0-9A-Z])(\d{4,6}[A-Z0-9]{3,7})(?=[A-Z][A-Z0-9]{0,3}\d|$)/);
+  if(m) return m[1];
+  return raw; // fallback: no confident extraction, keep raw for manual edit
+}
+
+function showRawScanNote(raw){
+  let note = document.getElementById('rawScanNote');
+  if(!note){
+    note = document.createElement('div');
+    note.id = 'rawScanNote';
+    note.style.cssText = 'margin-top:10px;font-size:11px;color:var(--text-dim);line-height:1.5;word-break:break-all;background:var(--surface-2);padding:8px 10px;border-radius:8px;';
+    document.getElementById('scanPlate').appendChild(note);
+  }
+  note.innerHTML = `<b style="color:var(--text-muted);">Full scanned data:</b><br>${raw}<br><span style="color:var(--accent);">ઉપર auto-detected નંબર ખોટો લાગે તો અહીંથી copy કરી manually edit કરો.</span>`;
+}
+
+/* ============ REPORTS MODULE ============ */
+let reportsTab = 'purchases';
+let reportsDate = 'all';
+let reportsCompany = 'All';
+const REPORT_TITLES = {purchases:'Purchases', sales:'Sales', stock:'Stock Report'};
+
+document.getElementById('openReports').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-reports').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarReports').classList.remove('hidden');
+  renderReportsList();
+});
+document.getElementById('backFromReports').addEventListener('click', ()=>{
+  document.getElementById('view-reports').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarReports').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+document.querySelectorAll('#reportsTabRow .chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#reportsTabRow .chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    reportsTab = chip.dataset.tab;
+    document.getElementById('reportsTitle').textContent = REPORT_TITLES[reportsTab];
+    renderReportsList();
+  });
+});
+document.querySelectorAll('#reportsDateChips .chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#reportsDateChips .chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    reportsDate = chip.dataset.date;
+    renderReportsList();
+  });
+});
+document.querySelectorAll('#reportsCompanyChips .chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#reportsCompanyChips .chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    reportsCompany = chip.dataset.company;
+    renderReportsList();
+  });
+});
+
+function isInDateRange(isoDate, filter){
+  if(filter==='all') return true;
+  const d = new Date(isoDate);
+  const now = new Date();
+  if(filter==='today') return d.toDateString()===now.toDateString();
+  if(filter==='month') return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+  if(filter==='year') return d.getFullYear()===now.getFullYear();
+  return true;
+}
+
+function getAllTransactions(type){
+  const list = [];
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('inv:')){
+      try{
+        const inv = JSON.parse(localStorage.getItem(k));
+        const pn = k.slice(4);
+        const arr = inv[type] || [];
+        arr.forEach(txn=> list.push({...txn, partNumber: pn}));
+      }catch(e){}
+    }
+  }
+  return list.sort((a,b)=> new Date(b.date) - new Date(a.date));
+}
+
+function renderReportsList(){
+  const wrap = document.getElementById('reportsList');
+  const countEl = document.getElementById('reportsCount');
+  const totalEl = document.getElementById('reportsTotal');
+
+  if(reportsTab === 'stock'){
+    renderStockReportList();
+    return;
+  }
+
+  let items = getAllTransactions(reportsTab);
+  items = items.filter(it => isInDateRange(it.date, reportsDate));
+  if(reportsCompany !== 'All') items = items.filter(it => (it.company||'') === reportsCompany);
+
+  countEl.textContent = `${items.length} items`;
+  const totalAmt = items.reduce((s,it)=> s + (Number(it.price)||0), 0);
+  totalEl.textContent = totalAmt>0 ? `Total ₹${totalAmt}` : '';
+
+  if(items.length===0){
+    wrap.innerHTML = `<div class="notes-box">કંઈ ${REPORT_TITLES[reportsTab]} entry મળી નથી.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = items.map(it=>`
+    <div class="report-row" id="row_${it.id}">
+      <div class="report-row-top">
+        <div>
+          <div class="report-partno">${it.partNumber}</div>
+          <div class="report-meta">${it.company||'—'} • ${it.category||'—'} • Qty: ${it.qty}</div>
+          <div class="report-meta">${new Date(it.date).toLocaleString('en-IN', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        <div class="report-price">₹${it.price||0}</div>
+      </div>
+      <div class="report-actions">
+        <div class="report-action-btn" onclick="toggleEditTransaction('${it.partNumber}','${reportsTab}','${it.id}')">✏️ Edit</div>
+        <div class="report-action-btn danger" onclick="deleteTransaction('${it.partNumber}','${reportsTab}','${it.id}')">🗑️ Delete / Cancel</div>
+      </div>
+      <div id="editform_${it.id}"></div>
+    </div>`).join('');
+}
+
+function toggleEditTransaction(pn, type, txnId){
+  const holder = document.getElementById('editform_'+txnId);
+  if(holder.innerHTML){ holder.innerHTML=''; return; }
+  const inv = getInventory(pn);
+  const txn = (inv[type]||[]).find(t=>t.id===txnId);
+  if(!txn) return;
+  holder.innerHTML = `
+    <div class="report-edit-form">
+      <label class="field-label">Quantity</label>
+      <input type="number" class="form-input" id="edit_qty_${txnId}" value="${txn.qty}">
+      <label class="field-label" style="margin-top:10px;display:block;">Price (₹)</label>
+      <input type="number" class="form-input" id="edit_price_${txnId}" value="${txn.price||0}">
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="saveEditTransaction('${pn}','${type}','${txnId}')">💾 Save</button>
+    </div>`;
+}
+
+function saveEditTransaction(pn, type, txnId){
+  const inv = getInventory(pn);
+  const txn = (inv[type]||[]).find(t=>t.id===txnId);
+  if(!txn) return;
+  const newQty = parseInt(document.getElementById('edit_qty_'+txnId).value, 10) || txn.qty;
+  const newPrice = document.getElementById('edit_price_'+txnId).value || 0;
+  const qtyDiff = newQty - txn.qty;
+  // adjust overall stock: purchase increases stock, sale decreases stock
+  inv.qty += (type==='purchases') ? qtyDiff : -qtyDiff;
+  if(inv.qty < 0) inv.qty = 0;
+  txn.qty = newQty;
+  txn.price = newPrice;
+  localStorage.setItem('inv:'+pn, JSON.stringify(inv));
+  showToast('✓ Updated');
+  renderReportsList();
+}
+
+function deleteTransaction(pn, type, txnId){
+  const ok = window.confirm('આ entry ને DELETE/CANCEL કરવી છે? Stock પણ automatic reverse થશે. (Undo નહીં થાય)');
+  if(!ok) return;
+  const inv = getInventory(pn);
+  const idx = (inv[type]||[]).findIndex(t=>t.id===txnId);
+  if(idx===-1) return;
+  const txn = inv[type][idx];
+  // reverse stock effect: deleting a purchase removes that stock; deleting a sale gives stock back
+  inv.qty += (type==='purchases') ? -txn.qty : txn.qty;
+  if(inv.qty < 0) inv.qty = 0;
+  inv[type].splice(idx,1);
+  localStorage.setItem('inv:'+pn, JSON.stringify(inv));
+  showToast('🗑️ Entry deleted, stock updated');
+  renderReportsList();
+}
+
+function renderStockReportList(){
+  const wrap = document.getElementById('reportsList');
+  const countEl = document.getElementById('reportsCount');
+  const totalEl = document.getElementById('reportsTotal');
+  let items = getAllInventory();
+  if(reportsCompany !== 'All') items = items.filter(it => (it.company||'') === reportsCompany);
+
+  countEl.textContent = `${items.length} items`;
+  totalEl.textContent = '';
+
+  if(items.length===0){
+    wrap.innerHTML = `<div class="notes-box">કંઈ stock નથી.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = items.map(it=>{
+    const loc = [it.location?.rack, it.location?.shelf, it.location?.box, it.location?.position].filter(Boolean).join(' → ');
+    const stockColor = it.qty > 0 ? 'var(--verified)' : 'var(--text-dim)';
+    return `
+    <div class="report-row">
+      <div class="report-row-top">
+        <div>
+          <div class="report-partno">${it.partNumber}</div>
+          <div class="report-meta">${it.company||'—'} • ${it.category||'—'}</div>
+          ${loc ? `<div class="report-meta">📍 ${loc}</div>` : ''}
+        </div>
+        <span class="status-pill" style="color:${stockColor};border-color:${stockColor};background:transparent;">${it.qty} in stock</span>
+      </div>
+      <div class="report-actions">
+        <div class="report-action-btn" onclick="toggleEditStockItem('${it.partNumber}')">✏️ Edit</div>
+        <div class="report-action-btn danger" onclick="deleteInventoryItem('${it.partNumber}'); renderReportsList();">🗑️ Delete</div>
+      </div>
+      <div id="editstock_${it.partNumber.replace(/[^a-zA-Z0-9]/g,'_')}"></div>
+    </div>`;
+  }).join('');
+}
+
+function toggleEditStockItem(pn){
+  const safeId = pn.replace(/[^a-zA-Z0-9]/g,'_');
+  const holder = document.getElementById('editstock_'+safeId);
+  if(holder.innerHTML){ holder.innerHTML=''; return; }
+  const inv = getInventory(pn);
+  holder.innerHTML = `
+    <div class="report-edit-form">
+      <label class="field-label">Category</label>
+      <input type="text" class="form-input" id="stkedit_cat_${safeId}" value="${(inv.category||'').replace(/"/g,'&quot;')}">
+      <label class="field-label" style="margin-top:10px;display:block;">Vehicles</label>
+      <input type="text" class="form-input" id="stkedit_veh_${safeId}" value="${(inv.vehicles||'').replace(/"/g,'&quot;')}">
+      <label class="field-label" style="margin-top:10px;display:block;">Stock Qty</label>
+      <input type="number" class="form-input" id="stkedit_qty_${safeId}" value="${inv.qty}">
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="saveEditStockItem('${pn}')">💾 Save</button>
+    </div>`;
+}
+
+function saveEditStockItem(pn){
+  const safeId = pn.replace(/[^a-zA-Z0-9]/g,'_');
+  const inv = getInventory(pn);
+  inv.category = document.getElementById('stkedit_cat_'+safeId).value.trim();
+  inv.vehicles = document.getElementById('stkedit_veh_'+safeId).value.trim();
+  inv.qty = parseInt(document.getElementById('stkedit_qty_'+safeId).value, 10) || 0;
+  localStorage.setItem('inv:'+pn, JSON.stringify(inv));
+  showToast('✓ Stock updated');
+  renderReportsList();
+}
+
+document.getElementById('printReportBtn').addEventListener('click', ()=>{
+  const box = document.getElementById('reportsList');
+  let printArea = document.getElementById('printableSticker');
+  if(!printArea){
+    printArea = document.createElement('div');
+    printArea.id = 'printableSticker';
+    document.body.appendChild(printArea);
+  }
+  printArea.style.cssText = 'position:fixed;top:-9999px;left:-9999px;background:#fff;color:#000;padding:16px;width:auto;height:auto;';
+  printArea.innerHTML = `<h2>${REPORT_TITLES[reportsTab]} Report</h2>` + box.innerHTML.replace(/color:var\(--[a-z-]+\)/g,'color:#000');
+  window.print();
+});
+
+/* ============ STICKER SCANNER MODULE ============ */
+let stickerLines = []; // array of {text, position} objects, position: one of 9 grid zones
+let stickerFormat = 'Generic';
+let activeCustomFormatName = null; // tracks which custom (user-saved) format chip is currently selected, if any
+let stickerPhotoDataUrl = null;
+let stickerLogoDataUrl = null;
+let stickerLogoWidthPx = 90;
+let stickerLogoHeightPx = 32;
+let stickerLogoOffsetX = 0;
+let stickerLogoOffsetY = 0;
+let logoNudgeSpeed = 'slow'; // 'slow' = 1px, 'fast' = 8px per tap
+let barcodeOverlayX = 0;
+let barcodeOverlayY = 0;
+let barcodeOverlayWidthPx = 130;
+let barcodeOverlayHeightPx = 45;
+let stickerPhotoBgPartNumber = '';
+let stickerWidthMM = 70;
+let stickerHeightMM = 45;
+const STICKER_POSITIONS = ['top-left','top-center','top-right','mid-left','center','mid-right','bottom-left','bottom-center','bottom-right'];
+const LABEL_SIZE_CHART = {
+  '01P': {count:1, w:210, h:297}, '02L': {count:2, w:200, h:146}, '04P': {count:4, w:100, h:145},
+  '06L': {count:6, w:99, h:93}, '08L': {count:8, w:100, h:72}, '08LA': {count:8, w:90, h:55},
+  '12L': {count:12, w:100, h:44}, '15L': {count:15, w:61, h:21}, '16L': {count:16, w:99, h:34},
+  '18L': {count:18, w:63.5, h:46.6}, '21L': {count:21, w:63.5, h:38}, '22L': {count:22, w:100, h:24},
+  '24L': {count:24, w:64, h:34}, '30L': {count:30, w:67, h:27.5}, '30P': {count:30, w:39, h:47.5},
+  '32P': {count:32, w:25, h:70}, '40L': {count:40, w:39, h:35}, '40P': {count:40, w:18, h:73},
+  '48L': {count:48, w:48, h:24}, '56L': {count:56, w:48, h:20}, '65L': {count:65, w:38, h:21},
+  '84L': {count:84, w:46, h:11}, '110L': {count:110, w:35, h:10}
+};
+
+const STICKER_FORMATS = ['Generic', 'Photo Background', 'Hyundai / Kia', 'Continental', 'Mobase Yellow', 'Maruti Suzuki', 'Tata', 'Mahindra', 'Toyota', 'Honda'];
+
+document.getElementById('openSticker').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-sticker').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarSticker').classList.remove('hidden');
+  renderStickerSavedList();
+  document.getElementById('stickerEditorZone').innerHTML = '';
+  document.getElementById('stickerPhotoPreview').classList.add('hidden');
+  document.getElementById('stickerPartInput').value = '';
+});
+document.getElementById('backFromSticker').addEventListener('click', ()=>{
+  document.getElementById('view-sticker').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarSticker').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+function readFileAsDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function resizeDataUrlForAI(dataUrl){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const MAX_DIM = 1280; // enough detail for AI to read text clearly, much faster upload than raw gallery photos (often 8-12MB)
+      const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.82)); // JPEG compression — much smaller payload than PNG
+    };
+    img.onerror = ()=> resolve(dataUrl); // fallback to original if resize fails
+    img.src = dataUrl;
+  });
+}
+
+async function handleStickerPhoto(file){
+  if(!file) return;
+  stickerPhotoDataUrl = await readFileAsDataUrl(file);
+  const img = document.getElementById('stickerPhotoPreview');
+  img.src = stickerPhotoDataUrl;
+  img.classList.remove('hidden');
+  stickerLogoDataUrl = null;
+
+  const geminiKey = localStorage.getItem('gemini_api_key');
+  const hfKey = localStorage.getItem('hf_api_key');
+
+  if(!geminiKey && !hfKey){
+    stickerLines = [{text:'', position:'center'}];
+    stickerFormat = 'Generic';
+    openStickerEditor();
+    showToast('⚠️ ⚙️ Settings માં Gemini કે Hugging Face key નાખો — auto-read માટે જરૂરી. હમણાં manually ટાઈપ કરો.');
+    return;
+  }
+
+  showToast('⏳ ફોટો તૈયાર કરું છું...');
+  const resizedForAI = await resizeDataUrlForAI(stickerPhotoDataUrl);
+
+  showToast('⏳ AI ફોટો વાંચી રહ્યું છે... (10-20 સેકંડ)');
+  let result = null;
+  let lastError = null;
+
+  if(geminiKey){
+    try{ result = await geminiReadSticker(resizedForAI, geminiKey); }
+    catch(e){ lastError = e; }
+  }
+
+  if(!result && hfKey){
+    if(geminiKey) showToast('⏳ Gemini નિષ્ફળ — Hugging Face થી ટ્રાય કરું છું...');
+    try{ result = await hfReadSticker(resizedForAI, hfKey); }
+    catch(e){ lastError = e; }
+  }
+
+  if(result){
+    stickerLines = result.lines.length ? result.lines : [{text:'', position:'center'}];
+    stickerWidthMM = result.widthMM;
+    stickerHeightMM = result.heightMM;
+    const allText = stickerLines.map(l=>l.text).join(' ').toUpperCase();
+    stickerFormat = (allText.includes('HYUNDAI') || allText.includes('KIA') || allText.includes('HKMC')) ? 'Hyundai / Kia' : 'Generic';
+    openStickerEditor();
+    showToast('✓ AI એ ટેક્સ્ટ + position વાંચ્યું — logo ✂️ crop કરો, ચેક/edit કરી લો');
+  } else {
+    stickerLines = [{text:'', position:'center'}];
+    stickerFormat = 'Generic';
+    openStickerEditor();
+    showToast('⚠️ AI read નિષ્ફળ (' + (lastError ? lastError.message : 'unknown') + ') — manually ટાઈપ કરો');
+  }
+}
+document.getElementById('stickerGalleryInput').addEventListener('change', e=> handleStickerPhoto(e.target.files[0]));
+document.getElementById('stickerCameraInput').addEventListener('change', e=> handleStickerPhoto(e.target.files[0]));
+
+async function fetchWithTimeout(url, options, timeoutMs){
+  const controller = new AbortController();
+  const timer = setTimeout(()=> controller.abort(), timeoutMs);
+  try{
+    return await fetch(url, {...options, signal: controller.signal});
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function geminiReadSticker(dataUrl, apiKey){
+  const base64 = dataUrl.split(',')[1];
+  const mimeMatch = dataUrl.match(/^data:(image\/[a-z]+);/);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+
+  const prompt = `This is a photo of an automotive spare part label/sticker. Read EVERY line of text visible on it exactly as printed (part numbers, model codes, company name, lot numbers, dates, certification marks — everything). For each line, also identify its approximate position on the label using ONE of these 9 zones: "top-left","top-center","top-right","mid-left","center","mid-right","bottom-left","bottom-center","bottom-right" — matching where that text actually appears on the original label. Also estimate the label's approximate physical size in millimeters (typical automotive labels are 40-100mm wide).
+
+Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure:
+{
+  "widthMM": 70,
+  "heightMM": 45,
+  "lines": [
+    {"text": "CONTINENTAL", "position": "top-left"},
+    {"text": "95400-K6610", "position": "top-right"},
+    {"text": "MADE IN INDIA", "position": "bottom-center"}
+  ]
+}`;
+
+  const models = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
+  let lastError = null;
+  for(const model of models){
+    try{
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const response = await fetchWithTimeout(url, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          contents: [{role:"user", parts:[
+            {text: prompt},
+            {inline_data: {mime_type: mimeType, data: base64}}
+          ]}]
+        })
+      }, 15000);
+      const data = await response.json();
+      if(data.error){ lastError = new Error(data.error.message||'Gemini error'); continue; }
+      const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+      const text = parts.map(p=>p.text||'').join('\n').trim();
+      const cleaned = text.replace(/```json|```/g,'').trim();
+      const objMatch = cleaned.match(/\{[\s\S]*\}/);
+      if(!objMatch){ lastError = new Error('AI જવાબ સમજાયો નહીં'); continue; }
+      const result = JSON.parse(objMatch[0]);
+      if(result.lines && Array.isArray(result.lines) && result.lines.length){
+        return {
+          lines: result.lines.map(l=>({text:String(l.text||''), position: STICKER_POSITIONS.includes(l.position)?l.position:'center'})),
+          widthMM: Number(result.widthMM) || 70,
+          heightMM: Number(result.heightMM) || 45
+        };
+      }
+      lastError = new Error('ખાલી પરિણામ');
+    }catch(e){ lastError = e; }
+  }
+  throw lastError || new Error('બધા models નિષ્ફળ');
+}
+
+async function hfReadSticker(dataUrl, hfToken){
+  const prompt = `This is a photo of an automotive spare part label/sticker. Read EVERY line of text visible on it exactly as printed (part numbers, model codes, company name, lot numbers, dates, certification marks — everything). For each line, also identify its approximate position on the label using ONE of these 9 zones: "top-left","top-center","top-right","mid-left","center","mid-right","bottom-left","bottom-center","bottom-right" — matching where that text actually appears on the original label. Also estimate the label's approximate physical size in millimeters (typical automotive labels are 40-100mm wide).
+
+Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure:
+{"widthMM": 70, "heightMM": 45, "lines": [{"text": "CONTINENTAL", "position": "top-left"}, {"text": "95400-K6610", "position": "top-right"}]}`;
+
+  const response = await fetchWithTimeout('https://router.huggingface.co/v1/chat/completions', {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "Authorization": `Bearer ${hfToken}`},
+    body: JSON.stringify({
+      model: "meta-llama/Llama-3.2-11B-Vision-Instruct",
+      messages: [{
+        role: "user",
+        content: [
+          {type: "text", text: prompt},
+          {type: "image_url", image_url: {url: dataUrl}}
+        ]
+      }]
+    })
+  }, 25000);
+  const data = await response.json();
+  if(data.error) throw new Error(data.error.message || 'Hugging Face error');
+  const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+  const cleaned = text.replace(/```json|```/g,'').trim();
+  const objMatch = cleaned.match(/\{[\s\S]*\}/);
+  if(!objMatch) throw new Error('AI જવાબ સમજાયો નહીં');
+  const result = JSON.parse(objMatch[0]);
+  if(!(result.lines && Array.isArray(result.lines) && result.lines.length)) throw new Error('ખાલી પરિણામ');
+  return {
+    lines: result.lines.map(l=>({text:String(l.text||''), position: STICKER_POSITIONS.includes(l.position)?l.position:'center'})),
+    widthMM: Number(result.widthMM) || 70,
+    heightMM: Number(result.heightMM) || 45
+  };
+}
+
+document.getElementById('stickerCreateBtn').addEventListener('click', ()=>{
+  const pn = document.getElementById('stickerPartInput').value.trim().toUpperCase();
+  if(!pn){ showToast('⚠️ Part number નાખો'); return; }
+  stickerPhotoDataUrl = null;
+  stickerLogoDataUrl = null;
+  document.getElementById('stickerPhotoPreview').classList.add('hidden');
+  stickerLines = [{text:pn, position:'center'}];
+  stickerFormat = 'Generic';
+  stickerWidthMM = 70; stickerHeightMM = 45;
+  openStickerEditor();
+});
+
+function openStickerEditor(){
+  const zone = document.getElementById('stickerEditorZone');
+  zone.innerHTML = `
+    <div class="part-detail" style="margin-top:16px;">
+      <div class="pd-label">LIVE PREVIEW (મૂળ sticker જેવું જ)</div>
+      <div class="sticker-preview" id="stickerPreviewBox" style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:2px;"></div>
+
+      <label class="field-label" style="margin-top:16px;display:block;">Logo — ટેપ કરીને upload કરો</label>
+      <div class="logo-box" id="logoBox" style="width:${stickerLogoWidthPx}px;height:${stickerLogoHeightPx}px;margin-top:6px;">
+        ${stickerLogoDataUrl ? `<img src="${stickerLogoDataUrl}" style="width:100%;height:100%;object-fit:contain;">` : `<span>Tap to add logo</span>`}
+        <input type="file" accept="image/*" id="logoInput" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
+      </div>
+      ${stickerLogoDataUrl ? `
+      <div class="form-row2" style="margin-top:10px;">
+        <div>
+          <label class="field-label">Logo Width (px)</label>
+          <input type="number" class="form-input" id="logoWidthInput" value="${stickerLogoWidthPx}" min="20" max="300">
+        </div>
+        <div>
+          <label class="field-label">Logo Height (px)</label>
+          <input type="number" class="form-input" id="logoHeightInput" value="${stickerLogoHeightPx}" min="10" max="150">
+        </div>
+      </div>
+
+      <label class="field-label" style="margin-top:12px;display:block;">Logo Position — ખસેડો</label>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+        <div class="format-chip ${logoNudgeSpeed==='slow'?'active':''}" id="logoSpeedSlowChip" onclick="setLogoNudgeSpeed('slow')">🐢 Slow</div>
+        <div class="format-chip ${logoNudgeSpeed==='fast'?'active':''}" id="logoSpeedFastChip" onclick="setLogoNudgeSpeed('fast')">🐇 Fast</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
+        <div></div>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(0,-1)">⬆️</button>
+        <div></div>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(-1,0)">⬅️</button>
+        <button class="btn btn-ghost" style="padding:0;font-size:10px;" onclick="resetLogoPosition()">Reset</button>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(1,0)">➡️</button>
+        <div></div>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(0,1)">⬇️</button>
+        <div></div>
+      </div>
+
+      <button class="btn btn-ghost" id="clearLogoBtn" style="margin-top:12px;">✕ Logo કાઢો</button>` : ''}
+
+      <div class="form-row2" style="margin-top:16px;">
+        <div>
+          <label class="field-label">Width (mm)</label>
+          <input type="number" class="form-input" id="stickerWidthInput" value="${stickerWidthMM}">
+        </div>
+        <div>
+          <label class="field-label">Height (mm)</label>
+          <input type="number" class="form-input" id="stickerHeightInput" value="${stickerHeightMM}">
+        </div>
+      </div>
+
+      <label class="field-label" style="margin-top:14px;display:block;">Standard Label Code (A4 sheet) — તાપ કરો size auto-set માટે</label>
+      <div class="format-chips" id="labelCodeChips">
+        ${Object.keys(LABEL_SIZE_CHART).map(code=>`<div class="format-chip" onclick="applyLabelCode('${code}')">${code} (${LABEL_SIZE_CHART[code].count})</div>`).join('')}
+      </div>
+
+      ${stickerPhotoDataUrl ? `<label class="field-label" style="margin-top:16px;display:block;">Original Photo${stickerFormat==='Photo Background' ? ' (background તરીકે વપરાય છે)' : ' (reference)'}</label><img src="${stickerPhotoDataUrl}" class="sticker-upload-photo">` : ''}
+
+      ${stickerFormat === 'Photo Background' ? `
+      <label class="field-label" style="margin-top:16px;display:block;">Part Number (barcode આ પ્રમાણે બદલાય)</label>
+      <input type="text" class="form-input" id="stickerPhotoBgPnInput" value="${stickerPhotoBgPartNumber}" placeholder="e.g. 95400-K6610">
+
+      <label class="field-label" style="margin-top:16px;display:block;">Barcode Position — ખસેડો</label>
+      <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
+        <div></div>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeBarcode(0,-1)">⬆️</button>
+        <div></div>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeBarcode(-1,0)">⬅️</button>
+        <button class="btn btn-ghost" style="padding:0;font-size:10px;" onclick="resetBarcodePosition()">Reset</button>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeBarcode(1,0)">➡️</button>
+        <div></div>
+        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeBarcode(0,1)">⬇️</button>
+        <div></div>
+      </div>
+      <div class="form-row2" style="margin-top:10px;">
+        <div>
+          <label class="field-label">Barcode Width (px)</label>
+          <input type="number" class="form-input" id="barcodeWidthInput" value="${barcodeOverlayWidthPx}" min="40" max="300">
+        </div>
+        <div>
+          <label class="field-label">Barcode Height (px)</label>
+          <input type="number" class="form-input" id="barcodeHeightInput" value="${barcodeOverlayHeightPx}" min="20" max="150">
+        </div>
+      </div>
+      ` : `
+      <label class="field-label" style="margin-top:16px;display:block;">Text Lines — position પસંદ કરો (મૂળ sticker પર જ્યાં હોય ત્યાં)</label>
+      <div id="stickerLinesWrap"></div>
+      <button class="btn btn-ghost" id="addStickerLineBtn" style="margin-top:10px;">➕ Line ઉમેરો</button>
+      `}
+
+      <label class="field-label" style="margin-top:16px;display:block;">Company Format</label>
+      <div class="format-chips" id="stickerFormatChips"></div>
+
+      <div class="action-row" style="margin-top:18px;">
+        <button class="btn btn-ghost" id="saveStickerBtn" style="flex:1;">💾 Save</button>
+        <button class="btn btn-ghost" id="printStickerBtn" style="flex:1;">🖨️ 1 Sticker Print</button>
+      </div>
+      <button class="btn btn-primary" id="printA4SheetBtn" style="margin-top:10px;">🖨️ પૂરી A4 Sheet Print (<span id="a4SheetCount">-</span> labels)</button>
+    </div>
+  `;
+  if(stickerFormat !== 'Photo Background') renderStickerLines();
+  renderStickerFormatChips();
+  renderStickerPreview();
+
+  document.getElementById('logoInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      stickerLogoDataUrl = ev.target.result;
+      stickerLogoOffsetX = 0; stickerLogoOffsetY = 0;
+      openStickerEditor();
+    };
+    reader.readAsDataURL(file);
+  });
+  const clearBtn = document.getElementById('clearLogoBtn');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{ stickerLogoDataUrl=null; openStickerEditor(); });
+  const logoWidthInput = document.getElementById('logoWidthInput');
+  const logoHeightInput = document.getElementById('logoHeightInput');
+  if(logoWidthInput) logoWidthInput.addEventListener('input', e=>{
+    stickerLogoWidthPx = Math.max(10, Number(e.target.value)||90);
+    document.getElementById('logoBox').style.width = stickerLogoWidthPx+'px';
+    renderStickerPreview();
+  });
+  if(logoHeightInput) logoHeightInput.addEventListener('input', e=>{
+    stickerLogoHeightPx = Math.max(10, Number(e.target.value)||32);
+    document.getElementById('logoBox').style.height = stickerLogoHeightPx+'px';
+    renderStickerPreview();
+  });
+
+  const barcodeWidthInput = document.getElementById('barcodeWidthInput');
+  const barcodeHeightInput = document.getElementById('barcodeHeightInput');
+  if(barcodeWidthInput) barcodeWidthInput.addEventListener('input', e=>{
+    barcodeOverlayWidthPx = Math.max(20, Number(e.target.value)||130);
+    renderStickerPreview();
+  });
+  if(barcodeHeightInput) barcodeHeightInput.addEventListener('input', e=>{
+    barcodeOverlayHeightPx = Math.max(10, Number(e.target.value)||45);
+    renderStickerPreview();
+  });
+  const photoBgPnInput = document.getElementById('stickerPhotoBgPnInput');
+  if(photoBgPnInput) photoBgPnInput.addEventListener('input', e=>{
+    stickerPhotoBgPartNumber = e.target.value.trim().toUpperCase();
+    renderStickerPreview();
+  });
+
+  document.getElementById('stickerWidthInput').addEventListener('input', e=>{ stickerWidthMM = Number(e.target.value)||70; renderStickerPreview(); updateA4SheetCount(); });
+  document.getElementById('stickerHeightInput').addEventListener('input', e=>{ stickerHeightMM = Number(e.target.value)||45; renderStickerPreview(); updateA4SheetCount(); });
+
+  const addLineBtn = document.getElementById('addStickerLineBtn');
+  if(addLineBtn) addLineBtn.addEventListener('click', ()=>{
+    stickerLines.push({text:'', position:'center'});
+    renderStickerLines();
+    renderStickerPreview();
+  });
+  document.getElementById('saveStickerBtn').addEventListener('click', saveCurrentSticker);
+  document.getElementById('printStickerBtn').addEventListener('click', printCurrentSticker);
+  document.getElementById('printA4SheetBtn').addEventListener('click', printFullA4Sheet);
+  updateA4SheetCount();
+}
+
+function renderStickerLines(){
+  const wrap = document.getElementById('stickerLinesWrap');
+  wrap.innerHTML = stickerLines.map((line, i)=>`
+    <div class="st-textline-row" style="flex-wrap:wrap;">
+      <input type="text" class="form-input" style="margin-top:0;flex:2;" value="${(line.text||'').replace(/"/g,'&quot;')}" oninput="updateStickerLineText(${i}, this.value)" placeholder="લાઈન ${i+1}">
+      <select class="form-input" style="margin-top:0;flex:1;min-width:110px;" onchange="updateStickerLinePosition(${i}, this.value)">
+        ${STICKER_POSITIONS.map(p=>`<option value="${p}" ${line.position===p?'selected':''}>${p}</option>`).join('')}
+      </select>
+      <button class="st-del-btn" onclick="removeStickerLine(${i})">✕</button>
+    </div>`).join('');
+}
+
+function updateStickerLineText(i, val){ stickerLines[i].text = val; renderStickerPreview(); }
+function updateStickerLinePosition(i, val){ stickerLines[i].position = val; renderStickerPreview(); }
+function removeStickerLine(i){
+  stickerLines.splice(i,1);
+  renderStickerLines();
+  renderStickerPreview();
+}
+
+function getCustomFormats(){
+  try{ return JSON.parse(localStorage.getItem('customStickerFormats')||'[]'); }catch(e){ return []; }
+}
+
+function renderStickerFormatChips(){
+  const wrap = document.getElementById('stickerFormatChips');
+  const customs = getCustomFormats();
+  wrap.innerHTML =
+    STICKER_FORMATS.map(f=>`<div class="format-chip ${f===stickerFormat?'active':''}" onclick="setStickerFormat('${f}')">${f}</div>`).join('') +
+    customs.map(c=>`<div class="format-chip ${c.name===activeCustomFormatName?'active':''}" style="position:relative;" onclick="loadCustomFormat('${c.name.replace(/'/g,"\\'")}')">🧩 ${c.name} <span onclick="event.stopPropagation();deleteCustomFormat('${c.name.replace(/'/g,"\\'")}')" style="margin-left:4px;color:var(--danger);">✕</span></div>`).join('') +
+    `<div class="format-chip" style="border-color:var(--accent);color:var(--accent);" onclick="saveAsNewCustomFormat()">➕ નવો Format Save કરો</div>`;
+}
+function setStickerFormat(f){
+  stickerFormat = f;
+  activeCustomFormatName = null;
+  if(f === 'Photo Background' && !stickerPhotoBgPartNumber){
+    stickerPhotoBgPartNumber = guessStickerPartNumber();
+  }
+  openStickerEditor(); // rebuild — different formats show different controls (text-lines vs barcode-position)
+}
+
+function saveAsNewCustomFormat(){
+  const name = window.prompt('નવા Format નું નામ આપો (દા.ત. "Bosch ECU", "Denso Sensor"):');
+  if(!name || !name.trim()) return;
+  const customs = getCustomFormats();
+  const existing = customs.findIndex(c=>c.name===name.trim());
+  const entry = {
+    name: name.trim(),
+    lines: stickerLines.slice(),
+    widthMM: stickerWidthMM, heightMM: stickerHeightMM,
+    logo: stickerLogoDataUrl, logoWidthPx: stickerLogoWidthPx, logoHeightPx: stickerLogoHeightPx,
+    logoOffsetX: stickerLogoOffsetX, logoOffsetY: stickerLogoOffsetY,
+    baseTemplate: (stickerFormat==='Hyundai / Kia' || stickerFormat==='Continental') ? stickerFormat : 'Generic'
+  };
+  if(existing >= 0) customs[existing] = entry; else customs.push(entry);
+  localStorage.setItem('customStickerFormats', JSON.stringify(customs));
+  activeCustomFormatName = name.trim();
+  showToast(`✓ "${name.trim()}" format saved — હવે dropdown માં દેખાશે`);
+  openStickerEditor();
+}
+
+function loadCustomFormat(name){
+  const customs = getCustomFormats();
+  const c = customs.find(x=>x.name===name);
+  if(!c) return;
+  stickerLines = c.lines.slice();
+  stickerWidthMM = c.widthMM; stickerHeightMM = c.heightMM;
+  stickerLogoDataUrl = c.logo || null;
+  stickerLogoWidthPx = c.logoWidthPx || 90; stickerLogoHeightPx = c.logoHeightPx || 32;
+  stickerLogoOffsetX = c.logoOffsetX || 0; stickerLogoOffsetY = c.logoOffsetY || 0;
+  stickerFormat = c.baseTemplate || 'Generic'; // render using the underlying template shape
+  activeCustomFormatName = name;
+  openStickerEditor();
+  showToast(`✓ "${name}" format loaded — edit કરીને ફરી save કરી શકાય`);
+}
+
+function deleteCustomFormat(name){
+  const ok = window.confirm(`"${name}" format DELETE કરવો છે?`);
+  if(!ok) return;
+  let customs = getCustomFormats();
+  customs = customs.filter(c=>c.name!==name);
+  localStorage.setItem('customStickerFormats', JSON.stringify(customs));
+  renderStickerFormatChips();
+  showToast('🗑️ Format deleted');
+}
+
+function setLogoNudgeSpeed(speed){
+  logoNudgeSpeed = speed;
+  const slowChip = document.getElementById('logoSpeedSlowChip');
+  const fastChip = document.getElementById('logoSpeedFastChip');
+  if(slowChip) slowChip.classList.toggle('active', speed==='slow');
+  if(fastChip) fastChip.classList.toggle('active', speed==='fast');
+}
+
+function nudgeLogo(dx, dy){
+  const step = logoNudgeSpeed === 'fast' ? 8 : 1;
+  stickerLogoOffsetX += dx * step;
+  stickerLogoOffsetY += dy * step;
+  renderStickerPreview(); // preview only updates — editing form stays frozen/stable
+}
+
+function resetLogoPosition(){
+  stickerLogoOffsetX = 0;
+  stickerLogoOffsetY = 0;
+  renderStickerPreview();
+}
+
+function nudgeBarcode(dx, dy){
+  const step = logoNudgeSpeed === 'fast' ? 8 : 1;
+  barcodeOverlayX += dx * step;
+  barcodeOverlayY += dy * step;
+  renderStickerPreview();
+}
+
+function resetBarcodePosition(){
+  barcodeOverlayX = 0;
+  barcodeOverlayY = 0;
+  renderStickerPreview();
+}
+
+function updateA4SheetCount(){
+  const el = document.getElementById('a4SheetCount');
+  if(!el) return;
+  const cols = Math.floor(210 / stickerWidthMM);
+  const rows = Math.floor(297 / stickerHeightMM);
+  el.textContent = (cols>=1 && rows>=1) ? (cols*rows) : '0 (size બહુ મોટું)';
+}
+
+function applyLabelCode(code){
+  const size = LABEL_SIZE_CHART[code];
+  if(!size) return;
+  stickerWidthMM = size.w;
+  stickerHeightMM = size.h;
+  const wInput = document.getElementById('stickerWidthInput');
+  const hInput = document.getElementById('stickerHeightInput');
+  if(wInput) wInput.value = stickerWidthMM;
+  if(hInput) hInput.value = stickerHeightMM;
+  renderStickerPreview();
+  updateA4SheetCount();
+  showToast(`✓ ${code} — ${size.w} x ${size.h} mm set થયું`);
+}
+
+function guessStickerPartNumber(){
+  const found = stickerLines.find(l=> (l.text||'').trim());
+  return found ? found.text.trim() : 'PARTNO';
+}
+
+const POS_GRID_MAP = {
+  'top-left':'1/1', 'top-center':'1/2', 'top-right':'1/3',
+  'mid-left':'2/1', 'center':'2/2', 'mid-right':'2/3',
+  'bottom-left':'3/1', 'bottom-center':'3/2', 'bottom-right':'3/3'
+};
+const POS_ALIGN_MAP = {
+  'top-left':'flex-start;text-align:left', 'top-center':'flex-start;text-align:center', 'top-right':'flex-start;text-align:right',
+  'mid-left':'center;text-align:left', 'center':'center;text-align:center', 'mid-right':'center;text-align:right',
+  'bottom-left':'flex-end;text-align:left', 'bottom-center':'flex-end;text-align:center', 'bottom-right':'flex-end;text-align:right'
+};
+
+function renderStickerPreview(){
+  const box = document.getElementById('stickerPreviewBox');
+  if(!box) return;
+  const pn = guessStickerPartNumber();
+
+  box.style.width = '100%';
+  box.style.aspectRatio = `${stickerWidthMM} / ${stickerHeightMM}`;
+
+  if(stickerFormat === 'Hyundai / Kia'){
+    renderHyundaiKiaTemplate(box, pn);
+    return;
+  }
+  if(stickerFormat === 'Continental'){
+    renderContinentalTemplate(box, pn);
+    return;
+  }
+  if(stickerFormat === 'Mobase Yellow'){
+    renderMobaseTemplate(box, pn);
+    return;
+  }
+  if(stickerFormat === 'Photo Background'){
+    renderPhotoBackgroundTemplate(box, pn);
+    return;
+  }
+  renderGenericGridTemplate(box, pn);
+}
+
+function renderMobaseTemplate(box, pn){
+  box.style.display = 'block';
+  box.style.padding = '0';
+
+  const brandLines = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='top-left').map(l=>l.text);
+  const unitBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-left').map(l=>l.text);
+  const certBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-right').map(l=>l.text);
+  const footerText = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-center')||{}).text || '';
+  const tu11Text = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-right')||{}).text || 'TU11';
+
+  const logoHtml = stickerLogoDataUrl
+    ? `<img src="${stickerLogoDataUrl}" style="width:100%;height:100%;object-fit:contain;">`
+    : `<span>Logo</span>`;
+
+  box.innerHTML = `
+    <div class="mb-label">
+      <div class="mb-el logo-box" style="left:2.5%;top:7.5%;width:30%;height:14%;transform:translate(${stickerLogoOffsetX}px,${stickerLogoOffsetY}px);">${logoHtml}</div>
+      ${brandLines.map((t,i)=>`<div class="mb-el mb-brand-text" style="left:2.5%;top:${20.5+i*8}%;width:60%;">${t}</div>`).join('')}
+      <div class="mb-el mb-ce-mark" style="left:3.5%;top:${20.5+brandLines.length*8+3}%;width:12%;">CE</div>
+
+      <div class="mb-el mb-top-mid" style="left:42%;top:8%;width:38%;">
+        ${unitBlock.map((t,i)=> i===1 ? `<b>${t}</b><br>` : `${t}<br>`).join('')}
+      </div>
+
+      <div class="mb-el mb-pb-mark" style="left:84.5%;top:7%;width:10.5%;height:15%;">Pb</div>
+
+      ${certBlock.map((t,i)=>`<div class="mb-el mb-row-text" style="left:3.75%;top:${44+i*8}%;width:60%;">${t}</div>`).join('')}
+
+      <div class="mb-el" style="left:65.8%;top:55.5%;width:24%;height:33%;"><div class="mb-qr-host" id="stickerQrHolder"></div></div>
+
+      <div class="mb-el mb-tu11" style="left:54%;top:85%;width:20%;">${tu11Text}</div>
+      ${footerText ? `<div class="mb-el mb-footer" style="left:2%;top:91.5%;width:96%;">${footerText}</div>` : ''}
+    </div>
+  `;
+  const qrHolder = document.getElementById('stickerQrHolder');
+  if(qrHolder){ qrHolder.innerHTML=''; try{ new QRCode(qrHolder, {text:pn, width:150, height:150, colorDark:"#000000", colorLight:"#f5cf1b"}); }catch(e){} }
+}
+
+function renderContinentalTemplate(box, pn){
+  box.style.display = 'block';
+  box.style.padding = '0';
+
+  const topBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='top-left').map(l=>l.text);
+  const midLeft = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-left').map(l=>l.text);
+  const midRight = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-right').map(l=>l.text);
+  const eMarkText = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-left')||{}).text || '';
+  const bottomInfo = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='bottom-center').map(l=>l.text);
+  const footerText = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-right')||{}).text || '';
+
+  box.innerHTML = `
+    <div class="cnt-label">
+      <div class="cnt-top-row">
+        <div>
+          ${topBlock.map((t,i)=> i===0 ? `<div class="cnt-brand">${t}</div>` : i===1 ? `<div class="cnt-model">${t}</div>` : `<div class="cnt-desc">${t}</div>`).join('')}
+        </div>
+        <div class="cnt-qr" id="stickerQrHolder"></div>
+      </div>
+
+      <div class="cnt-part">${pn}</div>
+
+      <div class="cnt-mid-row">
+        <div>${midLeft.map(t=>`<div>${t}</div>`).join('')}</div>
+        <div style="text-align:right;">${midRight.map(t=>`<div>${t}</div>`).join('')}</div>
+      </div>
+
+      ${eMarkText ? `<div class="cnt-e-mark"><div class="cnt-e-circle">E11</div><span>${eMarkText}</span></div>` : ''}
+
+      <div class="cnt-bottom">${bottomInfo.map(t=>`<div>${t}</div>`).join('')}</div>
+
+      ${footerText ? `<div class="cnt-footer"><div>${footerText}</div><div>Made in Korea</div></div>` : ''}
+
+      <div class="cnt-barcode-area"><svg id="stickerBarcodeSvg"></svg></div>
+    </div>
+  `;
+  const qrHolder = document.getElementById('stickerQrHolder');
+  if(qrHolder){ qrHolder.innerHTML=''; try{ new QRCode(qrHolder, {text:pn, width:50, height:50, colorDark:"#000000", colorLight:"#f4f4ef"}); }catch(e){} }
+  try{ JsBarcode("#stickerBarcodeSvg", pn, {format:"CODE128", displayValue:true, height:30, margin:2, fontSize:10, background:"#f4f4ef", lineColor:"#000000"}); }catch(e){}
+}
+
+function renderPhotoBackgroundTemplate(box, pn){
+  const barcodeValue = stickerPhotoBgPartNumber || pn;
+  box.style.display = 'block';
+  box.style.padding = '0';
+  box.style.position = 'relative';
+  box.style.backgroundImage = stickerPhotoDataUrl ? `url(${stickerPhotoDataUrl})` : 'none';
+  box.style.backgroundSize = 'contain';
+  box.style.backgroundRepeat = 'no-repeat';
+  box.style.backgroundPosition = 'center';
+
+  box.innerHTML = `
+    <div style="position:absolute;left:calc(50% + ${barcodeOverlayX}px);top:calc(82% + ${barcodeOverlayY}px);
+      transform:translate(-50%,-50%);width:${barcodeOverlayWidthPx}px;height:${barcodeOverlayHeightPx}px;
+      background:#fff;padding:2px;display:flex;align-items:center;justify-content:center;">
+      <svg id="stickerBarcodeSvg" style="width:100%;height:100%;"></svg>
+    </div>
+  `;
+  try{ JsBarcode("#stickerBarcodeSvg", barcodeValue, {format:"CODE128", displayValue:false, height:40, margin:2, background:"#ffffff", lineColor:"#000000"}); }catch(e){}
+}
+
+function normalizeToTemplateSlot(pos){
+  const map = {
+    'top-left':'top-left', 'top-center':'top-left', 'top-right':'top-left',
+    'mid-left':'mid-left', 'center':'mid-left',
+    'mid-right':'mid-right',
+    'bottom-left':'bottom-left',
+    'bottom-center':'bottom-center',
+    'bottom-right':'bottom-right'
+  };
+  return map[pos] || 'mid-left';
+}
+
+function renderHyundaiKiaTemplate(box, pn){
+  box.style.display = 'block';
+  box.style.padding = '0';
+
+  // left column = mid-left lines, right column = mid-right lines, top-left extra text = company line, bottom-center = big center line, bottom-left/right = footer
+  const leftLines = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-left').map(l=>l.text);
+  const rightLines = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-right').map(l=>l.text);
+  const companyLine = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='top-left')||{}).text || 'HYUNDAI KIA MOTORS';
+  const centerLine = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-center')||{}).text || '';
+  const footerLine = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='bottom-left'||normalizeToTemplateSlot(l.position)==='bottom-right').map(l=>l.text).join(' • ');
+
+  const logoContent = stickerLogoDataUrl ? `<img src="${stickerLogoDataUrl}">` : `<span>Tap to add logo</span>`;
+
+  box.innerHTML = `
+    <div class="label" style="height:100%;">
+      <div class="top-row">
+        <div>
+          <div class="logo-box" style="width:${stickerLogoWidthPx}px;height:${stickerLogoHeightPx}px;transform:translate(${stickerLogoOffsetX}px,${stickerLogoOffsetY}px);">${logoContent}</div>
+          <div class="company">${companyLine}</div>
+        </div>
+        <div class="qr" id="stickerQrHolder"></div>
+      </div>
+      <div class="content-row">
+        <div class="col">${leftLines.map(t=>`<p>${t}</p>`).join('')}</div>
+        <div class="col">${rightLines.map((t,i)=>`<p class="${i===1?'bold-line':''}">${t}</p>`).join('')}</div>
+      </div>
+      <div>
+        ${centerLine ? `<div class="center-line">${centerLine}</div>` : ''}
+        ${footerLine ? `<div class="footer">${footerLine}</div>` : ''}
+      </div>
+    </div>
+  `;
+  const qrHolder = document.getElementById('stickerQrHolder');
+  if(qrHolder){ qrHolder.innerHTML=''; try{ new QRCode(qrHolder, {text:pn, width:60, height:60, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){} }
+}
+
+function renderGenericGridTemplate(box, pn){
+  box.style.display = 'grid';
+  box.style.background = '#fff';
+  box.style.gridTemplateColumns = '1fr 1fr 1fr';
+  box.style.gridTemplateRows = '1fr 1fr 1fr';
+  box.style.gap = '2px';
+  box.style.padding = '6px';
+
+  // group lines by grid cell
+  const cells = {};
+  stickerLines.forEach(l=>{
+    const key = l.position || 'center';
+    if(!cells[key]) cells[key] = [];
+    cells[key].push(l.text || '');
+  });
+
+  let html = '';
+  Object.keys(POS_GRID_MAP).forEach(pos=>{
+    const [r,c] = POS_GRID_MAP[pos].split('/');
+    const [justify, textAlign] = POS_ALIGN_MAP[pos].split(';text-align:');
+    const content = (cells[pos]||[]).map(t=>`<div class="st-line">${t||''}</div>`).join('');
+    if(content){
+      html += `<div style="grid-row:${r};grid-column:${c};display:flex;flex-direction:column;justify-content:${justify};align-items:${textAlign==='left'?'flex-start':textAlign==='right'?'flex-end':'center'};text-align:${textAlign};overflow:hidden;padding:2px;">${content}</div>`;
+    }
+  });
+
+  const logoHtml = stickerLogoDataUrl
+    ? `<img src="${stickerLogoDataUrl}" style="grid-row:1;grid-column:1;width:${stickerLogoWidthPx}px;height:${stickerLogoHeightPx}px;object-fit:contain;justify-self:start;align-self:start;transform:translate(${stickerLogoOffsetX}px,${stickerLogoOffsetY}px);">`
+    : stickerPhotoDataUrl
+      ? `<div class="logo-box" style="grid-row:1;grid-column:1;width:60px;height:26px;justify-self:start;align-self:start;">logo here</div>`
+      : '';
+
+  box.innerHTML = html + logoHtml +
+    `<div style="grid-row:3;grid-column:1/4;display:flex;justify-content:center;align-items:flex-end;gap:8px;">
+      <div id="stickerQrHolder"></div>
+      <svg id="stickerBarcodeSvg"></svg>
+    </div>`;
+
+  try{ JsBarcode("#stickerBarcodeSvg", pn, {format:"CODE128", displayValue:false, height:24, margin:2, background:"transparent", lineColor:"#000000"}); }catch(e){}
+  const qrHolder = document.getElementById('stickerQrHolder');
+  if(qrHolder){ qrHolder.innerHTML=''; try{ new QRCode(qrHolder, {text:pn, width:40, height:40, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){} }
+}
+
+function saveCurrentSticker(){
+  const pn = stickerFormat==='Photo Background' ? (stickerPhotoBgPartNumber || guessStickerPartNumber()) : guessStickerPartNumber();
+  const data = {partNumber:pn, lines: stickerLines.slice(), format: stickerFormat, widthMM: stickerWidthMM, heightMM: stickerHeightMM,
+    logo: stickerLogoDataUrl, logoWidthPx: stickerLogoWidthPx, logoHeightPx: stickerLogoHeightPx, logoOffsetX: stickerLogoOffsetX, logoOffsetY: stickerLogoOffsetY,
+    photoBg: stickerFormat==='Photo Background' ? stickerPhotoDataUrl : null,
+    photoBgPartNumber: stickerPhotoBgPartNumber, barcodeOverlayX, barcodeOverlayY, barcodeOverlayWidthPx, barcodeOverlayHeightPx,
+    savedAt: new Date().toISOString()};
+  localStorage.setItem('sticker:'+pn, JSON.stringify(data));
+  showToast(`✓ "${pn}" sticker saved`);
+  renderStickerSavedList();
+}
+
+function printCurrentSticker(){
+  const box = document.getElementById('stickerPreviewBox');
+  let printArea = document.getElementById('printableSticker');
+  if(!printArea){
+    printArea = document.createElement('div');
+    printArea.id = 'printableSticker';
+    document.body.appendChild(printArea);
+  }
+  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;background:#fff;width:${stickerWidthMM}mm;height:${stickerHeightMM}mm;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:1mm;padding:2mm;box-sizing:border-box;color:#111;font-family:'IBM Plex Mono',monospace;`;
+  printArea.innerHTML = box.innerHTML;
+  window.print();
+}
+
+function printFullA4Sheet(){
+  const box = document.getElementById('stickerPreviewBox');
+  const cols = Math.floor(210 / stickerWidthMM);
+  const rows = Math.floor(297 / stickerHeightMM);
+  if(cols < 1 || rows < 1){
+    showToast('⚠️ Size બહુ મોટું છે — A4 sheet પર 1 પણ label ફિટ નથી થતું');
+    return;
+  }
+  const total = cols * rows;
+
+  let printArea = document.getElementById('printableSticker');
+  if(!printArea){
+    printArea = document.createElement('div');
+    printArea.id = 'printableSticker';
+    document.body.appendChild(printArea);
+  }
+  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${cols*stickerWidthMM}mm;height:${rows*stickerHeightMM}mm;
+    display:grid;grid-template-columns:repeat(${cols}, ${stickerWidthMM}mm);grid-template-rows:repeat(${rows}, ${stickerHeightMM}mm);
+    gap:0;background:#fff;`;
+
+  const cellContent = box.innerHTML; // already-rendered barcode/QR graphics get reused visually in each repeated cell
+  let html = '';
+  for(let i=0;i<total;i++){
+    html += `<div style="width:${stickerWidthMM}mm;height:${stickerHeightMM}mm;overflow:hidden;box-sizing:border-box;">${cellContent}</div>`;
+  }
+  printArea.innerHTML = html;
+  showToast(`🖨️ ${total} labels (${cols}×${rows}) — A4 sheet તૈયાર`);
+  window.print();
+}
+
+function getAllSavedStickers(){
+  const list = [];
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('sticker:')){
+      try{ list.push(JSON.parse(localStorage.getItem(k))); }catch(e){}
+    }
+  }
+  return list.sort((a,b)=> new Date(b.savedAt)-new Date(a.savedAt));
+}
+
+function renderStickerSavedList(){
+  const wrap = document.getElementById('stickerSavedList');
+  const items = getAllSavedStickers();
+  if(items.length===0){ wrap.innerHTML=''; return; }
+  wrap.innerHTML = `<label class="field-label" style="display:block;margin-bottom:6px;">Saved Stickers (tap to reuse)</label>` +
+    items.map(it=>`<span class="saved-sticker-chip" onclick="loadSavedSticker('${it.partNumber.replace(/'/g,"\\'")}')">🏷️ ${it.partNumber}</span>`).join('');
+}
+
+function loadSavedSticker(pn){
+  try{
+    const data = JSON.parse(localStorage.getItem('sticker:'+pn));
+    stickerLines = data.lines.slice();
+    stickerFormat = data.format || 'Generic';
+    stickerWidthMM = data.widthMM || 70;
+    stickerHeightMM = data.heightMM || 45;
+    stickerLogoDataUrl = data.logo || null;
+    stickerLogoWidthPx = data.logoWidthPx || 90;
+    stickerLogoHeightPx = data.logoHeightPx || 32;
+    stickerLogoOffsetX = data.logoOffsetX || 0;
+    stickerLogoOffsetY = data.logoOffsetY || 0;
+    stickerPhotoBgPartNumber = data.photoBgPartNumber || '';
+    barcodeOverlayX = data.barcodeOverlayX || 0;
+    barcodeOverlayY = data.barcodeOverlayY || 0;
+    barcodeOverlayWidthPx = data.barcodeOverlayWidthPx || 130;
+    barcodeOverlayHeightPx = data.barcodeOverlayHeightPx || 45;
+    stickerPhotoDataUrl = data.format==='Photo Background' ? (data.photoBg || null) : null;
+    if(stickerFormat !== 'Photo Background') document.getElementById('stickerPhotoPreview').classList.add('hidden');
+    openStickerEditor();
+  }catch(e){}
+}
+
+/* ============ MULTIPLE BUY MODULE (legacy, no longer linked from home — merged into Buy) ============ */
+let multiStream = null;
+let multiScanInterval = null;
+let multiGPS = null;
+let multiSession = {}; // partNumber -> count
+let lastMultiScanValue = '';
+let lastMultiScanTime = 0;
+
+document.getElementById('backFromMultiBuy').addEventListener('click', ()=>{
+  stopMultiScanCamera();
+  document.getElementById('view-multibuy').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarMultiBuy').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+function captureMultiGPS(){
+  const dot = document.getElementById('multiGpsDot');
+  const txt = document.getElementById('multiGpsText');
+  if(!navigator.geolocation){ txt.textContent='GPS not supported'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      multiGPS = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      dot.classList.add('live');
+      txt.textContent = `Live GPS: ${multiGPS.lat.toFixed(6)}, ${multiGPS.lng.toFixed(6)}`;
+    },
+    ()=>{ txt.textContent='Location permission needed'; },
+    {enableHighAccuracy:true, timeout:8000}
+  );
+}
+
+async function startMultiScanCamera(){
+  const video = document.getElementById('multiScanVideo');
+  if(!('BarcodeDetector' in window)){
+    showToast('⚠️ Camera scan સપોર્ટ નથી — manual નંબર વાપરો');
+    return;
+  }
+  try{
+    multiStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject = multiStream;
+    await video.play();
+  }catch(e){
+    showToast('⚠️ Camera access ના મળી — manual નંબર વાપરો');
+    return;
+  }
+
+  const detector = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','code_93','codabar','data_matrix','upc_a','upc_e','itf']});
+  multiScanInterval = setInterval(async ()=>{
+    try{
+      const codes = await detector.detect(video);
+      if(codes && codes.length){
+        const raw = (codes[0].rawValue||'').trim();
+        if(!raw) return;
+        const now = Date.now();
+        const codeChanged = raw !== lastMultiScanValue;
+        const cooldownPassed = (now - lastMultiScanTime) > 700; // guards against motion-blur double-fire
+        if(codeChanged && cooldownPassed){
+          lastMultiScanValue = raw;
+          lastMultiScanTime = now;
+          const pn = extractPartNumber(raw).toUpperCase();
+          addMultiScan(pn);
+          flashMultiFrame();
+        } else if(codeChanged && !cooldownPassed){
+          // code changed too fast after last count — likely blur artifact, don't count but do update tracking so a genuine new code isn't stuck
+          lastMultiScanValue = raw;
+        }
+      } else {
+        lastMultiScanValue = ''; // code left the frame — next appearance (even same value) will count as new
+      }
+    }catch(e){}
+  }, 350);
+}
+
+function stopMultiScanCamera(){
+  if(multiScanInterval){ clearInterval(multiScanInterval); multiScanInterval=null; }
+  if(multiStream){ multiStream.getTracks().forEach(t=>t.stop()); multiStream=null; }
+}
+
+function flashMultiFrame(){
+  const frame = document.getElementById('multiScanFrame');
+  frame.classList.add('flash');
+  setTimeout(()=>frame.classList.remove("flash"), 900);
+}
+
+function addMultiScan(pn){
+  if(!pn) return;
+  multiSession[pn] = (multiSession[pn]||0) + 1;
+  renderMultiList();
+}
+
+function renderMultiList(){
+  const wrap = document.getElementById('multiScannedList');
+  const keys = Object.keys(multiSession);
+  let total = 0;
+  keys.forEach(k=> total += multiSession[k]);
+
+  document.getElementById('multiTotalCount').textContent = total;
+  document.getElementById('multiDoneCount').textContent = total;
+  document.getElementById('multiBuyTotalLabel').textContent = 'Total: ' + total;
+
+  if(keys.length===0){
+    wrap.innerHTML = `<div class="notes-box">હજુ કંઈ scan નથી થયું — camera ને barcode/QR સામે રાખો.</div>`;
+    return;
+  }
+  wrap.innerHTML = keys.map(pn=>`
+    <div class="scanned-item">
+      <span class="scanned-partno">${pn}</span>
+      <span class="scanned-qty">×${multiSession[pn]}</span>
+    </div>`).join('');
+}
+
+document.getElementById('multiDoneBtn').addEventListener('click', ()=>{
+  const keys = Object.keys(multiSession);
+  if(keys.length===0){ showToast('⚠️ કંઈ scan નથી થયું'); return; }
+
+  keys.forEach(pn=>{
+    const existing = getInventory(pn) || {qty:0, purchases:[]};
+    existing.qty += multiSession[pn];
+    existing.purchases.push({
+      qty: multiSession[pn], gps: multiGPS, date: new Date().toISOString(), via: 'Multiple Buy'
+    });
+    localStorage.setItem('inv:'+pn, JSON.stringify(existing));
+  });
+
+  const total = keys.reduce((s,k)=>s+multiSession[k],0);
+  showToast(`✓ ${total} units, ${keys.length} parts માટે add થયું`);
+  multiSession = {};
+  renderMultiList();
+});
+
+/* ============ INVENTORY MODULE ============ */
+document.getElementById('openInventory').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-inventory').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarInventory').classList.remove('hidden');
+  document.getElementById('invFilterInput').value = '';
+  renderInventoryList();
+});
+document.getElementById('backFromInventory').addEventListener('click', ()=>{
+  document.getElementById('view-inventory').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarInventory').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+function getAllInventory(){
+  const list = [];
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('inv:')){
+      try{
+        const data = JSON.parse(localStorage.getItem(k));
+        data.partNumber = k.slice(4);
+        list.push(data);
+      }catch(e){}
+    }
+  }
+  return list.sort((a,b)=> a.partNumber.localeCompare(b.partNumber));
+}
+
+function deleteInventoryItem(pn){
+  const ok = window.confirm(`"${pn}" ને Inventory માંથી કાયમ માટે DELETE કરવું છે? (Undo નહીં થાય)`);
+  if(!ok) return;
+  localStorage.removeItem('inv:'+pn);
+  showToast(`🗑️ ${pn} delete થયું`);
+  renderInventoryList(document.getElementById('invFilterInput').value.trim());
+}
+
+function renderInventoryList(filterText){
+  const wrap = document.getElementById('invList');
+  const countEl = document.getElementById('invCount');
+  let items = getAllInventory();
+
+  if(filterText){
+    const f = filterText.toLowerCase();
+    items = items.filter(it =>
+      it.partNumber.toLowerCase().includes(f) ||
+      (it.category||'').toLowerCase().includes(f) ||
+      (it.vehicles||'').toLowerCase().includes(f)
+    );
+  }
+
+  countEl.textContent = `${items.length} items`;
+
+  if(items.length===0){
+    wrap.innerHTML = `<div class="notes-box">હજુ કોઈ part inventory માં નથી. Buy module થી ઉમેરો.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = items.map(it=>{
+    const loc = [it.location?.rack, it.location?.shelf, it.location?.box, it.location?.position].filter(Boolean).join(' → ');
+    const stockColor = it.qty > 0 ? 'var(--verified)' : 'var(--text-dim)';
+    return `
+    <div class="req-item">
+      <div class="req-item-top">
+        <div>
+          <div class="req-partno">${it.partNumber}</div>
+          <div class="req-meta">${it.category ? it.category+' • ' : ''}${it.vehicles || 'Vehicle unknown'}</div>
+          ${loc ? `<div class="req-meta">📍 ${loc}</div>` : ''}
+          ${it.condition ? `<div class="req-meta">Condition: ${it.condition}</div>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          <span class="status-pill" style="color:${stockColor};border-color:${stockColor};background:transparent;">${it.qty} in stock</span>
+          <button onclick="deleteInventoryItem('${it.partNumber.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--danger);font-size:11px;font-weight:700;padding:2px 4px;cursor:pointer;">🗑️ Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('invFilterInput').addEventListener('input', e=>{
+  renderInventoryList(e.target.value.trim());
+});
+document.getElementById('invScanCameraBtn').addEventListener('click', ()=>{
+  openCameraScan('invFilterInput');
+});
+
+/* ============ REQUIREMENT MODULE ============ */
+let reqGPS = null;
+let selectedPrio = 'Medium';
+
+document.getElementById('openReq').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-req').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarReq').classList.remove('hidden');
+  document.getElementById('reqPartInput').focus();
+  captureReqGPS();
+  renderReqList();
+});
+document.getElementById('backFromReq').addEventListener('click', ()=>{
+  document.getElementById('view-req').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarReq').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+function captureReqGPS(){
+  const dot = document.getElementById('reqGpsDot');
+  const txt = document.getElementById('reqGpsText');
+  if(!navigator.geolocation){ txt.textContent='GPS not supported'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      reqGPS = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      dot.classList.add('live');
+      txt.textContent = `GPS: ${reqGPS.lat.toFixed(6)}, ${reqGPS.lng.toFixed(6)}`;
+    },
+    ()=>{ txt.textContent='Location permission needed'; },
+    {enableHighAccuracy:true, timeout:8000}
+  );
+}
+
+document.getElementById('reqScanCameraBtn').addEventListener('click', ()=>{
+  openCameraScan('reqPartInput');
+});
+
+document.querySelectorAll('#reqPrioGrid .prio-chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#reqPrioGrid .prio-chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    selectedPrio = chip.dataset.prio;
+  });
+});
+
+function getAllRequirements(){
+  const list = [];
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('req:')){
+      try{ list.push(JSON.parse(localStorage.getItem(k))); }catch(e){}
+    }
+  }
+  return list.sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+document.getElementById('addReqBtn').addEventListener('click', ()=>{
+  const pn = document.getElementById('reqPartInput').value.trim().toUpperCase();
+  if(!pn){ showToast('⚠️ પાર્ટ નંબર નાખો'); document.getElementById('reqPartInput').focus(); return; }
+
+  const id = 'req:' + pn + ':' + Date.now();
+  const reqData = {
+    id, partNumber: pn,
+    name: document.getElementById('reqName').value.trim(),
+    qty: document.getElementById('reqQty').value || 1,
+    note: document.getElementById('reqNote').value.trim(),
+    priority: selectedPrio,
+    status: 'Pending',
+    gps: reqGPS,
+    createdAt: new Date().toISOString()
+  };
+  localStorage.setItem(id, JSON.stringify(reqData));
+  showToast(`✓ ${pn} Requirement ઉમેરાયો`);
+
+  document.getElementById('reqPartInput').value='';
+  document.getElementById('reqName').value='';
+  document.getElementById('reqNote').value='';
+  document.getElementById('reqQty').value='1';
+  document.getElementById('reqPartInput').focus();
+  renderReqList();
+});
+
+function prioColor(p){ return p==='High' ? 'var(--danger)' : p==='Low' ? 'var(--verified)' : 'var(--conflict)'; }
+
+function renderReqList(){
+  const wrap = document.getElementById('reqList');
+  const items = getAllRequirements().filter(r=>r.status==='Pending');
+  if(items.length===0){
+    wrap.innerHTML = `<div class="notes-box">હજુ કોઈ requirement નોંધાયો નથી.</div>`;
+    return;
+  }
+  wrap.innerHTML = items.map(r=>`
+    <div class="req-item">
+      <div class="req-item-top">
+        <div>
+          <div class="req-partno">${r.partNumber}</div>
+          <div class="req-meta">${r.name ? r.name+' • ' : ''}Qty: ${r.qty}${r.note ? ' • '+r.note : ''}</div>
+          <div class="req-meta"><span class="prio-dot" style="background:${prioColor(r.priority)};"></span>${r.priority} priority</div>
+        </div>
+        <button class="btn btn-verified" style="width:auto;padding:8px 14px;font-size:12px;" onclick="markReqDone('${r.id}')">✓ Done</button>
+      </div>
+    </div>`).join('');
+}
+
+function markReqDone(id){
+  try{
+    const r = JSON.parse(localStorage.getItem(id));
+    r.status = 'Completed';
+    localStorage.setItem(id, JSON.stringify(r));
+    showToast('✓ Requirement પૂરો થયો');
+    renderReqList();
+  }catch(e){}
+}
+
+/* ============ SELL MODULE ============ */
+let sellGPS = null;
+
+document.getElementById('openSell').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-sell').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarSell').classList.remove('hidden');
+  document.getElementById('sellPartInput').focus();
+  captureSellGPS();
+});
+document.getElementById('backFromSell').addEventListener('click', ()=>{
+  document.getElementById('view-sell').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarSell').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+function captureSellGPS(){
+  const dot = document.getElementById('sellGpsDot');
+  const txt = document.getElementById('sellGpsText');
+  if(!navigator.geolocation){ txt.textContent='GPS not supported'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      sellGPS = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      dot.classList.add('live');
+      txt.textContent = `GPS: ${sellGPS.lat.toFixed(6)}, ${sellGPS.lng.toFixed(6)}`;
+    },
+    ()=>{ txt.textContent='Location permission needed'; },
+    {enableHighAccuracy:true, timeout:8000}
+  );
+}
+
+document.getElementById('sellScanCameraBtn').addEventListener('click', ()=>{
+  openCameraScan('sellPartInput');
+});
+document.getElementById('sellPartInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkSellStock(); });
+document.getElementById('sellCheckBtn').addEventListener('click', checkSellStock);
+
+function checkSellStock(){
+  const pn = document.getElementById('sellPartInput').value.trim().toUpperCase();
+  const zone = document.getElementById('sellResultZone');
+  if(!pn){ document.getElementById('sellPartInput').focus(); return; }
+
+  const inv = getInventory(pn);
+  const qty = inv ? inv.qty : 0;
+
+  if(qty <= 0){
+    zone.innerHTML = `
+      <div class="part-detail">
+        <div class="pd-partno">${pn}</div>
+        <div class="status-pill status-new">✕ NO STOCK</div>
+        <div class="notes-box" style="margin-top:14px;">This part number is not in stock — cannot sell.</div>
+      </div>`;
+    return;
+  }
+
+  zone.innerHTML = `
+    <div class="part-detail">
+      <div class="pd-partno">${pn}</div>
+      <div class="status-pill status-verified">✓ IN STOCK</div>
+      <div class="stock-badge" style="margin-top:12px;">📦 Available: ${qty} units</div>
+
+      <div class="info-row" style="margin-top:14px;"><span class="info-label">Category</span><span class="info-value">${inv.category||'—'}</span></div>
+      <div class="info-row"><span class="info-label">Vehicles</span><span class="info-value">${inv.vehicles||'—'}</span></div>
+      <div class="info-row"><span class="info-label">Location</span><span class="info-value">${[inv.location?.rack,inv.location?.shelf,inv.location?.box,inv.location?.position].filter(Boolean).join(' → ')||'—'}</span></div>
+
+      <div class="form-group">
+        <label class="field-label">Sell Quantity (max ${qty})</label>
+        <input type="number" class="form-input" id="sellQty" value="1" min="1" max="${qty}" inputmode="numeric">
+      </div>
+
+      <div class="form-group">
+        <label class="field-label">Sale Price (₹) — કુલ</label>
+        <input type="number" class="form-input" id="sellPrice" placeholder="0" inputmode="numeric">
+      </div>
+
+      <div id="sellQtyError"></div>
+
+      <button class="btn btn-primary" id="confirmSellBtn" style="margin-top:18px;">💰 Confirm Sell</button>
+    </div>`;
+
+  const confirmBtn = document.getElementById('confirmSellBtn');
+  confirmBtn.addEventListener('click', ()=>{
+    if(confirmBtn.disabled) return; // guard against double-tap causing double-sell
+
+    const inv2 = getInventory(pn);
+    const currentStock = inv2 ? inv2.qty : 0;
+    const sellQtyInput = document.getElementById('sellQty');
+    let sellQty = parseInt(sellQtyInput.value, 10);
+    const errBox = document.getElementById('sellQtyError');
+
+    if(!sellQty || sellQty < 1){
+      errBox.innerHTML = `<div class="notes-box" style="border-left-color:var(--danger);">⚠️ ઓછામાં ઓછું 1 quantity નાખો.</div>`;
+      return;
+    }
+    if(currentStock <= 0){
+      showToast('⚠️ Stock ખતમ થઈ ગયો'); checkSellStock(); return;
+    }
+    if(sellQty > currentStock){
+      errBox.innerHTML = `<div class="notes-box" style="border-left-color:var(--danger);">⚠️ સ્ટોકમાં ફક્ત ${currentStock} જ છે — એટલાથી વધારે વેચી ના શકાય.</div>`;
+      return;
+    }
+
+    confirmBtn.disabled = true;
+    confirmBtn.style.opacity = '0.5';
+
+    inv2.qty -= sellQty;
+    const salePrice = document.getElementById('sellPrice').value || 0;
+    inv2.sales = inv2.sales || [];
+    inv2.sales.push({id: 'txn_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), qty: sellQty, price: salePrice, company: inv2.company||'', category: inv2.category||'', gps: sellGPS, date: new Date().toISOString()});
+    localStorage.setItem('inv:'+pn, JSON.stringify(inv2));
+    showToast(`✓ ${pn} — ${sellQty} units વેચાયા — ₹${salePrice} (બાકી stock: ${inv2.qty})`);
+    document.getElementById('sellPartInput').value = '';
+    zone.innerHTML = '';
+    document.getElementById('sellPartInput').focus();
+  });
+}
+
+/* ============ BUY MODULE (continuous batch scan) ============ */
+let buyGPS = null;
+let selectedCondition = 'Working';
+let buyStream = null;
+let buyScanInterval = null;
+let buySession = {};
+let lastBuyScanValue = '';
+let lastBuyScanTime = 0;
+
+document.getElementById('openBuy').addEventListener('click', async ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-buy').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarBuy').classList.remove('hidden');
+  buySession = {};
+  renderBuyList();
+  captureBuyGPS();
+  await startBuyScanCamera();
+});
+document.getElementById('backFromBuy').addEventListener('click', ()=>{
+  stopBuyScanCamera();
+  document.getElementById('view-buy').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarBuy').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+function captureBuyGPS(){
+  const dot = document.getElementById('buyGpsDot');
+  const txt = document.getElementById('buyGpsText');
+  if(!navigator.geolocation){ txt.textContent='GPS not supported'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      buyGPS = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      dot.classList.add('live');
+      txt.textContent = `GPS: ${buyGPS.lat.toFixed(6)}, ${buyGPS.lng.toFixed(6)}`;
+    },
+    ()=>{ txt.textContent='Location permission needed'; },
+    {enableHighAccuracy:true, timeout:8000}
+  );
+}
+
+async function startBuyScanCamera(){
+  const video = document.getElementById('buyScanVideo');
+  if(!('BarcodeDetector' in window)){
+    showToast('⚠️ Camera scan સપોર્ટ નથી — manual નંબર વાપરો');
+    return;
+  }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    if(document.getElementById('view-buy').classList.contains('hidden')){
+      // user already navigated away before permission resolved — release immediately
+      stream.getTracks().forEach(t=>t.stop());
+      return;
+    }
+    buyStream = stream;
+    video.srcObject = buyStream;
+    await video.play();
+  }catch(e){
+    showToast('⚠️ Camera access ના મળી — manual નંબર વાપરો');
+    return;
+  }
+  const detector = new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8','code_93','codabar','data_matrix','upc_a','upc_e','itf']});
+  const buyDetectCanvas = document.createElement('canvas');
+  const buyDetectCtx = buyDetectCanvas.getContext('2d', {willReadFrequently:true});
+
+  buyScanInterval = setInterval(async ()=>{
+    try{
+      if(!video.videoWidth || !video.videoHeight) return;
+      buyDetectCanvas.width = video.videoWidth;
+      buyDetectCanvas.height = video.videoHeight;
+      buyDetectCtx.drawImage(video, 0, 0);
+      const codes = await detector.detect(buyDetectCanvas);
+      if(codes && codes.length){
+        const raw = (codes[0].rawValue||'').trim();
+        if(!raw) return;
+        const now = Date.now();
+        const codeChanged = raw !== lastBuyScanValue;
+        const cooldownPassed = (now - lastBuyScanTime) > 700;
+        if(codeChanged && cooldownPassed){
+          lastBuyScanValue = raw; lastBuyScanTime = now;
+          const pn = extractPartNumber(raw).toUpperCase();
+          addBuyScan(pn);
+          flashBuyFrame();
+        } else if(codeChanged && !cooldownPassed){
+          lastBuyScanValue = raw;
+        }
+      } else {
+        lastBuyScanValue = '';
+      }
+    }catch(e){}
+  }, 350);
+}
+
+function stopBuyScanCamera(){
+  if(buyScanInterval){ clearInterval(buyScanInterval); buyScanInterval=null; }
+  if(buyStream){ buyStream.getTracks().forEach(t=>t.stop()); buyStream=null; }
+}
+
+function flashBuyFrame(){
+  const frame = document.getElementById('buyScanFrame');
+  if(!frame) return;
+  frame.classList.add('flash');
+  if(navigator.vibrate) navigator.vibrate(120);
+  setTimeout(()=>frame.classList.remove("flash"), 900);
+}
+
+function addBuyScan(pn){
+  if(!pn) return;
+  buySession[pn] = (buySession[pn]||0) + 1;
+  renderBuyList();
+}
+
+function renderBuyList(){
+  const wrap = document.getElementById('buyScannedList');
+  const keys = Object.keys(buySession);
+  let total = 0;
+  keys.forEach(k=> total += buySession[k]);
+  document.getElementById('buyTotalCount').textContent = total;
+  document.getElementById('buyDoneCount').textContent = total;
+
+  if(keys.length===0){
+    wrap.innerHTML = `<div class="notes-box">હજુ કંઈ scan નથી થયું — camera ને barcode/QR સામે રાખો, અથવા manually ટાઈપ કરો.</div>`;
+    return;
+  }
+  wrap.innerHTML = `<div class="notes-box" style="margin-bottom:10px;">💡 કોઈ પાર્ટ નંબર ખોટો/અલગ દેખાય (scan noise) તો એના પર ટેપ કરીને સાચો કરો — સાચા નંબર સાથે merge થઈ જશે.</div>` +
+    keys.map(pn=>`
+    <div class="scanned-item" style="cursor:pointer;" onclick="editBuyScanItem('${pn.replace(/'/g,"\\'")}')">
+      <span class="scanned-partno">${pn} ✏️</span>
+      <span class="scanned-qty">×${buySession[pn]}</span>
+    </div>`).join('');
+}
+
+function editBuyScanItem(oldPn){
+  const newPn = window.prompt('સાચો Part Number લખો:', oldPn);
+  if(newPn === null) return; // cancelled
+  const cleaned = newPn.trim().toUpperCase();
+  if(!cleaned){ delete buySession[oldPn]; renderBuyList(); return; }
+  const qty = buySession[oldPn];
+  delete buySession[oldPn];
+  buySession[cleaned] = (buySession[cleaned] || 0) + qty;
+  renderBuyList();
+}
+
+document.getElementById('buyManualAddBtn').addEventListener('click', ()=>{
+  const input = document.getElementById('buyManualInput');
+  const pn = input.value.trim().toUpperCase();
+  if(!pn){ input.focus(); return; }
+  addBuyScan(pn);
+  input.value=''; input.focus();
+});
+document.getElementById('buyManualInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter') document.getElementById('buyManualAddBtn').click();
+});
+
+document.querySelectorAll('#condGrid .cond-chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#condGrid .cond-chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    selectedCondition = chip.dataset.cond;
+  });
+});
+
+function getInventory(pn){
+  try{
+    const raw = localStorage.getItem('inv:'+pn);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+let selectedBuyCompany = 'All';
+document.querySelectorAll('#buyCompanyChips .chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#buyCompanyChips .chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    selectedBuyCompany = chip.dataset.company;
+  });
+});
+
+document.getElementById('confirmBuyBtn').addEventListener('click', ()=>{
+  const keys = Object.keys(buySession);
+  if(keys.length===0){ showToast('⚠️ કંઈ scan/add નથી થયું'); return; }
+
+  const category = document.getElementById('buyCategory').value.trim();
+  const vehicles = document.getElementById('buyVehicles').value.trim();
+  const location = {
+    rack: document.getElementById('buyRack').value.trim(),
+    shelf: document.getElementById('buyShelf').value.trim(),
+    box: document.getElementById('buyBox').value.trim(),
+    position: document.getElementById('buyPosition').value.trim()
+  };
+  const totalPrice = document.getElementById('buyPrice').value || 0;
+
+  keys.forEach(pn=>{
+    const existing = getInventory(pn) || {qty:0, purchases:[], sales:[]};
+    existing.qty += buySession[pn];
+    if(category) existing.category = category;
+    if(vehicles) existing.vehicles = vehicles;
+    if(location.rack || location.shelf || location.box || location.position) existing.location = location;
+    existing.condition = selectedCondition;
+    existing.company = selectedBuyCompany;
+    existing.purchases = existing.purchases || [];
+    existing.purchases.push({
+      id: 'txn_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+      qty: buySession[pn], price: totalPrice, condition: selectedCondition, company: selectedBuyCompany,
+      category: category, gps: buyGPS, date: new Date().toISOString()
+    });
+    localStorage.setItem('inv:'+pn, JSON.stringify(existing));
+  });
+
+  const total = keys.reduce((s,k)=>s+buySession[k],0);
+  showToast(`✓ ${total} units, ${keys.length} parts — Inventory માં ઉમેરાયું`);
+  buySession = {};
+  renderBuyList();
+  document.getElementById('buyPrice').value='';
+});
+
+/* ============ SEARCH FLOW ============ */
+document.getElementById('searchBtn').addEventListener('click', doSearch);
+document.getElementById('partInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
+
+async function doSearch(){
+  const input = document.getElementById('partInput');
+  const partNo = input.value.trim().toUpperCase();
+  if(!partNo){ input.focus(); return; }
+
+  const zone = document.getElementById('resultZone');
+  const plate = document.getElementById('scanPlate');
+  plate.classList.add('scanning');
+  zone.innerHTML = `<div class="loading-wrap"><div class="spinner"></div><div class="loading-text">ડેટાબેઝ ચેક કરું છું...</div></div>`;
+
+  const existing = await getPart(partNo);
+  if(existing){
+    plate.classList.remove('scanning');
+    renderResult(existing, true);
+    return;
+  }
+
+  zone.innerHTML = `<div class="loading-wrap"><div class="spinner"></div><div class="loading-text" id="loadingStageTxt">🔎 ડેટાબેઝમાં નથી — વેબ પર શોધવાનું શરૂ કરું છું...</div></div>`;
+
+  const stages = [
+    '🌐 Multiple parts websites ચેક કરું છું...',
+    '🚗 Vehicle catalogs સાથે match કરું છું...',
+    '⚖️ Sources compare કરી confidence નક્કી કરું છું...',
+    '✍️ પરિણામ તૈયાર કરું છું...'
+  ];
+  let stageIdx = 0;
+  const stageTimer = setInterval(()=>{
+    const el = document.getElementById('loadingStageTxt');
+    if(el && stageIdx < stages.length){ el.textContent = stages[stageIdx]; stageIdx++; }
+  }, 3500);
+
+  try{
+    const result = await aiLookupPart(partNo, selectedCompany);
+    clearInterval(stageTimer);
+    result.partNumber = partNo;
+    result.gps = currentGPS;
+    result.searchedAt = new Date().toISOString();
+    currentPart = result;
+    plate.classList.remove('scanning');
+    renderResult(result, false);
+  }catch(e){
+    clearInterval(stageTimer);
+    plate.classList.remove('scanning');
+    if(e.needsKey){
+      zone.innerHTML = `<div class="part-detail"><div class="notes-box">⚠️ ${e.message}</div>
+        <button class="btn btn-primary" id="goSettingsBtn" style="margin-top:14px;">⚙️ Settings ખોલો</button></div>`;
+      document.getElementById('goSettingsBtn').addEventListener('click', ()=>{
+        document.getElementById('view-search').classList.add('hidden');
+        document.getElementById('view-settings').classList.remove('hidden');
+        document.getElementById('topbarSearch').classList.add('hidden');
+        document.getElementById('topbarSettings').classList.remove('hidden');
+      });
+    } else {
+      zone.innerHTML = `<div class="part-detail"><div class="notes-box">⚠️ AI lookup નિષ્ફળ ગયું: ${e.message}. ફરી પ્રયત્ન કરો.</div></div>`;
+    }
+  }
+}
+
+function statusPill(status, verified){
+  if(verified) return `<span class="status-pill status-verified">✓ VERIFIED IN DB</span>`;
+  if(status==='high_confidence') return `<span class="status-pill status-verified">✓ HIGH CONFIDENCE</span>`;
+  return `<span class="status-pill status-new">NEW PART</span>`;
+}
+
+function renderResult(r, isVerified){
+  const zone = document.getElementById('resultZone');
+  const barColor = r.confidence>=70 ? 'var(--verified)' : r.confidence>=40 ? 'var(--conflict)' : 'var(--danger)';
+
+  const vehiclesHtml = (r.vehicles||[]).map(v=>`
+    <div class="vehicle-item">
+      <div>
+        <div class="vehicle-name">${v.make||''} ${v.model||''}</div>
+        <div class="vehicle-meta">${v.variant||'—'}</div>
+      </div>
+      <div class="vehicle-years">${v.years||'—'}</div>
+    </div>`).join('') || `<div class="notes-box">કોઈ ચોક્કસ ગાડી મળી નથી.</div>`;
+
+  const sourcesHtml = (r.sources||[]).map(s=>`<div class="source-item">${s}</div>`).join('');
+
+  const badgesHtml = isVerified ? '' : `
+    <div class="badge-row">
+      ${r.status==='conflict' ? '<span class="badge badge-conflict">⚠ Information Conflict</span>' : ''}
+      ${r.status!=='high_confidence' ? '<span class="badge badge-verify">Requires Verification</span>' : ''}
+      ${(r.sources && r.sources.length) ? '<span class="badge badge-sources">🌐 Live web sources</span>' : ''}
+    </div>`;
+
+  zone.innerHTML = `
+    <div class="part-detail">
+      <div class="pd-label">Part Master</div>
+      <div class="pd-partno">${r.partNumber}</div>
+      ${statusPill(r.status, isVerified)}
+
+      <div class="codes-box">
+        <svg id="barcodeSvg"></svg>
+        <div class="qr-wrap"><div id="qrcanvas"></div></div>
+        <div class="barcode-label">${r.partNumber}</div>
+      </div>
+
+      ${!isVerified ? `
+      <div class="confidence-row">
+        <div class="confidence-label"><span>AI Confidence</span><span>${r.confidence}%</span></div>
+        <div class="confidence-bar-bg"><div class="confidence-bar-fill" style="width:${r.confidence}%;background:${barColor};"></div></div>
+      </div>
+      ${badgesHtml}` : ''}
+
+      <div style="margin-top:16px;">
+        <div class="info-row"><span class="info-label">Category</span><span class="info-value">${r.category||'—'}</span></div>
+        <div class="info-row"><span class="info-label">Name</span><span class="info-value">${r.name||'—'}</span></div>
+      </div>
+
+      <label class="field-label" style="margin-top:16px;display:block;">Fits Vehicles</label>
+      <div class="vehicle-list">${vehiclesHtml}</div>
+
+      ${r.notes ? `<div class="notes-box ${isVerified?'ok':''}">${r.notes}</div>` : ''}
+      ${(!isVerified && sourcesHtml) ? `<details class="sources-list"><summary>Sources (${(r.sources||[]).length})</summary>${sourcesHtml}</details>` : ''}
+
+      <div class="stub-row">
+        <div class="stub-btn">⬇️ Buy</div>
+        <div class="stub-btn">💰 Sell</div>
+      </div>
+
+      <div class="action-row">
+        ${isVerified ? `
+          <button class="btn btn-ghost" id="newSearchBtn" style="flex:1;">🔍 New Search</button>
+        ` : `
+          <button class="btn btn-ghost" id="rejectBtn" style="flex:1;">Reject / Retry</button>
+          <button class="btn ${r.status==='high_confidence'?'btn-verified':'btn-primary'}" id="confirmBtn" style="flex:1;">
+            ${r.status==='high_confidence' ? '✓ Confirm & Save' : '⚠ Save Unverified'}
+          </button>
+        `}
+      </div>
+    </div>
+  `;
+
+  // Render barcode + QR
+  try{
+    JsBarcode("#barcodeSvg", r.partNumber, {format:"CODE128", displayValue:false, height:50, margin:6, background:"#ffffff", lineColor:"#000000"});
+  }catch(e){}
+  document.getElementById('qrcanvas').innerHTML = '';
+  try{ new QRCode(document.getElementById('qrcanvas'), {text:r.partNumber, width:110, height:110, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){}
+
+  if(isVerified){
+    document.getElementById('newSearchBtn').addEventListener('click', ()=>{
+      zone.innerHTML=''; document.getElementById('partInput').value=''; document.getElementById('partInput').focus();
+    });
+  } else {
+    document.getElementById('confirmBtn').addEventListener('click', async ()=>{
+      currentPart.verified = (r.status==='high_confidence');
+      await savePart(currentPart);
+      showToast(currentPart.verified ? '✓ Verified & saved to database' : '⚠ Saved as unverified');
+      renderResult(currentPart, true);
+    });
+    document.getElementById('rejectBtn').addEventListener('click', ()=>{
+      zone.innerHTML=''; document.getElementById('partInput').focus();
+    });
+  }
+}
+
+function showToast(msg){
+  const t = document.createElement('div');
+  t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2500);
+}
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
