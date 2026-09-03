@@ -229,6 +229,8 @@
   .st-textline-row{display:flex;gap:8px;align-items:center;margin-top:8px;}
   .st-textline-row input{flex:1;}
   .st-del-btn{background:none;border:none;color:var(--danger);font-size:18px;padding:4px 8px;cursor:pointer;}
+  .st-select-btn{background:none;border:none;font-size:18px;padding:4px 6px;cursor:pointer;color:var(--text-muted);}
+  .st-select-btn.active{color:var(--accent);}
   .saved-sticker-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);
     padding:7px 12px;border-radius:8px;font-family:var(--font-mono);font-size:12.5px;margin:4px 6px 0 0;cursor:pointer;}
 
@@ -447,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-mobase-overflow-fix</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-line-nudge-feature</span>
       </div>
     </div>
 
@@ -1412,6 +1414,8 @@ let stickerLogoHeightPx = 32;
 let stickerLogoOffsetX = 0;
 let stickerLogoOffsetY = 0;
 let logoNudgeSpeed = 'slow'; // 'slow' = 1px, 'fast' = 8px per tap
+let selectedLineIndex = null;
+let lineNudgeSpeed = 'slow';
 let barcodeOverlayX = 0;
 let barcodeOverlayY = 0;
 let barcodeOverlayWidthPx = 130;
@@ -1735,6 +1739,7 @@ function openStickerEditor(){
       <label class="field-label" style="margin-top:16px;display:block;">Text Lines — position પસંદ કરો (મૂળ sticker પર જ્યાં હોય ત્યાં)</label>
       <div id="stickerLinesWrap"></div>
       <button class="btn btn-ghost" id="addStickerLineBtn" style="margin-top:10px;">➕ Line ઉમેરો</button>
+      <div id="lineNudgePanelWrap"></div>
       `}
 
       <label class="field-label" style="margin-top:16px;display:block;">Company Format</label>
@@ -1811,19 +1816,78 @@ function openStickerEditor(){
 function renderStickerLines(){
   const wrap = document.getElementById('stickerLinesWrap');
   wrap.innerHTML = stickerLines.map((line, i)=>`
-    <div class="st-textline-row" style="flex-wrap:wrap;">
+    <div class="st-textline-row" style="flex-wrap:wrap;${selectedLineIndex===i?'background:var(--accent-dim);border-radius:8px;padding:6px;':''}">
+      <button class="st-select-btn ${selectedLineIndex===i?'active':''}" onclick="selectStickerLine(${i})" title="Select to move">${selectedLineIndex===i?'☑️':'☐'}</button>
       <input type="text" class="form-input" style="margin-top:0;flex:2;" value="${(line.text||'').replace(/"/g,'&quot;')}" oninput="updateStickerLineText(${i}, this.value)" placeholder="લાઈન ${i+1}">
       <select class="form-input" style="margin-top:0;flex:1;min-width:110px;" onchange="updateStickerLinePosition(${i}, this.value)">
         ${STICKER_POSITIONS.map(p=>`<option value="${p}" ${line.position===p?'selected':''}>${p}</option>`).join('')}
       </select>
       <button class="st-del-btn" onclick="removeStickerLine(${i})">✕</button>
     </div>`).join('');
+  renderLineNudgePanel();
+}
+
+function renderLineNudgePanel(){
+  const panelWrap = document.getElementById('lineNudgePanelWrap');
+  if(!panelWrap) return;
+  if(selectedLineIndex === null || !stickerLines[selectedLineIndex]){
+    panelWrap.innerHTML = '';
+    return;
+  }
+  panelWrap.innerHTML = `
+    <label class="field-label" style="margin-top:12px;display:block;">Line ${selectedLineIndex+1} Position — ખસેડો</label>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+      <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" id="lineSpeedSlowChip" onclick="setLineNudgeSpeed('slow')">🐢 Slow</div>
+      <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" id="lineSpeedFastChip" onclick="setLineNudgeSpeed('fast')">🐇 Fast</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
+      <div></div>
+      <button class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(0,-1)">⬆️</button>
+      <div></div>
+      <button class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(-1,0)">⬅️</button>
+      <button class="btn btn-ghost" style="padding:0;font-size:10px;" onclick="resetSelectedLinePosition()">Reset</button>
+      <button class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(1,0)">➡️</button>
+      <div></div>
+      <button class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(0,1)">⬇️</button>
+      <div></div>
+    </div>
+  `;
+}
+
+function selectStickerLine(i){
+  selectedLineIndex = (selectedLineIndex === i) ? null : i; // tap again to deselect
+  renderStickerLines(); // only re-renders the lines list + nudge panel — rest of form stays frozen
+}
+
+function setLineNudgeSpeed(speed){
+  lineNudgeSpeed = speed;
+  const slowChip = document.getElementById('lineSpeedSlowChip');
+  const fastChip = document.getElementById('lineSpeedFastChip');
+  if(slowChip) slowChip.classList.toggle('active', speed==='slow');
+  if(fastChip) fastChip.classList.toggle('active', speed==='fast');
+}
+
+function nudgeSelectedLine(dx, dy){
+  if(selectedLineIndex === null || !stickerLines[selectedLineIndex]) return;
+  const step = lineNudgeSpeed === 'fast' ? 8 : 1;
+  const line = stickerLines[selectedLineIndex];
+  line.offsetX = (line.offsetX || 0) + dx * step;
+  line.offsetY = (line.offsetY || 0) + dy * step;
+  renderStickerPreview(); // preview only — form stays frozen/stable while nudging
+}
+
+function resetSelectedLinePosition(){
+  if(selectedLineIndex === null || !stickerLines[selectedLineIndex]) return;
+  stickerLines[selectedLineIndex].offsetX = 0;
+  stickerLines[selectedLineIndex].offsetY = 0;
+  renderStickerPreview();
 }
 
 function updateStickerLineText(i, val){ stickerLines[i].text = val; renderStickerPreview(); }
 function updateStickerLinePosition(i, val){ stickerLines[i].position = val; renderStickerPreview(); }
 function removeStickerLine(i){
   stickerLines.splice(i,1);
+  if(selectedLineIndex === i) selectedLineIndex = null;
   renderStickerLines();
   renderStickerPreview();
 }
@@ -1998,9 +2062,9 @@ function renderMobaseTemplate(box, pn){
   box.style.display = 'block';
   box.style.padding = '0';
 
-  const brandLines = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='top-left').map(l=>l.text);
-  const unitBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-left').map(l=>l.text);
-  const certBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-right').map(l=>l.text);
+  const brandLines = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='top-left');
+  const unitBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-left');
+  const certBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-right');
   const footerText = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-center')||{}).text || '';
   const tu11Text = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-right')||{}).text || 'TU11';
 
@@ -2015,7 +2079,7 @@ function renderMobaseTemplate(box, pn){
   box.innerHTML = `
     <div class="mb-label">
       <div class="mb-el logo-box" style="left:2.5%;top:7.5%;width:30%;height:14%;transform:translate(${stickerLogoOffsetX}px,${stickerLogoOffsetY}px);">${logoHtml}</div>
-      ${brandLines.map((t,i)=>`<div class="mb-el mb-brand-text" style="left:2.5%;top:${20.5+i*brandGap}%;width:60%;">${t}</div>`).join('')}
+      ${brandLines.map((l,i)=>`<div class="mb-el mb-brand-text" style="left:2.5%;top:${20.5+i*brandGap}%;width:60%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${l.text}</div>`).join('')}
       <div class="mb-el mb-ce-mark" style="left:3.5%;top:${20.5+brandLines.length*brandGap+3}%;width:12%;">CE</div>
 
       <div class="mb-el mb-top-mid" style="left:42%;top:8%;width:38%;">
@@ -2024,7 +2088,7 @@ function renderMobaseTemplate(box, pn){
 
       <div class="mb-el mb-pb-mark" style="left:84.5%;top:7%;width:10.5%;height:15%;">Pb</div>
 
-      ${certBlock.map((t,i)=>`<div class="mb-el mb-row-text" style="left:3.75%;top:${44+i*certGap}%;width:60%;">${t}</div>`).join('')}
+      ${certBlock.map((l,i)=>`<div class="mb-el mb-row-text" style="left:3.75%;top:${44+i*certGap}%;width:60%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${l.text}</div>`).join('')}
 
       <div class="mb-el" style="left:65.8%;top:55.5%;width:24%;height:33%;"><div class="mb-qr-host" id="stickerQrHolder"></div></div>
 
@@ -2149,7 +2213,7 @@ function renderGenericGridTemplate(box, pn){
   box.style.display = 'grid';
   box.style.background = 'transparent';
   box.style.gridTemplateColumns = '1fr 1fr 1fr';
-  box.style.gridTemplateRows = '1fr 1fr 1fr';
+  box.style.gridTemplateRows = '1fr 1fr 1fr 0.7fr';
   box.style.gap = '2px';
   box.style.padding = '6px';
 
@@ -2158,16 +2222,18 @@ function renderGenericGridTemplate(box, pn){
   stickerLines.forEach(l=>{
     const key = l.position || 'center';
     if(!cells[key]) cells[key] = [];
-    cells[key].push(l.text || '');
+    cells[key].push(l);
   });
 
   let html = '';
   Object.keys(POS_GRID_MAP).forEach(pos=>{
     const [r,c] = POS_GRID_MAP[pos].split('/');
     const [justify, textAlign] = POS_ALIGN_MAP[pos].split(';text-align:');
-    const content = (cells[pos]||[]).map(t=>`<div class="st-line">${t||''}</div>`).join('');
+    const lineCount = (cells[pos]||[]).length;
+    const fontSize = lineCount > 4 ? Math.max(5, Math.round(9 - (lineCount-4)*0.6)) : 9;
+    const content = (cells[pos]||[]).map(l=>`<div class="st-line" style="font-size:${fontSize}px;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${l.text||''}</div>`).join('');
     if(content){
-      html += `<div style="grid-row:${r};grid-column:${c};display:flex;flex-direction:column;justify-content:${justify};align-items:${textAlign==='left'?'flex-start':textAlign==='right'?'flex-end':'center'};text-align:${textAlign};overflow:hidden;padding:2px;">${content}</div>`;
+      html += `<div style="grid-row:${r};grid-column:${c};display:flex;flex-direction:column;justify-content:${justify};align-items:${textAlign==='left'?'flex-start':textAlign==='right'?'flex-end':'center'};text-align:${textAlign};overflow:visible;padding:2px;">${content}</div>`;
     }
   });
 
@@ -2178,7 +2244,7 @@ function renderGenericGridTemplate(box, pn){
       : '';
 
   box.innerHTML = html + logoHtml +
-    `<div style="grid-row:3;grid-column:1/4;display:flex;justify-content:center;align-items:flex-end;gap:8px;">
+    `<div style="grid-row:4;grid-column:1/4;display:flex;justify-content:center;align-items:center;gap:8px;">
       <div id="stickerQrHolder"></div>
       <svg id="stickerBarcodeSvg"></svg>
     </div>`;
