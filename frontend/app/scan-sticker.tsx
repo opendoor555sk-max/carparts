@@ -141,10 +141,10 @@ export default function ScanSticker() {
     } catch {}
   }, []);
   useEffect(() => { loadSaved(); }, [loadSaved]);
-  // Only Super Admin may create stickers.
+  // Only the app owner (admin) may create stickers.
   useEffect(() => {
     if (user && user.role !== "super_admin") {
-      show("Only Super Admin can create stickers", "error");
+      show("Only Admin can create stickers", "error");
       router.back();
     }
   }, [user, router, show]);

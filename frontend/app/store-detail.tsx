@@ -53,7 +53,7 @@ export default function StoreDetail() {
 
   return (
     <View style={styles.flex}>
-      <Header title={name || "Store"} subtitle="Super Admin view" onBack={() => router.back()} />
+      <Header title={name || "Store"} subtitle="Admin view" onBack={() => router.back()} />
 
       {statCards.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsRow}>

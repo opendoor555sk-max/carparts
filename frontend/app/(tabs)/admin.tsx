@@ -107,7 +107,7 @@ export default function Admin() {
                   <Ionicons name="business" size={22} color={colors.brand} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.linkTitle}>All Stores (Super Admin)</Text>
+                  <Text style={styles.linkTitle}>All Stores</Text>
                   <Text style={styles.linkSub}>View data of all stores</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />

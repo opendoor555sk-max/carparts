@@ -42,7 +42,7 @@ export default function Stores() {
 
   return (
     <View style={styles.flex}>
-      <Header title="All Stores" subtitle="Super Admin — all stores" onBack={() => router.back()} />
+      <Header title="All Stores" subtitle="Admin — all stores" onBack={() => router.back()} />
       {loading ? (
         <Loading />
       ) : stores.length === 0 ? (

@@ -308,7 +308,7 @@ async def require_admin(user=Depends(get_current_user)):
 
 async def require_super_admin(user=Depends(get_current_user)):
     if user.get("role") != "super_admin":
-        raise HTTPException(403, "ફક્ત Super Admin આ કરી શકે")
+        raise HTTPException(403, "ફક્ત Admin આ કરી શકે")
     return user
 
 
@@ -322,7 +322,7 @@ def resolve_store(user: dict, store_id_param: Optional[str] = None, require_writ
     """
     if user.get("role") == "super_admin":
         if require_write and not store_id_param:
-            raise HTTPException(400, "Super Admin: પહેલા store પસંદ કરો (store_id)")
+            raise HTTPException(400, "Admin: પહેલા store પસંદ કરો (store_id)")
         return store_id_param
     return user.get("store_id")
 
