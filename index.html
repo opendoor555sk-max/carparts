@@ -217,7 +217,7 @@
   .camera-hint{padding:16px;text-align:center;color:#fff;font-size:13px;background:rgba(0,0,0,.6);}
 
   /* Sticker Scanner */
-  .sticker-preview{background:#fff;border-radius:6px;padding:6px;margin-top:14px;
+  .sticker-preview{background:transparent;border-radius:6px;padding:0;margin-top:14px;
     color:#111;font-family:'IBM Plex Mono',monospace;position:relative;overflow:hidden;}
   .sticker-preview .st-line{font-size:9px;line-height:1.25;word-break:break-word;}
   .sticker-codes{display:flex;justify-content:flex-end;margin-top:8px;}
@@ -447,7 +447,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-white-strip-fix</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-a4-sheet-print-fix</span>
       </div>
     </div>
 
@@ -1742,8 +1742,9 @@ function openStickerEditor(){
 
       <div class="action-row" style="margin-top:18px;">
         <button class="btn btn-ghost" id="saveStickerBtn" style="flex:1;">💾 Save</button>
-        <button class="btn btn-primary" id="printStickerBtn" style="flex:1;">🖨️ Print</button>
+        <button class="btn btn-ghost" id="printStickerBtn" style="flex:1;">🖨️ 1 Sticker Print</button>
       </div>
+      <button class="btn btn-primary" id="printA4SheetBtn" style="margin-top:10px;">🖨️ પૂરી A4 Sheet Print (<span id="a4SheetCount">-</span> labels)</button>
     </div>
   `;
   if(stickerFormat !== 'Photo Background') renderStickerLines();
@@ -1792,8 +1793,8 @@ function openStickerEditor(){
     renderStickerPreview();
   });
 
-  document.getElementById('stickerWidthInput').addEventListener('input', e=>{ stickerWidthMM = Number(e.target.value)||70; renderStickerPreview(); });
-  document.getElementById('stickerHeightInput').addEventListener('input', e=>{ stickerHeightMM = Number(e.target.value)||45; renderStickerPreview(); });
+  document.getElementById('stickerWidthInput').addEventListener('input', e=>{ stickerWidthMM = Number(e.target.value)||70; renderStickerPreview(); updateA4SheetCount(); });
+  document.getElementById('stickerHeightInput').addEventListener('input', e=>{ stickerHeightMM = Number(e.target.value)||45; renderStickerPreview(); updateA4SheetCount(); });
 
   const addLineBtn = document.getElementById('addStickerLineBtn');
   if(addLineBtn) addLineBtn.addEventListener('click', ()=>{
@@ -1803,6 +1804,8 @@ function openStickerEditor(){
   });
   document.getElementById('saveStickerBtn').addEventListener('click', saveCurrentSticker);
   document.getElementById('printStickerBtn').addEventListener('click', printCurrentSticker);
+  document.getElementById('printA4SheetBtn').addEventListener('click', printFullA4Sheet);
+  updateA4SheetCount();
 }
 
 function renderStickerLines(){
@@ -1925,6 +1928,14 @@ function resetBarcodePosition(){
   renderStickerPreview();
 }
 
+function updateA4SheetCount(){
+  const el = document.getElementById('a4SheetCount');
+  if(!el) return;
+  const cols = Math.floor(210 / stickerWidthMM);
+  const rows = Math.floor(297 / stickerHeightMM);
+  el.textContent = (cols>=1 && rows>=1) ? (cols*rows) : '0 (size બહુ મોટું)';
+}
+
 function applyLabelCode(code){
   const size = LABEL_SIZE_CHART[code];
   if(!size) return;
@@ -1935,6 +1946,7 @@ function applyLabelCode(code){
   if(wInput) wInput.value = stickerWidthMM;
   if(hInput) hInput.value = stickerHeightMM;
   renderStickerPreview();
+  updateA4SheetCount();
   showToast(`✓ ${code} — ${size.w} x ${size.h} mm set થયું`);
 }
 
@@ -1985,11 +1997,11 @@ function renderMobaseTemplate(box, pn){
   box.style.display = 'block';
   box.style.padding = '0';
 
-  const brandLines = stickerLines.filter(l=>l.position==='top-left').map(l=>l.text);
-  const unitBlock = stickerLines.filter(l=>l.position==='mid-left').map(l=>l.text);
-  const certBlock = stickerLines.filter(l=>l.position==='mid-right').map(l=>l.text);
-  const footerText = (stickerLines.find(l=>l.position==='bottom-center')||{}).text || '';
-  const tu11Text = (stickerLines.find(l=>l.position==='bottom-right')||{}).text || 'TU11';
+  const brandLines = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='top-left').map(l=>l.text);
+  const unitBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-left').map(l=>l.text);
+  const certBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-right').map(l=>l.text);
+  const footerText = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-center')||{}).text || '';
+  const tu11Text = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-right')||{}).text || 'TU11';
 
   const logoHtml = stickerLogoDataUrl
     ? `<img src="${stickerLogoDataUrl}" style="width:100%;height:100%;object-fit:contain;">`
@@ -2023,12 +2035,12 @@ function renderContinentalTemplate(box, pn){
   box.style.display = 'block';
   box.style.padding = '0';
 
-  const topBlock = stickerLines.filter(l=>l.position==='top-left').map(l=>l.text);
-  const midLeft = stickerLines.filter(l=>l.position==='mid-left').map(l=>l.text);
-  const midRight = stickerLines.filter(l=>l.position==='mid-right').map(l=>l.text);
-  const eMarkText = (stickerLines.find(l=>l.position==='bottom-left')||{}).text || '';
-  const bottomInfo = stickerLines.filter(l=>l.position==='bottom-center').map(l=>l.text);
-  const footerText = (stickerLines.find(l=>l.position==='bottom-right')||{}).text || '';
+  const topBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='top-left').map(l=>l.text);
+  const midLeft = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-left').map(l=>l.text);
+  const midRight = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-right').map(l=>l.text);
+  const eMarkText = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-left')||{}).text || '';
+  const bottomInfo = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='bottom-center').map(l=>l.text);
+  const footerText = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-right')||{}).text || '';
 
   box.innerHTML = `
     <div class="cnt-label">
@@ -2071,7 +2083,7 @@ function renderPhotoBackgroundTemplate(box, pn){
   box.style.backgroundPosition = 'center';
 
   box.innerHTML = `
-    <div style="position:absolute;left:calc(50% + ${barcodeOverlayX}px);top:calc(50% + ${barcodeOverlayY}px);
+    <div style="position:absolute;left:calc(50% + ${barcodeOverlayX}px);top:calc(82% + ${barcodeOverlayY}px);
       transform:translate(-50%,-50%);width:${barcodeOverlayWidthPx}px;height:${barcodeOverlayHeightPx}px;
       background:#fff;padding:2px;display:flex;align-items:center;justify-content:center;">
       <svg id="stickerBarcodeSvg" style="width:100%;height:100%;"></svg>
@@ -2080,16 +2092,28 @@ function renderPhotoBackgroundTemplate(box, pn){
   try{ JsBarcode("#stickerBarcodeSvg", barcodeValue, {format:"CODE128", displayValue:false, height:40, margin:2, background:"#ffffff", lineColor:"#000000"}); }catch(e){}
 }
 
+function normalizeToTemplateSlot(pos){
+  const map = {
+    'top-left':'top-left', 'top-center':'top-left', 'top-right':'top-left',
+    'mid-left':'mid-left', 'center':'mid-left',
+    'mid-right':'mid-right',
+    'bottom-left':'bottom-left',
+    'bottom-center':'bottom-center',
+    'bottom-right':'bottom-right'
+  };
+  return map[pos] || 'mid-left';
+}
+
 function renderHyundaiKiaTemplate(box, pn){
   box.style.display = 'block';
   box.style.padding = '0';
 
   // left column = mid-left lines, right column = mid-right lines, top-left extra text = company line, bottom-center = big center line, bottom-left/right = footer
-  const leftLines = stickerLines.filter(l=>l.position==='mid-left').map(l=>l.text);
-  const rightLines = stickerLines.filter(l=>l.position==='mid-right').map(l=>l.text);
-  const companyLine = (stickerLines.find(l=>l.position==='top-left')||{}).text || 'HYUNDAI KIA MOTORS';
-  const centerLine = (stickerLines.find(l=>l.position==='bottom-center')||{}).text || '';
-  const footerLine = stickerLines.filter(l=>l.position==='bottom-left'||l.position==='bottom-right').map(l=>l.text).join(' • ');
+  const leftLines = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-left').map(l=>l.text);
+  const rightLines = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-right').map(l=>l.text);
+  const companyLine = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='top-left')||{}).text || 'HYUNDAI KIA MOTORS';
+  const centerLine = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-center')||{}).text || '';
+  const footerLine = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='bottom-left'||normalizeToTemplateSlot(l.position)==='bottom-right').map(l=>l.text).join(' • ');
 
   const logoContent = stickerLogoDataUrl ? `<img src="${stickerLogoDataUrl}">` : `<span>Tap to add logo</span>`;
 
@@ -2118,6 +2142,7 @@ function renderHyundaiKiaTemplate(box, pn){
 
 function renderGenericGridTemplate(box, pn){
   box.style.display = 'grid';
+  box.style.background = '#fff';
   box.style.gridTemplateColumns = '1fr 1fr 1fr';
   box.style.gridTemplateRows = '1fr 1fr 1fr';
   box.style.gap = '2px';
@@ -2180,6 +2205,36 @@ function printCurrentSticker(){
   }
   printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;background:#fff;width:${stickerWidthMM}mm;height:${stickerHeightMM}mm;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:1mm;padding:2mm;box-sizing:border-box;color:#111;font-family:'IBM Plex Mono',monospace;`;
   printArea.innerHTML = box.innerHTML;
+  window.print();
+}
+
+function printFullA4Sheet(){
+  const box = document.getElementById('stickerPreviewBox');
+  const cols = Math.floor(210 / stickerWidthMM);
+  const rows = Math.floor(297 / stickerHeightMM);
+  if(cols < 1 || rows < 1){
+    showToast('⚠️ Size બહુ મોટું છે — A4 sheet પર 1 પણ label ફિટ નથી થતું');
+    return;
+  }
+  const total = cols * rows;
+
+  let printArea = document.getElementById('printableSticker');
+  if(!printArea){
+    printArea = document.createElement('div');
+    printArea.id = 'printableSticker';
+    document.body.appendChild(printArea);
+  }
+  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${cols*stickerWidthMM}mm;height:${rows*stickerHeightMM}mm;
+    display:grid;grid-template-columns:repeat(${cols}, ${stickerWidthMM}mm);grid-template-rows:repeat(${rows}, ${stickerHeightMM}mm);
+    gap:0;background:#fff;`;
+
+  const cellContent = box.innerHTML; // already-rendered barcode/QR graphics get reused visually in each repeated cell
+  let html = '';
+  for(let i=0;i<total;i++){
+    html += `<div style="width:${stickerWidthMM}mm;height:${stickerHeightMM}mm;overflow:hidden;box-sizing:border-box;">${cellContent}</div>`;
+  }
+  printArea.innerHTML = html;
+  showToast(`🖨️ ${total} labels (${cols}×${rows}) — A4 sheet તૈયાર`);
   window.print();
 }
 
