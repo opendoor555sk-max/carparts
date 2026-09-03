@@ -71,6 +71,7 @@ export default function PartDetail() {
   const isAdmin = user?.role === "admin";
   const [pendingUnit, setPendingUnit] = useState<string | null>(null);
   const [deletingUnit, setDeletingUnit] = useState(false);
+  const [qrMm, setQrMm] = useState(30);
 
   const adjustStock = async (delta: number) => {
     try {
@@ -278,12 +279,22 @@ export default function PartDetail() {
           <Text style={styles.cardTitle}>BARCODE & QR CODE</Text>
           <Barcode value={partNumber} height={64} />
           <View style={styles.qrWrap}>
-            <SvgXml xml={codeSvg("qr", partNumber)} width={120} height={120} />
+            <SvgXml xml={codeSvg("qr", partNumber)} width={qrMm * 4} height={qrMm * 4} />
             <Text style={styles.qrCaption}>{partNumber}</Text>
+          </View>
+          <View style={styles.qrSizeRow}>
+            <Text style={styles.qrSizeLabel}>QR SIZE</Text>
+            <Pressable style={styles.qrSizeBtn} onPress={() => setQrMm((s) => Math.max(12, s - 2))} testID="qr-dec">
+              <Ionicons name="remove" size={18} color={colors.warning} />
+            </Pressable>
+            <Text style={styles.qrSizeVal}>{qrMm} mm</Text>
+            <Pressable style={styles.qrSizeBtn} onPress={() => setQrMm((s) => Math.min(50, s + 2))} testID="qr-inc">
+              <Ionicons name="add" size={18} color={colors.success} />
+            </Pressable>
           </View>
           <Button
             title="Print Barcode Label"
-            onPress={async () => printBarcodeLabel(await brandingFromUser(user), partNumber, p?.company)}
+            onPress={async () => printBarcodeLabel(await brandingFromUser(user), partNumber, p?.company, qrMm)}
             variant="secondary"
             icon="print"
             testID="print-barcode"
@@ -646,6 +657,10 @@ const styles = StyleSheet.create({
   cardTitle: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1, marginBottom: spacing.md },
   qrWrap: { alignItems: "center", backgroundColor: "#fff", borderRadius: radius.md, paddingVertical: spacing.md, marginTop: spacing.md },
   qrCaption: { color: "#000", fontSize: font.sm, fontWeight: "700", marginTop: spacing.xs, letterSpacing: 0.5 },
+  qrSizeRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.md, marginTop: spacing.md },
+  qrSizeLabel: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 0.5 },
+  qrSizeBtn: { width: 36, height: 36, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface2 },
+  qrSizeVal: { color: colors.onSurface, fontSize: font.base, fontWeight: "800", minWidth: 56, textAlign: "center" },
   row: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md, paddingVertical: 5 },
   rowLabel: { color: colors.info, fontSize: font.base },
   rowValue: { color: colors.onSurface, fontSize: font.base, fontWeight: "700", flexShrink: 1, textAlign: "right" },

@@ -797,6 +797,54 @@ async def list_stores(user=Depends(require_super_admin)):
     return out
 
 
+@api.get("/admin/gps-locations")
+async def admin_gps_locations(user=Depends(require_super_admin)):
+    """God-view of every GPS point captured across all stores — from requirements
+    (inquiries) and stock unit purchase locations. Used by the Super Admin map screen."""
+    def parse_gps(g: Optional[str]):
+        if not g:
+            return None
+        try:
+            parts = [float(x.strip()) for x in str(g).replace(";", ",").split(",")[:2]]
+            if len(parts) == 2 and -90 <= parts[0] <= 90 and -180 <= parts[1] <= 180:
+                return {"lat": parts[0], "lng": parts[1]}
+        except Exception:
+            return None
+        return None
+
+    store_names: Dict[str, str] = {}
+    for s in await db.stores.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(1000):
+        store_names[s["id"]] = s.get("name", "Store")
+
+    out = []
+    # Requirements / inquiries
+    reqs = await db.requirements.find({"gps": {"$nin": ["", None]}}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    for r in reqs:
+        coord = parse_gps(r.get("gps"))
+        if not coord:
+            continue
+        out.append({
+            "type": "Requirement", "part_number": r.get("part_number", ""),
+            "store_id": r.get("store_id"), "store_name": store_names.get(r.get("store_id"), "—"),
+            "by": r.get("by", ""), "at": r.get("created_at", ""),
+            "gps": r.get("gps"), **coord,
+        })
+    # Stock units with a purchase GPS
+    units = await db.stock.find({"location.gps": {"$nin": ["", None]}}, {"_id": 0}).sort("created_at", -1).to_list(2000)
+    for u in units:
+        coord = parse_gps((u.get("location") or {}).get("gps"))
+        if not coord:
+            continue
+        out.append({
+            "type": "Purchase", "part_number": u.get("part_number", ""),
+            "store_id": u.get("store_id"), "store_name": store_names.get(u.get("store_id"), "—"),
+            "by": u.get("added_by", "") or u.get("created_by", ""), "at": u.get("created_at", ""),
+            "gps": (u.get("location") or {}).get("gps"), **coord,
+        })
+    out.sort(key=lambda x: x.get("at", ""), reverse=True)
+    return out
+
+
 # ---------------- Admin: users ----------------
 @api.get("/admin/users")
 async def list_users(store_id: Optional[str] = None, user=Depends(require("manage_users"))):
@@ -1899,6 +1947,7 @@ class StickerTemplateReq(BaseModel):
     aspect: float = 1.4
     pn_box: Optional[dict] = None
     part_number: str = ""
+    company: Optional[str] = ""
 
 
 @api.post("/sticker-templates")
@@ -1906,6 +1955,21 @@ async def save_sticker_template(req: StickerTemplateReq, user=Depends(get_curren
     sid = resolve_store(user, None)
     pn = (req.part_number or "").strip()
     now = datetime.now(timezone.utc).isoformat()
+    # Auto-register the part number so it appears in the common catalog (and the
+    # store's own parts library when the saver owns a store).
+    if pn:
+        await upsert_catalog(pn, {"company": (req.company or "").strip(), "name": ""}, sid)
+        if sid and not await db.parts.find_one({"store_id": sid, "part_number": pn}):
+            cat = await db.catalog.find_one({"part_number": pn}, {"_id": 0}) or {}
+            await db.parts.insert_one({
+                "id": new_id(), "store_id": sid, "part_number": pn,
+                "name": cat.get("name", ""), "company": (req.company or cat.get("company") or "All"),
+                "category": cat.get("category", ""), "compatible_vehicles": cat.get("compatible_vehicles", []),
+                "variant": cat.get("variant", ""), "year": cat.get("year", ""),
+                "verification_status": "Unverified", "source": "Sticker",
+                "created_at": now, "created_by": user["username"],
+                "purchase_limit": None, "limit_enabled": False,
+            })
     # One sticker per part number (per store): update existing instead of duplicating.
     existing = await db.sticker_templates.find_one({"store_id": sid, "part_number": pn}) if pn else None
     if existing:

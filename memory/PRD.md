@@ -287,3 +287,9 @@ Re-search status: IN STOCK / KNOWN PART / REQUIREMENT / NEW PART.
 - Added "Create by Part Number" manual input in scan-sticker.tsx (create blank sticker without photo).
 - Part detail page (part/[pn].tsx) now shows BOTH Barcode + QR code; Print Barcode Label now prints barcode + QR.
 - SEC-001 & SEC-004 confirmed already fixed in server.py (create_user restricts admin to super_admin; update_user blocks staff editing admin; /admin/users projects out password_hash/password_enc/google keys).
+
+## Session Update 2 (June 2026)
+- Item1 QR size: part/[pn].tsx has +/- QR size control (12-50mm), passed to printBarcodeLabel(qrMm). Verified 34mm.
+- Item2 Sticker auto-save: backend save_sticker_template now upserts catalog + creates a store parts entry (source=Sticker) if store admin. Frontend sends company. Verified via curl.
+- Item3 GPS map: new GET /api/admin/gps-locations (super_admin) aggregates requirements+stock gps with store names/coords. New screen app/admin-gps.tsx (filter All/Requirement/Purchase, tap opens device Google Maps via Linking). Linked from Admin panel for super_admin. Verified via screenshot.
+- Item4 Google Play Billing: PENDING (user wants it last; needs Play Console products + native build to test).

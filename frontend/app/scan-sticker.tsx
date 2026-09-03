@@ -388,8 +388,8 @@ export default function ScanSticker() {
   const saveTemplate = async () => {
     if (!tpl) return;
     try {
-      await api.post("/sticker-templates", { name: (partNumber || "Sticker").trim(), bg_data_url: JSON.stringify(tpl), aspect: tpl.aspect, pn_box: null, part_number: partNumber });
-      show("Template saved", "success");
+      await api.post("/sticker-templates", { name: (partNumber || "Sticker").trim(), bg_data_url: JSON.stringify(tpl), aspect: tpl.aspect, pn_box: null, part_number: partNumber, company });
+      show("Template saved — part added to inventory", "success");
       loadSaved();
     } catch (e: any) { show(e?.message || "Save failed", "error"); }
   };

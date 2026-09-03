@@ -172,12 +172,12 @@ export async function printReceipt(b: Branding, kind: "BUY" | "SELL", data: Rece
   await printHtml(wrap(kind === "BUY" ? "Purchase Receipt" : "Sale Receipt", b, `<table>${rows}</table>${barcode}`));
 }
 
-export async function printBarcodeLabel(b: Branding, partNumber: string, company?: string): Promise<void> {
+export async function printBarcodeLabel(b: Branding, partNumber: string, company?: string, qrMm: number = 30): Promise<void> {
   const body = `<div style="text-align:center;padding:10px">
     ${company ? `<div style="font-size:13px;font-weight:700;margin-bottom:6px">${esc(company)}</div>` : ""}
     ${barcodeSvg(partNumber, { height: 90, moduleWidth: 2 })}
     <div style="display:flex;align-items:center;justify-content:center;margin-top:12px">
-      <div style="width:120px;height:120px">${qrSvg(partNumber, { margin: 1 })}</div>
+      <div style="width:${qrMm}mm;height:${qrMm}mm">${qrSvg(partNumber, { margin: 1 })}</div>
     </div>
   </div>`;
   await printHtml(wrap("Barcode Label", b, body));

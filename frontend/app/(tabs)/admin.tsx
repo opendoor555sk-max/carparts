@@ -113,6 +113,22 @@ export default function Admin() {
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
             ) : null}
+            {isSuperAdmin ? (
+              <Pressable
+                style={[styles.link, { marginBottom: spacing.md, borderColor: colors.success }]}
+                onPress={() => router.push("/admin-gps" as any)}
+                testID="admin-link-gps"
+              >
+                <View style={styles.linkIcon}>
+                  <Ionicons name="location" size={22} color={colors.success} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.linkTitle}>GPS Locations Map</Text>
+                  <Text style={styles.linkSub}>All searches & inquiries on the map</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.info} />
+              </Pressable>
+            ) : null}
             <View style={{ gap: spacing.md }}>
               {links.map((l) => {
                 const allowed = can(l.perm);
