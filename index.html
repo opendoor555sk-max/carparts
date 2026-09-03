@@ -247,7 +247,7 @@
   .footer{text-align:center;font-size:clamp(5.5px,2vw,8px);font-weight:600;letter-spacing:0.3px;color:#111;}
 
   /* Continental label template */
-  .cnt-label{background:#f4f4ef;padding:4% 5%;font-family:Arial,Helvetica,sans-serif;color:#111;height:100%;font-size:clamp(6px,2.2vw,11px);line-height:1.3;overflow:hidden;}
+  .cnt-label{background:#f4f4ef;padding:4% 5%;font-family:Arial,Helvetica,sans-serif;color:#111;height:100%;font-size:clamp(6px,2.2vw,11px);line-height:1.3;overflow:visible;}
   .cnt-top-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2%;}
   .cnt-brand{font-size:clamp(9px,3.2vw,15px);font-weight:800;letter-spacing:0.5px;}
   .cnt-model{font-size:clamp(8px,2.9vw,13px);font-weight:700;}
@@ -263,7 +263,7 @@
   .cnt-barcode-area{margin-top:2%;padding-top:2%;border-top:1px dashed #aaa;text-align:center;}
 
   /* Mobase Yellow Label template */
-  .mb-label{background:#f5cf1b;height:100%;position:relative;overflow:hidden;container-type:inline-size;}
+  .mb-label{background:#f5cf1b;height:100%;position:relative;overflow:visible;container-type:inline-size;}
   .mb-el{position:absolute;}
   .mb-brand-text{font-weight:800;font-size:2.7cqw;color:#111;white-space:nowrap;}
   .mb-ce-mark{font-weight:900;font-size:8.5cqw;color:#111;letter-spacing:-1.5px;}
@@ -447,7 +447,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-remove-white-bg</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-mobase-overflow-fix</span>
       </div>
     </div>
 
@@ -2008,11 +2008,15 @@ function renderMobaseTemplate(box, pn){
     ? `<img src="${stickerLogoDataUrl}" style="width:100%;height:100%;object-fit:contain;">`
     : `<span>Logo</span>`;
 
+  // dynamic spacing: shrink line-gap when there are many lines, so content never overflows its allocated area
+  const brandGap = Math.min(8, 16 / Math.max(1, brandLines.length));
+  const certGap = Math.min(8, 38 / Math.max(1, certBlock.length));
+
   box.innerHTML = `
     <div class="mb-label">
       <div class="mb-el logo-box" style="left:2.5%;top:7.5%;width:30%;height:14%;transform:translate(${stickerLogoOffsetX}px,${stickerLogoOffsetY}px);">${logoHtml}</div>
-      ${brandLines.map((t,i)=>`<div class="mb-el mb-brand-text" style="left:2.5%;top:${20.5+i*8}%;width:60%;">${t}</div>`).join('')}
-      <div class="mb-el mb-ce-mark" style="left:3.5%;top:${20.5+brandLines.length*8+3}%;width:12%;">CE</div>
+      ${brandLines.map((t,i)=>`<div class="mb-el mb-brand-text" style="left:2.5%;top:${20.5+i*brandGap}%;width:60%;">${t}</div>`).join('')}
+      <div class="mb-el mb-ce-mark" style="left:3.5%;top:${20.5+brandLines.length*brandGap+3}%;width:12%;">CE</div>
 
       <div class="mb-el mb-top-mid" style="left:42%;top:8%;width:38%;">
         ${unitBlock.map((t,i)=> i===1 ? `<b>${t}</b><br>` : `${t}<br>`).join('')}
@@ -2020,7 +2024,7 @@ function renderMobaseTemplate(box, pn){
 
       <div class="mb-el mb-pb-mark" style="left:84.5%;top:7%;width:10.5%;height:15%;">Pb</div>
 
-      ${certBlock.map((t,i)=>`<div class="mb-el mb-row-text" style="left:3.75%;top:${44+i*8}%;width:60%;">${t}</div>`).join('')}
+      ${certBlock.map((t,i)=>`<div class="mb-el mb-row-text" style="left:3.75%;top:${44+i*certGap}%;width:60%;">${t}</div>`).join('')}
 
       <div class="mb-el" style="left:65.8%;top:55.5%;width:24%;height:33%;"><div class="mb-qr-host" id="stickerQrHolder"></div></div>
 
