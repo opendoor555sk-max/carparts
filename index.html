@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-font-size-control</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-mobase-footer-tu11-fix</span>
       </div>
     </div>
 
@@ -2097,8 +2097,8 @@ function renderMobaseTemplate(box, pn){
   const brandLines = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='top-left');
   const unitBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-left');
   const certBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-right');
-  const footerText = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-center')||{}).text || '';
-  const tu11Text = (stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-right')||{}).text || 'TU11';
+  const footerLine = stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-center');
+  const tu11Line = stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-right');
 
   const logoHtml = stickerLogoDataUrl
     ? `<img src="${stickerLogoDataUrl}" style="width:100%;height:100%;object-fit:contain;">`
@@ -2124,8 +2124,8 @@ function renderMobaseTemplate(box, pn){
 
       <div class="mb-el" style="left:65.8%;top:55.5%;width:24%;height:33%;"><div class="mb-qr-host" id="stickerQrHolder"></div></div>
 
-      <div class="mb-el mb-tu11" style="left:54%;top:85%;width:20%;">${tu11Text}</div>
-      ${footerText ? `<div class="mb-el mb-footer" style="left:2%;top:91.5%;width:96%;">${footerText}</div>` : ''}
+      <div class="mb-el mb-tu11" style="left:54%;top:85%;width:20%;transform:translate(${(tu11Line&&tu11Line.offsetX)||0}px,${(tu11Line&&tu11Line.offsetY)||0}px);${tu11Line&&tu11Line.fontSize?`font-size:${tu11Line.fontSize}px;`:''}">${tu11Line?tu11Line.text:'TU11'}</div>
+      ${footerLine ? `<div class="mb-el mb-footer" style="left:2%;top:91.5%;width:96%;transform:translate(${footerLine.offsetX||0}px,${footerLine.offsetY||0}px);${footerLine.fontSize?`font-size:${footerLine.fontSize}px;`:''}">${footerLine.text}</div>` : ''}
     </div>
   `;
   const qrHolder = document.getElementById('stickerQrHolder');
