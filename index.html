@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-freeform-generic-position</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-multiselect-bugfix</span>
       </div>
     </div>
 
@@ -1414,7 +1414,7 @@ let stickerLogoHeightPx = 32;
 let stickerLogoOffsetX = 0;
 let stickerLogoOffsetY = 0;
 let logoNudgeSpeed = 'slow'; // 'slow' = 1px, 'fast' = 8px per tap
-let selectedLineIndex = null;
+let selectedLineIndices = new Set();
 let lineNudgeSpeed = 'slow';
 let barcodeOverlayX = 0;
 let barcodeOverlayY = 0;
@@ -1816,8 +1816,8 @@ function openStickerEditor(){
 function renderStickerLines(){
   const wrap = document.getElementById('stickerLinesWrap');
   wrap.innerHTML = stickerLines.map((line, i)=>`
-    <div class="st-textline-row" style="flex-wrap:wrap;${selectedLineIndex===i?'background:var(--accent-dim);border-radius:8px;padding:6px;':''}">
-      <button class="st-select-btn ${selectedLineIndex===i?'active':''}" onclick="selectStickerLine(${i})" title="Select to move">${selectedLineIndex===i?'☑️':'☐'}</button>
+    <div class="st-textline-row" style="flex-wrap:wrap;${selectedLineIndices.has(i)?'background:var(--accent-dim);border-radius:8px;padding:6px;':''}">
+      <button class="st-select-btn ${selectedLineIndices.has(i)?'active':''}" onclick="selectStickerLine(${i})" title="Select to move">${selectedLineIndices.has(i)?'☑️':'☐'}</button>
       <input type="text" class="form-input" style="margin-top:0;flex:2;" value="${(line.text||'').replace(/"/g,'&quot;')}" oninput="updateStickerLineText(${i}, this.value)" placeholder="લાઈન ${i+1}">
       <button class="st-del-btn" onclick="removeStickerLine(${i})">✕</button>
     </div>`).join('');
@@ -1827,33 +1827,40 @@ function renderStickerLines(){
 function renderLineNudgePanel(){
   const panelWrap = document.getElementById('lineNudgePanelWrap');
   if(!panelWrap) return;
-  if(selectedLineIndex === null || !stickerLines[selectedLineIndex]){
+  if(selectedLineIndices.size === 0){
     panelWrap.innerHTML = '';
     return;
   }
   panelWrap.innerHTML = `
-    <label class="field-label" style="margin-top:12px;display:block;">Line ${selectedLineIndex+1} Position — ખસેડો</label>
+    <label class="field-label" style="margin-top:12px;display:block;">${selectedLineIndices.size} Line(s) Selected — ખસેડો</label>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
       <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" id="lineSpeedSlowChip" onclick="setLineNudgeSpeed('slow')">🐢 Slow</div>
       <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" id="lineSpeedFastChip" onclick="setLineNudgeSpeed('fast')">🐇 Fast</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
       <div></div>
-      <button class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(0,-1)">⬆️</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(0,-1)">⬆️</button>
       <div></div>
-      <button class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(-1,0)">⬅️</button>
-      <button class="btn btn-ghost" style="padding:0;font-size:10px;" onclick="resetSelectedLinePosition()">Reset</button>
-      <button class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(1,0)">➡️</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(-1,0)">⬅️</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;font-size:10px;" onclick="resetSelectedLinePosition()">Reset</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(1,0)">➡️</button>
       <div></div>
-      <button class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(0,1)">⬇️</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(0,1)">⬇️</button>
       <div></div>
     </div>
+    <button type="button" class="btn btn-ghost" style="margin-top:8px;" onclick="clearLineSelection()">✕ Selection સાફ કરો</button>
   `;
 }
 
 function selectStickerLine(i){
-  selectedLineIndex = (selectedLineIndex === i) ? null : i; // tap again to deselect
+  if(selectedLineIndices.has(i)) selectedLineIndices.delete(i);
+  else selectedLineIndices.add(i);
   renderStickerLines(); // only re-renders the lines list + nudge panel — rest of form stays frozen
+}
+
+function clearLineSelection(){
+  selectedLineIndices.clear();
+  renderStickerLines();
 }
 
 function setLineNudgeSpeed(speed){
@@ -1865,26 +1872,38 @@ function setLineNudgeSpeed(speed){
 }
 
 function nudgeSelectedLine(dx, dy){
-  if(selectedLineIndex === null || !stickerLines[selectedLineIndex]) return;
+  if(selectedLineIndices.size === 0){ showToast('⚠️ પહેલા કોઈ line select કરો (☐ ટેપ કરીને)'); return; }
   const step = lineNudgeSpeed === 'fast' ? 8 : 1;
-  const line = stickerLines[selectedLineIndex];
-  line.offsetX = (line.offsetX || 0) + dx * step;
-  line.offsetY = (line.offsetY || 0) + dy * step;
+  selectedLineIndices.forEach(idx=>{
+    const line = stickerLines[idx];
+    if(!line) return;
+    line.offsetX = (line.offsetX || 0) + dx * step;
+    line.offsetY = (line.offsetY || 0) + dy * step;
+  });
   renderStickerPreview(); // preview only — form stays frozen/stable while nudging
 }
 
 function resetSelectedLinePosition(){
-  if(selectedLineIndex === null || !stickerLines[selectedLineIndex]) return;
-  stickerLines[selectedLineIndex].offsetX = 0;
-  stickerLines[selectedLineIndex].offsetY = 0;
+  if(selectedLineIndices.size === 0) return;
+  selectedLineIndices.forEach(idx=>{
+    const line = stickerLines[idx];
+    if(!line) return;
+    line.offsetX = 0;
+    line.offsetY = 0;
+  });
   renderStickerPreview();
 }
 
 function updateStickerLineText(i, val){ stickerLines[i].text = val; renderStickerPreview(); }
-function updateStickerLinePosition(i, val){ stickerLines[i].position = val; renderStickerPreview(); }
 function removeStickerLine(i){
   stickerLines.splice(i,1);
-  if(selectedLineIndex === i) selectedLineIndex = null;
+  const newSelection = new Set();
+  selectedLineIndices.forEach(idx=>{
+    if(idx < i) newSelection.add(idx);
+    else if(idx > i) newSelection.add(idx-1);
+    // idx === i is dropped (the removed line)
+  });
+  selectedLineIndices = newSelection;
   renderStickerLines();
   renderStickerPreview();
 }
