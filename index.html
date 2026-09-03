@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-multiselect-bugfix</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-unitblock-fix</span>
       </div>
     </div>
 
@@ -2099,7 +2099,7 @@ function renderMobaseTemplate(box, pn){
       <div class="mb-el mb-ce-mark" style="left:3.5%;top:${20.5+brandLines.length*brandGap+3}%;width:12%;">CE</div>
 
       <div class="mb-el mb-top-mid" style="left:42%;top:8%;width:38%;">
-        ${unitBlock.map((t,i)=> i===1 ? `<b>${t}</b><br>` : `${t}<br>`).join('')}
+        ${unitBlock.map((l,i)=>`<span style="display:inline-block;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${i===1 ? `<b>${l.text}</b>` : l.text}</span><br>`).join('')}
       </div>
 
       <div class="mb-el mb-pb-mark" style="left:84.5%;top:7%;width:10.5%;height:15%;">Pb</div>
