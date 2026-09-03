@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "Auto Parts Store",
-    "slug": "frontend",
+    "name": "Kabadi Market",
+    "slug": "kabadi-market",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "kabadimarket",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.partnumberfirst.eepol0",
+      "bundleIdentifier": "com.abdulsalam.kabadimarket",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan part barcodes and QR codes",
         "NSFaceIDUsageDescription": "Unlock your account securely",
@@ -24,7 +24,7 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.emergent.partnumberfirst.eepol0",
+      "package": "com.abdulsalam.kabadimarket",
       "permissions": [
         "CAMERA",
         "USE_BIOMETRIC",
