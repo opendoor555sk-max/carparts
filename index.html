@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 22:00 IST — debug-toast-added</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 22:10 IST — detailed-debug-toast</span>
       </div>
     </div>
 
@@ -2119,13 +2119,15 @@ function setLineNudgeSpeed(speed){
 function nudgeSelectedLine(dx, dy){
   if(selectedLineIndices.size === 0){ showToast('⚠️ પહેલા કોઈ line select કરો (☐ ટેપ કરીને)'); return; }
   const step = lineNudgeSpeed === 'fast' ? 8 : 1;
+  const debugInfo = [];
   selectedLineIndices.forEach(idx=>{
     const line = stickerLines[idx];
-    if(!line) return;
+    if(!line){ debugInfo.push(`idx${idx}=NOTFOUND`); return; }
     line.offsetX = (line.offsetX || 0) + dx * step;
     line.offsetY = (line.offsetY || 0) + dy * step;
+    debugInfo.push(`idx${idx}:"${(line.text||'').slice(0,15)}"→(${line.offsetX},${line.offsetY})`);
   });
-  showToast(`✓ Nudge ચાલ્યું: dx=${dx} dy=${dy}`); // TEMP debug — confirms click handler fired
+  showToast(`✓ ${debugInfo.join(' | ')}`); // TEMP debug — shows actual resulting offset per targeted line
   renderStickerPreview(); // preview only — form stays frozen/stable while nudging
 }
 
@@ -2307,7 +2309,7 @@ const POS_ALIGN_MAP = {
 
 function renderStickerPreview(){
   const box = document.getElementById('stickerPreviewBox');
-  if(!box) return;
+  if(!box){ console.error('DEBUG: stickerPreviewBox NOT FOUND'); return; }
   const pn = guessStickerPartNumber();
 
   box.style.cssText = ''; // clear ALL leftover inline styles from any previously-rendered format before applying the new one
