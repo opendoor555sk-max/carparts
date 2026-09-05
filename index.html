@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 21:45 IST — fulldesign-mixprint-uniqueid</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 22:00 IST — debug-toast-added</span>
       </div>
     </div>
 
@@ -2125,6 +2125,7 @@ function nudgeSelectedLine(dx, dy){
     line.offsetX = (line.offsetX || 0) + dx * step;
     line.offsetY = (line.offsetY || 0) + dy * step;
   });
+  showToast(`✓ Nudge ચાલ્યું: dx=${dx} dy=${dy}`); // TEMP debug — confirms click handler fired
   renderStickerPreview(); // preview only — form stays frozen/stable while nudging
 }
 
