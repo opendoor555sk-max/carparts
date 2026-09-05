@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 20:05 IST — unified-panel-multiselect</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 20:20 IST — mobase-bottomleft-fix</span>
       </div>
     </div>
 
@@ -2308,6 +2308,7 @@ function renderMobaseTemplate(box, pn){
   const brandLines = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='top-left');
   const unitBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-left');
   const certBlock = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='mid-right');
+  const bottomLeftLines = stickerLines.filter(l=>normalizeToTemplateSlot(l.position)==='bottom-left');
   const footerLine = stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-center');
   const tu11Line = stickerLines.find(l=>normalizeToTemplateSlot(l.position)==='bottom-right');
 
@@ -2317,7 +2318,8 @@ function renderMobaseTemplate(box, pn){
 
   // dynamic spacing: shrink line-gap when there are many lines, so content never overflows its allocated area
   const brandGap = Math.min(8, 16 / Math.max(1, brandLines.length));
-  const certGap = Math.min(8, 38 / Math.max(1, certBlock.length));
+  const certGap = Math.min(8, 30 / Math.max(1, certBlock.length));
+  const bottomLeftGap = Math.min(6, 12 / Math.max(1, bottomLeftLines.length));
 
   box.innerHTML = `
     <div class="mb-label">
@@ -2334,6 +2336,8 @@ function renderMobaseTemplate(box, pn){
       ${certBlock.map((l,i)=>`<div class="mb-el mb-row-text" style="left:3.75%;top:${44+i*certGap}%;width:60%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
 
       <div class="mb-el" style="left:65.8%;top:55.5%;width:24%;height:33%;"><div class="mb-qr-host" id="stickerQrHolder"></div></div>
+
+      ${bottomLeftLines.map((l,i)=>`<div class="mb-el mb-row-text" style="left:3.75%;top:${75+i*bottomLeftGap}%;width:48%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
 
       <div class="mb-el mb-tu11" style="left:54%;top:85%;width:20%;transform:translate(${(tu11Line&&tu11Line.offsetX)||0}px,${(tu11Line&&tu11Line.offsetY)||0}px);${tu11Line&&tu11Line.fontSize?`font-size:${tu11Line.fontSize}px;`:''}">${tu11Line?tu11Line.text:'TU11'}</div>
       ${footerLine ? `<div class="mb-el mb-footer" style="left:2%;top:91.5%;width:96%;transform:translate(${footerLine.offsetX||0}px,${footerLine.offsetY||0}px);${footerLine.fontSize?`font-size:${footerLine.fontSize}px;`:''}">${footerLine.text}</div>` : ''}
