@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-mix-print-feature</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-critical-freeze-fix</span>
       </div>
     </div>
 
@@ -1975,6 +1975,13 @@ function openStickerEditor(){
   document.getElementById('saveStickerBtn').addEventListener('click', saveCurrentSticker);
   document.getElementById('printStickerBtn').addEventListener('click', printCurrentSticker);
   document.getElementById('printA4SheetBtn').addEventListener('click', printFullA4Sheet);
+  const mixBtn = document.getElementById('openMixPrintBtn');
+  if(mixBtn) mixBtn.addEventListener('click', ()=>{
+    document.getElementById('mixPrintModal').classList.remove('hidden');
+    renderMixLabelCodeChips();
+    renderMixStickerPickChips();
+    renderMixBlockGrid();
+  });
   updateA4SheetCount();
 }
 
@@ -2479,12 +2486,6 @@ let mixActiveCode = '21L';
 let mixSelectedStickerPN = null;
 let mixPlacements = {}; // blockIndex -> partNumber
 
-document.getElementById('openMixPrintBtn').addEventListener('click', ()=>{
-  document.getElementById('mixPrintModal').classList.remove('hidden');
-  renderMixLabelCodeChips();
-  renderMixStickerPickChips();
-  renderMixBlockGrid();
-});
 document.getElementById('closeMixPrintBtn').addEventListener('click', ()=>{
   document.getElementById('mixPrintModal').classList.add('hidden');
 });
