@@ -294,8 +294,8 @@
   .report-edit-form{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
   @media print{
     body *{visibility:hidden;}
-    #printableSticker, #printableSticker *{visibility:visible;}
-    #printableSticker{position:absolute;top:0;left:0;}
+    #printableSticker, #printableSticker *{visibility:visible !important;}
+    #printableSticker{position:absolute !important;top:0 !important;left:0 !important;}
   }
 </style>
 </head>
@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 19:29 IST — tdz-bugs-fixed</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 19:45 IST — print-fix-margins</span>
       </div>
     </div>
 
@@ -855,6 +855,9 @@
 
       <label class="field-label" style="margin-top:16px;display:block;">2. Block પર ટેપ કરો (<span id="mixPlacedCount">0</span> placed)</label>
       <div id="mixBlockGrid" style="display:grid;gap:4px;margin-top:8px;background:#000;padding:6px;border-radius:8px;"></div>
+
+      <label class="field-label" style="margin-top:16px;display:block;">Paper Margin (mm)</label>
+      <input type="number" class="form-input" id="mixPrintMarginInput" value="0" min="0" max="30">
 
       <button class="btn btn-primary" id="mixPrintBtn" style="margin-top:16px;">🖨️ Mix Sheet Print</button>
     </div>
@@ -1913,6 +1916,9 @@ function openStickerEditor(){
         <button class="btn btn-ghost" id="saveStickerBtn" style="flex:1;">💾 Save</button>
         <button class="btn btn-ghost" id="printStickerBtn" style="flex:1;">🖨️ 1 Sticker Print</button>
       </div>
+      <label class="field-label" style="margin-top:16px;display:block;">Paper Margin (mm) — sheet ની ધારથી</label>
+      <input type="number" class="form-input" id="printMarginInput" value="0" min="0" max="30">
+
       <button class="btn btn-primary" id="printA4SheetBtn" style="margin-top:10px;">🖨️ પૂરી A4 Sheet Print (<span id="a4SheetCount">-</span> labels)</button>
       <button class="btn btn-ghost" id="openMixPrintBtn" style="margin-top:10px;border-color:var(--accent);color:var(--accent);">🧩 Mix Print — Block પર અલગ Sticker મૂકો</button>
     </div>
@@ -2564,6 +2570,8 @@ document.getElementById('mixPrintBtn').addEventListener('click', ()=>{
   const size = LABEL_SIZE_CHART[mixActiveCode];
   const placedIndices = Object.keys(mixPlacements);
   if(placedIndices.length===0){ showToast('⚠️ ઓછામાં ઓછો 1 block ભરો'); return; }
+  const marginInput = document.getElementById('mixPrintMarginInput');
+  const marginMM = marginInput ? (Number(marginInput.value) || 0) : 0;
 
   let printArea = document.getElementById('printableSticker');
   if(!printArea){
@@ -2571,8 +2579,8 @@ document.getElementById('mixPrintBtn').addEventListener('click', ()=>{
     printArea.id = 'printableSticker';
     document.body.appendChild(printArea);
   }
-  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${size.cols*size.w}mm;height:${size.rows*size.h}mm;
-    display:grid;grid-template-columns:repeat(${size.cols}, ${size.w}mm);grid-template-rows:repeat(${size.rows}, ${size.h}mm);gap:0;background:#fff;`;
+  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${size.cols*size.w + marginMM*2}mm;height:${size.rows*size.h + marginMM*2}mm;
+    display:grid;grid-template-columns:repeat(${size.cols}, ${size.w}mm);grid-template-rows:repeat(${size.rows}, ${size.h}mm);gap:0;background:#fff;padding:${marginMM}mm;box-sizing:border-box;`;
 
   const allStickers = getAllSavedStickers();
   let html = '';
@@ -2644,6 +2652,8 @@ function printFullA4Sheet(){
     return;
   }
   const total = cols * rows;
+  const marginInput = document.getElementById('printMarginInput');
+  const marginMM = marginInput ? (Number(marginInput.value) || 0) : 0;
 
   let printArea = document.getElementById('printableSticker');
   if(!printArea){
@@ -2651,9 +2661,9 @@ function printFullA4Sheet(){
     printArea.id = 'printableSticker';
     document.body.appendChild(printArea);
   }
-  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${cols*stickerWidthMM}mm;height:${rows*stickerHeightMM}mm;
+  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${cols*stickerWidthMM + marginMM*2}mm;height:${rows*stickerHeightMM + marginMM*2}mm;
     display:grid;grid-template-columns:repeat(${cols}, ${stickerWidthMM}mm);grid-template-rows:repeat(${rows}, ${stickerHeightMM}mm);
-    gap:0;background:#fff;`;
+    gap:0;background:#fff;padding:${marginMM}mm;box-sizing:border-box;`;
 
   const cellContent = box.innerHTML; // already-rendered barcode/QR graphics get reused visually in each repeated cell
   let html = '';
