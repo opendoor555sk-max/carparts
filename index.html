@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 22:10 IST — detailed-debug-toast</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 22:30 IST — proven-pattern-direct-bind</span>
       </div>
     </div>
 
@@ -1915,9 +1915,6 @@ function openStickerEditor(){
       <div class="action-row" style="margin-top:18px;">
         <button class="btn btn-ghost" id="saveStickerBtn" style="flex:1;">💾 Save</button>
       </div>
-      <label class="field-label" style="margin-top:16px;display:block;">Paper Margin (mm) — sheet ની ધારથી</label>
-      <input type="number" class="form-input" id="printMarginInput" value="0" min="0" max="30">
-
       <button class="btn btn-ghost" id="openMixPrintBtn" style="margin-top:10px;border-color:var(--accent);color:var(--accent);">🧩 Mix Print — Block પર અલગ Sticker મૂકો</button>
     </div>
   `;
@@ -1971,8 +1968,8 @@ function openStickerEditor(){
     renderStickerPreview();
   });
 
-  document.getElementById('stickerWidthInput').addEventListener('input', e=>{ stickerWidthMM = Number(e.target.value)||70; activeLabelCode = null; renderStickerPreview(); updateA4SheetCount(); });
-  document.getElementById('stickerHeightInput').addEventListener('input', e=>{ stickerHeightMM = Number(e.target.value)||45; activeLabelCode = null; renderStickerPreview(); updateA4SheetCount(); });
+  document.getElementById('stickerWidthInput').addEventListener('input', e=>{ stickerWidthMM = Number(e.target.value)||70; activeLabelCode = null; renderStickerPreview(); });
+  document.getElementById('stickerHeightInput').addEventListener('input', e=>{ stickerHeightMM = Number(e.target.value)||45; activeLabelCode = null; renderStickerPreview(); });
 
   const addLineBtn = document.getElementById('addStickerLineBtn');
   if(addLineBtn) addLineBtn.addEventListener('click', ()=>{
@@ -1988,7 +1985,6 @@ function openStickerEditor(){
     renderMixStickerPickChips();
     renderMixBlockGrid();
   });
-  updateA4SheetCount();
 }
 
 function renderStickerLines(){
@@ -2010,22 +2006,30 @@ function renderLineNudgePanel(){
     panelWrap.innerHTML = `
       <label class="field-label" style="margin-top:12px;display:block;">🖼️ Logo Selected — ખસેડો</label>
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-        <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" data-action="speed" data-args="slow">🐢 Slow</div>
-        <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" data-action="speed" data-args="fast">🐇 Fast</div>
+        <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" id="pnlSlowChip">🐢 Slow</div>
+        <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" id="pnlFastChip">🐇 Fast</div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
         <div></div>
-        <button type="button" class="btn btn-ghost" style="padding:0;" data-action="logo-nudge" data-args="0,-1">⬆️</button>
+        <button type="button" class="btn btn-ghost" style="padding:0;" id="pnlUpBtn">⬆️</button>
         <div></div>
-        <button type="button" class="btn btn-ghost" style="padding:0;" data-action="logo-nudge" data-args="-1,0">⬅️</button>
-        <button type="button" class="btn btn-ghost" style="padding:0;font-size:10px;" data-action="logo-reset">Reset</button>
-        <button type="button" class="btn btn-ghost" style="padding:0;" data-action="logo-nudge" data-args="1,0">➡️</button>
+        <button type="button" class="btn btn-ghost" style="padding:0;" id="pnlLeftBtn">⬅️</button>
+        <button type="button" class="btn btn-ghost" style="padding:0;font-size:10px;" id="pnlResetBtn">Reset</button>
+        <button type="button" class="btn btn-ghost" style="padding:0;" id="pnlRightBtn">➡️</button>
         <div></div>
-        <button type="button" class="btn btn-ghost" style="padding:0;" data-action="logo-nudge" data-args="0,1">⬇️</button>
+        <button type="button" class="btn btn-ghost" style="padding:0;" id="pnlDownBtn">⬇️</button>
         <div></div>
       </div>
-      <button type="button" class="btn btn-ghost" style="margin-top:8px;" data-action="logo-deselect">✕ Logo Selection સાફ કરો</button>
+      <button type="button" class="btn btn-ghost" style="margin-top:8px;" id="pnlClearBtn">✕ Logo Selection સાફ કરો</button>
     `;
+    document.getElementById('pnlSlowChip').addEventListener('click', ()=> setLineNudgeSpeed('slow'));
+    document.getElementById('pnlFastChip').addEventListener('click', ()=> setLineNudgeSpeed('fast'));
+    document.getElementById('pnlUpBtn').addEventListener('click', ()=> nudgeLogo(0,-1));
+    document.getElementById('pnlDownBtn').addEventListener('click', ()=> nudgeLogo(0,1));
+    document.getElementById('pnlLeftBtn').addEventListener('click', ()=> nudgeLogo(-1,0));
+    document.getElementById('pnlRightBtn').addEventListener('click', ()=> nudgeLogo(1,0));
+    document.getElementById('pnlResetBtn').addEventListener('click', resetLogoPosition);
+    document.getElementById('pnlClearBtn').addEventListener('click', deselectLogo);
     return;
   }
 
@@ -2037,47 +2041,41 @@ function renderLineNudgePanel(){
   panelWrap.innerHTML = `
     <label class="field-label" style="margin-top:12px;display:block;">${selectedLineIndices.size} Line(s) Selected — ખસેડો</label>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-      <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" data-action="speed" data-args="slow">🐢 Slow</div>
-      <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" data-action="speed" data-args="fast">🐇 Fast</div>
+      <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" id="pnlSlowChip">🐢 Slow</div>
+      <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" id="pnlFastChip">🐇 Fast</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
       <div></div>
-      <button type="button" class="btn btn-ghost" style="padding:0;" data-action="line-nudge" data-args="0,-1">⬆️</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;" id="pnlUpBtn">⬆️</button>
       <div></div>
-      <button type="button" class="btn btn-ghost" style="padding:0;" data-action="line-nudge" data-args="-1,0">⬅️</button>
-      <button type="button" class="btn btn-ghost" style="padding:0;font-size:10px;" data-action="line-reset">Reset</button>
-      <button type="button" class="btn btn-ghost" style="padding:0;" data-action="line-nudge" data-args="1,0">➡️</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;" id="pnlLeftBtn">⬅️</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;font-size:10px;" id="pnlResetBtn">Reset</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;" id="pnlRightBtn">➡️</button>
       <div></div>
-      <button type="button" class="btn btn-ghost" style="padding:0;" data-action="line-nudge" data-args="0,1">⬇️</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;" id="pnlDownBtn">⬇️</button>
       <div></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
       <span class="field-label" style="margin:0;">Font Size</span>
-      <button type="button" class="btn btn-ghost" style="width:auto;padding:6px 14px;" data-action="font" data-args="-1">A-</button>
-      <button type="button" class="btn btn-ghost" style="width:auto;padding:6px 14px;font-size:16px;" data-action="font" data-args="1">A+</button>
+      <button type="button" class="btn btn-ghost" style="width:auto;padding:6px 14px;" id="pnlFontMinusBtn">A-</button>
+      <button type="button" class="btn btn-ghost" style="width:auto;padding:6px 14px;font-size:16px;" id="pnlFontPlusBtn">A+</button>
     </div>
-    <button type="button" class="btn btn-ghost" style="margin-top:8px;" data-action="line-clear">✕ Selection સાફ કરો</button>
+    <button type="button" class="btn btn-ghost" style="margin-top:8px;" id="pnlClearBtn">✕ Selection સાફ કરો</button>
   `;
+  document.getElementById('pnlSlowChip').addEventListener('click', ()=> setLineNudgeSpeed('slow'));
+  document.getElementById('pnlFastChip').addEventListener('click', ()=> setLineNudgeSpeed('fast'));
+  document.getElementById('pnlUpBtn').addEventListener('click', ()=> nudgeSelectedLine(0,-1));
+  document.getElementById('pnlDownBtn').addEventListener('click', ()=> nudgeSelectedLine(0,1));
+  document.getElementById('pnlLeftBtn').addEventListener('click', ()=> nudgeSelectedLine(-1,0));
+  document.getElementById('pnlRightBtn').addEventListener('click', ()=> nudgeSelectedLine(1,0));
+  document.getElementById('pnlResetBtn').addEventListener('click', resetSelectedLinePosition);
+  document.getElementById('pnlFontMinusBtn').addEventListener('click', ()=> adjustSelectedLineFontSize(-1));
+  document.getElementById('pnlFontPlusBtn').addEventListener('click', ()=> adjustSelectedLineFontSize(1));
+  document.getElementById('pnlClearBtn').addEventListener('click', clearLineSelection);
 }
 
 function bindLineNudgePanelDelegation(){
-  const wrap = document.getElementById('lineNudgePanelWrap');
-  if(!wrap || wrap.dataset.bound) return; // avoid rebinding if somehow called twice on the same element
-  wrap.dataset.bound = '1';
-  wrap.addEventListener('click', (e)=>{
-    const el = e.target.closest('[data-action]');
-    if(!el) return;
-    const action = el.dataset.action;
-    const args = el.dataset.args;
-    if(action === 'speed') setLineNudgeSpeed(args);
-    else if(action === 'logo-nudge'){ const [dx,dy] = args.split(',').map(Number); nudgeLogo(dx,dy); }
-    else if(action === 'logo-reset') resetLogoPosition();
-    else if(action === 'logo-deselect') deselectLogo();
-    else if(action === 'line-nudge'){ const [dx,dy] = args.split(',').map(Number); nudgeSelectedLine(dx,dy); }
-    else if(action === 'line-reset') resetSelectedLinePosition();
-    else if(action === 'font') adjustSelectedLineFontSize(Number(args));
-    else if(action === 'line-clear') clearLineSelection();
-  });
+  // no-op now — buttons are bound directly in renderLineNudgePanel() each render, matching the proven-working demo pattern
 }
 
 function selectLogoForMove(){
@@ -2119,15 +2117,12 @@ function setLineNudgeSpeed(speed){
 function nudgeSelectedLine(dx, dy){
   if(selectedLineIndices.size === 0){ showToast('⚠️ પહેલા કોઈ line select કરો (☐ ટેપ કરીને)'); return; }
   const step = lineNudgeSpeed === 'fast' ? 8 : 1;
-  const debugInfo = [];
   selectedLineIndices.forEach(idx=>{
     const line = stickerLines[idx];
-    if(!line){ debugInfo.push(`idx${idx}=NOTFOUND`); return; }
+    if(!line) return;
     line.offsetX = (line.offsetX || 0) + dx * step;
     line.offsetY = (line.offsetY || 0) + dy * step;
-    debugInfo.push(`idx${idx}:"${(line.text||'').slice(0,15)}"→(${line.offsetX},${line.offsetY})`);
   });
-  showToast(`✓ ${debugInfo.join(' | ')}`); // TEMP debug — shows actual resulting offset per targeted line
   renderStickerPreview(); // preview only — form stays frozen/stable while nudging
 }
 
@@ -2259,22 +2254,6 @@ function resetBarcodePosition(){
   renderStickerPreview();
 }
 
-function getSheetGrid(){
-  if(activeLabelCode && LABEL_SIZE_CHART[activeLabelCode]){
-    const s = LABEL_SIZE_CHART[activeLabelCode];
-    return {cols: s.cols, rows: s.rows};
-  }
-  // custom size — fall back to simple max-fit calculation
-  return {cols: Math.floor(210 / stickerWidthMM), rows: Math.floor(297 / stickerHeightMM)};
-}
-
-function updateA4SheetCount(){
-  const el = document.getElementById('a4SheetCount');
-  if(!el) return;
-  const {cols, rows} = getSheetGrid();
-  el.textContent = (cols>=1 && rows>=1) ? (cols*rows) : '0 (size બહુ મોટું)';
-}
-
 function applyLabelCode(code){
   const size = LABEL_SIZE_CHART[code];
   if(!size) return;
@@ -2286,7 +2265,6 @@ function applyLabelCode(code){
   if(wInput) wInput.value = stickerWidthMM;
   if(hInput) hInput.value = stickerHeightMM;
   renderStickerPreview();
-  updateA4SheetCount();
   showToast(`✓ ${code} — ${size.w} x ${size.h} mm set થયું`);
 }
 
@@ -2309,7 +2287,7 @@ const POS_ALIGN_MAP = {
 
 function renderStickerPreview(){
   const box = document.getElementById('stickerPreviewBox');
-  if(!box){ console.error('DEBUG: stickerPreviewBox NOT FOUND'); return; }
+  if(!box) return;
   const pn = guessStickerPartNumber();
 
   box.style.cssText = ''; // clear ALL leftover inline styles from any previously-rendered format before applying the new one
@@ -2535,19 +2513,6 @@ function saveCurrentSticker(){
   renderStickerSavedList();
 }
 
-function printCurrentSticker(){
-  const box = document.getElementById('stickerPreviewBox');
-  let printArea = document.getElementById('printableSticker');
-  if(!printArea){
-    printArea = document.createElement('div');
-    printArea.id = 'printableSticker';
-    document.body.appendChild(printArea);
-  }
-  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;background:#fff;width:${stickerWidthMM}mm;height:${stickerHeightMM}mm;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:1mm;padding:2mm;box-sizing:border-box;color:#111;font-family:'IBM Plex Mono',monospace;`;
-  printArea.innerHTML = box.innerHTML;
-  window.print();
-}
-
 /* ============ MIX PRINT (block-by-block, different sticker per block) ============ */
 let mixActiveCode = '21L';
 let mixSelectedPalette = new Set(); // multi-select palette of stickers
@@ -2728,37 +2693,6 @@ function renderSavedStickerHtml(stickerData, uniqueSuffix){
     </div>`;
   }
   return {html, qrId, barcodeId, pn};
-}
-
-function printFullA4Sheet(){
-  const box = document.getElementById('stickerPreviewBox');
-  const {cols, rows} = getSheetGrid();
-  if(cols < 1 || rows < 1){
-    showToast('⚠️ Size બહુ મોટું છે — A4 sheet પર 1 પણ label ફિટ નથી થતું');
-    return;
-  }
-  const total = cols * rows;
-  const marginInput = document.getElementById('printMarginInput');
-  const marginMM = marginInput ? (Number(marginInput.value) || 0) : 0;
-
-  let printArea = document.getElementById('printableSticker');
-  if(!printArea){
-    printArea = document.createElement('div');
-    printArea.id = 'printableSticker';
-    document.body.appendChild(printArea);
-  }
-  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${cols*stickerWidthMM + marginMM*2}mm;height:${rows*stickerHeightMM + marginMM*2}mm;
-    display:grid;grid-template-columns:repeat(${cols}, ${stickerWidthMM}mm);grid-template-rows:repeat(${rows}, ${stickerHeightMM}mm);
-    gap:0;background:#fff;padding:${marginMM}mm;box-sizing:border-box;`;
-
-  const cellContent = box.innerHTML; // already-rendered barcode/QR graphics get reused visually in each repeated cell
-  let html = '';
-  for(let i=0;i<total;i++){
-    html += `<div style="width:${stickerWidthMM}mm;height:${stickerHeightMM}mm;overflow:hidden;box-sizing:border-box;">${cellContent}</div>`;
-  }
-  printArea.innerHTML = html;
-  showToast(`🖨️ ${total} labels (${cols}×${rows}) — A4 sheet તૈયાર`);
-  window.print();
 }
 
 function getAllSavedStickers(){
