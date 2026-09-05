@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 20:20 IST — mobase-bottomleft-fix</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 21:00 IST — partnumber-detection-fix</span>
       </div>
     </div>
 
@@ -1482,6 +1482,7 @@ let barcodeOverlayY = 0;
 let barcodeOverlayWidthPx = 130;
 let barcodeOverlayHeightPx = 45;
 let stickerPhotoBgPartNumber = '';
+let aiDetectedPartNumber = ''; // set from AI's dedicated partNumber field, preferred over guessing from lines
 let stickerWidthMM = 70;
 let stickerHeightMM = 45;
 const STICKER_POSITIONS = ['top-left','top-center','top-right','mid-left','center','mid-right','bottom-left','bottom-center','bottom-right'];
@@ -1596,6 +1597,7 @@ async function handleStickerPhoto(file){
     stickerLines = result.lines.length ? result.lines : [{text:'', position:'center'}];
     stickerWidthMM = result.widthMM;
     stickerHeightMM = result.heightMM;
+    aiDetectedPartNumber = result.partNumber || '';
     const allText = stickerLines.map(l=>l.text).join(' ').toUpperCase();
     stickerFormat = (allText.includes('HYUNDAI') || allText.includes('KIA') || allText.includes('HKMC')) ? 'Hyundai / Kia' : 'Generic';
 
@@ -1665,12 +1667,15 @@ async function geminiReadSticker(dataUrl, apiKey){
 
   const prompt = `This is a photo of an automotive spare part label/sticker. Read EVERY line of text visible on it exactly as printed (part numbers, model codes, company name, lot numbers, dates, certification marks — everything). For each line, also identify its approximate position on the label using ONE of these 9 zones: "top-left","top-center","top-right","mid-left","center","mid-right","bottom-left","bottom-center","bottom-right" — matching where that text actually appears on the original label. Also estimate the label's approximate physical size in millimeters (typical automotive labels are 40-100mm wide).
 
+Also identify the MAIN PART NUMBER of this component (the single most important identifying code — usually alphanumeric with dashes, e.g. 95400-K6610 — NOT the company/brand name) as a separate "partNumber" field.
+
 Also find the manufacturer BRAND LOGO(s) at the top of the label (e.g. company name logo graphic) and give its bounding box as percentages of the whole label image (0-100). null if there is no distinct logo graphic.
 
 Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure:
 {
   "widthMM": 70,
   "heightMM": 45,
+  "partNumber": "95400-K6610",
   "lines": [
     {"text": "CONTINENTAL", "position": "top-left"},
     {"text": "95400-K6610", "position": "top-right"},
@@ -1707,7 +1712,8 @@ Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure
           lines: result.lines.map(l=>({text:String(l.text||''), position: STICKER_POSITIONS.includes(l.position)?l.position:'center'})),
           widthMM: Number(result.widthMM) || 70,
           heightMM: Number(result.heightMM) || 45,
-          logo: normalizeLogoBox(result.logo)
+          logo: normalizeLogoBox(result.logo),
+          partNumber: (result.partNumber||'').trim()
         };
       }
       lastError = new Error('ખાલી પરિણામ');
@@ -1719,10 +1725,12 @@ Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure
 async function hfReadSticker(dataUrl, hfToken){
   const prompt = `This is a photo of an automotive spare part label/sticker. Read EVERY line of text visible on it exactly as printed (part numbers, model codes, company name, lot numbers, dates, certification marks — everything). For each line, also identify its approximate position on the label using ONE of these 9 zones: "top-left","top-center","top-right","mid-left","center","mid-right","bottom-left","bottom-center","bottom-right" — matching where that text actually appears on the original label. Also estimate the label's approximate physical size in millimeters (typical automotive labels are 40-100mm wide).
 
+Also identify the MAIN PART NUMBER of this component (the single most important identifying code — usually alphanumeric with dashes, e.g. 95400-K6610 — NOT the company/brand name) as a separate "partNumber" field.
+
 Also find the manufacturer BRAND LOGO(s) at the top of the label (e.g. company name logo graphic) and give its bounding box as percentages of the whole label image (0-100). null if there is no distinct logo graphic.
 
 Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure:
-{"widthMM": 70, "heightMM": 45, "lines": [{"text": "CONTINENTAL", "position": "top-left"}, {"text": "95400-K6610", "position": "top-right"}], "logo": {"x": 5, "y": 5, "w": 25, "h": 12}}`;
+{"widthMM": 70, "heightMM": 45, "partNumber": "95400-K6610", "lines": [{"text": "CONTINENTAL", "position": "top-left"}, {"text": "95400-K6610", "position": "top-right"}], "logo": {"x": 5, "y": 5, "w": 25, "h": 12}}`;
 
   const response = await fetchWithTimeout('https://router.huggingface.co/v1/chat/completions', {
     method: "POST",
@@ -1750,7 +1758,8 @@ Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure
     lines: result.lines.map(l=>({text:String(l.text||''), position: STICKER_POSITIONS.includes(l.position)?l.position:'center'})),
     widthMM: Number(result.widthMM) || 70,
     heightMM: Number(result.heightMM) || 45,
-    logo: normalizeLogoBox(result.logo)
+    logo: normalizeLogoBox(result.logo),
+    partNumber: (result.partNumber||'').trim()
   };
 }
 
@@ -1761,10 +1770,12 @@ async function claudeReadSticker(dataUrl, apiKey){
 
   const prompt = `This is a photo of an automotive spare part label/sticker. Read EVERY line of text visible on it exactly as printed (part numbers, model codes, company name, lot numbers, dates, certification marks — everything). For each line, also identify its approximate position on the label using ONE of these 9 zones: "top-left","top-center","top-right","mid-left","center","mid-right","bottom-left","bottom-center","bottom-right" — matching where that text actually appears on the original label. Also estimate the label's approximate physical size in millimeters (typical automotive labels are 40-100mm wide).
 
+Also identify the MAIN PART NUMBER of this component (the single most important identifying code — usually alphanumeric with dashes, e.g. 95400-K6610 — NOT the company/brand name) as a separate "partNumber" field.
+
 Also find the manufacturer BRAND LOGO(s) at the top of the label (e.g. company name logo graphic) and give its bounding box as percentages of the whole label image (0-100). null if there is no distinct logo graphic.
 
 Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure:
-{"widthMM": 70, "heightMM": 45, "lines": [{"text": "CONTINENTAL", "position": "top-left"}, {"text": "95400-K6610", "position": "top-right"}], "logo": {"x": 5, "y": 5, "w": 25, "h": 12}}`;
+{"widthMM": 70, "heightMM": 45, "partNumber": "95400-K6610", "lines": [{"text": "CONTINENTAL", "position": "top-left"}, {"text": "95400-K6610", "position": "top-right"}], "logo": {"x": 5, "y": 5, "w": 25, "h": 12}}`;
 
   const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
     method: "POST",
@@ -1799,7 +1810,8 @@ Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure
     lines: result.lines.map(l=>({text:String(l.text||''), position: STICKER_POSITIONS.includes(l.position)?l.position:'center'})),
     widthMM: Number(result.widthMM) || 70,
     heightMM: Number(result.heightMM) || 45,
-    logo: normalizeLogoBox(result.logo)
+    logo: normalizeLogoBox(result.logo),
+    partNumber: (result.partNumber||'').trim()
   };
 }
 
@@ -1808,6 +1820,7 @@ document.getElementById('stickerCreateBtn').addEventListener('click', ()=>{
   if(!pn){ showToast('⚠️ Part number નાખો'); return; }
   stickerPhotoDataUrl = null;
   stickerLogoDataUrl = null;
+  aiDetectedPartNumber = pn;
   document.getElementById('stickerPhotoPreview').classList.add('hidden');
   stickerLines = [{text:pn, position:'center'}];
   stickerFormat = 'Generic';
@@ -1910,6 +1923,7 @@ function openStickerEditor(){
       <button class="btn btn-ghost" id="openMixPrintBtn" style="margin-top:10px;border-color:var(--accent);color:var(--accent);">🧩 Mix Print — Block પર અલગ Sticker મૂકો</button>
     </div>
   `;
+  bindLineNudgePanelDelegation();
   if(stickerFormat !== 'Photo Background') renderStickerLines();
   else renderLineNudgePanel();
   renderStickerFormatChips();
@@ -2000,21 +2014,21 @@ function renderLineNudgePanel(){
     panelWrap.innerHTML = `
       <label class="field-label" style="margin-top:12px;display:block;">🖼️ Logo Selected — ખસેડો</label>
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-        <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" onclick="setLineNudgeSpeed('slow')">🐢 Slow</div>
-        <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" onclick="setLineNudgeSpeed('fast')">🐇 Fast</div>
+        <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" data-action="speed" data-args="slow">🐢 Slow</div>
+        <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" data-action="speed" data-args="fast">🐇 Fast</div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
         <div></div>
-        <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(0,-1)">⬆️</button>
+        <button type="button" class="btn btn-ghost" style="padding:0;" data-action="logo-nudge" data-args="0,-1">⬆️</button>
         <div></div>
-        <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(-1,0)">⬅️</button>
-        <button type="button" class="btn btn-ghost" style="padding:0;font-size:10px;" onclick="resetLogoPosition()">Reset</button>
-        <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(1,0)">➡️</button>
+        <button type="button" class="btn btn-ghost" style="padding:0;" data-action="logo-nudge" data-args="-1,0">⬅️</button>
+        <button type="button" class="btn btn-ghost" style="padding:0;font-size:10px;" data-action="logo-reset">Reset</button>
+        <button type="button" class="btn btn-ghost" style="padding:0;" data-action="logo-nudge" data-args="1,0">➡️</button>
         <div></div>
-        <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(0,1)">⬇️</button>
+        <button type="button" class="btn btn-ghost" style="padding:0;" data-action="logo-nudge" data-args="0,1">⬇️</button>
         <div></div>
       </div>
-      <button type="button" class="btn btn-ghost" style="margin-top:8px;" onclick="deselectLogo()">✕ Logo Selection સાફ કરો</button>
+      <button type="button" class="btn btn-ghost" style="margin-top:8px;" data-action="logo-deselect">✕ Logo Selection સાફ કરો</button>
     `;
     return;
   }
@@ -2027,27 +2041,47 @@ function renderLineNudgePanel(){
   panelWrap.innerHTML = `
     <label class="field-label" style="margin-top:12px;display:block;">${selectedLineIndices.size} Line(s) Selected — ખસેડો</label>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-      <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" onclick="setLineNudgeSpeed('slow')">🐢 Slow</div>
-      <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" onclick="setLineNudgeSpeed('fast')">🐇 Fast</div>
+      <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" data-action="speed" data-args="slow">🐢 Slow</div>
+      <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" data-action="speed" data-args="fast">🐇 Fast</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
       <div></div>
-      <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(0,-1)">⬆️</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;" data-action="line-nudge" data-args="0,-1">⬆️</button>
       <div></div>
-      <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(-1,0)">⬅️</button>
-      <button type="button" class="btn btn-ghost" style="padding:0;font-size:10px;" onclick="resetSelectedLinePosition()">Reset</button>
-      <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(1,0)">➡️</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;" data-action="line-nudge" data-args="-1,0">⬅️</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;font-size:10px;" data-action="line-reset">Reset</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;" data-action="line-nudge" data-args="1,0">➡️</button>
       <div></div>
-      <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeSelectedLine(0,1)">⬇️</button>
+      <button type="button" class="btn btn-ghost" style="padding:0;" data-action="line-nudge" data-args="0,1">⬇️</button>
       <div></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
       <span class="field-label" style="margin:0;">Font Size</span>
-      <button type="button" class="btn btn-ghost" style="width:auto;padding:6px 14px;" onclick="adjustSelectedLineFontSize(-1)">A-</button>
-      <button type="button" class="btn btn-ghost" style="width:auto;padding:6px 14px;font-size:16px;" onclick="adjustSelectedLineFontSize(1)">A+</button>
+      <button type="button" class="btn btn-ghost" style="width:auto;padding:6px 14px;" data-action="font" data-args="-1">A-</button>
+      <button type="button" class="btn btn-ghost" style="width:auto;padding:6px 14px;font-size:16px;" data-action="font" data-args="1">A+</button>
     </div>
-    <button type="button" class="btn btn-ghost" style="margin-top:8px;" onclick="clearLineSelection()">✕ Selection સાફ કરો</button>
+    <button type="button" class="btn btn-ghost" style="margin-top:8px;" data-action="line-clear">✕ Selection સાફ કરો</button>
   `;
+}
+
+function bindLineNudgePanelDelegation(){
+  const wrap = document.getElementById('lineNudgePanelWrap');
+  if(!wrap || wrap.dataset.bound) return; // avoid rebinding if somehow called twice on the same element
+  wrap.dataset.bound = '1';
+  wrap.addEventListener('click', (e)=>{
+    const el = e.target.closest('[data-action]');
+    if(!el) return;
+    const action = el.dataset.action;
+    const args = el.dataset.args;
+    if(action === 'speed') setLineNudgeSpeed(args);
+    else if(action === 'logo-nudge'){ const [dx,dy] = args.split(',').map(Number); nudgeLogo(dx,dy); }
+    else if(action === 'logo-reset') resetLogoPosition();
+    else if(action === 'logo-deselect') deselectLogo();
+    else if(action === 'line-nudge'){ const [dx,dy] = args.split(',').map(Number); nudgeSelectedLine(dx,dy); }
+    else if(action === 'line-reset') resetSelectedLinePosition();
+    else if(action === 'font') adjustSelectedLineFontSize(Number(args));
+    else if(action === 'line-clear') clearLineSelection();
+  });
 }
 
 function selectLogoForMove(){
@@ -2258,6 +2292,7 @@ function applyLabelCode(code){
 }
 
 function guessStickerPartNumber(){
+  if(aiDetectedPartNumber) return aiDetectedPartNumber;
   const found = stickerLines.find(l=> (l.text||'').trim());
   return found ? found.text.trim() : 'PARTNO';
 }
@@ -2732,6 +2767,7 @@ function loadSavedSticker(pn){
   try{
     const data = JSON.parse(localStorage.getItem('sticker:'+pn));
     stickerLines = data.lines.slice();
+    aiDetectedPartNumber = data.partNumber || pn;
     stickerFormat = data.format || 'Generic';
     stickerWidthMM = data.widthMM || 70;
     stickerHeightMM = data.heightMM || 45;
