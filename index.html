@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-critical-freeze-fix</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 19:29 IST — tdz-bugs-fixed</span>
       </div>
     </div>
 
@@ -864,6 +864,11 @@
 <script>
 /* ============ STATE ============ */
 let currentGPS = null;
+let multiStream = null;
+let multiScanInterval = null;
+let scanStream = null;
+let scanInterval = null;
+let scanTargetInputId = 'partInput';
 let currentPart = null;
 let selectedCompany = 'All';
 
@@ -1110,11 +1115,6 @@ document.getElementById('reqPhotoScanBtn').addEventListener('click', ()=>{
 });
 
 /* ============ CAMERA SCAN (Barcode/QR) ============ */
-let scanStream = null;
-let scanInterval = null;
-
-let scanTargetInputId = 'partInput';
-
 async function openCameraScan(targetInputId){
   scanTargetInputId = (typeof targetInputId === 'string' && targetInputId) ? targetInputId : 'partInput';
   const modal = document.getElementById('cameraModal');
@@ -2708,8 +2708,6 @@ function loadSavedSticker(pn){
 }
 
 /* ============ MULTIPLE BUY MODULE (legacy, no longer linked from home — merged into Buy) ============ */
-let multiStream = null;
-let multiScanInterval = null;
 let multiGPS = null;
 let multiSession = {}; // partNumber -> count
 let lastMultiScanValue = '';
