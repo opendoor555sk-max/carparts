@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 21:00 IST — partnumber-detection-fix</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 21:45 IST — fulldesign-mixprint-uniqueid</span>
       </div>
     </div>
 
@@ -1914,12 +1914,10 @@ function openStickerEditor(){
 
       <div class="action-row" style="margin-top:18px;">
         <button class="btn btn-ghost" id="saveStickerBtn" style="flex:1;">💾 Save</button>
-        <button class="btn btn-ghost" id="printStickerBtn" style="flex:1;">🖨️ 1 Sticker Print</button>
       </div>
       <label class="field-label" style="margin-top:16px;display:block;">Paper Margin (mm) — sheet ની ધારથી</label>
       <input type="number" class="form-input" id="printMarginInput" value="0" min="0" max="30">
 
-      <button class="btn btn-primary" id="printA4SheetBtn" style="margin-top:10px;">🖨️ પૂરી A4 Sheet Print (<span id="a4SheetCount">-</span> labels)</button>
       <button class="btn btn-ghost" id="openMixPrintBtn" style="margin-top:10px;border-color:var(--accent);color:var(--accent);">🧩 Mix Print — Block પર અલગ Sticker મૂકો</button>
     </div>
   `;
@@ -1983,8 +1981,6 @@ function openStickerEditor(){
     renderStickerPreview();
   });
   document.getElementById('saveStickerBtn').addEventListener('click', saveCurrentSticker);
-  document.getElementById('printStickerBtn').addEventListener('click', printCurrentSticker);
-  document.getElementById('printA4SheetBtn').addEventListener('click', printFullA4Sheet);
   const mixBtn = document.getElementById('openMixPrintBtn');
   if(mixBtn) mixBtn.addEventListener('click', ()=>{
     document.getElementById('mixPrintModal').classList.remove('hidden');
@@ -2653,64 +2649,82 @@ document.getElementById('mixPrintBtn').addEventListener('click', ()=>{
 
   const allStickers = getAllSavedStickers();
   let html = '';
+  const renderJobs = []; // {qrId, barcodeId, pn} for each placed cell, to render AFTER insertion into DOM
   for(let i=0;i<size.count;i++){
     const pn = mixPlacements[i];
     const cellStyle = `width:${size.w}mm;height:${size.h}mm;overflow:hidden;box-sizing:border-box;`;
     if(!pn){ html += `<div style="${cellStyle}"></div>`; continue; }
     const stickerData = allStickers.find(s=>s.partNumber===pn);
-    html += `<div style="${cellStyle}">${renderStickerToHtmlString(stickerData)}</div>`;
+    const result = renderSavedStickerHtml(stickerData, i);
+    html += `<div style="${cellStyle}">${result.html}</div>`;
+    renderJobs.push(result);
   }
   printArea.innerHTML = html;
+  // now that unique-ID elements actually exist in the DOM, render each QR/barcode into them
+  renderJobs.forEach(job=>{
+    const qrHolder = document.getElementById(job.qrId);
+    if(qrHolder){ try{ new QRCode(qrHolder, {text:job.pn, width:qrHolder.offsetWidth||40, height:qrHolder.offsetHeight||40, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){} }
+    const barcodeSvg = document.getElementById(job.barcodeId);
+    if(barcodeSvg){ try{ JsBarcode('#'+job.barcodeId, job.pn, {format:"CODE128", displayValue:false, margin:1, background:"#ffffff", lineColor:"#000000"}); }catch(e){} }
+  });
   showToast(`🖨️ ${placedIndices.length} sticker(s) placed — printing...`);
   window.print();
 });
 
 // Renders a saved sticker's data (any format) into an HTML string, reusing the same template functions
-function renderStickerToHtmlString(stickerData){
+function renderSavedStickerHtml(stickerData, uniqueSuffix){
   if(!stickerData) return '';
-  const backup = {stickerLines, stickerFormat, stickerWidthMM, stickerHeightMM, stickerLogoDataUrl, stickerLogoWidthPx, stickerLogoHeightPx, stickerLogoOffsetX, stickerLogoOffsetY, stickerPhotoDataUrl, stickerPhotoBgPartNumber, barcodeOverlayX, barcodeOverlayY, barcodeOverlayWidthPx, barcodeOverlayHeightPx};
+  const lines = stickerData.lines || [];
+  const format = stickerData.format || 'Generic';
+  const pn = stickerData.partNumber || (lines.find(l=>(l.text||'').trim())||{}).text || 'PARTNO';
+  const logoUrl = stickerData.logo || null;
+  const logoW = stickerData.logoWidthPx || 90;
+  const logoH = stickerData.logoHeightPx || 32;
+  const logoOX = stickerData.logoOffsetX || 0;
+  const logoOY = stickerData.logoOffsetY || 0;
 
-  stickerLines = stickerData.lines || [];
-  stickerFormat = stickerData.format || 'Generic';
-  stickerWidthMM = stickerData.widthMM || 70;
-  stickerHeightMM = stickerData.heightMM || 45;
-  stickerLogoDataUrl = stickerData.logo || null;
-  stickerLogoWidthPx = stickerData.logoWidthPx || 90;
-  stickerLogoHeightPx = stickerData.logoHeightPx || 32;
-  stickerLogoOffsetX = stickerData.logoOffsetX || 0;
-  stickerLogoOffsetY = stickerData.logoOffsetY || 0;
-  stickerPhotoDataUrl = stickerData.photoBg || null;
-  stickerPhotoBgPartNumber = stickerData.photoBgPartNumber || '';
-  barcodeOverlayX = stickerData.barcodeOverlayX || 0;
-  barcodeOverlayY = stickerData.barcodeOverlayY || 0;
-  barcodeOverlayWidthPx = stickerData.barcodeOverlayWidthPx || 130;
-  barcodeOverlayHeightPx = stickerData.barcodeOverlayHeightPx || 45;
+  const qrId = 'mixQr_' + uniqueSuffix;
+  const barcodeId = 'mixBarcode_' + uniqueSuffix;
+  let html = '';
 
-  // temporarily rename the real live-preview box (if present) so our scratch box's
-  // getElementById('stickerPreviewBox') lookup can't accidentally hit it
-  const realBox = document.getElementById('stickerPreviewBox');
-  if(realBox) realBox.id = 'stickerPreviewBox__temp_hidden';
-
-  const scratch = document.createElement('div');
-  scratch.id = 'stickerPreviewBox';
-  scratch.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:300px;height:200px;';
-  document.body.appendChild(scratch);
-
-  renderStickerPreview();
-  const html = scratch.innerHTML;
-  scratch.remove();
-  if(realBox) realBox.id = 'stickerPreviewBox';
-
-  stickerLines = backup.stickerLines; stickerFormat = backup.stickerFormat;
-  stickerWidthMM = backup.stickerWidthMM; stickerHeightMM = backup.stickerHeightMM;
-  stickerLogoDataUrl = backup.stickerLogoDataUrl; stickerLogoWidthPx = backup.stickerLogoWidthPx;
-  stickerLogoHeightPx = backup.stickerLogoHeightPx; stickerLogoOffsetX = backup.stickerLogoOffsetX;
-  stickerLogoOffsetY = backup.stickerLogoOffsetY; stickerPhotoDataUrl = backup.stickerPhotoDataUrl;
-  stickerPhotoBgPartNumber = backup.stickerPhotoBgPartNumber;
-  barcodeOverlayX = backup.barcodeOverlayX; barcodeOverlayY = backup.barcodeOverlayY;
-  barcodeOverlayWidthPx = backup.barcodeOverlayWidthPx; barcodeOverlayHeightPx = backup.barcodeOverlayHeightPx;
-
-  return html;
+  if(format === 'Mobase Yellow'){
+    const norm = (p)=> normalizeToTemplateSlot(p);
+    const brandLines = lines.filter(l=>norm(l.position)==='top-left');
+    const unitBlock = lines.filter(l=>norm(l.position)==='mid-left');
+    const certBlock = lines.filter(l=>norm(l.position)==='mid-right');
+    const bottomLeftLines = lines.filter(l=>norm(l.position)==='bottom-left');
+    const footerLine = lines.find(l=>norm(l.position)==='bottom-center');
+    const tu11Line = lines.find(l=>norm(l.position)==='bottom-right');
+    const brandGap = Math.min(8, 16/Math.max(1,brandLines.length));
+    const certGap = Math.min(8, 30/Math.max(1,certBlock.length));
+    const bottomLeftGap = Math.min(6, 12/Math.max(1,bottomLeftLines.length));
+    const logoHtml = logoUrl ? `<img src="${logoUrl}" style="width:100%;height:100%;object-fit:contain;">` : '';
+    html = `<div style="position:relative;width:100%;height:100%;background:#f5cf1b;overflow:hidden;font-family:Arial,sans-serif;color:#111;">
+      <div style="position:absolute;left:2.5%;top:7.5%;width:${logoW}px;height:${logoH}px;transform:translate(${logoOX}px,${logoOY}px);border:1px dashed #bbb;">${logoHtml}</div>
+      ${brandLines.map((l,i)=>`<div style="position:absolute;left:2.5%;top:${20.5+i*brandGap}%;width:60%;font-weight:800;font-size:2.7cqw;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
+      <div style="position:absolute;left:3.5%;top:${20.5+brandLines.length*brandGap+3}%;font-weight:900;font-size:8.5cqw;">CE</div>
+      <div style="position:absolute;left:42%;top:8%;width:38%;font-size:2.4cqw;font-weight:700;">${unitBlock.map((l,i)=>`<span style="transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);display:inline-block;">${i===1?`<b>${l.text}</b>`:l.text}</span><br>`).join('')}</div>
+      <div style="position:absolute;left:84.5%;top:7%;width:10.5%;height:15%;border-radius:50%;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;font-style:italic;font-size:2.8cqw;">Pb</div>
+      ${certBlock.map((l,i)=>`<div style="position:absolute;left:3.75%;top:${44+i*certGap}%;width:60%;font-size:2.4cqw;font-weight:700;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
+      <div style="position:absolute;left:65.8%;top:55.5%;width:24%;height:33%;" id="${qrId}"></div>
+      ${bottomLeftLines.map((l,i)=>`<div style="position:absolute;left:3.75%;top:${75+i*bottomLeftGap}%;width:48%;font-size:2.4cqw;font-weight:700;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
+      <div style="position:absolute;left:54%;top:85%;width:20%;text-align:right;font-size:2.6cqw;font-weight:700;">${tu11Line?tu11Line.text:'TU11'}</div>
+      ${footerLine?`<div style="position:absolute;left:2%;top:91.5%;width:96%;text-align:center;font-size:1.9cqw;font-weight:700;">${footerLine.text}</div>`:''}
+    </div>`;
+  } else {
+    // Generic fallback (and other formats not yet fully replicated here): show all lines stacked + logo + real QR + barcode
+    html = `<div style="position:relative;width:100%;height:100%;background:#fff;overflow:hidden;padding:4px;box-sizing:border-box;font-family:Arial,sans-serif;color:#111;">
+      ${logoUrl?`<img src="${logoUrl}" style="position:absolute;left:2%;top:2%;width:${logoW}px;height:${logoH}px;object-fit:contain;transform:translate(${logoOX}px,${logoOY}px);">`:''}
+      <div style="display:flex;flex-direction:column;gap:1px;margin-top:${logoUrl?logoH+8:0}px;">
+        ${lines.map(l=>`<div style="font-size:${l.fontSize||8}px;">${l.text}</div>`).join('')}
+      </div>
+      <div style="position:absolute;bottom:2%;left:50%;transform:translateX(-50%);display:flex;gap:6px;align-items:center;">
+        <div id="${qrId}"></div>
+        <svg id="${barcodeId}"></svg>
+      </div>
+    </div>`;
+  }
+  return {html, qrId, barcodeId, pn};
 }
 
 function printFullA4Sheet(){
