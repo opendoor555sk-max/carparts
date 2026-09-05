@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 19:45 IST — print-fix-margins</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 20:05 IST — unified-panel-multiselect</span>
       </div>
     </div>
 
@@ -846,6 +846,7 @@
 
       <label class="field-label" style="margin-top:16px;display:block;">1. Sticker પસંદ કરો</label>
       <div class="format-chips" id="mixStickerPickChips" style="margin-top:8px;"></div>
+      <div class="hint" id="mixPaletteHint" style="margin-top:4px;"></div>
 
       <div class="action-row" style="margin-top:12px;">
         <button class="btn btn-ghost" id="mixAutoFillBtn" style="flex:1;">⚡ Auto-fill (બધા)</button>
@@ -1473,7 +1474,7 @@ let stickerLogoWidthPx = 90;
 let stickerLogoHeightPx = 32;
 let stickerLogoOffsetX = 0;
 let stickerLogoOffsetY = 0;
-let logoNudgeSpeed = 'slow'; // 'slow' = 1px, 'fast' = 8px per tap
+let isLogoSelected = false; // unified: either logo OR text lines are "selected" for moving, never both
 let selectedLineIndices = new Set();
 let lineNudgeSpeed = 'slow';
 let barcodeOverlayX = 0;
@@ -1839,22 +1840,9 @@ function openStickerEditor(){
         </div>
       </div>
 
-      <label class="field-label" style="margin-top:12px;display:block;">Logo Position — ખસેડો</label>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-        <div class="format-chip ${logoNudgeSpeed==='slow'?'active':''}" id="logoSpeedSlowChip" onclick="setLogoNudgeSpeed('slow')">🐢 Slow</div>
-        <div class="format-chip ${logoNudgeSpeed==='fast'?'active':''}" id="logoSpeedFastChip" onclick="setLogoNudgeSpeed('fast')">🐇 Fast</div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
-        <div></div>
-        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(0,-1)">⬆️</button>
-        <div></div>
-        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(-1,0)">⬅️</button>
-        <button class="btn btn-ghost" style="padding:0;font-size:10px;" onclick="resetLogoPosition()">Reset</button>
-        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(1,0)">➡️</button>
-        <div></div>
-        <button class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(0,1)">⬇️</button>
-        <div></div>
-      </div>
+      <button type="button" class="btn ${isLogoSelected?'btn-primary':'btn-ghost'}" id="selectLogoForMoveBtn" style="margin-top:10px;">
+        ${isLogoSelected?'☑️ Logo ખસેડવા selected — ઉપર arrows વાપરો':'☐ Logo ને ખસેડવા select કરો'}
+      </button>
 
       <button class="btn btn-ghost" id="clearLogoBtn" style="margin-top:12px;">✕ Logo કાઢો</button>` : ''}
 
@@ -1906,7 +1894,6 @@ function openStickerEditor(){
       <label class="field-label" style="margin-top:16px;display:block;">Text Lines — position પસંદ કરો (મૂળ sticker પર જ્યાં હોય ત્યાં)</label>
       <div id="stickerLinesWrap"></div>
       <button class="btn btn-ghost" id="addStickerLineBtn" style="margin-top:10px;">➕ Line ઉમેરો</button>
-      <div id="lineNudgePanelWrap2" style="border:2px solid var(--accent);border-radius:10px;padding:10px;margin-top:14px;"></div>
       `}
 
       <label class="field-label" style="margin-top:16px;display:block;">Company Format</label>
@@ -1924,6 +1911,7 @@ function openStickerEditor(){
     </div>
   `;
   if(stickerFormat !== 'Photo Background') renderStickerLines();
+  else renderLineNudgePanel();
   renderStickerFormatChips();
   renderStickerPreview();
 
@@ -1939,7 +1927,9 @@ function openStickerEditor(){
     reader.readAsDataURL(file);
   });
   const clearBtn = document.getElementById('clearLogoBtn');
-  if(clearBtn) clearBtn.addEventListener('click', ()=>{ stickerLogoDataUrl=null; openStickerEditor(); });
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{ stickerLogoDataUrl=null; isLogoSelected=false; openStickerEditor(); });
+  const selectLogoBtn = document.getElementById('selectLogoForMoveBtn');
+  if(selectLogoBtn) selectLogoBtn.addEventListener('click', ()=>{ isLogoSelected ? deselectLogo() : selectLogoForMove(); });
   const logoWidthInput = document.getElementById('logoWidthInput');
   const logoHeightInput = document.getElementById('logoHeightInput');
   if(logoWidthInput) logoWidthInput.addEventListener('input', e=>{
@@ -2004,14 +1994,37 @@ function renderStickerLines(){
 
 function renderLineNudgePanel(){
   const panelWrap = document.getElementById('lineNudgePanelWrap');
-  const panelWrap2 = document.getElementById('lineNudgePanelWrap2');
-  if(!panelWrap && !panelWrap2) return;
-  if(selectedLineIndices.size === 0){
-    if(panelWrap) panelWrap.innerHTML = '';
-    if(panelWrap2) panelWrap2.innerHTML = '';
+  if(!panelWrap) return;
+
+  if(isLogoSelected){
+    panelWrap.innerHTML = `
+      <label class="field-label" style="margin-top:12px;display:block;">🖼️ Logo Selected — ખસેડો</label>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+        <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" onclick="setLineNudgeSpeed('slow')">🐢 Slow</div>
+        <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" onclick="setLineNudgeSpeed('fast')">🐇 Fast</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
+        <div></div>
+        <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(0,-1)">⬆️</button>
+        <div></div>
+        <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(-1,0)">⬅️</button>
+        <button type="button" class="btn btn-ghost" style="padding:0;font-size:10px;" onclick="resetLogoPosition()">Reset</button>
+        <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(1,0)">➡️</button>
+        <div></div>
+        <button type="button" class="btn btn-ghost" style="padding:0;" onclick="nudgeLogo(0,1)">⬇️</button>
+        <div></div>
+      </div>
+      <button type="button" class="btn btn-ghost" style="margin-top:8px;" onclick="deselectLogo()">✕ Logo Selection સાફ કરો</button>
+    `;
     return;
   }
-  const panelHtml = `
+
+  if(selectedLineIndices.size === 0){
+    panelWrap.innerHTML = '';
+    return;
+  }
+
+  panelWrap.innerHTML = `
     <label class="field-label" style="margin-top:12px;display:block;">${selectedLineIndices.size} Line(s) Selected — ખસેડો</label>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
       <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" onclick="setLineNudgeSpeed('slow')">🐢 Slow</div>
@@ -2035,13 +2048,31 @@ function renderLineNudgePanel(){
     </div>
     <button type="button" class="btn btn-ghost" style="margin-top:8px;" onclick="clearLineSelection()">✕ Selection સાફ કરો</button>
   `;
-  if(panelWrap) panelWrap.innerHTML = panelHtml;
-  if(panelWrap2) panelWrap2.innerHTML = panelHtml;
+}
+
+function selectLogoForMove(){
+  isLogoSelected = true;
+  selectedLineIndices.clear(); // unified: selecting logo deselects any lines
+  renderStickerLines();
+  renderLineNudgePanel();
+  const btn = document.getElementById('selectLogoForMoveBtn');
+  if(btn){ btn.classList.add('btn-primary'); btn.classList.remove('btn-ghost'); btn.textContent = '☑️ Logo ખસેડવા selected — ઉપર arrows વાપરો'; }
+}
+function deselectLogo(){
+  isLogoSelected = false;
+  renderLineNudgePanel();
+  const btn = document.getElementById('selectLogoForMoveBtn');
+  if(btn){ btn.classList.remove('btn-primary'); btn.classList.add('btn-ghost'); btn.textContent = '☐ Logo ને ખસેડવા select કરો'; }
 }
 
 function selectStickerLine(i){
   if(selectedLineIndices.has(i)) selectedLineIndices.delete(i);
   else selectedLineIndices.add(i);
+  if(selectedLineIndices.size > 0 && isLogoSelected){
+    isLogoSelected = false;
+    const btn = document.getElementById('selectLogoForMoveBtn');
+    if(btn){ btn.classList.remove('btn-primary'); btn.classList.add('btn-ghost'); btn.textContent = '☐ Logo ને ખસેડવા select કરો'; }
+  }
   renderStickerLines(); // only re-renders the lines list + nudge panel — rest of form stays frozen
 }
 
@@ -2169,16 +2200,8 @@ function deleteCustomFormat(name){
   showToast('🗑️ Format deleted');
 }
 
-function setLogoNudgeSpeed(speed){
-  logoNudgeSpeed = speed;
-  const slowChip = document.getElementById('logoSpeedSlowChip');
-  const fastChip = document.getElementById('logoSpeedFastChip');
-  if(slowChip) slowChip.classList.toggle('active', speed==='slow');
-  if(fastChip) fastChip.classList.toggle('active', speed==='fast');
-}
-
 function nudgeLogo(dx, dy){
-  const step = logoNudgeSpeed === 'fast' ? 8 : 1;
+  const step = lineNudgeSpeed === 'fast' ? 8 : 1;
   stickerLogoOffsetX += dx * step;
   stickerLogoOffsetY += dy * step;
   renderStickerPreview(); // preview only updates — editing form stays frozen/stable
@@ -2191,7 +2214,7 @@ function resetLogoPosition(){
 }
 
 function nudgeBarcode(dx, dy){
-  const step = logoNudgeSpeed === 'fast' ? 8 : 1;
+  const step = lineNudgeSpeed === 'fast' ? 8 : 1;
   barcodeOverlayX += dx * step;
   barcodeOverlayY += dy * step;
   renderStickerPreview();
@@ -2489,7 +2512,8 @@ function printCurrentSticker(){
 
 /* ============ MIX PRINT (block-by-block, different sticker per block) ============ */
 let mixActiveCode = '21L';
-let mixSelectedStickerPN = null;
+let mixSelectedPalette = new Set(); // multi-select palette of stickers
+let mixActivePN = null; // most-recently-toggled sticker — used for single-block-tap placement
 let mixPlacements = {}; // blockIndex -> partNumber
 
 document.getElementById('closeMixPrintBtn').addEventListener('click', ()=>{
@@ -2514,11 +2538,14 @@ function renderMixStickerPickChips(){
   const stickers = getAllSavedStickers();
   if(stickers.length===0){ wrap.innerHTML = '<div class="notes-box">કોઈ saved sticker નથી — પહેલા Save કરો</div>'; return; }
   wrap.innerHTML = stickers.map(s=>
-    `<div class="format-chip ${s.partNumber===mixSelectedStickerPN?'active':''}" onclick="setMixSticker('${s.partNumber.replace(/'/g,"\\'")}')">🏷️ ${s.partNumber}</div>`
+    `<div class="format-chip ${mixSelectedPalette.has(s.partNumber)?'active':''}" onclick="toggleMixSticker('${s.partNumber.replace(/'/g,"\\'")}')">${mixSelectedPalette.has(s.partNumber)?'☑️':'🏷️'} ${s.partNumber}</div>`
   ).join('');
+  const hint = document.getElementById('mixPaletteHint');
+  if(hint) hint.textContent = mixSelectedPalette.size>0 ? `${mixSelectedPalette.size} sticker(s) palette માં — block tap = "${mixActivePN}", Auto-fill = બધા વારાફરતી` : 'ઓછામાં ઓછો 1 sticker પસંદ કરો';
 }
-function setMixSticker(pn){
-  mixSelectedStickerPN = pn;
+function toggleMixSticker(pn){
+  if(mixSelectedPalette.has(pn)){ mixSelectedPalette.delete(pn); if(mixActivePN===pn) mixActivePN = [...mixSelectedPalette].pop() || null; }
+  else{ mixSelectedPalette.add(pn); mixActivePN = pn; }
   renderMixStickerPickChips();
 }
 
@@ -2544,21 +2571,24 @@ function renderMixBlockGrid(){
 }
 
 function mixPlaceOnBlock(i){
-  if(!mixSelectedStickerPN){ showToast('⚠️ પહેલા ઉપરથી sticker પસંદ કરો'); return; }
-  mixPlacements[i] = mixSelectedStickerPN;
+  if(!mixActivePN){ showToast('⚠️ પહેલા ઉપરથી sticker પસંદ કરો'); return; }
+  mixPlacements[i] = mixActivePN;
   renderMixBlockGrid();
 }
 
 document.getElementById('mixAutoFillBtn').addEventListener('click', ()=>{
-  if(!mixSelectedStickerPN){ showToast('⚠️ પહેલા sticker પસંદ કરો'); return; }
+  if(mixSelectedPalette.size===0){ showToast('⚠️ પહેલા sticker(s) પસંદ કરો'); return; }
   const size = LABEL_SIZE_CHART[mixActiveCode];
-  for(let i=0;i<size.count;i++) mixPlacements[i] = mixSelectedStickerPN;
+  const palette = [...mixSelectedPalette];
+  for(let i=0;i<size.count;i++) mixPlacements[i] = palette[i % palette.length]; // round-robin distributes all selected stickers
   renderMixBlockGrid();
 });
 document.getElementById('mixFillEmptyBtn').addEventListener('click', ()=>{
-  if(!mixSelectedStickerPN){ showToast('⚠️ પહેલા sticker પસંદ કરો'); return; }
+  if(mixSelectedPalette.size===0){ showToast('⚠️ પહેલા sticker(s) પસંદ કરો'); return; }
   const size = LABEL_SIZE_CHART[mixActiveCode];
-  for(let i=0;i<size.count;i++){ if(!mixPlacements[i]) mixPlacements[i] = mixSelectedStickerPN; }
+  const palette = [...mixSelectedPalette];
+  let p = 0;
+  for(let i=0;i<size.count;i++){ if(!mixPlacements[i]){ mixPlacements[i] = palette[p % palette.length]; p++; } }
   renderMixBlockGrid();
 });
 document.getElementById('mixClearBtn').addEventListener('click', ()=>{
