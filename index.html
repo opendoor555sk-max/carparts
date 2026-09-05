@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-mobase-footer-tu11-fix</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">v2026-09-01-claude-ai-added</span>
       </div>
     </div>
 
@@ -791,6 +791,29 @@
           5️⃣ ઉપર paste કરીને Save કરો
         </div>
       </div>
+
+      <div class="search-hero" style="margin-top:24px;">
+        <h1>Claude API Key</h1>
+        <p>Sticker Scanner ના AI-read માટે બીજો વિકલ્પ — Gemini + Hugging Face બંને fail થાય તો આ વપરાય. ⚠️ Paid — Anthropic Console પર credits ઉમેરવા પડે (ફ્રી tier નથી).</p>
+      </div>
+
+      <div class="scan-plate">
+        <label class="field-label">Claude API Key (sk-ant-...)</label>
+        <input type="text" class="part-input" id="claudeKeyInput" placeholder="sk-ant-..." style="text-transform:none;font-size:14px;" autocomplete="off">
+        <button class="btn btn-primary" id="saveClaudeKeyBtn">💾 Save Key</button>
+      </div>
+
+      <div class="part-detail" style="margin-top:16px;">
+        <div class="pd-label">Key કેવી રીતે મેળવવી</div>
+        <div class="notes-box ok" style="margin-top:12px;">
+          1️⃣ console.anthropic.com ખોલો<br>
+          2️⃣ Sign up/Login કરો<br>
+          3️⃣ "API Keys" → "Create Key"<br>
+          4️⃣ Key copy કરો (sk-ant-... થી શરૂ થાય)<br>
+          5️⃣ Billing માં થોડા credits ઉમેરો (ઓછામાં ઓછા $5)<br>
+          6️⃣ ઉપર paste કરીને Save કરો
+        </div>
+      </div>
     </div>
 
   </div>
@@ -842,6 +865,7 @@ document.getElementById('openSettings').addEventListener('click', ()=>{
   document.getElementById('topbarSettings').classList.remove('hidden');
   document.getElementById('geminiKeyInput').value = localStorage.getItem('gemini_api_key') || '';
   document.getElementById('hfKeyInput').value = localStorage.getItem('hf_api_key') || '';
+  document.getElementById('claudeKeyInput').value = localStorage.getItem('claude_api_key') || '';
 });
 document.getElementById('backFromSettings').addEventListener('click', ()=>{
   document.getElementById('view-settings').classList.add('hidden');
@@ -860,6 +884,12 @@ document.getElementById('saveHfKeyBtn').addEventListener('click', ()=>{
   if(!key){ showToast('⚠️ Key નાખો'); return; }
   localStorage.setItem('hf_api_key', key);
   showToast('✓ Hugging Face Key saved');
+});
+document.getElementById('saveClaudeKeyBtn').addEventListener('click', ()=>{
+  const key = document.getElementById('claudeKeyInput').value.trim();
+  if(!key){ showToast('⚠️ Key નાખો'); return; }
+  localStorage.setItem('claude_api_key', key);
+  showToast('✓ Claude Key saved');
 });
 
 document.querySelectorAll('.module-card:not(#openSearch):not(#openBuy):not(#openSell):not(#openReq):not(#openInventory):not(#openMultiBuy):not(#openSticker):not(#openReports)').forEach(c=>{
@@ -1425,15 +1455,20 @@ let stickerWidthMM = 70;
 let stickerHeightMM = 45;
 const STICKER_POSITIONS = ['top-left','top-center','top-right','mid-left','center','mid-right','bottom-left','bottom-center','bottom-right'];
 const LABEL_SIZE_CHART = {
-  '01P': {count:1, w:210, h:297}, '02L': {count:2, w:200, h:146}, '04P': {count:4, w:100, h:145},
-  '06L': {count:6, w:99, h:93}, '08L': {count:8, w:100, h:72}, '08LA': {count:8, w:90, h:55},
-  '12L': {count:12, w:100, h:44}, '15L': {count:15, w:61, h:21}, '16L': {count:16, w:99, h:34},
-  '18L': {count:18, w:63.5, h:46.6}, '21L': {count:21, w:63.5, h:38}, '22L': {count:22, w:100, h:24},
-  '24L': {count:24, w:64, h:34}, '30L': {count:30, w:67, h:27.5}, '30P': {count:30, w:39, h:47.5},
-  '32P': {count:32, w:25, h:70}, '40L': {count:40, w:39, h:35}, '40P': {count:40, w:18, h:73},
-  '48L': {count:48, w:48, h:24}, '56L': {count:56, w:48, h:20}, '65L': {count:65, w:38, h:21},
-  '84L': {count:84, w:46, h:11}, '110L': {count:110, w:35, h:10}
+  '01P': {count:1, w:210, h:297, cols:1, rows:1}, '02L': {count:2, w:200, h:146, cols:1, rows:2},
+  '04P': {count:4, w:100, h:145, cols:2, rows:2}, '06L': {count:6, w:99, h:93, cols:2, rows:3},
+  '08L': {count:8, w:100, h:72, cols:2, rows:4}, '08LA': {count:8, w:90, h:55, cols:4, rows:2},
+  '12L': {count:12, w:100, h:44, cols:3, rows:4}, '15L': {count:15, w:61, h:21, cols:3, rows:5},
+  '16L': {count:16, w:99, h:34, cols:4, rows:4}, '18L': {count:18, w:63.5, h:46.6, cols:3, rows:6},
+  '21L': {count:21, w:63.5, h:38, cols:3, rows:7}, '22L': {count:22, w:100, h:24, cols:2, rows:11},
+  '24L': {count:24, w:64, h:34, cols:3, rows:8}, '30L': {count:30, w:67, h:27.5, cols:3, rows:10},
+  '30P': {count:30, w:39, h:47.5, cols:5, rows:6}, '32P': {count:32, w:25, h:70, cols:4, rows:8},
+  '40L': {count:40, w:39, h:35, cols:4, rows:10}, '40P': {count:40, w:18, h:73, cols:5, rows:8},
+  '48L': {count:48, w:48, h:24, cols:4, rows:12}, '56L': {count:56, w:48, h:20, cols:4, rows:14},
+  '65L': {count:65, w:38, h:21, cols:5, rows:13}, '84L': {count:84, w:46, h:11, cols:4, rows:21},
+  '110L': {count:110, w:35, h:10, cols:5, rows:22}
 };
+let activeLabelCode = null;
 
 const STICKER_FORMATS = ['Generic', 'Photo Background', 'Hyundai / Kia', 'Continental', 'Mobase Yellow', 'Maruti Suzuki', 'Tata', 'Mahindra', 'Toyota', 'Honda'];
 
@@ -1492,12 +1527,13 @@ async function handleStickerPhoto(file){
 
   const geminiKey = localStorage.getItem('gemini_api_key');
   const hfKey = localStorage.getItem('hf_api_key');
+  const claudeKey = localStorage.getItem('claude_api_key');
 
-  if(!geminiKey && !hfKey){
+  if(!geminiKey && !hfKey && !claudeKey){
     stickerLines = [{text:'', position:'center'}];
     stickerFormat = 'Generic';
     openStickerEditor();
-    showToast('⚠️ ⚙️ Settings માં Gemini કે Hugging Face key નાખો — auto-read માટે જરૂરી. હમણાં manually ટાઈપ કરો.');
+    showToast('⚠️ ⚙️ Settings માં Gemini, Hugging Face કે Claude key નાખો — auto-read માટે જરૂરી. હમણાં manually ટાઈપ કરો.');
     return;
   }
 
@@ -1519,20 +1555,57 @@ async function handleStickerPhoto(file){
     catch(e){ lastError = e; }
   }
 
+  if(!result && claudeKey){
+    if(geminiKey || hfKey) showToast('⏳ Claude થી ટ્રાય કરું છું...');
+    try{ result = await claudeReadSticker(resizedForAI, claudeKey); }
+    catch(e){ lastError = e; }
+  }
+
   if(result){
     stickerLines = result.lines.length ? result.lines : [{text:'', position:'center'}];
     stickerWidthMM = result.widthMM;
     stickerHeightMM = result.heightMM;
     const allText = stickerLines.map(l=>l.text).join(' ').toUpperCase();
     stickerFormat = (allText.includes('HYUNDAI') || allText.includes('KIA') || allText.includes('HKMC')) ? 'Hyundai / Kia' : 'Generic';
+
+    if(result.logo){
+      try{ await autoCropLogoFromBox(result.logo); }catch(e){ /* fall through — manual upload still available */ }
+    }
+
     openStickerEditor();
-    showToast('✓ AI એ ટેક્સ્ટ + position વાંચ્યું — logo ✂️ crop કરો, ચેક/edit કરી લો');
+    showToast(result.logo ? '✓ AI એ ટેક્સ્ટ + logo બંને automatic શોધ્યા!' : '✓ AI એ ટેક્સ્ટ વાંચ્યું — logo મળ્યો નહીં, ✂️ manually upload કરો');
   } else {
     stickerLines = [{text:'', position:'center'}];
     stickerFormat = 'Generic';
     openStickerEditor();
     showToast('⚠️ AI read નિષ્ફળ (' + (lastError ? lastError.message : 'unknown') + ') — manually ટાઈપ કરો');
   }
+}
+
+async function autoCropLogoFromBox(logoBox){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const cropX = (logoBox.x/100) * img.width;
+      const cropY = (logoBox.y/100) * img.height;
+      const cropW = (logoBox.w/100) * img.width;
+      const cropH = (logoBox.h/100) * img.height;
+      if(cropW <= 0 || cropH <= 0){ reject(new Error('invalid box')); return; }
+      const canvas = document.createElement('canvas');
+      canvas.width = cropW; canvas.height = cropH;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+      stickerLogoDataUrl = canvas.toDataURL('image/png');
+      // scale a sensible display size, preserving the logo's own aspect ratio
+      const aspect = cropW / cropH;
+      stickerLogoHeightPx = 32;
+      stickerLogoWidthPx = Math.round(32 * aspect);
+      stickerLogoOffsetX = 0; stickerLogoOffsetY = 0;
+      resolve();
+    };
+    img.onerror = ()=> reject(new Error('image load failed'));
+    img.src = stickerPhotoDataUrl;
+  });
 }
 document.getElementById('stickerGalleryInput').addEventListener('change', e=> handleStickerPhoto(e.target.files[0]));
 document.getElementById('stickerCameraInput').addEventListener('change', e=> handleStickerPhoto(e.target.files[0]));
@@ -1547,12 +1620,21 @@ async function fetchWithTimeout(url, options, timeoutMs){
   }
 }
 
+function normalizeLogoBox(logo){
+  if(!logo || typeof logo !== 'object') return null;
+  const x = Number(logo.x), y = Number(logo.y), w = Number(logo.w), h = Number(logo.h);
+  if([x,y,w,h].some(n=>isNaN(n) || n<0)) return null;
+  return {x, y, w, h};
+}
+
 async function geminiReadSticker(dataUrl, apiKey){
   const base64 = dataUrl.split(',')[1];
   const mimeMatch = dataUrl.match(/^data:(image\/[a-z]+);/);
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
   const prompt = `This is a photo of an automotive spare part label/sticker. Read EVERY line of text visible on it exactly as printed (part numbers, model codes, company name, lot numbers, dates, certification marks — everything). For each line, also identify its approximate position on the label using ONE of these 9 zones: "top-left","top-center","top-right","mid-left","center","mid-right","bottom-left","bottom-center","bottom-right" — matching where that text actually appears on the original label. Also estimate the label's approximate physical size in millimeters (typical automotive labels are 40-100mm wide).
+
+Also find the manufacturer BRAND LOGO(s) at the top of the label (e.g. company name logo graphic) and give its bounding box as percentages of the whole label image (0-100). null if there is no distinct logo graphic.
 
 Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure:
 {
@@ -1562,7 +1644,8 @@ Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure
     {"text": "CONTINENTAL", "position": "top-left"},
     {"text": "95400-K6610", "position": "top-right"},
     {"text": "MADE IN INDIA", "position": "bottom-center"}
-  ]
+  ],
+  "logo": {"x": 5, "y": 5, "w": 25, "h": 12}
 }`;
 
   const models = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
@@ -1592,7 +1675,8 @@ Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure
         return {
           lines: result.lines.map(l=>({text:String(l.text||''), position: STICKER_POSITIONS.includes(l.position)?l.position:'center'})),
           widthMM: Number(result.widthMM) || 70,
-          heightMM: Number(result.heightMM) || 45
+          heightMM: Number(result.heightMM) || 45,
+          logo: normalizeLogoBox(result.logo)
         };
       }
       lastError = new Error('ખાલી પરિણામ');
@@ -1604,8 +1688,10 @@ Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure
 async function hfReadSticker(dataUrl, hfToken){
   const prompt = `This is a photo of an automotive spare part label/sticker. Read EVERY line of text visible on it exactly as printed (part numbers, model codes, company name, lot numbers, dates, certification marks — everything). For each line, also identify its approximate position on the label using ONE of these 9 zones: "top-left","top-center","top-right","mid-left","center","mid-right","bottom-left","bottom-center","bottom-right" — matching where that text actually appears on the original label. Also estimate the label's approximate physical size in millimeters (typical automotive labels are 40-100mm wide).
 
+Also find the manufacturer BRAND LOGO(s) at the top of the label (e.g. company name logo graphic) and give its bounding box as percentages of the whole label image (0-100). null if there is no distinct logo graphic.
+
 Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure:
-{"widthMM": 70, "heightMM": 45, "lines": [{"text": "CONTINENTAL", "position": "top-left"}, {"text": "95400-K6610", "position": "top-right"}]}`;
+{"widthMM": 70, "heightMM": 45, "lines": [{"text": "CONTINENTAL", "position": "top-left"}, {"text": "95400-K6610", "position": "top-right"}], "logo": {"x": 5, "y": 5, "w": 25, "h": 12}}`;
 
   const response = await fetchWithTimeout('https://router.huggingface.co/v1/chat/completions', {
     method: "POST",
@@ -1632,7 +1718,57 @@ Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure
   return {
     lines: result.lines.map(l=>({text:String(l.text||''), position: STICKER_POSITIONS.includes(l.position)?l.position:'center'})),
     widthMM: Number(result.widthMM) || 70,
-    heightMM: Number(result.heightMM) || 45
+    heightMM: Number(result.heightMM) || 45,
+    logo: normalizeLogoBox(result.logo)
+  };
+}
+
+async function claudeReadSticker(dataUrl, apiKey){
+  const base64 = dataUrl.split(',')[1];
+  const mimeMatch = dataUrl.match(/^data:(image\/[a-z]+);/);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+
+  const prompt = `This is a photo of an automotive spare part label/sticker. Read EVERY line of text visible on it exactly as printed (part numbers, model codes, company name, lot numbers, dates, certification marks — everything). For each line, also identify its approximate position on the label using ONE of these 9 zones: "top-left","top-center","top-right","mid-left","center","mid-right","bottom-left","bottom-center","bottom-right" — matching where that text actually appears on the original label. Also estimate the label's approximate physical size in millimeters (typical automotive labels are 40-100mm wide).
+
+Also find the manufacturer BRAND LOGO(s) at the top of the label (e.g. company name logo graphic) and give its bounding box as percentages of the whole label image (0-100). null if there is no distinct logo graphic.
+
+Respond with ONLY raw JSON, no markdown, no explanation, in this exact structure:
+{"widthMM": 70, "heightMM": 45, "lines": [{"text": "CONTINENTAL", "position": "top-left"}, {"text": "95400-K6610", "position": "top-right"}], "logo": {"x": 5, "y": 5, "w": 25, "h": 12}}`;
+
+  const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      messages: [{
+        role: "user",
+        content: [
+          {type: "image", source: {type: "base64", media_type: mimeType, data: base64}},
+          {type: "text", text: prompt}
+        ]
+      }]
+    })
+  }, 20000);
+  const data = await response.json();
+  if(data.error) throw new Error(data.error.message || 'Claude error');
+  const textBlock = (data.content || []).find(c=>c.type==='text');
+  const text = textBlock ? textBlock.text : '';
+  const cleaned = text.replace(/```json|```/g,'').trim();
+  const objMatch = cleaned.match(/\{[\s\S]*\}/);
+  if(!objMatch) throw new Error('AI જવાબ સમજાયો નહીં');
+  const result = JSON.parse(objMatch[0]);
+  if(!(result.lines && Array.isArray(result.lines) && result.lines.length)) throw new Error('ખાલી પરિણામ');
+  return {
+    lines: result.lines.map(l=>({text:String(l.text||''), position: STICKER_POSITIONS.includes(l.position)?l.position:'center'})),
+    widthMM: Number(result.widthMM) || 70,
+    heightMM: Number(result.heightMM) || 45,
+    logo: normalizeLogoBox(result.logo)
   };
 }
 
@@ -1740,6 +1876,7 @@ function openStickerEditor(){
       <label class="field-label" style="margin-top:16px;display:block;">Text Lines — position પસંદ કરો (મૂળ sticker પર જ્યાં હોય ત્યાં)</label>
       <div id="stickerLinesWrap"></div>
       <button class="btn btn-ghost" id="addStickerLineBtn" style="margin-top:10px;">➕ Line ઉમેરો</button>
+      <div id="lineNudgePanelWrap2" style="border:2px solid var(--accent);border-radius:10px;padding:10px;margin-top:14px;"></div>
       `}
 
       <label class="field-label" style="margin-top:16px;display:block;">Company Format</label>
@@ -1798,8 +1935,8 @@ function openStickerEditor(){
     renderStickerPreview();
   });
 
-  document.getElementById('stickerWidthInput').addEventListener('input', e=>{ stickerWidthMM = Number(e.target.value)||70; renderStickerPreview(); updateA4SheetCount(); });
-  document.getElementById('stickerHeightInput').addEventListener('input', e=>{ stickerHeightMM = Number(e.target.value)||45; renderStickerPreview(); updateA4SheetCount(); });
+  document.getElementById('stickerWidthInput').addEventListener('input', e=>{ stickerWidthMM = Number(e.target.value)||70; activeLabelCode = null; renderStickerPreview(); updateA4SheetCount(); });
+  document.getElementById('stickerHeightInput').addEventListener('input', e=>{ stickerHeightMM = Number(e.target.value)||45; activeLabelCode = null; renderStickerPreview(); updateA4SheetCount(); });
 
   const addLineBtn = document.getElementById('addStickerLineBtn');
   if(addLineBtn) addLineBtn.addEventListener('click', ()=>{
@@ -1826,16 +1963,18 @@ function renderStickerLines(){
 
 function renderLineNudgePanel(){
   const panelWrap = document.getElementById('lineNudgePanelWrap');
-  if(!panelWrap) return;
+  const panelWrap2 = document.getElementById('lineNudgePanelWrap2');
+  if(!panelWrap && !panelWrap2) return;
   if(selectedLineIndices.size === 0){
-    panelWrap.innerHTML = '';
+    if(panelWrap) panelWrap.innerHTML = '';
+    if(panelWrap2) panelWrap2.innerHTML = '';
     return;
   }
-  panelWrap.innerHTML = `
+  const panelHtml = `
     <label class="field-label" style="margin-top:12px;display:block;">${selectedLineIndices.size} Line(s) Selected — ખસેડો</label>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-      <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" id="lineSpeedSlowChip" onclick="setLineNudgeSpeed('slow')">🐢 Slow</div>
-      <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" id="lineSpeedFastChip" onclick="setLineNudgeSpeed('fast')">🐇 Fast</div>
+      <div class="format-chip ${lineNudgeSpeed==='slow'?'active':''}" onclick="setLineNudgeSpeed('slow')">🐢 Slow</div>
+      <div class="format-chip ${lineNudgeSpeed==='fast'?'active':''}" onclick="setLineNudgeSpeed('fast')">🐇 Fast</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,44px);gap:6px;margin-top:10px;justify-content:center;">
       <div></div>
@@ -1855,6 +1994,8 @@ function renderLineNudgePanel(){
     </div>
     <button type="button" class="btn btn-ghost" style="margin-top:8px;" onclick="clearLineSelection()">✕ Selection સાફ કરો</button>
   `;
+  if(panelWrap) panelWrap.innerHTML = panelHtml;
+  if(panelWrap2) panelWrap2.innerHTML = panelHtml;
 }
 
 function selectStickerLine(i){
@@ -1870,10 +2011,7 @@ function clearLineSelection(){
 
 function setLineNudgeSpeed(speed){
   lineNudgeSpeed = speed;
-  const slowChip = document.getElementById('lineSpeedSlowChip');
-  const fastChip = document.getElementById('lineSpeedFastChip');
-  if(slowChip) slowChip.classList.toggle('active', speed==='slow');
-  if(fastChip) fastChip.classList.toggle('active', speed==='fast');
+  renderLineNudgePanel();
 }
 
 function nudgeSelectedLine(dx, dy){
@@ -2024,17 +2162,26 @@ function resetBarcodePosition(){
   renderStickerPreview();
 }
 
+function getSheetGrid(){
+  if(activeLabelCode && LABEL_SIZE_CHART[activeLabelCode]){
+    const s = LABEL_SIZE_CHART[activeLabelCode];
+    return {cols: s.cols, rows: s.rows};
+  }
+  // custom size — fall back to simple max-fit calculation
+  return {cols: Math.floor(210 / stickerWidthMM), rows: Math.floor(297 / stickerHeightMM)};
+}
+
 function updateA4SheetCount(){
   const el = document.getElementById('a4SheetCount');
   if(!el) return;
-  const cols = Math.floor(210 / stickerWidthMM);
-  const rows = Math.floor(297 / stickerHeightMM);
+  const {cols, rows} = getSheetGrid();
   el.textContent = (cols>=1 && rows>=1) ? (cols*rows) : '0 (size બહુ મોટું)';
 }
 
 function applyLabelCode(code){
   const size = LABEL_SIZE_CHART[code];
   if(!size) return;
+  activeLabelCode = code;
   stickerWidthMM = size.w;
   stickerHeightMM = size.h;
   const wInput = document.getElementById('stickerWidthInput');
@@ -2301,8 +2448,7 @@ function printCurrentSticker(){
 
 function printFullA4Sheet(){
   const box = document.getElementById('stickerPreviewBox');
-  const cols = Math.floor(210 / stickerWidthMM);
-  const rows = Math.floor(297 / stickerHeightMM);
+  const {cols, rows} = getSheetGrid();
   if(cols < 1 || rows < 1){
     showToast('⚠️ Size બહુ મોટું છે — A4 sheet પર 1 પણ label ફિટ નથી થતું');
     return;
