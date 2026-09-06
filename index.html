@@ -1915,6 +1915,9 @@ function openStickerEditor(){
       <div class="action-row" style="margin-top:18px;">
         <button class="btn btn-ghost" id="saveStickerBtn" style="flex:1;">💾 Save</button>
       </div>
+      <label class="field-label" style="margin-top:16px;display:block;">Paper Margin (mm) — sheet ની ધારથી</label>
+      <input type="number" class="form-input" id="printMarginInput" value="0" min="0" max="30">
+
       <button class="btn btn-ghost" id="openMixPrintBtn" style="margin-top:10px;border-color:var(--accent);color:var(--accent);">🧩 Mix Print — Block પર અલગ Sticker મૂકો</button>
     </div>
   `;
@@ -1968,8 +1971,8 @@ function openStickerEditor(){
     renderStickerPreview();
   });
 
-  document.getElementById('stickerWidthInput').addEventListener('input', e=>{ stickerWidthMM = Number(e.target.value)||70; activeLabelCode = null; renderStickerPreview(); });
-  document.getElementById('stickerHeightInput').addEventListener('input', e=>{ stickerHeightMM = Number(e.target.value)||45; activeLabelCode = null; renderStickerPreview(); });
+  document.getElementById('stickerWidthInput').addEventListener('input', e=>{ stickerWidthMM = Number(e.target.value)||70; activeLabelCode = null; renderStickerPreview(); updateA4SheetCount(); });
+  document.getElementById('stickerHeightInput').addEventListener('input', e=>{ stickerHeightMM = Number(e.target.value)||45; activeLabelCode = null; renderStickerPreview(); updateA4SheetCount(); });
 
   const addLineBtn = document.getElementById('addStickerLineBtn');
   if(addLineBtn) addLineBtn.addEventListener('click', ()=>{
@@ -1985,6 +1988,7 @@ function openStickerEditor(){
     renderMixStickerPickChips();
     renderMixBlockGrid();
   });
+  updateA4SheetCount();
 }
 
 function renderStickerLines(){
@@ -2254,6 +2258,22 @@ function resetBarcodePosition(){
   renderStickerPreview();
 }
 
+function getSheetGrid(){
+  if(activeLabelCode && LABEL_SIZE_CHART[activeLabelCode]){
+    const s = LABEL_SIZE_CHART[activeLabelCode];
+    return {cols: s.cols, rows: s.rows};
+  }
+  // custom size — fall back to simple max-fit calculation
+  return {cols: Math.floor(210 / stickerWidthMM), rows: Math.floor(297 / stickerHeightMM)};
+}
+
+function updateA4SheetCount(){
+  const el = document.getElementById('a4SheetCount');
+  if(!el) return;
+  const {cols, rows} = getSheetGrid();
+  el.textContent = (cols>=1 && rows>=1) ? (cols*rows) : '0 (size બહુ મોટું)';
+}
+
 function applyLabelCode(code){
   const size = LABEL_SIZE_CHART[code];
   if(!size) return;
@@ -2265,6 +2285,7 @@ function applyLabelCode(code){
   if(wInput) wInput.value = stickerWidthMM;
   if(hInput) hInput.value = stickerHeightMM;
   renderStickerPreview();
+  updateA4SheetCount();
   showToast(`✓ ${code} — ${size.w} x ${size.h} mm set થયું`);
 }
 
@@ -2513,6 +2534,19 @@ function saveCurrentSticker(){
   renderStickerSavedList();
 }
 
+function printCurrentSticker(){
+  const box = document.getElementById('stickerPreviewBox');
+  let printArea = document.getElementById('printableSticker');
+  if(!printArea){
+    printArea = document.createElement('div');
+    printArea.id = 'printableSticker';
+    document.body.appendChild(printArea);
+  }
+  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;background:#fff;width:${stickerWidthMM}mm;height:${stickerHeightMM}mm;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:1mm;padding:2mm;box-sizing:border-box;color:#111;font-family:'IBM Plex Mono',monospace;`;
+  printArea.innerHTML = box.innerHTML;
+  window.print();
+}
+
 /* ============ MIX PRINT (block-by-block, different sticker per block) ============ */
 let mixActiveCode = '21L';
 let mixSelectedPalette = new Set(); // multi-select palette of stickers
@@ -2693,6 +2727,37 @@ function renderSavedStickerHtml(stickerData, uniqueSuffix){
     </div>`;
   }
   return {html, qrId, barcodeId, pn};
+}
+
+function printFullA4Sheet(){
+  const box = document.getElementById('stickerPreviewBox');
+  const {cols, rows} = getSheetGrid();
+  if(cols < 1 || rows < 1){
+    showToast('⚠️ Size બહુ મોટું છે — A4 sheet પર 1 પણ label ફિટ નથી થતું');
+    return;
+  }
+  const total = cols * rows;
+  const marginInput = document.getElementById('printMarginInput');
+  const marginMM = marginInput ? (Number(marginInput.value) || 0) : 0;
+
+  let printArea = document.getElementById('printableSticker');
+  if(!printArea){
+    printArea = document.createElement('div');
+    printArea.id = 'printableSticker';
+    document.body.appendChild(printArea);
+  }
+  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${cols*stickerWidthMM + marginMM*2}mm;height:${rows*stickerHeightMM + marginMM*2}mm;
+    display:grid;grid-template-columns:repeat(${cols}, ${stickerWidthMM}mm);grid-template-rows:repeat(${rows}, ${stickerHeightMM}mm);
+    gap:0;background:#fff;padding:${marginMM}mm;box-sizing:border-box;`;
+
+  const cellContent = box.innerHTML; // already-rendered barcode/QR graphics get reused visually in each repeated cell
+  let html = '';
+  for(let i=0;i<total;i++){
+    html += `<div style="width:${stickerWidthMM}mm;height:${stickerHeightMM}mm;overflow:hidden;box-sizing:border-box;">${cellContent}</div>`;
+  }
+  printArea.innerHTML = html;
+  showToast(`🖨️ ${total} labels (${cols}×${rows}) — A4 sheet તૈયાર`);
+  window.print();
 }
 
 function getAllSavedStickers(){
