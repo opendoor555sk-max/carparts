@@ -369,6 +369,13 @@
         <div class="screen-sub">સાફ sticker → edit → print</div>
       </div>
     </div>
+    <div class="topbar-row hidden" id="topbarLabelPrint">
+      <button class="back-btn" id="backFromLabelPrint">‹</button>
+      <div class="title-block">
+        <div class="screen-title">Sticker Sheet Print</div>
+        <div class="screen-sub">A4 label sheets — anti-wastage</div>
+      </div>
+    </div>
     <div class="topbar-row hidden" id="topbarReports">
       <button class="back-btn" id="backFromReports">‹</button>
       <div class="title-block">
@@ -437,6 +444,13 @@
             <div class="module-desc">સાફ sticker બનાવો → edit → print</div>
           </div>
         </div>
+        <div class="module-card wide" id="openLabelPrint">
+          <div class="module-icon multi">🖨️</div>
+          <div>
+            <div class="module-name">LABEL PRINT (Emergent style)</div>
+            <div class="module-desc">Part Number + Line1 + Line2 → A4 sheet print</div>
+          </div>
+        </div>
         <div class="module-card wide" id="openReports">
           <div class="module-icon multi">📊</div>
           <div>
@@ -449,7 +463,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 23:00 IST — direct-dom-idx-fix</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 23:45 IST — emergent-labelprint-added</span>
       </div>
     </div>
 
@@ -706,6 +720,65 @@
       <div id="stickerSavedList" style="margin-top:14px;"></div>
 
       <div id="stickerEditorZone"></div>
+    </div>
+
+    <!-- LABEL PRINT VIEW (Emergent-style, exact copy of labels.tsx) -->
+    <div id="view-labelprint" class="hidden">
+      <div class="search-hero">
+        <h1>Sticker Sheet Print</h1>
+        <p>A4 label sheets — anti-wastage. Part Number + 2 lines → pick sheet size → tap blocks to print on.</p>
+      </div>
+
+      <div class="scan-plate">
+        <label class="field-label">LABEL CONTENT</label>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <input type="text" class="form-input" id="lblPartNumber" placeholder="Part Number" style="flex:1;margin-top:0;text-transform:uppercase;">
+          <button class="btn btn-primary" id="lblScanBtn" style="width:auto;padding:0 16px;">📷 Scan</button>
+        </div>
+        <input type="text" class="form-input" id="lblLine1" placeholder="Line 1 (company / store)" style="margin-top:8px;">
+        <input type="text" class="form-input" id="lblLine2" placeholder="Line 2 (name / note) — optional" style="margin-top:8px;">
+
+        <label class="field-label" style="margin-top:16px;">CODE</label>
+        <div class="format-chips" id="lblCodeChips" style="margin-top:8px;"></div>
+
+        <div id="lblPreviewBox" style="background:#fff;border-radius:8px;padding:14px;margin-top:14px;display:flex;align-items:center;justify-content:center;min-height:90px;"></div>
+      </div>
+
+      <div class="scan-plate" style="margin-top:14px;">
+        <label class="field-label">A4 SHEET LAYOUT</label>
+        <div class="format-chips" id="lblLayoutChips" style="margin-top:8px;"></div>
+        <div class="hint" id="lblLayoutInfo" style="margin-top:6px;"></div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;">
+          <label class="field-label" style="margin:0;">TAP BLOCKS TO PRINT (<span id="lblSelectedCount">0</span> selected)</label>
+          <div style="display:flex;gap:6px;">
+            <button type="button" class="btn btn-ghost" id="lblSelectAllBtn" style="width:auto;padding:6px 12px;">All</button>
+            <button type="button" class="btn btn-ghost" id="lblClearAllBtn" style="width:auto;padding:6px 12px;">Clear</button>
+          </div>
+        </div>
+        <div id="lblGrid" style="display:grid;gap:3px;background:#000;padding:6px;border-radius:8px;margin-top:10px;max-width:280px;"></div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
+          <span class="field-label" style="margin:0;">Show cut guide lines</span>
+          <input type="checkbox" id="lblShowBorder" checked style="width:22px;height:22px;">
+        </div>
+
+        <label class="field-label" style="margin-top:16px;">PAPER MARGIN (mm) — blank = auto</label>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <input type="number" class="form-input" id="lblMarginTop" placeholder="Top" style="margin-top:0;">
+          <input type="number" class="form-input" id="lblMarginLeft" placeholder="Left" style="margin-top:0;">
+          <button type="button" class="btn btn-ghost" id="lblMarginZeroBtn" style="width:auto;padding:0 14px;">0 / 0</button>
+        </div>
+
+        <label class="field-label" style="margin-top:16px;">PAGE MARGIN (mm) — 0 = edge-to-edge</label>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <input type="number" class="form-input" id="lblPageMargin" placeholder="0" value="0" style="margin-top:0;">
+          <button type="button" class="btn btn-ghost" id="lblPageMarginZeroBtn" style="width:auto;padding:0 14px;">Set 0</button>
+        </div>
+        <div class="hint" style="margin-top:6px;">Print dialog માં Margins = None અને Scale = 100% પસંદ કરો, ચોક્કસ edge-to-edge માટે.</div>
+
+        <button class="btn btn-primary" id="lblPrintBtn" style="margin-top:16px;">🖨️ Print A4 Sheet</button>
+      </div>
     </div>
 
     <!-- REPORTS VIEW -->
@@ -1175,6 +1248,9 @@ async function openCameraScan(targetInputId){
           if(scanTargetInputId === 'invFilterInput'){
             renderInventoryList(input.value.trim());
           }
+          if(scanTargetInputId === 'lblPartNumber'){
+            renderLblPreview();
+          }
         }
       }
     }catch(e){ /* detection frame skip, ignore */ }
@@ -1519,6 +1595,22 @@ document.getElementById('backFromSticker').addEventListener('click', ()=>{
   document.getElementById('view-sticker').classList.add('hidden');
   document.getElementById('view-home').classList.remove('hidden');
   document.getElementById('topbarSticker').classList.add('hidden');
+  document.getElementById('topbarHome').classList.remove('hidden');
+});
+
+document.getElementById('openLabelPrint').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-labelprint').classList.remove('hidden');
+  document.getElementById('topbarHome').classList.add('hidden');
+  document.getElementById('topbarLabelPrint').classList.remove('hidden');
+  initLabelPrintScreen();
+});
+document.getElementById('backFromLabelPrint').addEventListener('click', ()=>{
+  stopAllCameraStreams();
+  document.getElementById('view-labelprint').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  document.getElementById('topbarLabelPrint').classList.add('hidden');
   document.getElementById('topbarHome').classList.remove('hidden');
 });
 
@@ -3648,6 +3740,178 @@ function showToast(msg){
   document.body.appendChild(t);
   setTimeout(()=>t.remove(), 2500);
 }
+
+/* ============ LABEL PRINT (Emergent-style, exact copy of labels.tsx) ============ */
+const LBL_CODE_OPTS = [
+  {key:'barcode', label:'Barcode'},
+  {key:'qr', label:'QR Code'},
+  {key:'both', label:'Both'},
+  {key:'none', label:'Text only'}
+];
+let lblCodeType = 'both';
+let lblLayoutCode = '24L';
+let lblSelectedCells = new Set();
+
+function initLabelPrintScreen(){
+  document.getElementById('lblPartNumber').value = '';
+  document.getElementById('lblLine1').value = '';
+  document.getElementById('lblLine2').value = '';
+  lblCodeType = 'both';
+  lblLayoutCode = '24L';
+  lblSelectedCells = new Set();
+  renderLblCodeChips();
+  renderLblLayoutChips();
+  renderLblGrid();
+  renderLblPreview();
+}
+
+function renderLblCodeChips(){
+  const wrap = document.getElementById('lblCodeChips');
+  wrap.innerHTML = LBL_CODE_OPTS.map(c=>
+    `<div class="format-chip ${lblCodeType===c.key?'active':''}" data-code="${c.key}">${c.label}</div>`
+  ).join('');
+  wrap.querySelectorAll('[data-code]').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      lblCodeType = chip.dataset.code;
+      renderLblCodeChips();
+      renderLblPreview();
+    });
+  });
+}
+
+function renderLblPreview(){
+  const box = document.getElementById('lblPreviewBox');
+  const pn = document.getElementById('lblPartNumber').value.trim() || 'PART-0000';
+  box.innerHTML = '';
+  if(lblCodeType === 'none'){ box.innerHTML = `<div style="color:#111;font-weight:700;">${pn}</div>`; return; }
+  if(lblCodeType === 'qr'){
+    const holder = document.createElement('div');
+    box.appendChild(holder);
+    try{ new QRCode(holder, {text:pn, width:90, height:90, colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){}
+    return;
+  }
+  // barcode or both
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  box.appendChild(svg);
+  try{ JsBarcode(svg, pn, {format:"CODE128", displayValue:(lblCodeType==='barcode'), height:60, width:2, margin:4}); }catch(e){}
+}
+
+function renderLblLayoutChips(){
+  const wrap = document.getElementById('lblLayoutChips');
+  wrap.innerHTML = Object.keys(LABEL_SIZE_CHART).map(code=>
+    `<div class="format-chip ${code===lblLayoutCode?'active':''}" data-layout="${code}">${code} (${LABEL_SIZE_CHART[code].count})</div>`
+  ).join('');
+  wrap.querySelectorAll('[data-layout]').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      lblLayoutCode = chip.dataset.layout;
+      lblSelectedCells = new Set();
+      renderLblLayoutChips();
+      renderLblGrid();
+    });
+  });
+  const size = LABEL_SIZE_CHART[lblLayoutCode];
+  document.getElementById('lblLayoutInfo').textContent = `${size.count} labels • ${size.w} × ${size.h} mm • ${size.rows} rows × ${size.cols} cols`;
+}
+
+function renderLblGrid(){
+  const size = LABEL_SIZE_CHART[lblLayoutCode];
+  const grid = document.getElementById('lblGrid');
+  grid.style.gridTemplateColumns = `repeat(${size.cols}, 1fr)`;
+  grid.style.gridTemplateRows = `repeat(${size.rows}, 1fr)`;
+  grid.innerHTML = '';
+  for(let i=1;i<=size.count;i++){
+    const filled = lblSelectedCells.has(i);
+    const div = document.createElement('div');
+    div.style.cssText = `aspect-ratio:${size.w}/${size.h};background:${filled?'#ff9500':'#333'};color:${filled?'#000':'#999'};
+      border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer;`;
+    div.textContent = i;
+    div.addEventListener('click', ()=>{
+      if(lblSelectedCells.has(i)) lblSelectedCells.delete(i); else lblSelectedCells.add(i);
+      renderLblGrid();
+    });
+    grid.appendChild(div);
+  }
+  document.getElementById('lblSelectedCount').textContent = lblSelectedCells.size;
+}
+
+document.getElementById('lblPartNumber').addEventListener('input', renderLblPreview);
+document.getElementById('lblSelectAllBtn').addEventListener('click', ()=>{
+  const size = LABEL_SIZE_CHART[lblLayoutCode];
+  lblSelectedCells = new Set(Array.from({length:size.count}, (_,i)=>i+1));
+  renderLblGrid();
+});
+document.getElementById('lblClearAllBtn').addEventListener('click', ()=>{
+  lblSelectedCells = new Set();
+  renderLblGrid();
+});
+document.getElementById('lblMarginZeroBtn').addEventListener('click', ()=>{
+  document.getElementById('lblMarginTop').value = '0';
+  document.getElementById('lblMarginLeft').value = '0';
+});
+document.getElementById('lblPageMarginZeroBtn').addEventListener('click', ()=>{
+  document.getElementById('lblPageMargin').value = '0';
+});
+
+document.getElementById('lblScanBtn').addEventListener('click', ()=>{
+  openCameraScan('lblPartNumber');
+});
+
+document.getElementById('lblPrintBtn').addEventListener('click', ()=>{
+  const pn = document.getElementById('lblPartNumber').value.trim().toUpperCase();
+  const line1 = document.getElementById('lblLine1').value.trim();
+  const line2 = document.getElementById('lblLine2').value.trim();
+  if(!pn && lblCodeType !== 'none'){ showToast('⚠️ Part Number નાખો'); return; }
+  if(lblSelectedCells.size === 0){ showToast('⚠️ Print કરવા blocks પસંદ કરો'); return; }
+
+  const size = LABEL_SIZE_CHART[lblLayoutCode];
+  const marginTop = document.getElementById('lblMarginTop').value.trim();
+  const marginLeft = document.getElementById('lblMarginLeft').value.trim();
+  const pageMargin = Number(document.getElementById('lblPageMargin').value) || 0;
+  const showBorder = document.getElementById('lblShowBorder').checked;
+
+  let printArea = document.getElementById('printableSticker');
+  if(!printArea){
+    printArea = document.createElement('div');
+    printArea.id = 'printableSticker';
+    document.body.appendChild(printArea);
+  }
+  printArea.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${size.cols*size.w}mm;height:${size.rows*size.h}mm;
+    display:grid;grid-template-columns:repeat(${size.cols}, ${size.w}mm);grid-template-rows:repeat(${size.rows}, ${size.h}mm);
+    gap:0;background:#fff;padding:${pageMargin}mm;box-sizing:border-box;`;
+
+  let html = '';
+  const renderJobs = [];
+  for(let i=1;i<=size.count;i++){
+    const cellStyle = `width:${size.w}mm;height:${size.h}mm;overflow:hidden;box-sizing:border-box;${showBorder?'border:0.3px dashed #ccc;':''}
+      display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;color:#000;font-family:Arial,sans-serif;
+      ${marginTop?`padding-top:${marginTop}mm;`:''}${marginLeft?`padding-left:${marginLeft}mm;`:''}`;
+    if(!lblSelectedCells.has(i)){ html += `<div style="${cellStyle}"></div>`; continue; }
+    const qrId = 'lblQr_'+i, barcodeId = 'lblBarcode_'+i;
+    let codeHtml = '';
+    if(lblCodeType === 'qr') codeHtml = `<div id="${qrId}"></div>`;
+    else if(lblCodeType !== 'none') codeHtml = `<svg id="${barcodeId}"></svg>`;
+    html += `<div style="${cellStyle}">
+      ${line1?`<div style="font-size:8px;font-weight:700;">${line1}</div>`:''}
+      ${codeHtml}
+      ${lblCodeType==='none'||lblCodeType==='qr'?`<div style="font-size:8px;font-weight:700;margin-top:2px;">${pn}</div>`:''}
+      ${line2?`<div style="font-size:7px;">${line2}</div>`:''}
+    </div>`;
+    renderJobs.push({i, qrId, barcodeId});
+  }
+  printArea.innerHTML = html;
+  renderJobs.forEach(job=>{
+    if(lblCodeType === 'qr'){
+      const holder = document.getElementById(job.qrId);
+      if(holder){ try{ new QRCode(holder, {text:pn, width:Math.min(holder.parentElement.offsetWidth*0.6,60), height:Math.min(holder.parentElement.offsetWidth*0.6,60), colorDark:"#000000", colorLight:"#ffffff"}); }catch(e){} }
+    } else if(lblCodeType !== 'none'){
+      const svg = document.getElementById(job.barcodeId);
+      if(svg){ try{ JsBarcode('#'+job.barcodeId, pn, {format:"CODE128", displayValue:(lblCodeType==='barcode'), height:30, width:1.4, margin:1}); }catch(e){} }
+    }
+  });
+
+  showToast(`🖨️ ${lblSelectedCells.size} label(s) printing...`);
+  window.print();
+});
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
