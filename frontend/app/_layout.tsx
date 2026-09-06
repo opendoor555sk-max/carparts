@@ -12,9 +12,9 @@ import { ToastProvider } from "@/src/context/ToastContext";
 import { LocationGate } from "@/src/components/LocationGate";
 import { colors } from "@/src/theme";
 
-// Disable logbox errors etc so that users can see the app
-// and agent works as expected.
-LogBox.ignoreAllLogs(true);
+// TEMP: LogBox suppression disabled while debugging the post-login 404 —
+// re-enable (LogBox.ignoreAllLogs(true)) once resolved.
+// LogBox.ignoreAllLogs(true);
 
 // Keep the native splash visible from cold start until icon fonts register.
 // Required because @expo/vector-icons' componentDidMount fallback fires
