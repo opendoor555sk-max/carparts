@@ -449,7 +449,7 @@
       <div class="footer-note">
         અત્યારે ફક્ત SEARCH કામ કરે છે — Part number → Vehicle fitment lookup.<br>
         Buy/Sell/Requirement આગલા સ્ટેપમાં ઉમેરાશે.<br>
-        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 22:30 IST — proven-pattern-direct-bind</span>
+        <span style="color:var(--accent);font-family:var(--font-mono);">2026-09-05 23:00 IST — direct-dom-idx-fix</span>
       </div>
     </div>
 
@@ -2121,13 +2121,18 @@ function setLineNudgeSpeed(speed){
 function nudgeSelectedLine(dx, dy){
   if(selectedLineIndices.size === 0){ showToast('⚠️ પહેલા કોઈ line select કરો (☐ ટેપ કરીને)'); return; }
   const step = lineNudgeSpeed === 'fast' ? 8 : 1;
+  let anyDirectUpdateFailed = false;
   selectedLineIndices.forEach(idx=>{
     const line = stickerLines[idx];
     if(!line) return;
     line.offsetX = (line.offsetX || 0) + dx * step;
     line.offsetY = (line.offsetY || 0) + dy * step;
+    // try direct DOM update first (matches proven-working demo pattern exactly — no full re-render needed)
+    const el = document.querySelector(`#stickerPreviewBox [data-line-idx="${idx}"]`);
+    if(el){ el.style.transform = `translate(${line.offsetX}px,${line.offsetY}px)`; }
+    else{ anyDirectUpdateFailed = true; }
   });
-  renderStickerPreview(); // preview only — form stays frozen/stable while nudging
+  if(anyDirectUpdateFailed) renderStickerPreview(); // fallback for formats without data-line-idx yet
 }
 
 function resetSelectedLinePosition(){
@@ -2357,23 +2362,23 @@ function renderMobaseTemplate(box, pn){
   box.innerHTML = `
     <div class="mb-label">
       <div class="mb-el logo-box" style="left:2.5%;top:7.5%;width:30%;height:14%;transform:translate(${stickerLogoOffsetX}px,${stickerLogoOffsetY}px);">${logoHtml}</div>
-      ${brandLines.map((l,i)=>`<div class="mb-el mb-brand-text" style="left:2.5%;top:${20.5+i*brandGap}%;width:60%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
+      ${brandLines.map((l,i)=>`<div class="mb-el mb-brand-text" data-line-idx="${stickerLines.indexOf(l)}" style="left:2.5%;top:${20.5+i*brandGap}%;width:60%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
       <div class="mb-el mb-ce-mark" style="left:3.5%;top:${20.5+brandLines.length*brandGap+3}%;width:12%;">CE</div>
 
       <div class="mb-el mb-top-mid" style="left:42%;top:8%;width:38%;">
-        ${unitBlock.map((l,i)=>`<span style="display:inline-block;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${i===1 ? `<b>${l.text}</b>` : l.text}</span><br>`).join('')}
+        ${unitBlock.map((l,i)=>`<span data-line-idx="${stickerLines.indexOf(l)}" style="display:inline-block;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${i===1 ? `<b>${l.text}</b>` : l.text}</span><br>`).join('')}
       </div>
 
       <div class="mb-el mb-pb-mark" style="left:84.5%;top:7%;width:10.5%;height:15%;">Pb</div>
 
-      ${certBlock.map((l,i)=>`<div class="mb-el mb-row-text" style="left:3.75%;top:${44+i*certGap}%;width:60%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
+      ${certBlock.map((l,i)=>`<div class="mb-el mb-row-text" data-line-idx="${stickerLines.indexOf(l)}" style="left:3.75%;top:${44+i*certGap}%;width:60%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
 
       <div class="mb-el" style="left:65.8%;top:55.5%;width:24%;height:33%;"><div class="mb-qr-host" id="stickerQrHolder"></div></div>
 
-      ${bottomLeftLines.map((l,i)=>`<div class="mb-el mb-row-text" style="left:3.75%;top:${75+i*bottomLeftGap}%;width:48%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
+      ${bottomLeftLines.map((l,i)=>`<div class="mb-el mb-row-text" data-line-idx="${stickerLines.indexOf(l)}" style="left:3.75%;top:${75+i*bottomLeftGap}%;width:48%;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);${l.fontSize?`font-size:${l.fontSize}px;`:''}">${l.text}</div>`).join('')}
 
-      <div class="mb-el mb-tu11" style="left:54%;top:85%;width:20%;transform:translate(${(tu11Line&&tu11Line.offsetX)||0}px,${(tu11Line&&tu11Line.offsetY)||0}px);${tu11Line&&tu11Line.fontSize?`font-size:${tu11Line.fontSize}px;`:''}">${tu11Line?tu11Line.text:'TU11'}</div>
-      ${footerLine ? `<div class="mb-el mb-footer" style="left:2%;top:91.5%;width:96%;transform:translate(${footerLine.offsetX||0}px,${footerLine.offsetY||0}px);${footerLine.fontSize?`font-size:${footerLine.fontSize}px;`:''}">${footerLine.text}</div>` : ''}
+      <div class="mb-el mb-tu11" data-line-idx="${tu11Line ? stickerLines.indexOf(tu11Line) : -1}" style="left:54%;top:85%;width:20%;transform:translate(${(tu11Line&&tu11Line.offsetX)||0}px,${(tu11Line&&tu11Line.offsetY)||0}px);${tu11Line&&tu11Line.fontSize?`font-size:${tu11Line.fontSize}px;`:''}">${tu11Line?tu11Line.text:'TU11'}</div>
+      ${footerLine ? `<div class="mb-el mb-footer" data-line-idx="${stickerLines.indexOf(footerLine)}" style="left:2%;top:91.5%;width:96%;transform:translate(${footerLine.offsetX||0}px,${footerLine.offsetY||0}px);${footerLine.fontSize?`font-size:${footerLine.fontSize}px;`:''}">${footerLine.text}</div>` : ''}
     </div>
   `;
   const qrHolder = document.getElementById('stickerQrHolder');
@@ -2502,7 +2507,7 @@ function renderGenericGridTemplate(box, pn){
   const linesHtml = stickerLines.map((l,i)=>{
     const defaultTopPct = 6 + i * Math.min(8, 78/Math.max(1,lineCount));
     const fs = l.fontSize || autoFontSize;
-    return `<div class="st-line" style="position:absolute;left:8%;top:${defaultTopPct}%;width:60%;font-size:${fs}px;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${l.text||''}</div>`;
+    return `<div class="st-line" data-line-idx="${i}" style="position:absolute;left:8%;top:${defaultTopPct}%;width:60%;font-size:${fs}px;transform:translate(${l.offsetX||0}px,${l.offsetY||0}px);">${l.text||''}</div>`;
   }).join('');
 
   const logoHtml = stickerLogoDataUrl
