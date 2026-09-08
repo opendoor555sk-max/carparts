@@ -125,6 +125,12 @@ export default function ScanSticker() {
   const [company, setCompany] = useState("Hyundai / Kia");
   const [rawLines, setRawLines] = useState<{ text: string; bold?: boolean }[]>([]);
   const [manualPn, setManualPn] = useState("");
+  // Named, reusable layout templates (POST/GET /company-formats — "company" doubles
+  // as the free-text format name). Distinct from the per-company auto-format below:
+  // these are picked explicitly and applied by line ORDER, not field-key matching.
+  const [formats, setFormats] = useState<any[]>([]);
+  const [formatName, setFormatName] = useState("");
+  const [pendingFormatId, setPendingFormatId] = useState<string | null>(null);
   const [selLines, setSelLines] = useState<Set<number>>(new Set());
   const [nudgeStep, setNudgeStep] = useState(2);
   const [companyFormats, setCompanyFormats] = useState<Record<string, any>>({});
@@ -138,6 +144,7 @@ export default function ScanSticker() {
       const map: Record<string, any> = {};
       fmts.forEach((f) => { map[f.company] = f.template; });
       setCompanyFormats(map);
+      setFormats(fmts);
     } catch {}
   }, []);
   useEffect(() => { loadSaved(); }, [loadSaved]);
@@ -171,6 +178,61 @@ export default function ScanSticker() {
       : tplIn.code;
     return { ...tplIn, lines, code };
   };
+
+  // ---- Named formats: exact positions applied by line ORDER (no auto-layout, no field-key matching) ----
+  const saveNamedFormat = async () => {
+    if (!tpl) return;
+    const name = formatName.trim();
+    if (!name) return show("Enter a format name", "error");
+    try {
+      const template = {
+        lines: tpl.lines.map((l) => ({ text: l.text, x: l.x, y: l.y, size: l.size, bold: l.bold })),
+        code: tpl.code ? { type: tpl.code.type, sizeMm: tpl.code.sizeMm ?? codeSize, box: tpl.code.box } : null,
+        logo: tpl.logo ? { box: tpl.logo.box } : null,
+      };
+      await api.post("/company-formats", { company: name, template });
+      show(`Saved format "${name}"`, "success");
+      setFormatName("");
+      loadSaved();
+    } catch (e: any) { show(e?.message || "Save failed", "error"); }
+  };
+
+  // Rebuild the template from a saved format's exact positions/sizes, matching the
+  // format's saved lines to the (new) scanned lines strictly by index — line 1 of the
+  // format goes to line 1 of the scan, etc. Extra scanned lines beyond the saved count
+  // fall back to a simple stacked position so nothing is silently dropped.
+  const buildTplFromFormat = (rl: { text: string; bold?: boolean }[], fmt: any, aspect: number, hasCode: boolean, pn: string, comp: string) => {
+    const fmtLines: TplLine[] = fmt?.template?.lines || [];
+    const lines: TplLine[] = rl.map((l, i) => {
+      const s = fmtLines[i];
+      return s
+        ? { text: l.text, x: s.x, y: s.y, size: s.size, bold: s.bold ?? l.bold }
+        : { text: l.text, x: 3, y: Math.min(96, 88 + i * 3), size: 4, bold: l.bold };
+    });
+    const fc = fmt?.template?.code;
+    const code = hasCode
+      ? { type: (fc?.type as CodeType) || "qr", value: pn, box: fc?.box || codeBox(aspect, comp), sizeMm: fc?.sizeMm ?? codeSize }
+      : null;
+    setTpl((prev) => {
+      const logo = fc && fmt?.template?.logo?.box && prev?.logo ? { ...prev.logo, box: fmt.template.logo.box } : (prev?.logo ?? null);
+      return { aspect, lines, code, logo, company: comp };
+    });
+    if (fc?.type) setCodeType(fc.type as CodeType);
+    if (fc?.sizeMm) setCodeSize(fc.sizeMm);
+  };
+
+  // Apply a saved format now (already have scanned lines) or queue it for the next scan.
+  const loadFormat = (f: any) => {
+    if (tpl && rawLines.length) {
+      buildTplFromFormat(rawLines, f, tpl.aspect, !!tpl.code, partNumber, company);
+      setPendingFormatId(null);
+      show(`Applied "${f.company}" format`, "success");
+    } else {
+      setPendingFormatId(f.id);
+      show(`"${f.company}" will apply to your next scan`, "info");
+    }
+  };
+  const cancelPendingFormat = () => setPendingFormatId(null);
 
   const LOGO_START: Box = { x: 3, y: 2, w: 34, h: 15 };
 
@@ -251,18 +313,32 @@ export default function ScanSticker() {
       if (FORMATTED_COMPANIES.includes(comp)) ct = "datamatrix";
       setRawLines(rl);
       setCompany(comp);
-      buildTpl(rl, aspect, hasCode, ct, pn, null, comp, codeSize);
-      // If the user saved a format for this company, re-apply their arrangement.
-      const fmt = companyFormats[comp];
-      if (fmt) {
-        if (fmt.code?.type) ct = fmt.code.type;
-        if (fmt.code?.sizeMm) setCodeSize(fmt.code.sizeMm);
-        setTpl((prev) => (prev ? applyCompanyFormat(prev, fmt) : prev));
+
+      const pendingFmt = pendingFormatId ? formats.find((f) => f.id === pendingFormatId) : null;
+      if (pendingFmt) {
+        // A named format was explicitly picked before this scan — apply it by line
+        // order and skip both the auto-layout algorithm and the company auto-format.
+        buildTplFromFormat(rl, pendingFmt, aspect, hasCode, pn, comp);
+        if (pendingFmt.template?.code?.type) ct = pendingFmt.template.code.type;
+        setPartNumber(pn);
+        setCodeType(ct);
+        setCellMap({});
+        setPendingFormatId(null);
+        show(`Sticker generated (format: ${pendingFmt.company})`, "success");
+      } else {
+        buildTpl(rl, aspect, hasCode, ct, pn, null, comp, codeSize);
+        // If the user saved a format for this company, re-apply their arrangement.
+        const fmt = companyFormats[comp];
+        if (fmt) {
+          if (fmt.code?.type) ct = fmt.code.type;
+          if (fmt.code?.sizeMm) setCodeSize(fmt.code.sizeMm);
+          setTpl((prev) => (prev ? applyCompanyFormat(prev, fmt) : prev));
+        }
+        setPartNumber(pn);
+        setCodeType(ct);
+        setCellMap({});
+        show(`Sticker generated${fmt ? ` (${comp} saved format)` : FORMATTED_COMPANIES.includes(comp) ? ` (${comp} format)` : ""}`, "success");
       }
-      setPartNumber(pn);
-      setCodeType(ct);
-      setCellMap({});
-      show(`Sticker generated${fmt ? ` (${comp} saved format)` : FORMATTED_COMPANIES.includes(comp) ? ` (${comp} format)` : ""}`, "success");
     } catch (e: any) {
       show(e?.message || "Scan failed", "error");
     } finally {
@@ -565,6 +641,33 @@ export default function ScanSticker() {
           </>
         ) : null}
 
+        {formats.length ? (
+          <>
+            <Text style={styles.section}>LOAD FORMAT (exact layout, matched by line order)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.savedRow}>
+              {formats.map((f) => (
+                <Pressable key={f.id} onPress={() => loadFormat(f)} style={[styles.savedCard, pendingFormatId === f.id && styles.savedCardActive]} testID={`format-${f.id}`}>
+                  <View style={styles.savedInner}>
+                    <Ionicons name="grid" size={20} color={colors.brand} />
+                    <Text numberOfLines={1} style={styles.savedName}>{f.company}</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </ScrollView>
+            {pendingFormatId ? (
+              <View style={styles.pendingBanner}>
+                <Ionicons name="time" size={16} color={colors.brand} />
+                <Text style={styles.pendingText}>
+                  Next scan uses &quot;{formats.find((f) => f.id === pendingFormatId)?.company}&quot; — scan now to apply it.
+                </Text>
+                <Pressable onPress={cancelPendingFormat} testID="format-cancel-pending">
+                  <Ionicons name="close-circle" size={18} color={colors.error} />
+                </Pressable>
+              </View>
+            ) : null}
+          </>
+        ) : null}
+
         {busy ? (
           <View style={styles.busy}><ActivityIndicator size="large" color={colors.brand} /><Text style={styles.dim}>Generating clean sticker… (a few seconds)</Text></View>
         ) : null}
@@ -697,6 +800,26 @@ export default function ScanSticker() {
               <Text style={styles.fmtText}>Save as {company} FORMAT{companyFormats[company] ? " (update)" : ""}</Text>
             </Pressable>
             <Text style={styles.dim}>Format = your arrangement (positions, code, logo). Next scan of {company} auto-uses it.</Text>
+
+            <Text style={styles.flabel}>SAVE AS A NAMED FORMAT (pick it later from LOAD FORMAT above)</Text>
+            <View style={styles.manualRow}>
+              <TextInput
+                style={styles.manualInput}
+                value={formatName}
+                onChangeText={setFormatName}
+                placeholder="e.g. Small Front Sticker"
+                placeholderTextColor={colors.onSurface3}
+                autoCorrect={false}
+                onSubmitEditing={saveNamedFormat}
+                returnKeyType="done"
+                testID="format-name-input"
+              />
+              <Pressable style={styles.manualBtn} onPress={saveNamedFormat} testID="save-as-format">
+                <Ionicons name="save" size={18} color={colors.onBrand} />
+                <Text style={styles.pickText}>Save</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.dim}>Saves exact line positions/sizes, code box and logo box. On a future scan, pick it from LOAD FORMAT to snap new text into this exact layout — no auto-layout.</Text>
 
             <Text style={styles.section}>PRINT — place any sticker on any block</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -835,6 +958,9 @@ const styles = StyleSheet.create({
   batchInfoRow: { marginTop: 2 },
   savedRow: { gap: spacing.md, paddingVertical: spacing.xs },
   savedCard: { width: 110 },
+  savedCardActive: { borderRadius: radius.sm, borderWidth: 2, borderColor: colors.brand },
+  pendingBanner: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.brandFaint, borderRadius: radius.sm, padding: spacing.sm },
+  pendingText: { flex: 1, color: colors.onSurface, fontSize: font.sm - 1, fontWeight: "700" },
   savedInner: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: spacing.md, alignItems: "center", gap: 4 },
   savedName: { color: colors.onSurface, fontSize: font.sm - 1, fontWeight: "700" },
   savedDel: { position: "absolute", top: -6, right: -6, backgroundColor: colors.surface, borderRadius: 10 },
