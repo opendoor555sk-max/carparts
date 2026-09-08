@@ -38,7 +38,7 @@ ACCESS_MINUTES = int(os.environ.get('ACCESS_MINUTES', '720'))
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.7-flash')
-GEMINI_VISION_MODEL = os.environ.get('GEMINI_VISION_MODEL', 'gemini-2.5-flash')
+GEMINI_VISION_MODEL = os.environ.get('GEMINI_VISION_MODEL', 'gemini-3.6-flash')
 GEMINI_GROUNDING = os.environ.get('GEMINI_GROUNDING', 'false').lower() == 'true'
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 TAVILY_API_KEY = os.environ.get('TAVILY_API_KEY')
