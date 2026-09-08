@@ -38,7 +38,9 @@ ACCESS_MINUTES = int(os.environ.get('ACCESS_MINUTES', '720'))
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.7-flash')
+GEMINI_VISION_MODEL = os.environ.get('GEMINI_VISION_MODEL', 'gemini-2.5-flash')
 GEMINI_GROUNDING = os.environ.get('GEMINI_GROUNDING', 'false').lower() == 'true'
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 TAVILY_API_KEY = os.environ.get('TAVILY_API_KEY')
 
 # ---------------- Object storage ----------------
@@ -1491,6 +1493,55 @@ def tavily_search(query: str) -> dict:
     return r.json()
 
 
+def _gemini_image_part(b64: str) -> dict:
+    """Wrap a raw base64 image payload as a Gemini `inlineData` content part,
+    guessing the MIME type from the (unpadded) base64 data header."""
+    head = b64[:12]
+    if head.startswith("iVBORw0KGgo"):
+        mime = "image/png"
+    elif head.startswith("/9j/"):
+        mime = "image/jpeg"
+    elif head.startswith("UklGR"):
+        mime = "image/webp"
+    elif head.startswith("R0lGOD"):
+        mime = "image/gif"
+    else:
+        mime = "image/jpeg"
+    return {"inlineData": {"mimeType": mime, "data": b64}}
+
+
+def _gemini_generate(parts: List[dict], *, system_text: Optional[str] = None,
+                      model: Optional[str] = None, timeout: int = 60,
+                      json_response: bool = True) -> str:
+    """Call the Gemini API directly over plain HTTP (no SDK) and return the
+    model's text output. Raises Exception with a friendly message on failure."""
+    if not GEMINI_API_KEY:
+        raise Exception("Gemini API key not configured")
+    url = f"{GEMINI_API_BASE}/{model or GEMINI_MODEL}:generateContent"
+    payload: Dict[str, Any] = {"contents": [{"parts": parts}]}
+    if system_text:
+        payload["systemInstruction"] = {"parts": [{"text": system_text}]}
+    if json_response:
+        payload["generationConfig"] = {"responseMimeType": "application/json"}
+    resp = requests.post(url, params={"key": GEMINI_API_KEY}, json=payload, timeout=timeout)
+    if resp.status_code != 200:
+        try:
+            err = resp.json().get("error", {}).get("message") or resp.text
+        except Exception:
+            err = resp.text
+        raise Exception(f"Gemini API error ({resp.status_code}): {str(err)[:300]}")
+    data = resp.json()
+    candidates = data.get("candidates") or []
+    if not candidates:
+        reason = (data.get("promptFeedback") or {}).get("blockReason")
+        raise Exception(f"Gemini returned no output{f' (blocked: {reason})' if reason else ''}")
+    out_parts = ((candidates[0].get("content") or {}).get("parts")) or []
+    text = "".join(p.get("text", "") for p in out_parts if "text" in p)
+    if not text:
+        raise Exception("Gemini returned an empty response")
+    return text
+
+
 async def run_gemini(part_number: str, company: str) -> dict:
     web_context = ""
     sources: List[str] = []
@@ -1519,12 +1570,12 @@ async def run_gemini(part_number: str, company: str) -> dict:
         f"vehicle(s), list ALL of them in compatible_vehicles. Return the strict JSON only (no markdown)."
     )
 
-    if not EMERGENT_LLM_KEY:
+    if not GEMINI_API_KEY:
         raise Exception("No AI provider available")
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"ai-{new_id()}",
-                   system_message=GEMINI_SYSTEM).with_model("gemini", "gemini-3-flash-preview")
-    text = await chat.send_message(UserMessage(text=prompt))
+    text = await run_in_threadpool(
+        _gemini_generate, [{"text": prompt}],
+        system_text=GEMINI_SYSTEM, model=GEMINI_MODEL, timeout=60,
+    )
     return {"text": text, "sources": sources, "grounded": bool(sources)}
 
 
@@ -1581,7 +1632,7 @@ async def ai_research(body: AiResearchIn, store_id: Optional[str] = None, user=D
         doc.pop("_id", None)
         return doc
 
-    if not (GEMINI_API_KEY or EMERGENT_LLM_KEY):
+    if not GEMINI_API_KEY:
         raise HTTPException(503, "AI key not configured")
     try:
         res = await run_gemini(pn, body.company or "All")
@@ -1908,7 +1959,7 @@ async def backup_excel(user=Depends(require_admin)):
     )
 
 
-# ---------------- AI Sticker Scanner (Gemini 3 Pro vision) ----------------
+# ---------------- AI Sticker Scanner (Gemini vision) ----------------
 class StickerScanReq(BaseModel):
     image_base64: str  # raw base64 (no data: prefix)
 
@@ -1930,25 +1981,22 @@ Rules:
 
 @api.post("/scan-sticker")
 async def scan_sticker(req: StickerScanReq, user=Depends(get_current_user)):
-    if not EMERGENT_LLM_KEY:
+    if not GEMINI_API_KEY:
         raise HTTPException(500, "AI key not configured")
     b64 = req.image_base64
     if "," in b64 and b64.strip().startswith("data:"):
         b64 = b64.split(",", 1)[1]
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"sticker-{uuid.uuid4().hex[:8]}",
-            system_message="You extract structured JSON from product label images. Output JSON only.",
-        ).with_model("openai", "gpt-4o-mini")
-        msg = UserMessage(text=STICKER_SCAN_PROMPT, file_contents=[ImageContent(image_base64=b64)])
-        raw = await chat.send_message(msg)
+        text = await run_in_threadpool(
+            _gemini_generate,
+            [{"text": STICKER_SCAN_PROMPT}, _gemini_image_part(b64)],
+            system_text="You extract structured JSON from product label images. Output JSON only.",
+            model=GEMINI_VISION_MODEL, timeout=60,
+        )
     except Exception as e:
         logger.exception("sticker scan failed")
         raise HTTPException(502, f"AI scan failed: {e}")
 
-    text = raw if isinstance(raw, str) else str(raw)
     # strip markdown fences if present
     t = text.strip()
     if t.startswith("```"):
