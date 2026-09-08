@@ -128,6 +128,11 @@ export default function ScanSticker() {
   const [selLines, setSelLines] = useState<Set<number>>(new Set());
   const [nudgeStep, setNudgeStep] = useState(2);
   const [companyFormats, setCompanyFormats] = useState<Record<string, any>>({});
+  const [savedFormats, setSavedFormats] = useState<any[]>([]);
+  // Explicit pick from the "Load Format" list. When set, it overrides the
+  // automatic per-company format match and is applied by line ORDER/INDEX
+  // (not by field-text matching) — see applyFormatByIndex below.
+  const [selectedFormatName, setSelectedFormatName] = useState<string | null>(null);
   const layout = useMemo(() => SHEET_LAYOUTS.find((l) => l.code === layoutCode)!, [layoutCode]);
 
   const loadSaved = useCallback(async () => {
@@ -135,6 +140,7 @@ export default function ScanSticker() {
     try { setLogos(await api.get<any[]>("/logos")); } catch {}
     try {
       const fmts = await api.get<any[]>("/company-formats");
+      setSavedFormats(fmts);
       const map: Record<string, any> = {};
       fmts.forEach((f) => { map[f.company] = f.template; });
       setCompanyFormats(map);
@@ -167,9 +173,28 @@ export default function ScanSticker() {
       return s ? { ...l, x: s.x, y: s.y, size: s.size, bold: s.bold } : l;
     });
     const code = tplIn.code && fmt.code
-      ? { ...tplIn.code, type: fmt.code.type || tplIn.code.type, sizeMm: fmt.code.sizeMm ?? tplIn.code.sizeMm, box: { ...tplIn.code.box, y: fmt.code.box?.y ?? tplIn.code.box.y } }
+      ? { ...tplIn.code, type: fmt.code.type || tplIn.code.type, sizeMm: fmt.code.sizeMm ?? tplIn.code.sizeMm, box: fmt.code.box ? { ...tplIn.code.box, ...fmt.code.box } : tplIn.code.box }
       : tplIn.code;
-    return { ...tplIn, lines, code };
+    const logo = tplIn.logo && fmt.logo?.box ? { ...tplIn.logo, box: { ...tplIn.logo.box, ...fmt.logo.box } } : tplIn.logo;
+    return { ...tplIn, lines, code, logo };
+  };
+
+  // Re-apply a saved format's arrangement by line ORDER (index) rather than by
+  // matching field text: line i always takes format.lines[i]'s exact
+  // x/y/size, whatever the text says. Used when the user explicitly picks a
+  // format from the "Load Format" list below, so a saved layout snaps onto
+  // new stickers exactly as before instead of re-running auto-layout.
+  const applyFormatByIndex = (tplIn: StickerTemplate, fmt: any): StickerTemplate => {
+    if (!fmt || !Array.isArray(fmt.lines)) return tplIn;
+    const lines = tplIn.lines.map((l, i) => {
+      const s = fmt.lines[i];
+      return s ? { ...l, x: s.x, y: s.y, size: s.size, bold: s.bold } : l;
+    });
+    const code = tplIn.code && fmt.code
+      ? { ...tplIn.code, type: fmt.code.type || tplIn.code.type, sizeMm: fmt.code.sizeMm ?? tplIn.code.sizeMm, box: fmt.code.box ? { ...tplIn.code.box, ...fmt.code.box } : tplIn.code.box }
+      : tplIn.code;
+    const logo = tplIn.logo && fmt.logo?.box ? { ...tplIn.logo, box: { ...tplIn.logo.box, ...fmt.logo.box } } : tplIn.logo;
+    return { ...tplIn, lines, code, logo };
   };
 
   const LOGO_START: Box = { x: 3, y: 2, w: 34, h: 15 };
@@ -252,17 +277,19 @@ export default function ScanSticker() {
       setRawLines(rl);
       setCompany(comp);
       buildTpl(rl, aspect, hasCode, ct, pn, null, comp, codeSize);
-      // If the user saved a format for this company, re-apply their arrangement.
-      const fmt = companyFormats[comp];
+      // An explicit "Load Format" pick wins over the per-company auto-match,
+      // and applies by line index instead of field-text matching.
+      const explicit = selectedFormatName ? companyFormats[selectedFormatName] : null;
+      const fmt = explicit || companyFormats[comp];
       if (fmt) {
         if (fmt.code?.type) ct = fmt.code.type;
         if (fmt.code?.sizeMm) setCodeSize(fmt.code.sizeMm);
-        setTpl((prev) => (prev ? applyCompanyFormat(prev, fmt) : prev));
+        setTpl((prev) => (prev ? (explicit ? applyFormatByIndex(prev, fmt) : applyCompanyFormat(prev, fmt)) : prev));
       }
       setPartNumber(pn);
       setCodeType(ct);
       setCellMap({});
-      show(`Sticker generated${fmt ? ` (${comp} saved format)` : FORMATTED_COMPANIES.includes(comp) ? ` (${comp} format)` : ""}`, "success");
+      show(`Sticker generated${explicit ? ` (${selectedFormatName} format)` : fmt ? ` (${comp} saved format)` : FORMATTED_COMPANIES.includes(comp) ? ` (${comp} format)` : ""}`, "success");
     } catch (e: any) {
       show(e?.message || "Scan failed", "error");
     } finally {
@@ -285,11 +312,12 @@ export default function ScanSticker() {
     const rl = [{ text: pn, bold: true }];
     setRawLines(rl);
     buildTpl(rl, aspect, true, ct, pn, null, comp, codeSize);
-    const fmt = companyFormats[comp];
+    const explicit = selectedFormatName ? companyFormats[selectedFormatName] : null;
+    const fmt = explicit || companyFormats[comp];
     if (fmt) {
       if (fmt.code?.type) ct = fmt.code.type;
       if (fmt.code?.sizeMm) setCodeSize(fmt.code.sizeMm);
-      setTpl((prev) => (prev ? applyCompanyFormat(prev, fmt) : prev));
+      setTpl((prev) => (prev ? (explicit ? applyFormatByIndex(prev, fmt) : applyCompanyFormat(prev, fmt)) : prev));
     }
     setPartNumber(pn);
     setCodeType(ct);
@@ -400,14 +428,35 @@ export default function ScanSticker() {
       // Store only the arrangement recipe (positions/sizes/code) — not the specific values.
       const template = {
         lines: tpl.lines.map((l) => ({ text: l.text, x: l.x, y: l.y, size: l.size, bold: l.bold })),
-        code: tpl.code ? { type: tpl.code.type, sizeMm: tpl.code.sizeMm ?? codeSize, box: { y: tpl.code.box.y } } : null,
-        logo: tpl.logo ? { box: tpl.logo.box } : null,
+        code: tpl.code ? { type: tpl.code.type, sizeMm: tpl.code.sizeMm ?? codeSize, box: { ...tpl.code.box } } : null,
+        logo: tpl.logo ? { box: { ...tpl.logo.box } } : null,
       };
       await api.post("/company-formats", { company, template });
-      setCompanyFormats((m) => ({ ...m, [company]: template }));
+      loadSaved();
       show(`Saved as ${company} format`, "success");
     } catch (e: any) { show(e?.message || "Save failed", "error"); }
   };
+
+  // Explicit "Load Format" pick: overrides the automatic per-company match
+  // and, once loaded, applies by line index rather than field-text matching.
+  const pickFormat = (name: string | null) => {
+    setSelectedFormatName(name);
+    if (!name) return; // "Auto" — revert to per-company auto-layout/matching
+    const fmt = companyFormats[name];
+    if (!fmt) return;
+    if (fmt.code?.type) setCodeType(fmt.code.type);
+    if (fmt.code?.sizeMm) setCodeSize(fmt.code.sizeMm);
+    setTpl((prev) => (prev ? applyFormatByIndex(prev, fmt) : prev));
+    show(`Loaded "${name}" format`, "success");
+  };
+  const deleteFormat = async (name: string) => {
+    try {
+      await api.del(`/company-formats/${encodeURIComponent(name)}`);
+      if (selectedFormatName === name) setSelectedFormatName(null);
+      loadSaved();
+    } catch (e: any) { show(e?.message || "Delete failed", "error"); }
+  };
+
   const openTemplate = (t: any) => {
     try {
       const parsed: StickerTemplate = JSON.parse(t.bg_data_url);
@@ -545,6 +594,42 @@ export default function ScanSticker() {
             </Pressable>
           </View>
         </View>
+
+        {savedFormats.length ? (
+          <>
+            <Text style={styles.section}>LOAD FORMAT (snap the next sticker into a saved layout)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.savedRow}>
+              <Pressable
+                style={[styles.fmtChip, !selectedFormatName && styles.fmtChipActive]}
+                onPress={() => pickFormat(null)}
+                testID="format-auto"
+              >
+                <Ionicons name="sparkles" size={16} color={!selectedFormatName ? colors.onBrand : colors.brand} />
+                <Text style={[styles.fmtChipText, !selectedFormatName && styles.fmtChipTextActive]}>Auto</Text>
+              </Pressable>
+              {savedFormats.map((f) => (
+                <View key={f.company} style={styles.savedCard}>
+                  <Pressable
+                    onPress={() => pickFormat(f.company)}
+                    style={[styles.fmtChip, selectedFormatName === f.company && styles.fmtChipActive]}
+                    testID={`format-${f.company}`}
+                  >
+                    <Ionicons name="grid" size={16} color={selectedFormatName === f.company ? colors.onBrand : colors.brand} />
+                    <Text numberOfLines={1} style={[styles.fmtChipText, selectedFormatName === f.company && styles.fmtChipTextActive]}>{f.company}</Text>
+                  </Pressable>
+                  <Pressable style={styles.savedDel} onPress={() => deleteFormat(f.company)} testID={`format-del-${f.company}`}>
+                    <Ionicons name="close-circle" size={18} color={colors.error} />
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+            <Text style={styles.hint}>
+              {selectedFormatName
+                ? `"${selectedFormatName}" loaded — new/scanned lines snap into its exact saved positions by line order, not auto-layout.`
+                : "Auto: uses each company's own saved format (if any) or the built-in layout."}
+            </Text>
+          </>
+        ) : null}
 
         {saved.length ? (
           <>
@@ -838,6 +923,10 @@ const styles = StyleSheet.create({
   savedInner: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: spacing.md, alignItems: "center", gap: 4 },
   savedName: { color: colors.onSurface, fontSize: font.sm - 1, fontWeight: "700" },
   savedDel: { position: "absolute", top: -6, right: -6, backgroundColor: colors.surface, borderRadius: 10 },
+  fmtChip: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, minWidth: 90 },
+  fmtChipActive: { backgroundColor: colors.brand },
+  fmtChipText: { color: colors.brand, fontSize: font.sm - 1, fontWeight: "700" },
+  fmtChipTextActive: { color: colors.onBrand },
   logoAdd: { width: 64, height: 56, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.sm, alignItems: "center", justifyContent: "center", gap: 2 },
   logoCard: { width: 72 },
   logoThumb: { width: 72, height: 56, borderRadius: radius.sm, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border },
