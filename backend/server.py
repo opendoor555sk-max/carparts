@@ -1511,7 +1511,7 @@ def _gemini_image_part(b64: str) -> dict:
 
 
 def _gemini_generate(parts: List[dict], *, system_text: Optional[str] = None,
-                      model: Optional[str] = None, timeout: int = 60,
+                      model: Optional[str] = None, timeout: int = 90,
                       json_response: bool = True) -> str:
     """Call the Gemini API directly over plain HTTP (no SDK) and return the
     model's text output. Raises Exception with a friendly message on failure."""
@@ -1574,7 +1574,7 @@ async def run_gemini(part_number: str, company: str) -> dict:
         raise Exception("No AI provider available")
     text = await run_in_threadpool(
         _gemini_generate, [{"text": prompt}],
-        system_text=GEMINI_SYSTEM, model=GEMINI_MODEL, timeout=60,
+        system_text=GEMINI_SYSTEM, model=GEMINI_MODEL, timeout=90,
     )
     return {"text": text, "sources": sources, "grounded": bool(sources)}
 
@@ -1991,7 +1991,7 @@ async def scan_sticker(req: StickerScanReq, user=Depends(get_current_user)):
             _gemini_generate,
             [{"text": STICKER_SCAN_PROMPT}, _gemini_image_part(b64)],
             system_text="You extract structured JSON from product label images. Output JSON only.",
-            model=GEMINI_VISION_MODEL, timeout=60,
+            model=GEMINI_VISION_MODEL, timeout=90,
         )
     except Exception as e:
         logger.exception("sticker scan failed")
