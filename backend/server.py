@@ -16,6 +16,8 @@ from fastapi.concurrency import run_in_threadpool
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 from pydantic import BaseModel
 
 ROOT_DIR = Path(__file__).parent
@@ -580,6 +582,13 @@ async def startup():
     except Exception as e:
         logger.warning(f"Object storage init failed (non-fatal): {e}")
 
+    # Unique index backing the one-shot demo lock (see /demo-check) — the
+    # uniqueness on "id" is what makes the check-and-set atomic and race-safe.
+    try:
+        await db.locks.create_index("id", unique=True)
+    except Exception as e:
+        logger.warning(f"locks index create warning: {e}")
+
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -590,6 +599,30 @@ async def shutdown():
 @api.get("/")
 async def root():
     return {"app": "Auto Parts Store", "status": "ok"}
+
+
+DEMO_LOCK_ID = "single_demo_lock"
+
+
+@api.post("/demo-check")
+async def demo_check():
+    """One-shot flag: the very first caller gets {"allowed": true} and flips
+    the flag; every call after that gets {"allowed": false}. No auth.
+
+    Atomic via find_one_and_update(upsert=True) racing against a unique index
+    on "id" (created at startup) — only one concurrent caller can ever win the
+    insert, so this is safe even under concurrent requests.
+    """
+    try:
+        await db.locks.find_one_and_update(
+            {"id": DEMO_LOCK_ID, "used": {"$ne": True}},
+            {"$set": {"used": True}},
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+        return {"allowed": True}
+    except DuplicateKeyError:
+        return {"allowed": False}
 
 
 @api.post("/auth/register")
