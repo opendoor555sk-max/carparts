@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -13,6 +14,13 @@ import { Button, Field, Header } from "@/src/components/ui";
 import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
+
+// Top-left total-quantity counter: 3x the old header-subtitle size (font.sm=12) is its
+// new resting size. Each scan zooms it up to ZOOM_PEAK_SCALE then settles at 50% of
+// that peak (i.e. smaller than the peak, not back to 1x) until the next scan.
+const COUNTER_BASE_SIZE = font.sm * 3;
+const ZOOM_PEAK_SCALE = 1.6;
+const ZOOM_SETTLE_SCALE = ZOOM_PEAK_SCALE * 0.5;
 
 export default function BatchBuy() {
   const router = useRouter();
@@ -28,6 +36,24 @@ export default function BatchBuy() {
   const [gps, setGps] = useState("");
   const busy = useRef(false);
   const lastScan = useRef<{ code: string; at: number }>({ code: "", at: 0 });
+
+  // Scan-success flash border + counter zoom, both driven from one trigger.
+  const flashOpacity = useSharedValue(0);
+  const counterScale = useSharedValue(1);
+  const flashStyle = useAnimatedStyle(() => ({ opacity: flashOpacity.value }));
+  const counterStyle = useAnimatedStyle(() => ({ transform: [{ scale: counterScale.value }] }));
+
+  const triggerScanFeedback = useCallback(() => {
+    flashOpacity.value = withSequence(
+      withTiming(1, { duration: 70, easing: Easing.out(Easing.quad) }),
+      withTiming(0, { duration: 420, easing: Easing.in(Easing.quad) }),
+    );
+    counterScale.value = withSequence(
+      withTiming(ZOOM_PEAK_SCALE, { duration: 130, easing: Easing.out(Easing.quad) }),
+      withTiming(ZOOM_SETTLE_SCALE, { duration: 260, easing: Easing.inOut(Easing.quad) }),
+    );
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [flashOpacity, counterScale]);
 
   useEffect(() => {
     let sub: Location.LocationSubscription | null = null;
@@ -59,7 +85,7 @@ export default function BatchBuy() {
       busy.current = true;
       try {
         await api.post("/buy", { part_number: pn, company, condition: "Unknown", location: { gps }, override: false });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        triggerScanFeedback();
         setCounts((prev) => {
           const i = prev.findIndex((c) => c.pn === pn);
           if (i >= 0) {
@@ -81,7 +107,7 @@ export default function BatchBuy() {
         setTimeout(() => (busy.current = false), 350);
       }
     },
-    [company, gps, show],
+    [company, gps, show, triggerScanFeedback],
   );
 
   const onBarcode = useCallback(
@@ -96,7 +122,7 @@ export default function BatchBuy() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Multiple Buy" subtitle={isSuperAdmin ? `Total: ${total}  •  ${gps ? "📍 GPS ✓" : "GPS…"}` : `Total: ${total}`} onBack={() => router.back()} />
+      <Header title="Multiple Buy" subtitle={isSuperAdmin ? (gps ? "📍 GPS ✓" : "GPS…") : undefined} onBack={() => router.back()} />
       <View style={styles.cam}>
         {permission?.granted ? (
           <CameraView
@@ -112,9 +138,14 @@ export default function BatchBuy() {
             <Button title="Allow Camera" onPress={requestPermission} icon="camera" testID="batch-grant" />
           </View>
         )}
+        <Animated.View style={[styles.flashOverlay, flashStyle]} pointerEvents="none" testID="batch-scan-flash" />
         <View style={styles.overlay} pointerEvents="none">
           <View style={styles.bracket} />
           <Text style={styles.hint}>Scan → each scan = +1 qty</Text>
+        </View>
+        <View style={styles.counterWrap} pointerEvents="none" testID="batch-total-counter">
+          <Text style={styles.counterLabel}>TOTAL</Text>
+          <Animated.Text style={[styles.counterValue, counterStyle]}>{total}</Animated.Text>
         </View>
       </View>
 
@@ -159,8 +190,22 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.lg },
   dim: { color: colors.info, textAlign: "center" },
   overlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: spacing.md },
-  bracket: { width: 220, height: 120, borderWidth: 3, borderColor: colors.success, borderRadius: radius.md },
+  // 10x the original borderWidth (3 -> 30) so the scan-success border reads as a bold flash.
+  bracket: { width: 220, height: 120, borderWidth: 30, borderColor: colors.success, borderRadius: radius.md },
   hint: { color: "#fff", fontWeight: "700", fontSize: font.base },
+  flashOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.success },
+  counterWrap: {
+    position: "absolute",
+    top: spacing.sm,
+    left: spacing.sm,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    alignItems: "flex-start",
+  },
+  counterLabel: { color: "#fff", fontSize: font.sm, fontWeight: "700", letterSpacing: 1, opacity: 0.85 },
+  counterValue: { color: colors.success, fontSize: COUNTER_BASE_SIZE, lineHeight: COUNTER_BASE_SIZE * 1.05, fontWeight: "900" },
   inputRow: { flexDirection: "row", gap: spacing.sm, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider },
   addBtn: { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" },
   empty: { color: colors.info, textAlign: "center", marginTop: spacing.xl },
