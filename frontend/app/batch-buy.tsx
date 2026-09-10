@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,11 +31,14 @@ export default function BatchBuy() {
   const isSuperAdmin = user?.role === "super_admin";
   const [permission, requestPermission] = useCameraPermissions();
   const [manual, setManual] = useState("");
+  // Draft/review list — nothing here has been sent to the backend yet.
+  // Scanning only adds/increments a line; stock is written on confirmAndAddToStock().
   const [counts, setCounts] = useState<{ pn: string; qty: number }[]>([]);
-  const [total, setTotal] = useState(0);
+  const [confirming, setConfirming] = useState(false);
   const [gps, setGps] = useState("");
   const busy = useRef(false);
   const lastScan = useRef<{ code: string; at: number }>({ code: "", at: 0 });
+  const total = useMemo(() => counts.reduce((s, c) => s + c.qty, 0), [counts]);
 
   // Scan-success flash border + counter zoom, both driven from one trigger.
   const flashOpacity = useSharedValue(0);
@@ -83,37 +86,79 @@ export default function BatchBuy() {
     };
   }, []);
 
+  // Scanning is now purely local — it only adds/increments a draft line.
+  // Nothing touches the backend until confirmAndAddToStock() is pressed.
   const addOne = useCallback(
-    async (raw: string) => {
+    (raw: string) => {
       const pn = extractPartNumber(raw);
       if (!pn || busy.current) return;
       busy.current = true;
-      try {
-        await api.post("/buy", { part_number: pn, company, condition: "Unknown", location: { gps }, override: false });
-        triggerScanFeedback();
-        setCounts((prev) => {
-          const i = prev.findIndex((c) => c.pn === pn);
-          if (i >= 0) {
-            const cp = [...prev];
-            cp[i] = { ...cp[i], qty: cp[i].qty + 1 };
-            return cp;
-          }
-          return [{ pn, qty: 1 }, ...prev];
-        });
-        setTotal((t) => t + 1);
-      } catch (e: any) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        if (e?.detail?.code === "LIMIT_REACHED") {
-          show(`🚫 ${pn} — Limit reached, DO NOT BUY`, "error");
-        } else {
-          show(e?.detail?.message || e?.message || "Add failed", "error");
+      triggerScanFeedback();
+      setCounts((prev) => {
+        const i = prev.findIndex((c) => c.pn === pn);
+        if (i >= 0) {
+          const cp = [...prev];
+          cp[i] = { ...cp[i], qty: cp[i].qty + 1 };
+          return cp;
         }
-      } finally {
-        setTimeout(() => (busy.current = false), 350);
-      }
+        return [{ pn, qty: 1 }, ...prev];
+      });
+      setTimeout(() => (busy.current = false), 350);
     },
-    [company, gps, show, triggerScanFeedback],
+    [triggerScanFeedback],
   );
+
+  const incQty = useCallback((pn: string) => {
+    setCounts((prev) => prev.map((c) => (c.pn === pn ? { ...c, qty: c.qty + 1 } : c)));
+  }, []);
+  const decQty = useCallback((pn: string) => {
+    setCounts((prev) => prev.map((c) => (c.pn === pn ? { ...c, qty: Math.max(1, c.qty - 1) } : c)));
+  }, []);
+  const removeLine = useCallback((pn: string) => {
+    setCounts((prev) => prev.filter((c) => c.pn !== pn));
+  }, []);
+
+  // The actual write: one /buy call per unit (the endpoint has no quantity field —
+  // each call inserts exactly one stock unit), run sequentially per line. A line
+  // that partially fails (e.g. a purchase limit hit mid-way) keeps only the
+  // still-unadded remainder in the draft, so re-confirming later can't double-add
+  // units that already made it into stock.
+  const confirmAndAddToStock = useCallback(async () => {
+    if (!counts.length || confirming) return;
+    setConfirming(true);
+    const remaining: { pn: string; qty: number }[] = [];
+    const issues: string[] = [];
+    let added = 0;
+    for (const c of counts) {
+      let ok = 0;
+      let stopReason = "";
+      for (let i = 0; i < c.qty; i++) {
+        try {
+          await api.post("/buy", { part_number: c.pn, company, condition: "Unknown", location: { gps }, override: false });
+          ok++;
+        } catch (e: any) {
+          stopReason = e?.detail?.code === "LIMIT_REACHED" ? "limit reached" : (e?.detail?.message || e?.message || "failed");
+          break;
+        }
+      }
+      added += ok;
+      const left = c.qty - ok;
+      if (left > 0) {
+        remaining.push({ pn: c.pn, qty: left });
+        issues.push(`${c.pn}: added ${ok}/${c.qty}${stopReason ? ` — ${stopReason}` : ""}`);
+      }
+    }
+    setCounts(remaining);
+    setConfirming(false);
+    if (issues.length) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      show(`Added ${added} unit(s) — ${issues.length} line(s) still need attention`, added ? "info" : "error");
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      show(`Added ${added} unit(s) to stock`, "success");
+      router.replace("/(tabs)/inventory" as any);
+    }
+  }, [counts, confirming, company, gps, show, router]);
 
   const onBarcode = useCallback(
     ({ data }: { data: string }) => {
@@ -146,7 +191,7 @@ export default function BatchBuy() {
         <Animated.View style={[styles.flashOverlay, flashStyle]} pointerEvents="none" testID="batch-scan-flash" />
         <View style={styles.overlay} pointerEvents="none">
           <View style={styles.bracket} />
-          <Text style={styles.hint}>Scan → each scan = +1 qty</Text>
+          <Text style={styles.hint}>Scan → adds to draft below (+1 qty). Nothing saved until you confirm.</Text>
         </View>
         <View style={styles.counterWrap} pointerEvents="none" testID="batch-total-counter">
           <Text style={styles.counterLabel}>TOTAL</Text>
@@ -178,12 +223,30 @@ export default function BatchBuy() {
         renderItem={({ item }) => (
           <View style={styles.row} testID={`batch-${item.pn}`}>
             <Text style={styles.pn} numberOfLines={2}>{item.pn}</Text>
-            <View style={styles.qtyBadge}><Text style={styles.qtyText}>x{item.qty}</Text></View>
+            <View style={styles.qtyControls}>
+              <Pressable style={styles.qtyBtn} onPress={() => decQty(item.pn)} testID={`batch-minus-${item.pn}`}>
+                <Ionicons name="remove" size={18} color={colors.onSurface} />
+              </Pressable>
+              <View style={styles.qtyBadge}><Text style={styles.qtyText}>{item.qty}</Text></View>
+              <Pressable style={styles.qtyBtn} onPress={() => incQty(item.pn)} testID={`batch-plus-${item.pn}`}>
+                <Ionicons name="add" size={18} color={colors.onSurface} />
+              </Pressable>
+              <Pressable style={styles.delBtn} onPress={() => removeLine(item.pn)} testID={`batch-remove-${item.pn}`}>
+                <Ionicons name="trash" size={18} color={colors.error} />
+              </Pressable>
+            </View>
           </View>
         )}
       />
       <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
-        <Button title={`Done — ${total} units added`} onPress={() => router.replace("/(tabs)/inventory" as any)} icon="checkmark-circle" testID="batch-done" />
+        <Button
+          title={confirming ? "Adding to stock…" : `Confirm & Add to Stock (${total})`}
+          onPress={confirmAndAddToStock}
+          loading={confirming}
+          disabled={confirming || counts.length === 0}
+          icon="checkmark-circle"
+          testID="batch-confirm"
+        />
       </View>
     </View>
   );
@@ -218,7 +281,10 @@ const styles = StyleSheet.create({
   gpsStripText: { fontSize: font.base, fontWeight: "700", flex: 1 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.lg },
   pn: { color: colors.onSurface, fontSize: 40, lineHeight: 46, fontWeight: "900", letterSpacing: 1, flex: 1 },
-  qtyBadge: { backgroundColor: colors.success, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, minWidth: 64, alignItems: "center" },
-  qtyText: { color: colors.onSuccess, fontWeight: "900", fontSize: 30 },
+  qtyControls: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  qtyBtn: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  delBtn: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.error, alignItems: "center", justifyContent: "center", marginLeft: spacing.xs },
+  qtyBadge: { backgroundColor: colors.success, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, minWidth: 48, alignItems: "center" },
+  qtyText: { color: colors.onSuccess, fontWeight: "900", fontSize: 22 },
   bar: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.md },
 });
