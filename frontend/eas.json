@@ -9,21 +9,21 @@
       "distribution": "internal",
       "channel": "development",
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://part-number-first.preview.emergentagent.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://kabadi-market-backend.onrender.com"
       }
     },
     "preview": {
       "distribution": "internal",
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://part-number-first.preview.emergentagent.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://kabadi-market-backend.onrender.com"
       }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://part-number-first.preview.emergentagent.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://kabadi-market-backend.onrender.com"
       }
     }
   },
