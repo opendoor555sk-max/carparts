@@ -1,22 +1,27 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   FlatList,
+  Linking,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
+import { CameraView, useCameraPermissions } from "expo-camera";
 
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { ConfirmModal, Header, StatusChip, Loading, EmptyState, FilterChip } from "@/src/components/ui";
 import { printInventory, brandingFromUser } from "@/src/utils/print";
+import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type Unit = {
@@ -41,18 +46,51 @@ export default function Inventory() {
   const [cond, setCond] = useState("All");
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Unit | null>(null);
+  // Scan-to-filter: a barcode scan (or typed text) narrows the list to that part number.
+  const [pnFilter, setPnFilter] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const scannedRef = useRef(false);
 
   const load = useCallback(async () => {
     try {
-      const q = cond === "All" ? "" : `?condition=${encodeURIComponent(cond)}`;
-      const data = await api.get<Unit[]>(`/inventory${q}`);
+      const params = new URLSearchParams();
+      if (cond !== "All") params.set("condition", cond);
+      if (pnFilter.trim()) params.set("q", pnFilter.trim());
+      const qs = params.toString();
+      const data = await api.get<Unit[]>(`/inventory${qs ? `?${qs}` : ""}`);
       setUnits(data);
     } catch {
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [cond]);
+  }, [cond, pnFilter]);
+
+  const openScanner = async () => {
+    let perm = permission;
+    if (!perm?.granted) {
+      perm = await requestPermission();
+    }
+    if (perm?.granted) {
+      scannedRef.current = false;
+      setScannerOpen(true);
+    } else if (perm && !perm.canAskAgain) {
+      show("Camera blocked — enable it in Settings", "error");
+      Linking.openSettings();
+    } else {
+      show("Camera permission needed to scan", "error");
+    }
+  };
+
+  const onScanned = ({ data }: { data: string }) => {
+    if (scannedRef.current || !data) return;
+    scannedRef.current = true;
+    const pn = extractPartNumber(data);
+    setPnFilter(pn);
+    setScannerOpen(false);
+    show(`Filtering by: ${pn}`, "success");
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -115,6 +153,27 @@ export default function Inventory() {
           ) : undefined
         }
       />
+      <View style={styles.pnRow}>
+        <TextInput
+          style={[styles.pnInput, { flex: 1 }]}
+          value={pnFilter}
+          onChangeText={setPnFilter}
+          placeholder="Filter by part number"
+          placeholderTextColor={colors.info}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          testID="inv-pn-filter"
+        />
+        {pnFilter ? (
+          <Pressable style={styles.clearBtn} onPress={() => setPnFilter("")} hitSlop={8} testID="inv-pn-clear">
+            <Ionicons name="close" size={18} color={colors.info} />
+          </Pressable>
+        ) : null}
+        <Pressable style={styles.scanBtn} onPress={openScanner} testID="inv-scan">
+          <Ionicons name="barcode-outline" size={20} color={colors.onBrand} />
+          <Text style={styles.scanBtnText}>Scan</Text>
+        </Pressable>
+      </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -129,7 +188,11 @@ export default function Inventory() {
       {loading ? (
         <Loading />
       ) : units.length === 0 ? (
-        <EmptyState icon="cube-outline" title="No stock" subtitle="Add stock from the Buy module" />
+        <EmptyState
+          icon="cube-outline"
+          title={pnFilter ? "No match" : "No stock"}
+          subtitle={pnFilter ? `Nothing found for "${pnFilter}"` : "Add stock from the Buy module"}
+        />
       ) : (
         <FlatList
           data={units}
@@ -201,12 +264,42 @@ export default function Inventory() {
         onConfirm={performDelete}
         onCancel={() => setPendingDelete(null)}
       />
+
+      <Modal visible={scannerOpen} animationType="slide" onRequestClose={() => setScannerOpen(false)}>
+        <View style={styles.scanModal}>
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            barcodeScannerSettings={{
+              barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "code93", "upc_a", "upc_e", "codabar", "itf14", "datamatrix", "pdf417", "aztec"],
+            }}
+            onBarcodeScanned={onScanned}
+          />
+          <View style={styles.scanOverlay} pointerEvents="none">
+            <View style={styles.scanBracket} />
+            <Text style={styles.scanHint}>Point the camera at any Barcode or QR code</Text>
+          </View>
+          <Pressable style={styles.scanClose} onPress={() => setScannerOpen(false)} testID="scan-close">
+            <Ionicons name="close" size={26} color="#fff" />
+          </Pressable>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
+  pnRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  pnInput: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.base },
+  clearBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  scanBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.brand, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  scanBtnText: { color: colors.onBrand, fontWeight: "800", fontSize: font.sm },
+  scanModal: { flex: 1, backgroundColor: "#000" },
+  scanOverlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
+  scanBracket: { width: 240, height: 160, borderWidth: 3, borderColor: colors.brand, borderRadius: radius.md },
+  scanHint: { color: "#fff", fontSize: font.base, marginTop: spacing.lg, textAlign: "center", paddingHorizontal: spacing.xl },
+  scanClose: { position: "absolute", top: 48, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
   chipScroller: { maxHeight: 56, borderBottomWidth: 1, borderBottomColor: colors.divider },
   chipRow: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, alignItems: "center" },
   card: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden" },
