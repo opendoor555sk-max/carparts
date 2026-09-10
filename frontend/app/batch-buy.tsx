@@ -52,7 +52,12 @@ export default function BatchBuy() {
       withTiming(ZOOM_PEAK_SCALE, { duration: 130, easing: Easing.out(Easing.quad) }),
       withTiming(ZOOM_SETTLE_SCALE, { duration: 260, easing: Easing.inOut(Easing.quad) }),
     );
+    // expo-haptics has no numeric duration/intensity knob (iOS/Android don't expose
+    // one through this API) — so "+50% duration/intensity" is approximated with a
+    // second, heavier pulse shortly after the first, extending both the felt
+    // duration and strength of the combined haptic event.
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 60);
   }, [flashOpacity, counterScale]);
 
   useEffect(() => {
@@ -190,8 +195,8 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.lg },
   dim: { color: colors.info, textAlign: "center" },
   overlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: spacing.md },
-  // 10x the original borderWidth (3 -> 30) so the scan-success border reads as a bold flash.
-  bracket: { width: 220, height: 120, borderWidth: 30, borderColor: colors.success, borderRadius: radius.md },
+  // Box +30% (220x120 -> 286x156); border 5x thinner than the prior 30 -> 6.
+  bracket: { width: 286, height: 156, borderWidth: 6, borderColor: colors.success, borderRadius: radius.md },
   hint: { color: "#fff", fontWeight: "700", fontSize: font.base },
   flashOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.success },
   counterWrap: {
