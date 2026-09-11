@@ -1001,6 +1001,10 @@ async def conditions(user=Depends(get_current_user)):
 
 # ---------------- Limit helpers ----------------
 async def compute_limit(store_id: Optional[str], part_number: str) -> dict:
+    # part_number is never case-normalized at write time elsewhere, and Mongo
+    # matches are case-sensitive — normalize here so a limit set under one
+    # casing still applies to a purchase recorded under a different one.
+    part_number = (part_number or "").strip().upper()
     base = {"store_id": store_id} if store_id is not None else {}
     part = await db.parts.find_one({**base, "part_number": part_number}, {"_id": 0})
     existing_stock = await db.stock.count_documents({**base, "part_number": part_number, "sold": {"$ne": True}})
@@ -1153,7 +1157,10 @@ async def get_catalog(part_number: str, user=Depends(get_current_user)):
 # ---------------- Buy (increases stock) ----------------
 @api.post("/buy")
 async def buy(body: BuyIn, store_id: Optional[str] = None, user=Depends(require("buy"))):
-    pn = body.part_number.strip()
+    # Uppercased so this always lines up with the identity compute_limit()/
+    # /limits/part use — part_number matches are case-sensitive in Mongo, and a
+    # limit set under one casing must still apply to a buy under another.
+    pn = body.part_number.strip().upper()
     if not pn:
         raise HTTPException(400, "Part number required")
     sid = resolve_store(user, store_id, require_write=True)
@@ -1510,12 +1517,29 @@ async def set_global_limit(body: GlobalLimitIn, store_id: Optional[str] = None, 
 
 @api.post("/limits/part")
 async def set_part_limit(body: LimitIn, store_id: Optional[str] = None, user=Depends(require("manage_limits"))):
-    pn = body.part_number.strip()
+    pn = body.part_number.strip().upper()
+    if not pn:
+        raise HTTPException(400, "Part number required")
     sid = resolve_store(user, store_id, require_write=True)
-    r = await db.parts.update_one({"store_id": sid, "part_number": pn},
-                                  {"$set": {"purchase_limit": body.limit, "limit_enabled": body.enabled}})
-    if r.matched_count == 0:
-        raise HTTPException(404, "Part not found")
+    # Previously required a matching part to already exist (created only by a
+    # first /buy) and raised 404 otherwise — so setting a limit on a part before
+    # ever buying it silently never took effect. Upsert instead: a limit set
+    # proactively now actually persists and applies to the very first purchase.
+    now = now_iso()
+    await db.parts.update_one(
+        {"store_id": sid, "part_number": pn},
+        {
+            "$set": {"purchase_limit": body.limit, "limit_enabled": body.enabled},
+            "$setOnInsert": {
+                "id": new_id(), "store_id": sid, "part_number": pn, "company": "All",
+                "name": "", "category": "", "compatible_vehicles": [], "variant": "",
+                "year": "", "old_number": "", "new_number": "", "barcode": "",
+                "sticker_color": "", "technical_info": "", "photos": [], "source": "Limit",
+                "verification_status": "Unverified", "created_at": now, "created_by": user["username"],
+            },
+        },
+        upsert=True,
+    )
     return await compute_limit(sid, pn)
 
 

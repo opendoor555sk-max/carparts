@@ -62,9 +62,9 @@ export default function Limits() {
         enabled: partEnabled,
       });
       setComputed(res);
-      show("Part limit saved", "success");
+      show("Part limit saved — applies even to this part's first purchase", "success");
     } catch (e: any) {
-      show(e?.message || "Part not found — first Buy/Save part", "error");
+      show(e?.message || "Save failed", "error");
     } finally {
       setSavingPart(false);
     }
