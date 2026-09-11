@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
-import { Header, Loading } from "@/src/components/ui";
+import { Header, Loading, SignOutButton } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -59,7 +59,7 @@ export default function Categories() {
   if (loading) {
     return (
       <View style={styles.flex}>
-        <Header title="Category Master" />
+        <Header title="Category Master" center={<SignOutButton />} />
         <Loading />
       </View>
     );
@@ -67,7 +67,7 @@ export default function Categories() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Category Master" subtitle={`${total} items • 5 groups`} />
+      <Header title="Category Master" subtitle={`${total} items • 5 groups`} center={<SignOutButton />} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.md }}>
         {groups.map((g) => {
           const isOpen = open[g.group];

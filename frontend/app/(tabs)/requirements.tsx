@@ -15,7 +15,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
-import { Header, StatusChip, Loading, EmptyState, FilterChip } from "@/src/components/ui";
+import { Header, StatusChip, Loading, EmptyState, FilterChip, SignOutButton } from "@/src/components/ui";
 import { printRequirements, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -98,6 +98,7 @@ export default function Requirements() {
             </Pressable>
           </View>
         }
+        center={<SignOutButton />}
       />
       <ScrollView
         horizontal

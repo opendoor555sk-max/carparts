@@ -20,7 +20,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
-import { ConfirmModal, Header, StatusChip, Loading, EmptyState, FilterChip, Button } from "@/src/components/ui";
+import { ConfirmModal, Header, StatusChip, Loading, EmptyState, FilterChip, Button, SignOutButton } from "@/src/components/ui";
 import {
   EMPTY_LOCATION,
   LocationPicker,
@@ -210,6 +210,7 @@ export default function Inventory() {
             </Pressable>
           ) : undefined
         }
+        center={<SignOutButton />}
       />
       <View style={styles.pnRow}>
         <TextInput

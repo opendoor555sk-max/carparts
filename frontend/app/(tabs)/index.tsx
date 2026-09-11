@@ -13,7 +13,7 @@ import * as Haptics from "expo-haptics";
 
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
-import { FilterChip } from "@/src/components/ui";
+import { FilterChip, SignOutButton } from "@/src/components/ui";
 import { storage } from "@/src/utils/storage";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -71,14 +71,19 @@ export default function Home() {
 
   return (
     <View style={styles.flex}>
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.hello}>Welcome,</Text>
-          <Text style={styles.name}>{user?.name}</Text>
+      <View style={[styles.topBarWrap, { paddingTop: insets.top + spacing.sm }]}>
+        <View style={styles.topBar}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.hello}>Welcome,</Text>
+            <Text style={styles.name}>{user?.name}</Text>
+          </View>
+          <View style={styles.syncPill} testID="sync-pill">
+            <View style={styles.syncDot} />
+            <Text style={styles.syncText}>Online</Text>
+          </View>
         </View>
-        <View style={styles.syncPill} testID="sync-pill">
-          <View style={styles.syncDot} />
-          <Text style={styles.syncText}>Online</Text>
+        <View style={styles.signOutRow}>
+          <SignOutButton />
         </View>
       </View>
 
@@ -191,14 +196,17 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
+  topBarWrap: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
   },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  signOutRow: { alignItems: "center", marginTop: spacing.sm },
   hello: { color: colors.info, fontSize: font.sm },
   name: { color: colors.onSurface, fontSize: font.xl, fontWeight: "800" },
   syncPill: {

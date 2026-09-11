@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -13,6 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, font, radius, spacing, statusColor } from "@/src/theme";
+import { useAuth } from "@/src/context/AuthContext";
 
 // ---------- Screen header (sticky, safe-area aware) ----------
 export function Header({
@@ -20,11 +21,13 @@ export function Header({
   subtitle,
   onBack,
   right,
+  center,
 }: {
   title: string;
   subtitle?: string;
   onBack?: () => void;
   right?: React.ReactNode;
+  center?: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -45,7 +48,37 @@ export function Header({
         </View>
         {right ?? null}
       </View>
+      {center ? <View style={styles.headerCenterRow}>{center}</View> : null}
     </View>
+  );
+}
+
+// ---------- Quick Sign Out (top-center of a screen header) ----------
+// Confirms before signing out since this is now a prominent, easy-to-tap
+// button rather than buried in a menu — an accidental sign-out here would
+// be more disruptive than the old, harder-to-reach entry point.
+export function SignOutButton({ testID = "quick-signout" }: { testID?: string }) {
+  const { logout } = useAuth();
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <>
+      <Pressable style={styles.signOutBtn} onPress={() => setConfirming(true)} hitSlop={8} testID={testID}>
+        <Ionicons name="log-out-outline" size={14} color={colors.error} />
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </Pressable>
+      <ConfirmModal
+        visible={confirming}
+        title="Sign out?"
+        message="You'll need to log in again to continue."
+        confirmText="Sign Out"
+        danger
+        onConfirm={() => {
+          setConfirming(false);
+          logout();
+        }}
+        onCancel={() => setConfirming(false)}
+      />
+    </>
   );
 }
 
@@ -344,6 +377,19 @@ const styles = StyleSheet.create({
   backBtn: { width: 26 },
   headerTitle: { color: colors.onSurface, fontSize: font.xl, fontWeight: "800", letterSpacing: 0.3 },
   headerSub: { color: colors.info, fontSize: font.sm, marginTop: 1 },
+  headerCenterRow: { alignItems: "center", marginTop: spacing.sm },
+  signOutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+  },
+  signOutText: { color: colors.error, fontWeight: "800", fontSize: font.sm - 1 },
   chip: {
     paddingHorizontal: spacing.md,
     paddingVertical: 5,
