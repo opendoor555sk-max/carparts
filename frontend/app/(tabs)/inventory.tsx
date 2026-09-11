@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Linking,
   Modal,
@@ -15,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Location from "expo-location";
 
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
@@ -23,6 +25,16 @@ import { ConfirmModal, Header, StatusChip, Loading, EmptyState, FilterChip } fro
 import { printInventory, brandingFromUser } from "@/src/utils/print";
 import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
+
+type LocationCheckResult = {
+  part_number: string;
+  assigned_location: string | null;
+  current_location: string | null;
+  location_mismatch: boolean;
+  units_total: number;
+  units_with_location: number;
+  inconsistent_locations: string[] | null;
+};
 
 type Unit = {
   id: string;
@@ -51,6 +63,9 @@ export default function Inventory() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const scannedRef = useRef(false);
+  // Location-check result for the currently scanned/searched part.
+  const [locCheck, setLocCheck] = useState<LocationCheckResult | null>(null);
+  const [checkingLoc, setCheckingLoc] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -66,6 +81,36 @@ export default function Inventory() {
       setRefreshing(false);
     }
   }, [cond, pnFilter]);
+
+  // Fetches a one-time GPS fix and calls GET /inventory/location-check for `pn`,
+  // comparing it against the part's assigned_location. Runs on a completed scan
+  // or an explicit search submit — not on every keystroke.
+  const checkLocation = useCallback(async (raw: string) => {
+    const pn = raw.trim();
+    if (!pn) {
+      setLocCheck(null);
+      return;
+    }
+    setCheckingLoc(true);
+    try {
+      let currentGps = "";
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === "granted") {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          currentGps = `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`;
+        }
+      } catch {}
+      const params = new URLSearchParams({ part_number: pn });
+      if (currentGps) params.set("current_location", currentGps);
+      const res = await api.get<LocationCheckResult>(`/inventory/location-check?${params.toString()}`);
+      setLocCheck(res);
+    } catch {
+      setLocCheck(null);
+    } finally {
+      setCheckingLoc(false);
+    }
+  }, []);
 
   const openScanner = async () => {
     let perm = permission;
@@ -90,6 +135,7 @@ export default function Inventory() {
     setPnFilter(pn);
     setScannerOpen(false);
     show(`Filtering by: ${pn}`, "success");
+    checkLocation(pn);
   };
 
   useFocusEffect(
@@ -157,7 +203,9 @@ export default function Inventory() {
         <TextInput
           style={[styles.pnInput, { flex: 1 }]}
           value={pnFilter}
-          onChangeText={setPnFilter}
+          onChangeText={(t) => { setPnFilter(t); setLocCheck(null); }}
+          onSubmitEditing={() => checkLocation(pnFilter)}
+          returnKeyType="search"
           placeholder="Filter by part number"
           placeholderTextColor={colors.info}
           autoCapitalize="characters"
@@ -165,7 +213,7 @@ export default function Inventory() {
           testID="inv-pn-filter"
         />
         {pnFilter ? (
-          <Pressable style={styles.clearBtn} onPress={() => setPnFilter("")} hitSlop={8} testID="inv-pn-clear">
+          <Pressable style={styles.clearBtn} onPress={() => { setPnFilter(""); setLocCheck(null); }} hitSlop={8} testID="inv-pn-clear">
             <Ionicons name="close" size={18} color={colors.info} />
           </Pressable>
         ) : null}
@@ -174,6 +222,32 @@ export default function Inventory() {
           <Text style={styles.scanBtnText}>Scan</Text>
         </Pressable>
       </View>
+
+      {checkingLoc ? (
+        <View style={styles.locBannerNeutral} testID="loc-checking">
+          <ActivityIndicator size="small" color={colors.info} />
+          <Text style={styles.locBannerNeutralText}>Checking location…</Text>
+        </View>
+      ) : locCheck && (locCheck.location_mismatch || (locCheck.inconsistent_locations && locCheck.inconsistent_locations.length > 1)) ? (
+        <View style={styles.locBannerBad} testID="loc-warning">
+          <Ionicons name="warning" size={22} color="#fff" />
+          <Text style={styles.locBannerBadText}>
+            {locCheck.location_mismatch
+              ? `⚠️ WRONG LOCATION — should be at: ${locCheck.assigned_location || "unknown"}`
+              : `⚠️ INCONSISTENT LOCATIONS ON RECORD: ${(locCheck.inconsistent_locations || []).join(", ")}`}
+          </Text>
+        </View>
+      ) : locCheck && locCheck.assigned_location ? (
+        <View style={styles.locBannerGood} testID="loc-ok">
+          <Ionicons name="checkmark-circle" size={22} color="#fff" />
+          <Text style={styles.locBannerGoodText}>✅ Correct location: {locCheck.assigned_location}</Text>
+        </View>
+      ) : locCheck ? (
+        <View style={styles.locBannerNeutral} testID="loc-none">
+          <Ionicons name="information-circle" size={16} color={colors.info} />
+          <Text style={styles.locBannerNeutralText}>No assigned location on record for {locCheck.part_number}.</Text>
+        </View>
+      ) : null}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -300,6 +374,12 @@ const styles = StyleSheet.create({
   scanBracket: { width: 240, height: 160, borderWidth: 3, borderColor: colors.brand, borderRadius: radius.md },
   scanHint: { color: "#fff", fontSize: font.base, marginTop: spacing.lg, textAlign: "center", paddingHorizontal: spacing.xl },
   scanClose: { position: "absolute", top: 48, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
+  locBannerBad: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.error, marginHorizontal: spacing.lg, marginTop: spacing.sm, borderRadius: radius.md, padding: spacing.md },
+  locBannerBadText: { flex: 1, color: "#fff", fontWeight: "900", fontSize: font.base, letterSpacing: 0.3 },
+  locBannerGood: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.success, marginHorizontal: spacing.lg, marginTop: spacing.sm, borderRadius: radius.md, padding: spacing.md },
+  locBannerGoodText: { flex: 1, color: "#fff", fontWeight: "800", fontSize: font.base },
+  locBannerNeutral: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, marginHorizontal: spacing.lg, marginTop: spacing.sm, borderRadius: radius.md, padding: spacing.md },
+  locBannerNeutralText: { flex: 1, color: colors.info, fontSize: font.sm, fontWeight: "600" },
   chipScroller: { maxHeight: 56, borderBottomWidth: 1, borderBottomColor: colors.divider },
   chipRow: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, alignItems: "center" },
   card: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden" },

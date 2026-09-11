@@ -171,6 +171,23 @@ export default function Admin() {
 
             {isAdmin ? (
               <Pressable
+                style={[styles.link, { marginTop: spacing.md, borderColor: colors.warning }]}
+                onPress={() => router.push("/unlinked-stock" as any)}
+                testID="admin-link-unlinked-stock"
+              >
+                <View style={styles.linkIcon}>
+                  <Ionicons name="warning" size={22} color={colors.warning} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.linkTitle}>Unlinked Stock</Text>
+                  <Text style={styles.linkSub}>Units with no purchase record — link them properly</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.info} />
+              </Pressable>
+            ) : null}
+
+            {isAdmin ? (
+              <Pressable
                 style={[styles.link, { marginTop: spacing.md }]}
                 onPress={() => router.push("/history" as any)}
                 testID="admin-link-history"
