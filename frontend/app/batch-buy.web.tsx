@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { unstable_createElement } from "react-native-web";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,6 +13,7 @@ import * as Location from "expo-location";
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
 import { Button, Field, Header } from "@/src/components/ui";
+import { EMPTY_LOCATION, LocationPicker, isLocationEmpty, type AssignedLocation } from "@/src/components/LocationPicker";
 import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
@@ -37,8 +38,11 @@ export default function BatchBuyWeb() {
   const [counts, setCounts] = useState<{ pn: string; qty: number }[]>([]);
   const [confirming, setConfirming] = useState(false);
   const [gps, setGps] = useState("");
-  // Optional shelf/rack label applied to every unit added in this confirm.
-  const [assignedLocation, setAssignedLocation] = useState("");
+  // Optional hierarchical shelf/rack address applied to every unit added in this confirm.
+  const [assignedLocation, setAssignedLocation] = useState<AssignedLocation>({
+    ...EMPTY_LOCATION,
+    store_name: isSuperAdmin ? null : user?.store_name || null,
+  });
   const videoRef = useRef<any>(null);
   const controlsRef = useRef<any>(null);
   const busy = useRef(false);
@@ -141,7 +145,7 @@ export default function BatchBuyWeb() {
             company,
             condition: "Unknown",
             location: { gps },
-            assigned_location: assignedLocation.trim() || undefined,
+            assigned_location: isLocationEmpty(assignedLocation) ? undefined : assignedLocation,
             override: false,
           });
           ok++;
@@ -237,7 +241,7 @@ export default function BatchBuyWeb() {
       <FlatList
         data={counts}
         keyExtractor={(c) => c.pn}
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm, paddingBottom: insets.bottom + 90 }}
+        contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm, paddingBottom: insets.bottom + 320 }}
         ListEmptyComponent={<Text style={styles.empty}>Nothing scanned yet</Text>}
         renderItem={({ item }) => (
           <View style={styles.row} testID={`batch-${item.pn}`}>
@@ -258,15 +262,15 @@ export default function BatchBuyWeb() {
         )}
       />
       <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
-        <View style={{ marginBottom: spacing.sm }}>
-          <Field
+        <ScrollView style={styles.locScroll} contentContainerStyle={{ paddingBottom: spacing.sm }}>
+          <LocationPicker
             value={assignedLocation}
-            onChangeText={setAssignedLocation}
-            placeholder="Assigned Location (optional) — e.g. Rack A-3"
-            autoCapitalize="characters"
-            testID="batch-assigned-location"
+            onChange={setAssignedLocation}
+            showStoreName={isSuperAdmin}
+            label="Assigned Location (optional)"
+            testIDPrefix="batch-loc"
           />
-        </View>
+        </ScrollView>
         <Button
           title={confirming ? "Adding to stock…" : `Confirm & Add to Stock (${total})`}
           onPress={confirmAndAddToStock}
@@ -313,4 +317,5 @@ const styles = StyleSheet.create({
   qtyBadge: { backgroundColor: colors.success, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, minWidth: 48, alignItems: "center" },
   qtyText: { color: colors.onSuccess, fontWeight: "900", fontSize: 22 },
   bar: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.md },
+  locScroll: { maxHeight: 230, marginBottom: spacing.sm },
 });

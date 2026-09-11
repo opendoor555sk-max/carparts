@@ -6,6 +6,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
 import { Card, EmptyState, Header, Loading } from "@/src/components/ui";
+import { formatAssignedLocation, type AssignedLocation } from "@/src/components/LocationPicker";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type UnlinkedUnit = {
@@ -13,7 +14,7 @@ type UnlinkedUnit = {
   part_number: string;
   condition: string;
   location?: Record<string, string>;
-  assigned_location?: string | null;
+  assigned_location?: AssignedLocation | null;
   barcode?: string;
   created_at: string;
   added_by?: string;
@@ -89,7 +90,7 @@ export default function UnlinkedStock() {
                   {item.assigned_location ? (
                     <View style={styles.locRow}>
                       <Ionicons name="location" size={12} color={colors.info} />
-                      <Text style={styles.locText}>{item.assigned_location}</Text>
+                      <Text style={styles.locText}>{formatAssignedLocation(item.assigned_location)}</Text>
                     </View>
                   ) : null}
                 </View>
