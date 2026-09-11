@@ -85,6 +85,14 @@ export function SignOutButton({ testID = "quick-signout" }: { testID?: string })
           setConfirming(false);
           await logout();
           if (Platform.OS === "android") {
+            // logout() resolving only means the storage write was *queued* —
+            // Android's SharedPreferences-backed SecureStore/AsyncStorage flush
+            // to disk on a background thread, and BackHandler.exitApp() hard-kills
+            // the process (Process.killProcess), bypassing the normal lifecycle
+            // that would otherwise let that flush finish. Give it a moment before
+            // killing the process, so the cleared token reliably survives to the
+            // next cold start instead of racing the disk write.
+            await new Promise((resolve) => setTimeout(resolve, 400));
             BackHandler.exitApp();
           }
         }}

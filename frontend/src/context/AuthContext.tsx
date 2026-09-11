@@ -117,8 +117,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await storage.secureRemove(TOKEN_KEY);
-    await storage.removeItem(USER_KEY);
+    // storage never throws — a failed clear resolves `false` silently — so check
+    // and retry once rather than assuming success. Also re-read the token back to
+    // confirm it's actually gone before returning, since a caller (e.g. the quick
+    // Sign Out button) may hard-kill the process right after this resolves.
+    let tokenCleared = await storage.secureRemove(TOKEN_KEY);
+    if (!tokenCleared) tokenCleared = await storage.secureRemove(TOKEN_KEY);
+    let userCleared = await storage.removeItem(USER_KEY);
+    if (!userCleared) userCleared = await storage.removeItem(USER_KEY);
+    const stillThere = await storage.secureGet<string | null>(TOKEN_KEY, null);
+    if (stillThere !== null) {
+      console.warn("[auth] logout: token still present after clear+retry");
+    }
     setHasStoredToken(false);
     setUser(null);
   }, []);
