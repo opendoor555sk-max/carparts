@@ -464,6 +464,8 @@ class BuyIn(BaseModel):
     variant: Optional[str] = ""
     condition: str = "Unknown"
     location: Optional[Dict[str, str]] = {}
+    # Manual shelf/rack/bin label — distinct from `location` above, which is GPS-only.
+    assigned_location: Optional[str] = None
     price: Optional[float] = None
     photos: Optional[List[str]] = []
     barcode: Optional[str] = ""
@@ -1194,7 +1196,8 @@ async def buy(body: BuyIn, store_id: Optional[str] = None, user=Depends(require(
                                           "limit": limit})
     unit = {
         "id": new_id(), "store_id": sid, "part_number": pn, "condition": body.condition,
-        "location": body.location or {}, "photos": body.photos or [],
+        "location": body.location or {}, "assigned_location": (body.assigned_location or "").strip() or None,
+        "photos": body.photos or [],
         "barcode": body.barcode or "", "sold": False, "created_at": now_iso(),
         "added_by": user["username"], "overridden": bool(body.override and limit.get("status") == "STOP"),
     }
@@ -1260,12 +1263,60 @@ async def inventory(condition: Optional[str] = None, q: Optional[str] = None, st
     return out
 
 
+@api.get("/inventory/location-check")
+async def inventory_location_check(part_number: str, current_location: Optional[str] = None,
+                                    store_id: Optional[str] = None, user=Depends(get_current_user)):
+    """Look up a part's assigned (shelf/rack) location and flag a mismatch against
+    `current_location` — the location the caller is physically scanning/checking
+    from right now (passed in by the client; nothing here can observe that on its
+    own). If active units of this part disagree on assigned_location, that's
+    reported too, since it's itself a data-integrity problem worth surfacing.
+    """
+    pn = part_number.strip()
+    if not pn:
+        raise HTTPException(400, "Part number required")
+    query = sq(user, {"part_number": pn, "sold": {"$ne": True}}, store_id)
+    units = await db.stock.find(query, {"_id": 0, "assigned_location": 1}).to_list(2000)
+    locations = sorted({u["assigned_location"] for u in units if u.get("assigned_location")})
+    assigned_location = locations[0] if len(locations) == 1 else None
+    cur = (current_location or "").strip() or None
+    mismatch = bool(cur and assigned_location and cur.strip().lower() != assigned_location.strip().lower())
+    return {
+        "part_number": pn,
+        "assigned_location": assigned_location,
+        "current_location": cur,
+        "location_mismatch": mismatch,
+        "units_total": len(units),
+        "units_with_location": sum(1 for u in units if u.get("assigned_location")),
+        "inconsistent_locations": locations if len(locations) > 1 else None,
+    }
+
+
+@api.get("/inventory/unlinked-stock")
+async def inventory_unlinked_stock(store_id: Optional[str] = None, user=Depends(require_admin)):
+    """Active stock units with no traceable purchase record: neither a `buy`
+    transaction referencing the unit (the normal /buy path) nor the `adjusted`
+    flag set (the tracked /stock/adjust admin path). A unit failing both must
+    have been inserted outside the app's normal flow (direct DB write, import,
+    migration) — flag it for proper entry.
+    """
+    query = sq(user, {"sold": {"$ne": True}, "adjusted": {"$ne": True}}, store_id)
+    units = await db.stock.find(query, {"_id": 0}).sort("created_at", -1).to_list(5000)
+    if not units:
+        return []
+    unit_ids = [u["id"] for u in units]
+    txn_query = sq(user, {"type": "buy", "unit_id": {"$in": unit_ids}}, store_id)
+    linked_ids = {t["unit_id"] async for t in db.transactions.find(txn_query, {"_id": 0, "unit_id": 1})}
+    return [u for u in units if u["id"] not in linked_ids]
+
+
 # ---------------- Stock adjust / delete (Admin only) ----------------
 class StockAdjustIn(BaseModel):
     part_number: str
     delta: int = 0
     condition: Optional[str] = None
     location: Optional[Dict[str, Any]] = None
+    assigned_location: Optional[str] = None
 
 
 @api.post("/stock/adjust")
@@ -1280,7 +1331,8 @@ async def stock_adjust(body: StockAdjustIn, store_id: Optional[str] = None, user
     if delta > 0:
         for _ in range(delta):
             unit = {"id": new_id(), "store_id": sid, "part_number": pn, "condition": body.condition or "Unknown",
-                    "location": body.location or {}, "photos": [], "barcode": "",
+                    "location": body.location or {}, "assigned_location": (body.assigned_location or "").strip() or None,
+                    "photos": [], "barcode": "",
                     "sold": False, "created_at": now_iso(), "added_by": user["username"], "adjusted": True}
             await db.stock.insert_one(dict(unit))
             added += 1
@@ -1296,6 +1348,23 @@ async def stock_adjust(body: StockAdjustIn, store_id: Optional[str] = None, user
                                           "quantity": removed, "by": user["username"], "at": now_iso()})
     remaining = await db.stock.count_documents({"store_id": sid, "part_number": pn, "sold": {"$ne": True}})
     return {"ok": True, "added": added, "removed": removed, "remaining_stock": remaining}
+
+
+class StockUnitEditIn(BaseModel):
+    assigned_location: Optional[str] = None
+
+
+@api.patch("/stock/unit/{unit_id}")
+async def edit_unit(unit_id: str, body: StockUnitEditIn, user=Depends(require_admin)):
+    unit = await db.stock.find_one({"id": unit_id})
+    if not unit:
+        raise HTTPException(404, "Unit મળ્યું નથી")
+    if user.get("role") != "super_admin" and unit.get("store_id") != user.get("store_id"):
+        raise HTTPException(403, "બીજા store નું unit edit ન કરાય")
+    new_loc = (body.assigned_location or "").strip() or None
+    await db.stock.update_one({"id": unit_id}, {"$set": {"assigned_location": new_loc}})
+    updated = await db.stock.find_one({"id": unit_id}, {"_id": 0})
+    return {"ok": True, "unit": updated}
 
 
 @api.delete("/stock/unit/{unit_id}")
