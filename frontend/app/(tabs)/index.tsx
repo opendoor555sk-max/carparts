@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import {
+  BackHandler,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -51,6 +53,20 @@ export default function Home() {
       const saved = await storage.getItem<string>("kabadi.company", "All");
       if (saved) setCompany(saved);
     })();
+  }, []);
+
+  // Hardware back button on the Home tab should fully exit the app to the
+  // phone's own Home screen, not just sit there / bounce between tabs.
+  // Android-only: iOS forbids apps from self-terminating (App Store
+  // guidelines reject apps that try) — no equivalent exists there, so the
+  // OS's own home gesture/button is the only way to leave on iOS.
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      BackHandler.exitApp();
+      return true;
+    });
+    return () => sub.remove();
   }, []);
 
   const selectCompany = async (c: string) => {
