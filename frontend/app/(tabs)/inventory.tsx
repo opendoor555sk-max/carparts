@@ -16,7 +16,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import * as Location from "expo-location";
 
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
@@ -63,9 +62,13 @@ export default function Inventory() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const scannedRef = useRef(false);
-  // Location-check result for the currently scanned/searched part.
+  // Location-check result for the currently scanned/searched part. currentRack is
+  // typed by the staff member doing the physical check — a text label compared
+  // directly against assigned_location, not GPS (GPS coords never match a manual
+  // rack/shelf label, so that comparison was always going to false-positive).
   const [locCheck, setLocCheck] = useState<LocationCheckResult | null>(null);
   const [checkingLoc, setCheckingLoc] = useState(false);
+  const [currentRack, setCurrentRack] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -82,35 +85,31 @@ export default function Inventory() {
     }
   }, [cond, pnFilter]);
 
-  // Fetches a one-time GPS fix and calls GET /inventory/location-check for `pn`,
-  // comparing it against the part's assigned_location. Runs on a completed scan
-  // or an explicit search submit — not on every keystroke.
-  const checkLocation = useCallback(async (raw: string) => {
-    const pn = raw.trim();
-    if (!pn) {
-      setLocCheck(null);
-      return;
-    }
-    setCheckingLoc(true);
-    try {
-      let currentGps = "";
+  // Calls GET /inventory/location-check for `pn`, comparing it against the part's
+  // assigned_location using the rack label the staff member typed in (currentRack) —
+  // a proper text-to-text comparison, not GPS. Runs on a completed scan or an
+  // explicit search submit — not on every keystroke.
+  const checkLocation = useCallback(
+    async (raw: string) => {
+      const pn = raw.trim();
+      if (!pn) {
+        setLocCheck(null);
+        return;
+      }
+      setCheckingLoc(true);
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === "granted") {
-          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          currentGps = `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`;
-        }
-      } catch {}
-      const params = new URLSearchParams({ part_number: pn });
-      if (currentGps) params.set("current_location", currentGps);
-      const res = await api.get<LocationCheckResult>(`/inventory/location-check?${params.toString()}`);
-      setLocCheck(res);
-    } catch {
-      setLocCheck(null);
-    } finally {
-      setCheckingLoc(false);
-    }
-  }, []);
+        const params = new URLSearchParams({ part_number: pn });
+        if (currentRack.trim()) params.set("current_location", currentRack.trim());
+        const res = await api.get<LocationCheckResult>(`/inventory/location-check?${params.toString()}`);
+        setLocCheck(res);
+      } catch {
+        setLocCheck(null);
+      } finally {
+        setCheckingLoc(false);
+      }
+    },
+    [currentRack],
+  );
 
   const openScanner = async () => {
     let perm = permission;
@@ -221,6 +220,22 @@ export default function Inventory() {
           <Ionicons name="barcode-outline" size={20} color={colors.onBrand} />
           <Text style={styles.scanBtnText}>Scan</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.rackRow}>
+        <Ionicons name="location-outline" size={16} color={colors.info} />
+        <TextInput
+          style={styles.rackInput}
+          value={currentRack}
+          onChangeText={setCurrentRack}
+          onSubmitEditing={() => checkLocation(locCheck?.part_number || pnFilter)}
+          returnKeyType="done"
+          placeholder="Current Rack (where you're checking from)"
+          placeholderTextColor={colors.info}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          testID="inv-current-rack"
+        />
       </View>
 
       {checkingLoc ? (
@@ -366,6 +381,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
   pnRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   pnInput: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.base },
+  rackRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  rackInput: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.sm },
   clearBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
   scanBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.brand, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   scanBtnText: { color: colors.onBrand, fontWeight: "800", fontSize: font.sm },
