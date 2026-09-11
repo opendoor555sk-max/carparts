@@ -1440,12 +1440,16 @@ class StockUnitEditIn(BaseModel):
 
 
 @api.patch("/stock/unit/{unit_id}")
-async def edit_unit(unit_id: str, body: StockUnitEditIn, user=Depends(require_admin)):
+async def edit_unit(unit_id: str, body: StockUnitEditIn, user=Depends(require("buy"))):
+    # Setting/updating a unit's assigned_location is a normal part of the buy ->
+    # store-arrangement workflow, so anyone who can buy can arrange it — not just
+    # admins. This endpoint only ever touches assigned_location; deleting a unit
+    # (DELETE /stock/unit/{id}) remains admin-only.
     unit = await db.stock.find_one({"id": unit_id})
     if not unit:
         raise HTTPException(404, "Unit મળ્યું નથી")
     if user.get("role") != "super_admin" and unit.get("store_id") != user.get("store_id"):
-        raise HTTPException(403, "બીજા store નું unit edit ન કરાય")
+        raise HTTPException(403, "તમારા store નું unit જ edit કરી શકાય")
     new_loc = _location_from_model(body.assigned_location)
     await db.stock.update_one({"id": unit_id}, {"$set": {"assigned_location": new_loc}})
     updated = await db.stock.find_one({"id": unit_id}, {"_id": 0})

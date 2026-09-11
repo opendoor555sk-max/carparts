@@ -47,6 +47,7 @@ type Unit = {
   part_number: string;
   condition: string;
   location: Record<string, string>;
+  assigned_location?: AssignedLocation | null;
   part_name?: string;
   company?: string;
 };
@@ -331,6 +332,16 @@ export default function Inventory() {
                     <Ionicons name="location" size={13} color={colors.info} />
                     <Text style={styles.loc}>{locStr(item.location || {})}</Text>
                   </View>
+                  {item.assigned_location ? (
+                    <View style={styles.arrangedRow}>
+                      <Ionicons name="pricetag" size={12} color={colors.success} />
+                      <Text style={styles.arrangedText}>{formatAssignedLocation(item.assigned_location)}</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.pendingBadge} testID={`pending-${item.id}`}>
+                      <Text style={styles.pendingBadgeText}>⏳ Location Pending</Text>
+                    </View>
+                  )}
                 </View>
                 <StatusChip status={item.condition} />
               </Pressable>
@@ -452,6 +463,19 @@ const styles = StyleSheet.create({
   name: { color: colors.onSurface3, fontSize: font.base, marginTop: 2 },
   locRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: spacing.xs },
   loc: { color: colors.info, fontSize: font.sm },
+  arrangedRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  arrangedText: { color: colors.success, fontSize: font.sm, fontWeight: "700" },
+  pendingBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#3a3300",
+    borderWidth: 1,
+    borderColor: colors.warning,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    marginTop: 4,
+  },
+  pendingBadgeText: { color: colors.warning, fontSize: font.sm - 1, fontWeight: "800" },
   adminBar: { flexDirection: "row", borderTopWidth: 1, borderTopColor: colors.divider },
   adminBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: spacing.sm },
   adminBtnText: { fontSize: font.sm, fontWeight: "800" },
