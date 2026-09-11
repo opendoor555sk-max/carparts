@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import { Platform } from "react-native";
+import { useRouter } from "expo-router";
 
 import { api, TOKEN_KEY, USER_KEY } from "@/src/api/client";
 import { storage } from "@/src/utils/storage";
@@ -45,6 +46,7 @@ const AuthContext = createContext<AuthState>({} as AuthState);
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasStoredToken, setHasStoredToken] = useState(false);
@@ -119,8 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     // storage never throws — a failed clear resolves `false` silently — so check
     // and retry once rather than assuming success. Also re-read the token back to
-    // confirm it's actually gone before returning, since a caller (e.g. the quick
-    // Sign Out button) may hard-kill the process right after this resolves.
+    // confirm it's actually gone before returning.
     let tokenCleared = await storage.secureRemove(TOKEN_KEY);
     if (!tokenCleared) tokenCleared = await storage.secureRemove(TOKEN_KEY);
     let userCleared = await storage.removeItem(USER_KEY);
@@ -131,7 +132,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setHasStoredToken(false);
     setUser(null);
-  }, []);
+    // The actual fix for "Sign Out doesn't show Login on reopen": nothing was
+    // ever navigating away from whatever protected screen was on-screen when
+    // logout() ran. app/index.tsx's <Redirect> only gets evaluated when the
+    // router visits "/" — which never happened on its own, so a currently
+    // focused (tabs) screen just kept rendering with a null user in memory.
+    // This also means BackHandler.exitApp() on Android was never guaranteed
+    // to matter here: it doesn't call Process.killProcess()/System.exit() —
+    // it only invokes the native default back-press action (moveTaskToBack/
+    // finish), so the process and all in-memory state can survive and simply
+    // resume in the background. Navigate explicitly so the app is correct
+    // whether or not the process actually dies.
+    router.replace("/login");
+  }, [router]);
 
   const refresh = useCallback(async () => {
     try {

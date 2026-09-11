@@ -60,12 +60,19 @@ export function Header({
 // button rather than buried in a menu — an accidental sign-out here would
 // be more disruptive than the old, harder-to-reach entry point.
 //
-// On Android, after logging out this also exits the app entirely
-// (BackHandler.exitApp()) so the user lands on the phone's own Home
-// screen rather than staying on the in-app login screen. iOS has no
-// equivalent — Apple's guidelines forbid apps from self-terminating, and
-// apps that attempt it get rejected — so on iOS this just logs out and
-// leaves the user on the login screen as normal.
+// logout() itself (AuthContext) already navigates to /login — that's the
+// real fix for "reopening the app shows the old logged-in screen": nothing
+// used to route away from whatever protected screen was focused when
+// logout ran. On Android, this also then calls BackHandler.exitApp() as a
+// best-effort extra step so the user lands on the phone's Home screen —
+// but note exitApp() does NOT reliably kill the process (verified against
+// the installed react-native source: it only invokes the native default
+// back-press action, not Process.killProcess()/System.exit()), so the app
+// may just background and later resume rather than cold-start. The /login
+// navigation above is what guarantees correctness either way. iOS has no
+// exitApp equivalent at all — Apple's guidelines forbid apps from
+// self-terminating — so on iOS this just logs out and leaves the user on
+// the login screen, which is now correct there too.
 export function SignOutButton({ testID = "quick-signout" }: { testID?: string }) {
   const { logout } = useAuth();
   const [confirming, setConfirming] = useState(false);
@@ -85,13 +92,10 @@ export function SignOutButton({ testID = "quick-signout" }: { testID?: string })
           setConfirming(false);
           await logout();
           if (Platform.OS === "android") {
-            // logout() resolving only means the storage write was *queued* —
-            // Android's SharedPreferences-backed SecureStore/AsyncStorage flush
-            // to disk on a background thread, and BackHandler.exitApp() hard-kills
-            // the process (Process.killProcess), bypassing the normal lifecycle
-            // that would otherwise let that flush finish. Give it a moment before
-            // killing the process, so the cleared token reliably survives to the
-            // next cold start instead of racing the disk write.
+            // Give the /login navigation (triggered inside logout()) a moment
+            // to actually commit/render before the task backgrounds, in case
+            // exitApp() doesn't fully evict the process (see note above) and
+            // the same instance later resumes.
             await new Promise((resolve) => setTimeout(resolve, 400));
             BackHandler.exitApp();
           }
