@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -57,6 +59,13 @@ export function Header({
 // Confirms before signing out since this is now a prominent, easy-to-tap
 // button rather than buried in a menu — an accidental sign-out here would
 // be more disruptive than the old, harder-to-reach entry point.
+//
+// On Android, after logging out this also exits the app entirely
+// (BackHandler.exitApp()) so the user lands on the phone's own Home
+// screen rather than staying on the in-app login screen. iOS has no
+// equivalent — Apple's guidelines forbid apps from self-terminating, and
+// apps that attempt it get rejected — so on iOS this just logs out and
+// leaves the user on the login screen as normal.
 export function SignOutButton({ testID = "quick-signout" }: { testID?: string }) {
   const { logout } = useAuth();
   const [confirming, setConfirming] = useState(false);
@@ -72,9 +81,12 @@ export function SignOutButton({ testID = "quick-signout" }: { testID?: string })
         message="You'll need to log in again to continue."
         confirmText="Sign Out"
         danger
-        onConfirm={() => {
+        onConfirm={async () => {
           setConfirming(false);
-          logout();
+          await logout();
+          if (Platform.OS === "android") {
+            BackHandler.exitApp();
+          }
         }}
         onCancel={() => setConfirming(false)}
       />
