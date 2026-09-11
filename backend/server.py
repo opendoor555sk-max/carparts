@@ -93,6 +93,62 @@ def new_id() -> str:
     return str(uuid.uuid4())
 
 
+# ---------------- Hierarchical location address ----------------
+# "Store [name] · [Wall: Front/Back/Left/Right] · [Rack name OR Open Floor +
+# Carton number] · [Shelf: Top/Middle/Bottom]" — replaces the old free-text
+# `assigned_location` field with a structured object so /inventory/location-check
+# can compare fields instead of fuzzy-matching strings.
+VALID_WALLS = {"Front", "Back", "Left", "Right"}
+VALID_SHELVES = {"Top", "Middle", "Bottom"}
+
+
+def _normalize_location_fields(
+    store_name: Optional[str], wall: Optional[str], rack_name: Optional[str],
+    is_open_floor: Optional[bool], carton_number: Optional[Any], shelf_level: Optional[str],
+) -> Optional[Dict[str, Any]]:
+    store_name = (store_name or "").strip() or None
+    wall_raw = (wall or "").strip()
+    wall_norm = wall_raw.title() if wall_raw else None
+    if wall_norm and wall_norm not in VALID_WALLS:
+        wall_norm = None
+    is_open_floor = bool(is_open_floor)
+    rack_name_norm = None if is_open_floor else ((rack_name or "").strip() or None)
+    carton_norm = None
+    if is_open_floor and carton_number not in (None, ""):
+        carton_norm = str(carton_number).strip() or None
+    shelf_raw = (shelf_level or "").strip()
+    shelf_norm = shelf_raw.title() if shelf_raw else None
+    if shelf_norm and shelf_norm not in VALID_SHELVES:
+        shelf_norm = None
+    if is_open_floor:
+        shelf_norm = None
+    if not any([store_name, wall_norm, rack_name_norm, carton_norm, shelf_norm]):
+        return None
+    return {
+        "store_name": store_name, "wall": wall_norm, "rack_name": rack_name_norm,
+        "is_open_floor": is_open_floor, "carton_number": carton_norm, "shelf_level": shelf_norm,
+    }
+
+
+def _location_from_model(loc: Optional["AssignedLocationIn"]) -> Optional[Dict[str, Any]]:
+    if loc is None:
+        return None
+    return _normalize_location_fields(
+        loc.store_name, loc.wall, loc.rack_name, loc.is_open_floor, loc.carton_number, loc.shelf_level,
+    )
+
+
+def _location_key(loc: Optional[Dict[str, Any]]):
+    """Hashable/sortable fingerprint of a normalized location dict, for grouping
+    and equality checks (dicts themselves aren't hashable). String fields are
+    case-folded so e.g. rack "a-3" and "A-3" are treated as the same address."""
+    if not loc:
+        return None
+    def _norm(v: Any) -> Any:
+        return v.strip().lower() if isinstance(v, str) else v
+    return tuple(sorted((k, _norm(v)) for k, v in loc.items()))
+
+
 # ---------------- Permissions ----------------
 ALL_PERMISSIONS = [
     "search", "buy", "sell", "requirement", "manage_parts",
@@ -455,6 +511,18 @@ class PartUpdate(BaseModel):
     photos: Optional[List[str]] = None
 
 
+class AssignedLocationIn(BaseModel):
+    """Structured shelf/rack address — distinct from `location` (GPS-only).
+    Renders as: "Store [name] · [Wall] · [Rack name OR Open Floor + Carton
+    number] · [Shelf]"."""
+    store_name: Optional[str] = None
+    wall: Optional[str] = None  # Front / Back / Left / Right
+    rack_name: Optional[str] = None
+    is_open_floor: bool = False
+    carton_number: Optional[str] = None
+    shelf_level: Optional[str] = None  # Top / Middle / Bottom — Rack only
+
+
 class BuyIn(BaseModel):
     part_number: str
     company: Optional[str] = "All"
@@ -464,8 +532,8 @@ class BuyIn(BaseModel):
     variant: Optional[str] = ""
     condition: str = "Unknown"
     location: Optional[Dict[str, str]] = {}
-    # Manual shelf/rack/bin label — distinct from `location` above, which is GPS-only.
-    assigned_location: Optional[str] = None
+    # Manual hierarchical shelf/rack address — distinct from `location` above, which is GPS-only.
+    assigned_location: Optional[AssignedLocationIn] = None
     price: Optional[float] = None
     photos: Optional[List[str]] = []
     barcode: Optional[str] = ""
@@ -1203,7 +1271,7 @@ async def buy(body: BuyIn, store_id: Optional[str] = None, user=Depends(require(
                                           "limit": limit})
     unit = {
         "id": new_id(), "store_id": sid, "part_number": pn, "condition": body.condition,
-        "location": body.location or {}, "assigned_location": (body.assigned_location or "").strip() or None,
+        "location": body.location or {}, "assigned_location": _location_from_model(body.assigned_location),
         "photos": body.photos or [],
         "barcode": body.barcode or "", "sold": False, "created_at": now_iso(),
         "added_by": user["username"], "overridden": bool(body.override and limit.get("status") == "STOP"),
@@ -1271,23 +1339,40 @@ async def inventory(condition: Optional[str] = None, q: Optional[str] = None, st
 
 
 @api.get("/inventory/location-check")
-async def inventory_location_check(part_number: str, current_location: Optional[str] = None,
-                                    store_id: Optional[str] = None, user=Depends(get_current_user)):
+async def inventory_location_check(
+    part_number: str,
+    current_store_name: Optional[str] = None,
+    current_wall: Optional[str] = None,
+    current_rack_name: Optional[str] = None,
+    current_is_open_floor: Optional[bool] = None,
+    current_carton_number: Optional[str] = None,
+    current_shelf_level: Optional[str] = None,
+    store_id: Optional[str] = None, user=Depends(get_current_user),
+):
     """Look up a part's assigned (shelf/rack) location and flag a mismatch against
-    `current_location` — the location the caller is physically scanning/checking
-    from right now (passed in by the client; nothing here can observe that on its
-    own). If active units of this part disagree on assigned_location, that's
-    reported too, since it's itself a data-integrity problem worth surfacing.
+    the structured `current_*` location — the location the caller is physically
+    scanning/checking from right now (passed in by the client; nothing here can
+    observe that on its own). If active units of this part disagree on
+    assigned_location, that's reported too, since it's itself a data-integrity
+    problem worth surfacing.
     """
     pn = part_number.strip()
     if not pn:
         raise HTTPException(400, "Part number required")
     query = sq(user, {"part_number": pn, "sold": {"$ne": True}}, store_id)
     units = await db.stock.find(query, {"_id": 0, "assigned_location": 1}).to_list(2000)
-    locations = sorted({u["assigned_location"] for u in units if u.get("assigned_location")})
-    assigned_location = locations[0] if len(locations) == 1 else None
-    cur = (current_location or "").strip() or None
-    mismatch = bool(cur and assigned_location and cur.strip().lower() != assigned_location.strip().lower())
+    by_key: Dict[Any, Dict[str, Any]] = {}
+    for u in units:
+        loc = u.get("assigned_location")
+        if loc:
+            by_key[_location_key(loc)] = loc
+    distinct = list(by_key.values())
+    assigned_location = distinct[0] if len(distinct) == 1 else None
+    cur = _normalize_location_fields(
+        current_store_name, current_wall, current_rack_name,
+        current_is_open_floor, current_carton_number, current_shelf_level,
+    )
+    mismatch = bool(cur and assigned_location and _location_key(cur) != _location_key(assigned_location))
     return {
         "part_number": pn,
         "assigned_location": assigned_location,
@@ -1295,7 +1380,7 @@ async def inventory_location_check(part_number: str, current_location: Optional[
         "location_mismatch": mismatch,
         "units_total": len(units),
         "units_with_location": sum(1 for u in units if u.get("assigned_location")),
-        "inconsistent_locations": locations if len(locations) > 1 else None,
+        "inconsistent_locations": distinct if len(distinct) > 1 else None,
     }
 
 
@@ -1323,7 +1408,7 @@ class StockAdjustIn(BaseModel):
     delta: int = 0
     condition: Optional[str] = None
     location: Optional[Dict[str, Any]] = None
-    assigned_location: Optional[str] = None
+    assigned_location: Optional[AssignedLocationIn] = None
 
 
 @api.post("/stock/adjust")
@@ -1338,7 +1423,7 @@ async def stock_adjust(body: StockAdjustIn, store_id: Optional[str] = None, user
     if delta > 0:
         for _ in range(delta):
             unit = {"id": new_id(), "store_id": sid, "part_number": pn, "condition": body.condition or "Unknown",
-                    "location": body.location or {}, "assigned_location": (body.assigned_location or "").strip() or None,
+                    "location": body.location or {}, "assigned_location": _location_from_model(body.assigned_location),
                     "photos": [], "barcode": "",
                     "sold": False, "created_at": now_iso(), "added_by": user["username"], "adjusted": True}
             await db.stock.insert_one(dict(unit))
@@ -1358,17 +1443,21 @@ async def stock_adjust(body: StockAdjustIn, store_id: Optional[str] = None, user
 
 
 class StockUnitEditIn(BaseModel):
-    assigned_location: Optional[str] = None
+    assigned_location: Optional[AssignedLocationIn] = None
 
 
 @api.patch("/stock/unit/{unit_id}")
-async def edit_unit(unit_id: str, body: StockUnitEditIn, user=Depends(require_admin)):
+async def edit_unit(unit_id: str, body: StockUnitEditIn, user=Depends(require("buy"))):
+    # Setting/updating a unit's assigned_location is a normal part of the buy ->
+    # store-arrangement workflow, so anyone who can buy can arrange it — not just
+    # admins. This endpoint only ever touches assigned_location; deleting a unit
+    # (DELETE /stock/unit/{id}) remains admin-only.
     unit = await db.stock.find_one({"id": unit_id})
     if not unit:
         raise HTTPException(404, "Unit મળ્યું નથી")
     if user.get("role") != "super_admin" and unit.get("store_id") != user.get("store_id"):
-        raise HTTPException(403, "બીજા store નું unit edit ન કરાય")
-    new_loc = (body.assigned_location or "").strip() or None
+        raise HTTPException(403, "તમારા store નું unit જ edit કરી શકાય")
+    new_loc = _location_from_model(body.assigned_location)
     await db.stock.update_one({"id": unit_id}, {"$set": {"assigned_location": new_loc}})
     updated = await db.stock.find_one({"id": unit_id}, {"_id": 0})
     return {"ok": True, "unit": updated}

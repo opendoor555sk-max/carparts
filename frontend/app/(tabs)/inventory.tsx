@@ -20,19 +20,26 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
-import { ConfirmModal, Header, StatusChip, Loading, EmptyState, FilterChip } from "@/src/components/ui";
+import { ConfirmModal, Header, StatusChip, Loading, EmptyState, FilterChip, Button } from "@/src/components/ui";
+import {
+  EMPTY_LOCATION,
+  LocationPicker,
+  formatAssignedLocation,
+  locationToQueryParams,
+  type AssignedLocation,
+} from "@/src/components/LocationPicker";
 import { printInventory, brandingFromUser } from "@/src/utils/print";
 import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type LocationCheckResult = {
   part_number: string;
-  assigned_location: string | null;
-  current_location: string | null;
+  assigned_location: AssignedLocation | null;
+  current_location: AssignedLocation | null;
   location_mismatch: boolean;
   units_total: number;
   units_with_location: number;
-  inconsistent_locations: string[] | null;
+  inconsistent_locations: AssignedLocation[] | null;
 };
 
 type Unit = {
@@ -40,6 +47,7 @@ type Unit = {
   part_number: string;
   condition: string;
   location: Record<string, string>;
+  assigned_location?: AssignedLocation | null;
   part_name?: string;
   company?: string;
 };
@@ -51,6 +59,7 @@ export default function Inventory() {
   const { user } = useAuth();
   const { show } = useToast();
   const isAdmin = user?.role === "admin";
+  const isSuperAdmin = user?.role === "super_admin";
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -62,13 +71,18 @@ export default function Inventory() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const scannedRef = useRef(false);
-  // Location-check result for the currently scanned/searched part. currentRack is
-  // typed by the staff member doing the physical check — a text label compared
-  // directly against assigned_location, not GPS (GPS coords never match a manual
-  // rack/shelf label, so that comparison was always going to false-positive).
+  // Location-check result for the currently scanned/searched part. currentLoc is
+  // the structured address of where the staff member is physically standing —
+  // compared field-by-field against assigned_location on the backend, not GPS
+  // (GPS coords never match a manual rack/shelf label, so that comparison was
+  // always going to false-positive).
   const [locCheck, setLocCheck] = useState<LocationCheckResult | null>(null);
   const [checkingLoc, setCheckingLoc] = useState(false);
-  const [currentRack, setCurrentRack] = useState("");
+  const [currentLoc, setCurrentLoc] = useState<AssignedLocation>({
+    ...EMPTY_LOCATION,
+    store_name: isSuperAdmin ? null : user?.store_name || null,
+  });
+  const [locPickerOpen, setLocPickerOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -86,9 +100,9 @@ export default function Inventory() {
   }, [cond, pnFilter]);
 
   // Calls GET /inventory/location-check for `pn`, comparing it against the part's
-  // assigned_location using the rack label the staff member typed in (currentRack) —
-  // a proper text-to-text comparison, not GPS. Runs on a completed scan or an
-  // explicit search submit — not on every keystroke.
+  // assigned_location using the structured address the staff member picked
+  // (currentLoc) — a field-by-field comparison, not GPS. Runs on a completed
+  // scan or an explicit "Check Location" tap — not on every keystroke.
   const checkLocation = useCallback(
     async (raw: string) => {
       const pn = raw.trim();
@@ -98,8 +112,7 @@ export default function Inventory() {
       }
       setCheckingLoc(true);
       try {
-        const params = new URLSearchParams({ part_number: pn });
-        if (currentRack.trim()) params.set("current_location", currentRack.trim());
+        const params = new URLSearchParams({ part_number: pn, ...locationToQueryParams(currentLoc) });
         const res = await api.get<LocationCheckResult>(`/inventory/location-check?${params.toString()}`);
         setLocCheck(res);
       } catch {
@@ -108,7 +121,7 @@ export default function Inventory() {
         setCheckingLoc(false);
       }
     },
-    [currentRack],
+    [currentLoc],
   );
 
   const openScanner = async () => {
@@ -222,21 +235,29 @@ export default function Inventory() {
         </Pressable>
       </View>
 
-      <View style={styles.rackRow}>
+      <Pressable style={styles.rackRow} onPress={() => setLocPickerOpen((o) => !o)} testID="inv-current-loc-toggle">
         <Ionicons name="location-outline" size={16} color={colors.info} />
-        <TextInput
-          style={styles.rackInput}
-          value={currentRack}
-          onChangeText={setCurrentRack}
-          onSubmitEditing={() => checkLocation(locCheck?.part_number || pnFilter)}
-          returnKeyType="done"
-          placeholder="Current Rack (where you're checking from)"
-          placeholderTextColor={colors.info}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          testID="inv-current-rack"
-        />
-      </View>
+        <Text style={styles.rackToggleText} numberOfLines={1}>
+          {formatAssignedLocation(currentLoc) || "Current Location (where you're checking from)"}
+        </Text>
+        <Ionicons name={locPickerOpen ? "chevron-up" : "chevron-down"} size={16} color={colors.info} />
+      </Pressable>
+      {locPickerOpen ? (
+        <View style={styles.rackPickerWrap}>
+          <LocationPicker
+            value={currentLoc}
+            onChange={setCurrentLoc}
+            showStoreName={isSuperAdmin}
+            testIDPrefix="inv-loc"
+          />
+          <Button
+            title="Check Location"
+            onPress={() => checkLocation(locCheck?.part_number || pnFilter)}
+            icon="search"
+            testID="inv-check-location"
+          />
+        </View>
+      ) : null}
 
       {checkingLoc ? (
         <View style={styles.locBannerNeutral} testID="loc-checking">
@@ -248,14 +269,14 @@ export default function Inventory() {
           <Ionicons name="warning" size={22} color="#fff" />
           <Text style={styles.locBannerBadText}>
             {locCheck.location_mismatch
-              ? `⚠️ WRONG LOCATION — should be at: ${locCheck.assigned_location || "unknown"}`
-              : `⚠️ INCONSISTENT LOCATIONS ON RECORD: ${(locCheck.inconsistent_locations || []).join(", ")}`}
+              ? `⚠️ WRONG LOCATION — should be at: ${formatAssignedLocation(locCheck.assigned_location) || "unknown"}`
+              : `⚠️ INCONSISTENT LOCATIONS ON RECORD: ${(locCheck.inconsistent_locations || []).map((l) => formatAssignedLocation(l)).join(", ")}`}
           </Text>
         </View>
       ) : locCheck && locCheck.assigned_location ? (
         <View style={styles.locBannerGood} testID="loc-ok">
           <Ionicons name="checkmark-circle" size={22} color="#fff" />
-          <Text style={styles.locBannerGoodText}>✅ Correct location: {locCheck.assigned_location}</Text>
+          <Text style={styles.locBannerGoodText}>✅ Correct location: {formatAssignedLocation(locCheck.assigned_location)}</Text>
         </View>
       ) : locCheck ? (
         <View style={styles.locBannerNeutral} testID="loc-none">
@@ -311,6 +332,16 @@ export default function Inventory() {
                     <Ionicons name="location" size={13} color={colors.info} />
                     <Text style={styles.loc}>{locStr(item.location || {})}</Text>
                   </View>
+                  {item.assigned_location ? (
+                    <View style={styles.arrangedRow}>
+                      <Ionicons name="pricetag" size={12} color={colors.success} />
+                      <Text style={styles.arrangedText}>{formatAssignedLocation(item.assigned_location)}</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.pendingBadge} testID={`pending-${item.id}`}>
+                      <Text style={styles.pendingBadgeText}>⏳ Location Pending</Text>
+                    </View>
+                  )}
                 </View>
                 <StatusChip status={item.condition} />
               </Pressable>
@@ -381,8 +412,30 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
   pnRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   pnInput: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.base },
-  rackRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  rackInput: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.onSurface, fontSize: font.sm },
+  rackRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  rackToggleText: { flex: 1, color: colors.onSurface2, fontSize: font.sm, fontWeight: "600" },
+  rackPickerWrap: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
   clearBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
   scanBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.brand, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   scanBtnText: { color: colors.onBrand, fontWeight: "800", fontSize: font.sm },
@@ -410,6 +463,19 @@ const styles = StyleSheet.create({
   name: { color: colors.onSurface3, fontSize: font.base, marginTop: 2 },
   locRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: spacing.xs },
   loc: { color: colors.info, fontSize: font.sm },
+  arrangedRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  arrangedText: { color: colors.success, fontSize: font.sm, fontWeight: "700" },
+  pendingBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#3a3300",
+    borderWidth: 1,
+    borderColor: colors.warning,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    marginTop: 4,
+  },
+  pendingBadgeText: { color: colors.warning, fontSize: font.sm - 1, fontWeight: "800" },
   adminBar: { flexDirection: "row", borderTopWidth: 1, borderTopColor: colors.divider },
   adminBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: spacing.sm },
   adminBtnText: { fontSize: font.sm, fontWeight: "800" },

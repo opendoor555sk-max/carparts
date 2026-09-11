@@ -36,6 +36,7 @@ const MODULES: Module[] = [
   { key: "sell", title: "SELL", gujarati: "Sale", icon: "cash", perm: "sell", route: "/scan?mode=sell", color: colors.brand },
   { key: "requirement", title: "REQUIREMENT", gujarati: "Inquiry / Need", icon: "add-circle", perm: "requirement", route: "/scan?mode=requirement", color: colors.warning },
   { key: "batch", title: "MULTIPLE BUY", gujarati: "Quick batch buy", icon: "layers", perm: "buy", route: "/batch-buy", wide: true, color: colors.success },
+  { key: "arrange", title: "STORE ARRANGEMENT", gujarati: "Place bought stock", icon: "location", perm: "buy", route: "/store-arrangement", wide: true, color: colors.info },
 ];
 
 export default function Home() {

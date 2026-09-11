@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 import { fileUrl } from "@/src/api/client";
 import { barcodeSvg } from "@/src/utils/barcode128";
 import { qrSvg } from "@/src/utils/qr";
+import { formatAssignedLocation, type AssignedLocation } from "@/src/components/LocationPicker";
 
 export type Branding = {
   name: string;
@@ -181,6 +182,29 @@ export async function printBarcodeLabel(b: Branding, partNumber: string, company
     </div>
   </div>`;
   await printHtml(wrap("Barcode Label", b, body));
+}
+
+// Simple printable label for the physical rack/shelf spot itself — stuck on the
+// rack/carton rather than the part — showing the structured hierarchical
+// address in large text plus a barcode of the part number for a quick re-scan.
+export async function printLocationSticker(
+  b: Branding,
+  partNumber: string,
+  loc: AssignedLocation,
+  partName?: string,
+): Promise<void> {
+  const addr = formatAssignedLocation(loc) || "No location set";
+  const body = `<div style="text-align:center;padding:10px">
+    <div style="font-size:20px;font-weight:900;letter-spacing:0.5px">${esc(partNumber)}</div>
+    ${partName ? `<div style="font-size:13px;color:#555;margin-top:2px">${esc(partName)}</div>` : ""}
+    <div style="margin-top:16px;font-size:17px;font-weight:800;line-height:1.5;border:2px solid #222;border-radius:10px;padding:14px">
+      ${esc(addr)}
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;margin-top:14px">
+      ${barcodeSvg(partNumber, { height: 60, moduleWidth: 2 })}
+    </div>
+  </div>`;
+  await printHtml(wrap("Location Sticker", b, body));
 }
 
 export async function printRequirements(b: Branding, reqs: any[]): Promise<void> {

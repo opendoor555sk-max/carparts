@@ -36,8 +36,6 @@ export default function BatchBuy() {
   const [counts, setCounts] = useState<{ pn: string; qty: number }[]>([]);
   const [confirming, setConfirming] = useState(false);
   const [gps, setGps] = useState("");
-  // Optional shelf/rack label applied to every unit added in this confirm.
-  const [assignedLocation, setAssignedLocation] = useState("");
   const busy = useRef(false);
   const lastScan = useRef<{ code: string; at: number }>({ code: "", at: 0 });
   const total = useMemo(() => counts.reduce((s, c) => s + c.qty, 0), [counts]);
@@ -141,7 +139,6 @@ export default function BatchBuy() {
             company,
             condition: "Unknown",
             location: { gps },
-            assigned_location: assignedLocation.trim() || undefined,
             override: false,
           });
           ok++;
@@ -167,7 +164,7 @@ export default function BatchBuy() {
       show(`Added ${added} unit(s) to stock`, "success");
       router.replace("/(tabs)/inventory" as any);
     }
-  }, [counts, confirming, company, gps, assignedLocation, show, router]);
+  }, [counts, confirming, company, gps, show, router]);
 
   const onBarcode = useCallback(
     ({ data }: { data: string }) => {
@@ -248,15 +245,6 @@ export default function BatchBuy() {
         )}
       />
       <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
-        <View style={{ marginBottom: spacing.sm }}>
-          <Field
-            value={assignedLocation}
-            onChangeText={setAssignedLocation}
-            placeholder="Assigned Location (optional) — e.g. Rack A-3"
-            autoCapitalize="characters"
-            testID="batch-assigned-location"
-          />
-        </View>
         <Button
           title={confirming ? "Adding to stock…" : `Confirm & Add to Stock (${total})`}
           onPress={confirmAndAddToStock}
