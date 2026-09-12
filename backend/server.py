@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import json
 import logging
@@ -1074,14 +1075,42 @@ async def conditions(user=Depends(get_current_user)):
 
 
 # ---------------- Limit helpers ----------------
+# A given real-world part reaches the backend written two different ways:
+#   - Typed by hand (e.g. in the Limits screen, or a manual search box) —
+#     preserved as-typed, hyphens and all, e.g. "954A0-CCAF0".
+#   - Mined from an actual barcode/QR scan (frontend's extractPartNumber) —
+#     stripped down to just the alphanumeric OEM code, no separators at all,
+#     e.g. "954A0CCAF0".
+# Both spellings are the SAME part, but a plain Mongo equality match treats
+# them as two unrelated documents — so a limit set by typing the hyphenated
+# form never matches stock recorded from a scan of the same part, and the
+# limit silently never triggers. _canon_pn()/_pn_regex() make part-number
+# lookups punctuation-insensitive so either spelling finds the other.
+def _canon_pn(s: Optional[str]) -> str:
+    return re.sub(r"[^0-9A-Z]", "", (s or "").strip().upper())
+
+
+def _pn_regex(part_number: Optional[str]):
+    """A regex matching `part_number` and any punctuation/spacing variant of
+    it with the same alphanumeric characters in the same order (e.g. matches
+    "954A0-CCAF0", "954A0 CCAF0" and "954A0CCAF0" alike). Use as the value of
+    a `part_number` filter in place of an exact-string match."""
+    canon = _canon_pn(part_number)
+    if not canon:
+        return re.compile(r"(?!)")  # matches nothing
+    pattern = r"[^0-9A-Za-z]*".join(re.escape(ch) for ch in canon)
+    return re.compile(f"^{pattern}$", re.IGNORECASE)
+
+
 async def compute_limit(store_id: Optional[str], part_number: str) -> dict:
     # part_number is never case-normalized at write time elsewhere, and Mongo
     # matches are case-sensitive — normalize here so a limit set under one
     # casing still applies to a purchase recorded under a different one.
     part_number = (part_number or "").strip().upper()
     base = {"store_id": store_id} if store_id is not None else {}
-    part = await db.parts.find_one({**base, "part_number": part_number}, {"_id": 0})
-    existing_stock = await db.stock.count_documents({**base, "part_number": part_number, "sold": {"$ne": True}})
+    rx = _pn_regex(part_number)
+    part = await db.parts.find_one({**base, "part_number": rx}, {"_id": 0})
+    existing_stock = await db.stock.count_documents({**base, "part_number": rx, "sold": {"$ne": True}})
     settings = await db.settings.find_one({"key": "purchase_limit", "store_id": store_id})
     limit_enabled = False
     allowed = None
@@ -1110,10 +1139,13 @@ async def compute_limit(store_id: Optional[str], part_number: str) -> dict:
 
 
 async def compute_low_stock(store_id: Optional[str], part_number: str) -> dict:
+    # Same typed-vs-scanned formatting mismatch as compute_limit() above —
+    # match punctuation-insensitively so either spelling finds the other.
     part_number = (part_number or "").strip().upper()
     base = {"store_id": store_id} if store_id is not None else {}
-    part = await db.parts.find_one({**base, "part_number": part_number}, {"_id": 0})
-    stock_count = await db.stock.count_documents({**base, "part_number": part_number, "sold": {"$ne": True}})
+    rx = _pn_regex(part_number)
+    part = await db.parts.find_one({**base, "part_number": rx}, {"_id": 0})
+    stock_count = await db.stock.count_documents({**base, "part_number": rx, "sold": {"$ne": True}})
     enabled = bool(part and part.get("low_stock_enabled") and part.get("low_stock_threshold") is not None)
     threshold = part.get("low_stock_threshold") if part else None
     low = bool(enabled and threshold is not None and stock_count <= threshold)
@@ -1252,7 +1284,20 @@ async def buy(body: BuyIn, store_id: Optional[str] = None, user=Depends(require(
     if not pn:
         raise HTTPException(400, "Part number required")
     sid = resolve_store(user, store_id, require_write=True)
-    part = await db.parts.find_one({"store_id": sid, "part_number": pn}, {"_id": 0})
+    # Match punctuation-insensitively (see _pn_regex) so a buy scanned as
+    # "954A0CCAF0" finds a part document already created under a
+    # differently-formatted spelling of the SAME part number — e.g.
+    # "954A0-CCAF0", typed by hand when an admin proactively set a limit on
+    # it via /limits/part before any purchase existed. Without this, the buy
+    # would spawn an untracked duplicate part with no limit attached, and
+    # the configured limit would silently never apply to it.
+    part = await db.parts.find_one({"store_id": sid, "part_number": _pn_regex(pn)}, {"_id": 0})
+    if part:
+        # Keep recording stock under the identity that already exists (and
+        # may already carry a limit/threshold) rather than the raw scanned
+        # spelling, so every buy of this part accumulates against one
+        # canonical part_number instead of fragmenting across spellings.
+        pn = part["part_number"]
     if not part:
         cat = await db.catalog.find_one({"part_number": pn}, {"_id": 0}) or {}
         comp = body.company if _nonempty(body.company) else cat.get("company")
@@ -1655,6 +1700,14 @@ async def set_part_limit(body: LimitIn, store_id: Optional[str] = None, user=Dep
     if not pn:
         raise HTTPException(400, "Part number required")
     sid = resolve_store(user, store_id, require_write=True)
+    # If a part already exists under a punctuation variant of this same part
+    # number (e.g. an earlier /buy recorded it as scanned, without the hyphen
+    # the admin is typing here), attach the limit to THAT document instead of
+    # upserting a new one — otherwise the limit lands on an untracked
+    # duplicate that no purchase will ever match, and silently never applies.
+    existing = await db.parts.find_one({"store_id": sid, "part_number": _pn_regex(pn)}, {"_id": 0})
+    if existing:
+        pn = existing["part_number"]
     # Previously required a matching part to already exist (created only by a
     # first /buy) and raised 404 otherwise — so setting a limit on a part before
     # ever buying it silently never took effect. Upsert instead: a limit set
@@ -1689,6 +1742,12 @@ async def set_low_stock_threshold(body: LowStockIn, store_id: Optional[str] = No
     if not pn:
         raise HTTPException(400, "Part number required")
     sid = resolve_store(user, store_id, require_write=True)
+    # Same punctuation-variant reuse as /limits/part above — don't spawn an
+    # untracked duplicate part document if one already exists under a
+    # differently-formatted (but identical) part number.
+    existing = await db.parts.find_one({"store_id": sid, "part_number": _pn_regex(pn)}, {"_id": 0})
+    if existing:
+        pn = existing["part_number"]
     # Same upsert pattern as /limits/part: don't require the part to already
     # exist (created only by a first /buy) — a threshold set proactively
     # should still apply from the very first purchase onward.
