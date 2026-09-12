@@ -6,6 +6,25 @@ const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
 export const TOKEN_KEY = "kabadi.token";
 export const USER_KEY = "kabadi.user";
 
+// EXPO_PUBLIC_BACKEND_URL is inlined into the JS bundle at bundle-build time
+// (by `eas build` for the native shell, or by `expo export`/`eas update` for
+// an OTA publish) — it is NOT read at runtime on the device. If whoever ran
+// that bundling step had no (or a stale) EXPO_PUBLIC_BACKEND_URL in their
+// environment, BASE silently bakes in as undefined and every request below
+// becomes a fetch to the literal string "undefined/api/...", which React
+// Native's fetch polyfill reports as a generic, undiagnosable "Network
+// request failed" with no indication why. Fail loudly and specifically
+// instead, once, right away.
+if (!BASE) {
+  const msg =
+    "EXPO_PUBLIC_BACKEND_URL is not set in this build — it was not present " +
+    "when this JS bundle was built (native `eas build` or OTA `eas update`). " +
+    "All API requests will fail. Check eas.json's build.<profile>.env for a " +
+    "native build, or the local .env used when `eas update` was run for an " +
+    "OTA publish.";
+  console.error(msg);
+}
+
 export type ApiError = { status: number; message: string; detail?: any };
 
 async function getToken(): Promise<string | null> {
@@ -18,6 +37,13 @@ async function request<T = any>(
   body?: any,
   auth = true,
 ): Promise<T> {
+  if (!BASE) {
+    const err: ApiError = {
+      status: 0,
+      message: "App is misconfigured: no backend URL was built into this app version. Reinstall the latest build.",
+    };
+    throw err;
+  }
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (auth) {
     const token = await getToken();

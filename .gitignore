@@ -86,3 +86,12 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+
+# Exception: frontend/.env holds only the non-secret public backend URL
+# (already committed in frontend/eas.json's build profiles, and inlined into
+# every shipped JS bundle regardless). It's tracked deliberately so `eas
+# update` (which reads EXPO_PUBLIC_* from this file, unlike `eas build`,
+# which reads eas.json's own env block) can never publish an OTA update with
+# a different/stale backend URL than what native builds use, no matter which
+# machine runs the publish. See frontend/.env for details.
+!frontend/.env
