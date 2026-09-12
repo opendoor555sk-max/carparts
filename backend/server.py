@@ -578,6 +578,12 @@ class LimitIn(BaseModel):
     enabled: bool = True
 
 
+class LowStockIn(BaseModel):
+    part_number: str
+    threshold: Optional[int] = None
+    enabled: bool = True
+
+
 class GlobalLimitIn(BaseModel):
     global_default: Optional[int] = None
     global_enabled: bool = False
@@ -1103,6 +1109,20 @@ async def compute_limit(store_id: Optional[str], part_number: str) -> dict:
     }
 
 
+async def compute_low_stock(store_id: Optional[str], part_number: str) -> dict:
+    part_number = (part_number or "").strip().upper()
+    base = {"store_id": store_id} if store_id is not None else {}
+    part = await db.parts.find_one({**base, "part_number": part_number}, {"_id": 0})
+    stock_count = await db.stock.count_documents({**base, "part_number": part_number, "sold": {"$ne": True}})
+    enabled = bool(part and part.get("low_stock_enabled") and part.get("low_stock_threshold") is not None)
+    threshold = part.get("low_stock_threshold") if part else None
+    low = bool(enabled and threshold is not None and stock_count <= threshold)
+    return {
+        "part_number": part_number, "stock_count": stock_count,
+        "low_stock_enabled": enabled, "low_stock_threshold": threshold, "low": low,
+    }
+
+
 # ---------------- Search ----------------
 async def part_status(store_id: Optional[str], part_number: str) -> dict:
     base = {"store_id": store_id} if store_id is not None else {}
@@ -1335,6 +1355,31 @@ async def inventory(condition: Optional[str] = None, q: Optional[str] = None, st
         if category and u["category"] != category:
             continue
         out.append(u)
+    return out
+
+
+@api.get("/inventory/low-stock")
+async def low_stock_parts(store_id: Optional[str] = None, user=Depends(get_current_user)):
+    """Parts whose current stock_count is at or below their configured
+    low_stock_threshold. Mirrors compute_limit's per-part-then-live-count
+    approach, just applied across all of a store's thresholded parts at once.
+    """
+    query = sq(user, {"low_stock_enabled": True}, store_id)
+    parts = await db.parts.find(query, {"_id": 0}).to_list(1000)
+    out = []
+    for p in parts:
+        threshold = p.get("low_stock_threshold")
+        if threshold is None:
+            continue
+        stock_count = await db.stock.count_documents(
+            {"store_id": p.get("store_id"), "part_number": p["part_number"], "sold": {"$ne": True}})
+        if stock_count <= threshold:
+            out.append({
+                "part_number": p["part_number"], "name": p.get("name", ""),
+                "company": p.get("company", "") or "All", "category": p.get("category", "") or "Uncategorized",
+                "stock_count": stock_count, "low_stock_threshold": threshold,
+            })
+    out.sort(key=lambda x: x["stock_count"])
     return out
 
 
@@ -1635,6 +1680,40 @@ async def set_part_limit(body: LimitIn, store_id: Optional[str] = None, user=Dep
 @api.get("/limits/{part_number}")
 async def get_part_limit(part_number: str, store_id: Optional[str] = None, user=Depends(get_current_user)):
     return await compute_limit(resolve_store(user, store_id), part_number)
+
+
+@api.post("/limits/low-stock")
+async def set_low_stock_threshold(body: LowStockIn, store_id: Optional[str] = None,
+                                  user=Depends(require("manage_limits"))):
+    pn = body.part_number.strip().upper()
+    if not pn:
+        raise HTTPException(400, "Part number required")
+    sid = resolve_store(user, store_id, require_write=True)
+    # Same upsert pattern as /limits/part: don't require the part to already
+    # exist (created only by a first /buy) — a threshold set proactively
+    # should still apply from the very first purchase onward.
+    now = now_iso()
+    await db.parts.update_one(
+        {"store_id": sid, "part_number": pn},
+        {
+            "$set": {"low_stock_threshold": body.threshold, "low_stock_enabled": body.enabled},
+            "$setOnInsert": {
+                "id": new_id(), "store_id": sid, "part_number": pn, "company": "All",
+                "name": "", "category": "", "compatible_vehicles": [], "variant": "",
+                "year": "", "old_number": "", "new_number": "", "barcode": "",
+                "sticker_color": "", "technical_info": "", "photos": [], "source": "LowStock",
+                "verification_status": "Unverified", "created_at": now, "created_by": user["username"],
+            },
+        },
+        upsert=True,
+    )
+    return await compute_low_stock(sid, pn)
+
+
+@api.get("/limits/low-stock/{part_number}")
+async def get_low_stock_threshold(part_number: str, store_id: Optional[str] = None,
+                                  user=Depends(get_current_user)):
+    return await compute_low_stock(resolve_store(user, store_id), part_number)
 
 
 # ---------------- AI Research (Gemini) ----------------

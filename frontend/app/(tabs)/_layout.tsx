@@ -2,8 +2,11 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Platform } from "react-native";
 import { colors, font } from "@/src/theme";
+import { useLowStockCount } from "@/src/hooks/use-low-stock-count";
 
 export default function TabsLayout() {
+  const lowStockCount = useLowStockCount();
+
   return (
     <Tabs
       screenOptions={{
@@ -33,6 +36,8 @@ export default function TabsLayout() {
         options={{
           title: "Inventory",
           tabBarIcon: ({ color, size }) => <Ionicons name="cube" size={size} color={color} />,
+          tabBarBadge: lowStockCount > 0 ? lowStockCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.error },
         }}
       />
       <Tabs.Screen

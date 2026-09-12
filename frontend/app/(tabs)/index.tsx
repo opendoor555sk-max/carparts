@@ -15,6 +15,7 @@ import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { FilterChip, SignOutButton } from "@/src/components/ui";
 import { storage } from "@/src/utils/storage";
+import { useLowStockCount } from "@/src/hooks/use-low-stock-count";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 const COMPANIES = ["All", "Maruti Suzuki", "Hyundai", "Tata", "Mahindra", "Kia", "Toyota", "Honda", "Nissan", "Renault", "Ford", "Volkswagen", "Skoda", "MG", "Datsun", "Chevrolet"];
@@ -45,6 +46,7 @@ export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [company, setCompany] = useState("All");
+  const lowStockCount = useLowStockCount();
 
   useEffect(() => {
     (async () => {
@@ -92,6 +94,20 @@ export default function Home() {
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl }}
         showsVerticalScrollIndicator={false}
       >
+        {lowStockCount > 0 ? (
+          <Pressable
+            style={styles.lowStockBanner}
+            onPress={() => router.push("/(tabs)/inventory" as any)}
+            testID="home-low-stock-banner"
+          >
+            <Ionicons name="alert-circle" size={20} color={colors.onError} />
+            <Text style={styles.lowStockText}>
+              {lowStockCount} part{lowStockCount === 1 ? "" : "s"} low on stock — tap to view
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.onError} />
+          </Pressable>
+        ) : null}
+
         <Text style={styles.sectionLabel}>COMPANY GATE</Text>
         <ScrollView
           horizontal
@@ -223,6 +239,16 @@ const styles = StyleSheet.create({
   syncDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success },
   syncText: { color: colors.onSurface2, fontSize: font.sm, fontWeight: "700" },
   sectionLabel: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1, marginBottom: spacing.sm },
+  lowStockBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.error,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  lowStockText: { flex: 1, color: colors.onError, fontWeight: "800", fontSize: font.sm },
   chipRow: { gap: spacing.sm, paddingRight: spacing.lg },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   tile: {

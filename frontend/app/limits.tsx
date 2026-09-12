@@ -24,6 +24,12 @@ export default function Limits() {
   const [savingPart, setSavingPart] = useState(false);
   const [computed, setComputed] = useState<any>(null);
 
+  const [lowStockPn, setLowStockPn] = useState("");
+  const [lowStockThreshold, setLowStockThreshold] = useState("");
+  const [lowStockEnabled, setLowStockEnabled] = useState(true);
+  const [savingLowStock, setSavingLowStock] = useState(false);
+  const [lowStockComputed, setLowStockComputed] = useState<any>(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -70,6 +76,27 @@ export default function Limits() {
     }
   };
 
+  const saveLowStock = async () => {
+    if (!lowStockPn.trim()) {
+      show("Part number required", "error");
+      return;
+    }
+    setSavingLowStock(true);
+    try {
+      const res = await api.post("/limits/low-stock", {
+        part_number: lowStockPn.trim(),
+        threshold: lowStockThreshold ? parseInt(lowStockThreshold, 10) : null,
+        enabled: lowStockEnabled,
+      });
+      setLowStockComputed(res);
+      show("Low stock threshold saved", "success");
+    } catch (e: any) {
+      show(e?.message || "Save failed", "error");
+    } finally {
+      setSavingLowStock(false);
+    }
+  };
+
   return (
     <View style={styles.flex}>
       <Header title="Purchase Limits" subtitle="100% Admin configurable" onBack={() => router.back()} />
@@ -106,6 +133,26 @@ export default function Limits() {
               </View>
             ) : null}
           </Card>
+
+          <Card>
+            <Text style={styles.title}>LOW STOCK ALERT (per part)</Text>
+            <Field label="Part number" value={lowStockPn} onChangeText={setLowStockPn} autoCapitalize="characters" placeholder="e.g. 39100-2B000" testID="lowstock-pn" />
+            <Field label="Alert when stock at or below (blank = off)" value={lowStockThreshold} onChangeText={setLowStockThreshold} keyboardType="numeric" placeholder="e.g. 2" testID="lowstock-value" />
+            <View style={styles.rowBetween}>
+              <Text style={styles.label}>Enable this alert</Text>
+              <Switch value={lowStockEnabled} onValueChange={setLowStockEnabled} trackColor={{ true: colors.brand, false: colors.surface3 }} thumbColor={colors.onSurface} testID="lowstock-enable" />
+            </View>
+            <Button title="Save Low Stock Alert" onPress={saveLowStock} loading={savingLowStock} icon="alert-circle" variant="secondary" testID="save-lowstock" />
+            {lowStockComputed ? (
+              <View style={{ marginTop: spacing.md }}>
+                <Text style={[styles.status, lowStockComputed.low && styles.statusLow]}>
+                  {lowStockComputed.stock_count} in stock
+                  {lowStockComputed.low_stock_threshold != null ? ` • alert at ≤ ${lowStockComputed.low_stock_threshold}` : ""}
+                  {lowStockComputed.low ? " • LOW STOCK NOW" : ""}
+                </Text>
+              </View>
+            ) : null}
+          </Card>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -120,4 +167,5 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.md },
   label: { color: colors.onSurface2, fontSize: font.base, fontWeight: "600" },
   status: { color: colors.brand, fontWeight: "800", marginTop: spacing.sm },
+  statusLow: { color: colors.error },
 });

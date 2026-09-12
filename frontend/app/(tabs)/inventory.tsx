@@ -83,6 +83,8 @@ export default function Inventory() {
     store_name: isSuperAdmin ? null : user?.store_name || null,
   });
   const [locPickerOpen, setLocPickerOpen] = useState(false);
+  // part_number -> threshold, for parts currently at/below their low-stock alert.
+  const [lowStockMap, setLowStockMap] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
     try {
@@ -97,6 +99,10 @@ export default function Inventory() {
       setLoading(false);
       setRefreshing(false);
     }
+    try {
+      const low = await api.get<{ part_number: string; low_stock_threshold: number }[]>("/inventory/low-stock");
+      setLowStockMap(Object.fromEntries(low.map((l) => [l.part_number, l.low_stock_threshold])));
+    } catch {}
   }, [cond, pnFilter]);
 
   // Calls GET /inventory/location-check for `pn`, comparing it against the part's
@@ -343,6 +349,14 @@ export default function Inventory() {
                       <Text style={styles.pendingBadgeText}>⏳ Location Pending</Text>
                     </View>
                   )}
+                  {item.part_number in lowStockMap ? (
+                    <View style={styles.lowStockBadge} testID={`lowstock-${item.id}`}>
+                      <Ionicons name="alert-circle" size={12} color={colors.onError} />
+                      <Text style={styles.lowStockBadgeText}>
+                        LOW STOCK (alert at ≤ {lowStockMap[item.part_number]})
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
                 <StatusChip status={item.condition} />
               </Pressable>
@@ -477,6 +491,18 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   pendingBadgeText: { color: colors.warning, fontSize: font.sm - 1, fontWeight: "800" },
+  lowStockBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    backgroundColor: colors.error,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    marginTop: 4,
+  },
+  lowStockBadgeText: { color: colors.onError, fontSize: font.sm - 1, fontWeight: "800" },
   adminBar: { flexDirection: "row", borderTopWidth: 1, borderTopColor: colors.divider },
   adminBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: spacing.sm },
   adminBtnText: { fontSize: font.sm, fontWeight: "800" },
