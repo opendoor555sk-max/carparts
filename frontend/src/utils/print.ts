@@ -149,6 +149,10 @@ type ReceiptData = {
   buyer?: string;
   location?: any;
   by?: string;
+  // How many units this receipt covers — set when printing a multi-unit Buy
+  // line (the consolidated Buy screen buys N units of one part at once).
+  // Omitted (or 1) prints the same single-unit receipt as before.
+  qty?: number;
 };
 
 export async function printReceipt(b: Branding, kind: "BUY" | "SELL", data: ReceiptData): Promise<void> {
@@ -160,6 +164,7 @@ export async function printReceipt(b: Branding, kind: "BUY" | "SELL", data: Rece
     ["Part Number", data.part_number],
     ["Name", data.name || "-"],
     ["Condition", data.condition || "-"],
+    data.qty != null && data.qty !== 1 ? ["Quantity", String(data.qty)] : null,
     loc ? ["Location", loc] : null,
     data.buyer ? ["Buyer", data.buyer] : null,
     data.price != null && data.price !== "" ? ["Price", "Rs. " + data.price] : null,

@@ -14,9 +14,11 @@ import { colors, font, radius, spacing } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
 import * as Location from "expo-location";
 
+// "buy" used to route here too (Home's old "BUY" tile), on to buy.tsx's single-
+// item form. buy.tsx now does its own scanning directly (Home's "BUY" tile
+// points straight at /buy), so that mode is no longer reachable from anywhere.
 const MODE_META: Record<string, { title: string; color: string }> = {
   search: { title: "SEARCH", color: colors.info },
-  buy: { title: "BUY", color: colors.success },
   sell: { title: "SELL", color: colors.brand },
   requirement: { title: "REQUIREMENT", color: colors.warning },
 };
@@ -63,9 +65,6 @@ export default function ScanWeb() {
       } catch {}
       const c = encodeURIComponent(company as string);
       switch (mode) {
-        case "buy":
-          router.replace(`/buy?pn=${encodeURIComponent(pn)}&company=${c}` as any);
-          break;
         case "sell":
           router.replace(`/sell?pn=${encodeURIComponent(pn)}` as any);
           break;

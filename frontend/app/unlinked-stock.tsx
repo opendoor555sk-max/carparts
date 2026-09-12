@@ -44,8 +44,9 @@ export default function UnlinkedStock() {
     }, [load]),
   );
 
-  // Opens the existing manual-buy screen pre-filled with this part number, so
-  // the admin can properly record a purchase for a unit that has none.
+  // Opens the Buy screen pre-filled with this part number (as a new draft
+  // line, scanning skipped since we already know the part number), so the
+  // admin can properly record a purchase for a unit that has none.
   const linkUnit = (u: UnlinkedUnit) => {
     router.push(`/buy?pn=${encodeURIComponent(u.part_number)}` as any);
   };

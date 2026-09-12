@@ -12,12 +12,14 @@ import {
   Text,
   View,
 } from "react-native";
+import { unstable_createElement } from "react-native-web";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
@@ -78,7 +80,7 @@ type DraftLine = {
   uploading: boolean; // a photo upload in flight
 };
 
-export default function Buy() {
+export default function BuyWeb() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   // `pn` arrives from screens that already know the part number (part detail's
@@ -88,13 +90,14 @@ export default function Buy() {
   const { show } = useToast();
   const { user, can } = useAuth();
   const isSuperAdmin = user?.role === "super_admin";
-  const [permission, requestPermission] = useCameraPermissions();
   const [manual, setManual] = useState("");
   // Draft/review list — nothing here has been sent to the backend yet.
   // Scanning only adds/increments a line; stock is written on confirmAndAddToStock().
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [confirming, setConfirming] = useState(false);
   const [gps, setGps] = useState("");
+  const videoRef = useRef<any>(null);
+  const controlsRef = useRef<any>(null);
   const busy = useRef(false);
   const lastScan = useRef<{ code: string; at: number }>({ code: "", at: 0 });
   const total = useMemo(() => lines.reduce((s, c) => s + c.qty, 0), [lines]);
@@ -525,14 +528,40 @@ export default function Buy() {
     }
   }, [lines, confirming, gps, show, router, loadLineInfo]);
 
-  const onBarcode = useCallback(
-    ({ data }: { data: string }) => {
-      const now = Date.now();
-      if (data === lastScan.current.code && now - lastScan.current.at < 900) return;
-      lastScan.current = { code: data, at: now };
-      addOne(data);
-    },
-    [addOne],
+  useEffect(() => {
+    let cancelled = false;
+    const hints = new Map<DecodeHintType, any>();
+    hints.set(DecodeHintType.TRY_HARDER, true);
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.QR_CODE, BarcodeFormat.DATA_MATRIX, BarcodeFormat.CODE_128, BarcodeFormat.CODE_39,
+      BarcodeFormat.EAN_13, BarcodeFormat.UPC_A, BarcodeFormat.ITF, BarcodeFormat.PDF_417,
+    ]);
+    const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 25 });
+    (async () => {
+      let t = 0;
+      while (!videoRef.current && t < 40) { await new Promise((r) => setTimeout(r, 50)); t++; }
+      if (cancelled || !videoRef.current) return;
+      try {
+        controlsRef.current = await reader.decodeFromConstraints(
+          { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+          videoRef.current,
+          (res) => {
+            if (!res) return;
+            const code = res.getText();
+            const now = Date.now();
+            if (code === lastScan.current.code && now - lastScan.current.at < 900) return;
+            lastScan.current = { code, at: now };
+            addOne(code);
+          },
+        );
+      } catch {}
+    })();
+    return () => { cancelled = true; try { controlsRef.current?.stop?.(); } catch {} };
+  }, [addOne]);
+
+  const VideoEl = useMemo(
+    () => unstable_createElement("video", { ref: videoRef, autoPlay: true, muted: true, playsInline: true, style: { width: "100%", height: "100%", objectFit: "cover", backgroundColor: "#000" } }),
+    [],
   );
 
   return (
@@ -545,20 +574,7 @@ export default function Buy() {
         </View>
       ) : null}
       <View style={styles.cam}>
-        {permission?.granted ? (
-          <CameraView
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ["qr", "ean13", "code128", "code39", "upc_a", "datamatrix", "pdf417"] }}
-            onBarcodeScanned={onBarcode}
-          />
-        ) : (
-          <View style={styles.center}>
-            <Ionicons name="camera" size={40} color={colors.brand} />
-            <Text style={styles.dim}>Allow camera for quick scanning</Text>
-            <Button title="Allow Camera" onPress={requestPermission} icon="camera" testID="batch-grant" />
-          </View>
-        )}
+        {VideoEl}
         <Animated.View style={[styles.flashOverlay, flashStyle]} pointerEvents="none" testID="batch-scan-flash" />
         <Animated.View style={[styles.dangerFlashOverlay, dangerFlashStyle]} pointerEvents="none" testID="batch-danger-flash" />
         <View style={styles.overlay} pointerEvents="none">
@@ -789,9 +805,7 @@ const styles = StyleSheet.create({
   // visible even if the operator's attention is on the draft list below,
   // not just the camera.
   dangerBorder: { borderWidth: 4, borderColor: colors.error },
-  cam: { height: 280, backgroundColor: "#000" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.lg },
-  dim: { color: colors.info, textAlign: "center" },
+  cam: { height: 280, backgroundColor: "#000", overflow: "hidden" },
   dimText: { color: colors.info, fontSize: font.sm },
   overlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: spacing.md },
   // Box +30% (220x120 -> 286x156); border 5x thinner than the prior 30 -> 6.

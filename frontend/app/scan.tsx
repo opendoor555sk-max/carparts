@@ -17,9 +17,11 @@ import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
 
+// "buy" used to route here too (Home's old "BUY" tile), on to buy.tsx's single-
+// item form. buy.tsx now does its own scanning directly (Home's "BUY" tile
+// points straight at /buy), so that mode is no longer reachable from anywhere.
 const MODE_META: Record<string, { title: string; color: string; verb: string }> = {
   search: { title: "SEARCH", color: colors.info, verb: "Search" },
-  buy: { title: "BUY", color: colors.success, verb: "Buy" },
   sell: { title: "SELL", color: colors.brand, verb: "Sell" },
   requirement: { title: "REQUIREMENT", color: colors.warning, verb: "Requirement" },
 };
@@ -68,9 +70,6 @@ export default function Scan() {
       if (!pn) return;
       const c = encodeURIComponent(company as string);
       switch (mode) {
-        case "buy":
-          router.replace(`/buy?pn=${encodeURIComponent(pn)}&company=${c}` as any);
-          break;
         case "sell":
           router.replace(`/sell?pn=${encodeURIComponent(pn)}` as any);
           break;

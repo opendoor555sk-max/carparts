@@ -33,10 +33,15 @@ type Module = {
 
 const MODULES: Module[] = [
   { key: "search", title: "SEARCH", gujarati: "Find part", icon: "search", perm: "search", route: "/scan?mode=search", color: colors.info },
-  { key: "buy", title: "BUY", gujarati: "Purchase", icon: "download", perm: "buy", route: "/scan?mode=buy", color: colors.success },
+  // Single "BUY" module (formerly split into "BUY" -> scan.tsx -> single-item
+  // form, and a separate "MULTIPLE BUY" fast-scan screen) -- buy.tsx now does
+  // both: instant scan-to-draft like the old batch screen, with every single-
+  // item field (condition/photos/price/print/catalog-autofill/override)
+  // available per line. Routes straight there; no scan.tsx detour needed since
+  // buy.tsx has its own built-in camera scanning.
+  { key: "buy", title: "BUY", gujarati: "Purchase", icon: "download", perm: "buy", route: "/buy", color: colors.success },
   { key: "sell", title: "SELL", gujarati: "Sale", icon: "cash", perm: "sell", route: "/scan?mode=sell", color: colors.brand },
   { key: "requirement", title: "REQUIREMENT", gujarati: "Inquiry / Need", icon: "add-circle", perm: "requirement", route: "/scan?mode=requirement", color: colors.warning },
-  { key: "batch", title: "MULTIPLE BUY", gujarati: "Quick batch buy", icon: "layers", perm: "buy", route: "/batch-buy", wide: true, color: colors.success },
   { key: "arrange", title: "STORE ARRANGEMENT", gujarati: "Place bought stock", icon: "location", perm: "buy", route: "/store-arrangement", wide: true, color: colors.info },
 ];
 
