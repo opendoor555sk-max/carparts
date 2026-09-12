@@ -11,9 +11,13 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "updates": {
+      "url": "https://u.expo.dev/fcdbf2ef-0983-4703-96bd-142252ef7e70"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.emergent.partnumberfirst.eepol0",
+      "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan part barcodes and QR codes",
         "NSFaceIDUsageDescription": "Unlock your account securely",
@@ -28,6 +32,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.emergent.partnumberfirst.eepol0",
+      "versionCode": 1,
       "permissions": [
         "CAMERA",
         "USE_BIOMETRIC",
@@ -75,6 +80,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fcdbf2ef-0983-4703-96bd-142252ef7e70"
+      }
     }
   }
 }
