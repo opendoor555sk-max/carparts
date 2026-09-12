@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
+import { useAudioPlayer } from "expo-audio";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
@@ -63,6 +64,77 @@ export default function BatchBuy() {
     setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 60);
   }, [flashOpacity, counterScale]);
 
+  // ---- Real-time (per-scan) limit warning — separate from the hard, ---
+  // authoritative block that confirmAndAddToStock() already gets from /buy's
+  // 409 LIMIT_REACHED. This is an early heads-up so a scanning operator sees
+  // "stop" the instant they cross the line, instead of only finding out after
+  // scanning a whole batch and hitting Confirm. Deliberately loud/jarring —
+  // distinct in every channel (color, sound, haptic pattern, copy) from the
+  // green "added" feedback above — so it can't be mistaken for a normal scan.
+  const dangerFlashOpacity = useSharedValue(0);
+  const dangerFlashStyle = useAnimatedStyle(() => ({ opacity: dangerFlashOpacity.value }));
+  const [dangerBorder, setDangerBorder] = useState(false);
+  const [stopMessage, setStopMessage] = useState<string | null>(null);
+  const dangerTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A short, harsh hi-lo alarm — nothing else in this app plays a sound, so
+  // this alone is enough to read as "different from the normal success beep".
+  const dangerPlayer = useAudioPlayer(require("../assets/sounds/limit_reached.wav"));
+
+  const triggerDangerFeedback = useCallback(
+    (pn: string) => {
+      dangerFlashOpacity.value = withSequence(
+        withTiming(1, { duration: 60, easing: Easing.out(Easing.quad) }),
+        withTiming(0.15, { duration: 180, easing: Easing.inOut(Easing.quad) }),
+        withTiming(1, { duration: 60, easing: Easing.out(Easing.quad) }),
+        withTiming(0, { duration: 500, easing: Easing.in(Easing.quad) }),
+      );
+      setDangerBorder(true);
+      setStopMessage(`STOP BUYING ${pn} — Limit Reached`);
+      if (dangerTimeout.current) clearTimeout(dangerTimeout.current);
+      dangerTimeout.current = setTimeout(() => {
+        setDangerBorder(false);
+        setStopMessage(null);
+      }, 2200);
+      // Distinct double-buzz (vs. the single success pulse above) plus the alarm sound.
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 90);
+      setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 260);
+      try {
+        dangerPlayer.seekTo(0);
+        dangerPlayer.play();
+      } catch {
+        // best-effort — a missing/failed sound must never block the actual warning
+      }
+    },
+    [dangerFlashOpacity, dangerPlayer],
+  );
+
+  // Live, per-scan check against GET /limits/{part_number} — the same
+  // compute_limit() the Buy screen's limit card reads. `draftQtyBefore` is
+  // how many of this part are ALREADY queued in this batch's draft (not yet
+  // actually purchased), since those don't show up in the backend's
+  // existing_stock yet but do count toward whether one more would go over.
+  // Fails OPEN on a network error: the real, authoritative block still
+  // happens at Confirm time via /buy's 409 LIMIT_REACHED, so a flaky
+  // connection here degrades to "no early warning", never "can't scan".
+  const checkUnitAgainstLimit = useCallback(
+    async (pn: string, draftQtyBefore: number): Promise<boolean> => {
+      try {
+        const limit = await api.get(`/limits/${encodeURIComponent(pn)}`);
+        if (!limit?.limit_enabled || limit.allowed_limit == null) return true;
+        const projected = (limit.existing_stock || 0) + draftQtyBefore + 1;
+        if (projected > limit.allowed_limit) {
+          triggerDangerFeedback(pn);
+          return false;
+        }
+        return true;
+      } catch {
+        return true;
+      }
+    },
+    [triggerDangerFeedback],
+  );
+
   useEffect(() => {
     let sub: Location.LocationSubscription | null = null;
     (async () => {
@@ -86,13 +158,29 @@ export default function BatchBuy() {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (dangerTimeout.current) clearTimeout(dangerTimeout.current);
+    };
+  }, []);
+
   // Scanning is now purely local — it only adds/increments a draft line.
   // Nothing touches the backend until confirmAndAddToStock() is pressed.
+  // The limit check below is a network round-trip, so it runs BEFORE the
+  // add — a scan that would go over the limit never makes it into the draft
+  // at all (capped at the allowed remaining quantity), rather than being
+  // added and then un-added.
   const addOne = useCallback(
-    (raw: string) => {
+    async (raw: string) => {
       const pn = extractPartNumber(raw);
       if (!pn || busy.current) return;
       busy.current = true;
+      const draftQty = counts.find((c) => c.pn === pn)?.qty || 0;
+      const allowed = await checkUnitAgainstLimit(pn, draftQty);
+      if (!allowed) {
+        setTimeout(() => (busy.current = false), 350);
+        return;
+      }
       triggerScanFeedback();
       setCounts((prev) => {
         const i = prev.findIndex((c) => c.pn === pn);
@@ -105,12 +193,20 @@ export default function BatchBuy() {
       });
       setTimeout(() => (busy.current = false), 350);
     },
-    [triggerScanFeedback],
+    [triggerScanFeedback, counts, checkUnitAgainstLimit],
   );
 
-  const incQty = useCallback((pn: string) => {
-    setCounts((prev) => prev.map((c) => (c.pn === pn ? { ...c, qty: c.qty + 1 } : c)));
-  }, []);
+  const incQty = useCallback(
+    async (pn: string) => {
+      // The +1 stepper is just as capable of pushing a line over its limit as
+      // another scan would be — same check, so it can't be used to bypass it.
+      const draftQty = counts.find((c) => c.pn === pn)?.qty || 0;
+      const allowed = await checkUnitAgainstLimit(pn, draftQty);
+      if (!allowed) return;
+      setCounts((prev) => prev.map((c) => (c.pn === pn ? { ...c, qty: c.qty + 1 } : c)));
+    },
+    [counts, checkUnitAgainstLimit],
+  );
   const decQty = useCallback((pn: string) => {
     setCounts((prev) => prev.map((c) => (c.pn === pn ? { ...c, qty: Math.max(1, c.qty - 1) } : c)));
   }, []);
@@ -177,8 +273,14 @@ export default function BatchBuy() {
   );
 
   return (
-    <View style={styles.flex}>
+    <View style={[styles.flex, dangerBorder && styles.dangerBorder]} testID="batch-danger-border">
       <Header title="Multiple Buy" subtitle={isSuperAdmin ? (gps ? "📍 GPS ✓" : "GPS…") : undefined} onBack={() => router.back()} />
+      {stopMessage ? (
+        <View style={styles.stopBanner} testID="batch-stop-banner">
+          <Ionicons name="hand-left" size={20} color={colors.onError} />
+          <Text style={styles.stopBannerText} numberOfLines={2}>{stopMessage}</Text>
+        </View>
+      ) : null}
       <View style={styles.cam}>
         {permission?.granted ? (
           <CameraView
@@ -195,8 +297,9 @@ export default function BatchBuy() {
           </View>
         )}
         <Animated.View style={[styles.flashOverlay, flashStyle]} pointerEvents="none" testID="batch-scan-flash" />
+        <Animated.View style={[styles.dangerFlashOverlay, dangerFlashStyle]} pointerEvents="none" testID="batch-danger-flash" />
         <View style={styles.overlay} pointerEvents="none">
-          <View style={styles.bracket} />
+          <View style={[styles.bracket, dangerBorder && styles.bracketDanger]} />
           <Text style={styles.hint}>Scan → adds to draft below (+1 qty). Nothing saved until you confirm.</Text>
         </View>
         <View style={styles.counterWrap} pointerEvents="none" testID="batch-total-counter">
@@ -260,14 +363,31 @@ export default function BatchBuy() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
+  // Full-screen red border for the duration of a limit-reached warning —
+  // visible even if the operator's attention is on the draft list below,
+  // not just the camera.
+  dangerBorder: { borderWidth: 4, borderColor: colors.error },
   cam: { height: 280, backgroundColor: "#000" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.lg },
   dim: { color: colors.info, textAlign: "center" },
   overlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: spacing.md },
   // Box +30% (220x120 -> 286x156); border 5x thinner than the prior 30 -> 6.
   bracket: { width: 286, height: 156, borderWidth: 6, borderColor: colors.success, borderRadius: radius.md },
+  bracketDanger: { borderColor: colors.error },
   hint: { color: "#fff", fontWeight: "700", fontSize: font.base },
   flashOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.success },
+  // Same mechanism/position as flashOverlay above, red instead of green —
+  // the "similar to the existing success flash, but red" cue over the camera.
+  dangerFlashOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.error },
+  stopBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.error,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  stopBannerText: { color: colors.onError, fontWeight: "900", fontSize: font.lg, letterSpacing: 0.5, flex: 1 },
   counterWrap: {
     position: "absolute",
     top: spacing.sm,
