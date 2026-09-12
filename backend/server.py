@@ -1102,6 +1102,76 @@ def _pn_regex(part_number: Optional[str]):
     return re.compile(f"^{pattern}$", re.IGNORECASE)
 
 
+async def _find_canonical_part(base: Dict[str, Any], pn: str) -> Optional[dict]:
+    """Resolve `pn` (any punctuation/casing variant) to ONE db.parts document,
+    self-healing pre-existing duplicates rather than assuming _pn_regex only
+    ever matches one.
+
+    _pn_regex() above stops a *new* buy/limit-set from spawning a fresh
+    duplicate once it exists — it does nothing about parts that had ALREADY
+    fragmented into more than one document before that matching existed (the
+    exact state left behind by real historical usage: a "Limit"-source ghost
+    doc from an admin typing "954A0-CCAF0" into the Limits screen, and a
+    separate "Buy"-source doc from real scans recording "954A0CCAF0", created
+    independently before anything consolidated them). A bare
+    `find_one({"part_number": _pn_regex(pn)})` at every call site has NO
+    ordering guarantee across two such matches — it can silently return
+    whichever document happens to sort first, which may well be the one with
+    limit_enabled=False, even though the sibling document for the SAME real
+    part has a limit properly configured. The purchase then sails through
+    with no error and no signal anything is wrong, regardless of how correct
+    the punctuation-matching itself is. Reproduced end-to-end against the
+    live compute_limit()/buy() code: with a pre-existing "Buy" doc (no limit)
+    inserted before a pre-existing "Limit" doc (limit_enabled=True) for the
+    same canonical part number, buy() picked the limit-less doc and let a
+    3rd unit through against a configured limit of 2.
+
+    Fix: fetch every matching document, merge any limit/low-stock config and
+    descriptive fields found on ANY of them onto the earliest-created one,
+    persist that merge, and delete the now-redundant duplicates — so the
+    ambiguity is resolved once and every later lookup is unambiguous.
+
+    `base` is not guaranteed to pin one store (a super_admin's read-only,
+    cross-store aggregate view calls compute_limit()/compute_low_stock() with
+    store_id=None, so `base` can be {}) — merging/deleting must never cross a
+    store_id boundary, so duplicates are consolidated separately WITHIN each
+    store_id found among the matches, never against a different store's doc.
+    """
+    matches = await db.parts.find({**base, "part_number": _pn_regex(pn)}, {"_id": 0}).sort("created_at", 1).to_list(200)
+    if len(matches) <= 1:
+        return matches[0] if matches else None
+    by_store: Dict[Any, List[dict]] = {}
+    for d in matches:
+        by_store.setdefault(d.get("store_id"), []).append(d)
+    canonicals = []
+    for group in by_store.values():
+        canonical, dupes = group[0], group[1:]
+        if dupes:
+            merged: Dict[str, Any] = {}
+            for extra in dupes:
+                if extra.get("limit_enabled") and not canonical.get("limit_enabled"):
+                    merged["purchase_limit"] = extra.get("purchase_limit")
+                    merged["limit_enabled"] = True
+                if extra.get("low_stock_enabled") and not canonical.get("low_stock_enabled"):
+                    merged["low_stock_threshold"] = extra.get("low_stock_threshold")
+                    merged["low_stock_enabled"] = True
+                for field in ("name", "category", "compatible_vehicles", "variant"):
+                    if extra.get(field) and not canonical.get(field):
+                        merged[field] = extra[field]
+                if extra.get("company") and extra["company"] != "All" and canonical.get("company", "All") == "All":
+                    merged["company"] = extra["company"]
+            if merged:
+                canonical.update(merged)
+                await db.parts.update_one({"store_id": canonical.get("store_id"), "part_number": canonical["part_number"]},
+                                          {"$set": merged})
+            for extra in dupes:
+                await db.parts.delete_one({"store_id": extra.get("store_id"), "part_number": extra["part_number"]})
+        canonicals.append(canonical)
+    # matches was sorted by created_at ascending, and each group[0] kept that
+    # order, so the earliest-created canonical overall is simply the first.
+    return canonicals[0]
+
+
 async def compute_limit(store_id: Optional[str], part_number: str) -> dict:
     # part_number is never case-normalized at write time elsewhere, and Mongo
     # matches are case-sensitive — normalize here so a limit set under one
@@ -1109,7 +1179,7 @@ async def compute_limit(store_id: Optional[str], part_number: str) -> dict:
     part_number = (part_number or "").strip().upper()
     base = {"store_id": store_id} if store_id is not None else {}
     rx = _pn_regex(part_number)
-    part = await db.parts.find_one({**base, "part_number": rx}, {"_id": 0})
+    part = await _find_canonical_part(base, part_number)
     existing_stock = await db.stock.count_documents({**base, "part_number": rx, "sold": {"$ne": True}})
     settings = await db.settings.find_one({"key": "purchase_limit", "store_id": store_id})
     limit_enabled = False
@@ -1144,7 +1214,7 @@ async def compute_low_stock(store_id: Optional[str], part_number: str) -> dict:
     part_number = (part_number or "").strip().upper()
     base = {"store_id": store_id} if store_id is not None else {}
     rx = _pn_regex(part_number)
-    part = await db.parts.find_one({**base, "part_number": rx}, {"_id": 0})
+    part = await _find_canonical_part(base, part_number)
     stock_count = await db.stock.count_documents({**base, "part_number": rx, "sold": {"$ne": True}})
     enabled = bool(part and part.get("low_stock_enabled") and part.get("low_stock_threshold") is not None)
     threshold = part.get("low_stock_threshold") if part else None
@@ -1291,7 +1361,12 @@ async def buy(body: BuyIn, store_id: Optional[str] = None, user=Depends(require(
     # it via /limits/part before any purchase existed. Without this, the buy
     # would spawn an untracked duplicate part with no limit attached, and
     # the configured limit would silently never apply to it.
-    part = await db.parts.find_one({"store_id": sid, "part_number": _pn_regex(pn)}, {"_id": 0})
+    # _find_canonical_part (not a bare find_one) also self-heals the case
+    # where BOTH spellings already exist as separate documents from before
+    # this matching existed — merging whichever one carries the limit onto
+    # the identity kept, instead of risking an unordered find_one silently
+    # returning the limit-less sibling.
+    part = await _find_canonical_part({"store_id": sid}, pn)
     if part:
         # Keep recording stock under the identity that already exists (and
         # may already carry a limit/threshold) rather than the raw scanned
@@ -1705,7 +1780,9 @@ async def set_part_limit(body: LimitIn, store_id: Optional[str] = None, user=Dep
     # the admin is typing here), attach the limit to THAT document instead of
     # upserting a new one — otherwise the limit lands on an untracked
     # duplicate that no purchase will ever match, and silently never applies.
-    existing = await db.parts.find_one({"store_id": sid, "part_number": _pn_regex(pn)}, {"_id": 0})
+    # _find_canonical_part also merges/dedupes if more than one variant
+    # already exists (see its docstring) instead of picking one arbitrarily.
+    existing = await _find_canonical_part({"store_id": sid}, pn)
     if existing:
         pn = existing["part_number"]
     # Previously required a matching part to already exist (created only by a
@@ -1744,8 +1821,9 @@ async def set_low_stock_threshold(body: LowStockIn, store_id: Optional[str] = No
     sid = resolve_store(user, store_id, require_write=True)
     # Same punctuation-variant reuse as /limits/part above — don't spawn an
     # untracked duplicate part document if one already exists under a
-    # differently-formatted (but identical) part number.
-    existing = await db.parts.find_one({"store_id": sid, "part_number": _pn_regex(pn)}, {"_id": 0})
+    # differently-formatted (but identical) part number, and self-heal if
+    # more than one already does (see _find_canonical_part's docstring).
+    existing = await _find_canonical_part({"store_id": sid}, pn)
     if existing:
         pn = existing["part_number"]
     # Same upsert pattern as /limits/part: don't require the part to already
