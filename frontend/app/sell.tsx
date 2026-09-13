@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -27,6 +27,14 @@ export default function Sell() {
   const [price, setPrice] = useState("");
   const [buyer, setBuyer] = useState("");
 
+  // Optional Grahak Khata link — when set, this sale is recorded as credit
+  // owed by this customer instead of an assumed-paid-in-full cash sale.
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [customerResults, setCustomerResults] = useState<any[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [searchingCustomer, setSearchingCustomer] = useState(false);
+  const customerDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const load = useCallback(async () => {
     try {
       const full = await api.get(`/parts/${encodeURIComponent(partNumber)}`);
@@ -43,17 +51,43 @@ export default function Sell() {
     load();
   }, [load]);
 
+  const searchCustomers = (text: string) => {
+    setCustomerQuery(text);
+    setCustomerResults([]);
+    if (customerDebounce.current) clearTimeout(customerDebounce.current);
+    if (!text.trim()) return;
+    customerDebounce.current = setTimeout(async () => {
+      setSearchingCustomer(true);
+      try {
+        setCustomerResults(await api.get(`/customers?q=${encodeURIComponent(text.trim())}`));
+      } catch {
+      } finally {
+        setSearchingCustomer(false);
+      }
+    }, 300);
+  };
+
   const submit = async () => {
+    if (selectedCustomer && !price) {
+      show("Price required to record a sale on credit", "error");
+      return;
+    }
     setSubmitting(true);
     try {
-      await api.post("/sell", {
+      const res = await api.post("/sell", {
         part_number: partNumber,
         unit_id: selectedUnit,
         price: price ? parseFloat(price) : null,
         buyer,
+        customer_id: selectedCustomer?.id || null,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      show("Sold — stock reduced", "success");
+      show(
+        selectedCustomer
+          ? `Sold on credit — ${selectedCustomer.name}'s balance is now ₹${res.credit_balance?.toFixed(2)}`
+          : "Sold — stock reduced",
+        "success",
+      );
       router.replace(`/part/${encodeURIComponent(partNumber)}` as any);
     } catch (e: any) {
       const d = e?.detail;
@@ -134,6 +168,48 @@ export default function Sell() {
               <Text style={styles.cardTitle}>BUYER (optional)</Text>
               <Field value={buyer} onChangeText={setBuyer} placeholder="Buyer name" testID="sell-buyer" />
             </Card>
+
+            <Card testID="sell-credit-card">
+              <Text style={styles.cardTitle}>SELL ON CREDIT (Grahak Khata) — optional</Text>
+              {selectedCustomer ? (
+                <View style={styles.customerChip} testID="sell-selected-customer">
+                  <Ionicons name="person" size={18} color={colors.brand} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.customerChipName}>{selectedCustomer.name}</Text>
+                    <Text style={styles.customerChipPhone}>{selectedCustomer.phone} • Current balance: ₹{selectedCustomer.balance?.toFixed(2) ?? "0.00"}</Text>
+                  </View>
+                  <Pressable onPress={() => { setSelectedCustomer(null); setCustomerQuery(""); }} testID="sell-unlink-customer">
+                    <Ionicons name="close-circle" size={22} color={colors.error} />
+                  </Pressable>
+                </View>
+              ) : (
+                <>
+                  <Field
+                    value={customerQuery}
+                    onChangeText={searchCustomers}
+                    placeholder="Search customer by name or phone"
+                    testID="sell-customer-search"
+                  />
+                  {searchingCustomer ? <Loading text="Searching…" /> : null}
+                  {customerResults.map((c) => (
+                    <Pressable
+                      key={c.id}
+                      style={styles.customerResult}
+                      onPress={() => { setSelectedCustomer(c); setCustomerResults([]); }}
+                      testID={`sell-customer-result-${c.id}`}
+                    >
+                      <Text style={styles.customerChipName}>{c.name}</Text>
+                      <Text style={styles.customerChipPhone}>{c.phone} • Balance: ₹{c.balance.toFixed(2)}</Text>
+                    </Pressable>
+                  ))}
+                </>
+              )}
+              <Text style={styles.creditHint}>
+                {selectedCustomer
+                  ? "This sale will be added to the customer's balance instead of collected now."
+                  : "Leave blank for a normal cash sale."}
+              </Text>
+            </Card>
           </ScrollView>
 
           <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
@@ -168,6 +244,11 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
   cardTitle: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1, marginBottom: spacing.md },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  customerChip: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.brandFaint, borderRadius: radius.md, padding: spacing.md },
+  customerChipName: { color: colors.onSurface, fontSize: font.base, fontWeight: "800" },
+  customerChipPhone: { color: colors.info, fontSize: font.sm, marginTop: 1 },
+  customerResult: { paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.divider },
+  creditHint: { color: colors.info, fontSize: font.sm - 1, marginTop: spacing.sm },
   count: { color: colors.brand, fontWeight: "800", fontSize: font.base },
   unit: {
     flexDirection: "row",

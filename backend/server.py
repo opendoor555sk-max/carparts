@@ -546,6 +546,29 @@ class SellIn(BaseModel):
     unit_id: Optional[str] = None
     price: Optional[float] = None
     buyer: Optional[str] = ""
+    # Linking a customer turns this sale into a credit entry on their ledger
+    # (they owe `price`) instead of an assumed-paid-in-full cash sale — see
+    # the Customer Ledger section below. `buyer` above stays a free-text note
+    # independent of this (e.g. "picked up by driver") and is never required
+    # to match the linked customer's name.
+    customer_id: Optional[str] = None
+
+
+class CustomerIn(BaseModel):
+    name: str
+    phone: str
+    address: Optional[str] = ""
+
+
+class CustomerUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+
+
+class CustomerPaymentIn(BaseModel):
+    amount: float
+    note: Optional[str] = ""
 
 
 class KnownPartIn(BaseModel):
@@ -1435,12 +1458,147 @@ async def sell(body: SellIn, store_id: Optional[str] = None, user=Depends(requir
     unit = await db.stock.find_one(query)
     if not unit:
         raise HTTPException(409, detail={"code": "NO_STOCK", "message": "કોઈ stock available નથી — sell ન થાય"})
+    customer = None
+    if body.customer_id:
+        # Validate up front, before touching stock, so a bad customer_id fails
+        # loudly instead of selling the unit and then silently skipping the
+        # ledger entry it was supposed to get.
+        customer = await db.customers.find_one({"store_id": sid, "id": body.customer_id}, {"_id": 0})
+        if not customer:
+            raise HTTPException(404, "Customer not found")
+        if not body.price:
+            raise HTTPException(400, "Price required to record a sale on credit")
     await db.stock.update_one({"id": unit["id"]}, {"$set": {"sold": True, "sold_at": now_iso(), "sold_by": user["username"]}})
     txn = {"id": new_id(), "store_id": sid, "type": "sell", "part_number": pn, "unit_id": unit["id"],
-           "price": body.price, "buyer": body.buyer or "", "by": user["username"], "at": now_iso()}
+           "price": body.price, "buyer": body.buyer or "", "customer_id": body.customer_id,
+           "by": user["username"], "at": now_iso()}
     await db.transactions.insert_one(dict(txn))
     remaining = await db.stock.count_documents({"store_id": sid, "part_number": pn, "sold": {"$ne": True}})
-    return {"ok": True, "remaining_stock": remaining}
+    result = {"ok": True, "remaining_stock": remaining}
+    if customer:
+        entry = {
+            "id": new_id(), "store_id": sid, "customer_id": body.customer_id, "type": "sale",
+            "amount": body.price, "note": f"Credit sale — {pn}",
+            "part_number": pn, "unit_id": unit["id"], "transaction_id": txn["id"],
+            "by": user["username"], "at": now_iso(),
+        }
+        await db.customer_ledger.insert_one(dict(entry))
+        result["credit_balance"] = await compute_customer_balance(sid, body.customer_id)
+    return result
+
+
+# ---------------- Customer Ledger (Grahak Khata) ----------------
+# A customer's running balance is never stored as a mutable field — like
+# compute_limit()/compute_low_stock() above, it's computed fresh from the
+# ledger entries every time, so it can never drift out of sync with the
+# entries that actually justify it. type="sale" entries increase what the
+# customer owes; type="payment" entries reduce it.
+async def compute_customer_balance(store_id: Optional[str], customer_id: str) -> float:
+    entries = await db.customer_ledger.find({"store_id": store_id, "customer_id": customer_id}, {"_id": 0}).to_list(10000)
+    balance = 0.0
+    for e in entries:
+        amt = e.get("amount") or 0
+        balance += amt if e.get("type") == "sale" else -amt
+    return round(balance, 2)
+
+
+@api.post("/customers")
+async def create_customer(body: CustomerIn, store_id: Optional[str] = None, user=Depends(require("sell"))):
+    name = body.name.strip()
+    phone = body.phone.strip()
+    if not name or not phone:
+        raise HTTPException(400, "Name and phone are required")
+    sid = resolve_store(user, store_id, require_write=True)
+    # One ledger per phone number per store — otherwise the same customer
+    # typed in twice (or looked up by an operator who didn't search first)
+    # fragments their credit history across two untracked records, the exact
+    # failure mode the purchase-limit part_number fixes earlier addressed.
+    if await db.customers.find_one({"store_id": sid, "phone": phone}):
+        raise HTTPException(400, "A customer with this phone number already exists")
+    doc = {
+        "id": new_id(), "store_id": sid, "name": name, "phone": phone, "address": body.address or "",
+        "created_at": now_iso(), "created_by": user["username"],
+    }
+    await db.customers.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@api.get("/customers")
+async def list_customers(q: Optional[str] = None, phone: Optional[str] = None,
+                         store_id: Optional[str] = None, user=Depends(get_current_user)):
+    query = sq(user, None, store_id)
+    if phone:
+        # Exact match — used by the barcode/card-scan lookup, which decodes a
+        # known phone number and needs one unambiguous result, not a fuzzy list.
+        query["phone"] = phone.strip()
+    elif q:
+        rx = {"$regex": re.escape(q.strip()[:64]), "$options": "i"}
+        query["$or"] = [{"name": rx}, {"phone": rx}]
+    customers = await db.customers.find(query, {"_id": 0}).sort("name", 1).to_list(500)
+    for c in customers:
+        c["balance"] = await compute_customer_balance(c.get("store_id"), c["id"])
+    return customers
+
+
+@api.get("/customers/{customer_id}")
+async def get_customer(customer_id: str, store_id: Optional[str] = None, user=Depends(get_current_user)):
+    customer = await db.customers.find_one(sq(user, {"id": customer_id}, store_id), {"_id": 0})
+    if not customer:
+        raise HTTPException(404, "Customer not found")
+    customer["balance"] = await compute_customer_balance(customer.get("store_id"), customer_id)
+    return customer
+
+
+@api.patch("/customers/{customer_id}")
+async def update_customer(customer_id: str, body: CustomerUpdate, store_id: Optional[str] = None,
+                          user=Depends(require("sell"))):
+    updates = {k: v.strip() if isinstance(v, str) else v for k, v in body.dict().items() if v is not None}
+    if not updates:
+        return await get_customer(customer_id, store_id, user)
+    sid = resolve_store(user, store_id, require_write=True)
+    if updates.get("phone"):
+        dupe = await db.customers.find_one({"store_id": sid, "phone": updates["phone"], "id": {"$ne": customer_id}})
+        if dupe:
+            raise HTTPException(400, "A customer with this phone number already exists")
+    r = await db.customers.update_one({"store_id": sid, "id": customer_id}, {"$set": updates})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Customer not found")
+    return await get_customer(customer_id, sid, user)
+
+
+@api.get("/customers/{customer_id}/ledger")
+async def get_customer_ledger(customer_id: str, store_id: Optional[str] = None, user=Depends(get_current_user)):
+    customer = await db.customers.find_one(sq(user, {"id": customer_id}, store_id), {"_id": 0})
+    if not customer:
+        raise HTTPException(404, "Customer not found")
+    sid = customer.get("store_id")
+    entries = await db.customer_ledger.find({"store_id": sid, "customer_id": customer_id}, {"_id": 0}) \
+        .sort("at", -1).to_list(2000)
+    balance = 0.0
+    for e in reversed(entries):
+        amt = e.get("amount") or 0
+        balance += amt if e.get("type") == "sale" else -amt
+        e["running_balance"] = round(balance, 2)
+    return {"customer": customer, "balance": round(balance, 2), "entries": entries}
+
+
+@api.post("/customers/{customer_id}/payments")
+async def record_customer_payment(customer_id: str, body: CustomerPaymentIn, store_id: Optional[str] = None,
+                                  user=Depends(require("sell"))):
+    if body.amount is None or body.amount <= 0:
+        raise HTTPException(400, "Payment amount must be greater than 0")
+    sid = resolve_store(user, store_id, require_write=True)
+    customer = await db.customers.find_one({"store_id": sid, "id": customer_id})
+    if not customer:
+        raise HTTPException(404, "Customer not found")
+    entry = {
+        "id": new_id(), "store_id": sid, "customer_id": customer_id, "type": "payment",
+        "amount": body.amount, "note": body.note or "", "by": user["username"], "at": now_iso(),
+    }
+    await db.customer_ledger.insert_one(dict(entry))
+    entry.pop("_id", None)
+    return {"ok": True, "entry": entry, "balance": await compute_customer_balance(sid, customer_id)}
 
 
 # ---------------- Inventory ----------------

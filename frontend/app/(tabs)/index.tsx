@@ -42,6 +42,7 @@ const MODULES: Module[] = [
   { key: "buy", title: "BUY", gujarati: "Purchase", icon: "download", perm: "buy", route: "/buy", color: colors.success },
   { key: "sell", title: "SELL", gujarati: "Sale", icon: "cash", perm: "sell", route: "/scan?mode=sell", color: colors.brand },
   { key: "requirement", title: "REQUIREMENT", gujarati: "Inquiry / Need", icon: "add-circle", perm: "requirement", route: "/scan?mode=requirement", color: colors.warning },
+  { key: "customers", title: "CUSTOMERS", gujarati: "Grahak Khata", icon: "people", perm: "sell", route: "/customers", color: colors.brand },
   { key: "arrange", title: "STORE ARRANGEMENT", gujarati: "Place bought stock", icon: "location", perm: "buy", route: "/store-arrangement", wide: true, color: colors.info },
 ];
 
