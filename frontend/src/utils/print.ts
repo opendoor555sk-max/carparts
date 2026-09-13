@@ -1,4 +1,5 @@
 import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
 
 import { fileUrl } from "@/src/api/client";
@@ -225,6 +226,65 @@ export async function printRequirements(b: Branding, reqs: any[]): Promise<void>
     .join("");
   const body = `<table><thead><tr><th>#</th><th>Part Number</th><th>Name</th><th>Priority</th><th>Qty</th><th>In Stock</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><div class="tot">Total: ${reqs.length}</div>`;
   await printHtml(wrap("Requirements / Inquiry List", b, body));
+}
+
+export type InvoiceData = {
+  invoice_number: string;
+  at: string;
+  part_number: string;
+  description?: string;
+  customer_name?: string;
+  price?: number | null;
+  gst_rate: number;
+  gst_amount?: number | null;
+  total?: number | null;
+};
+
+function money(v?: number | null): string {
+  return v != null ? `Rs. ${v.toFixed(2)}` : "-";
+}
+
+export function invoiceHtml(b: Branding, inv: InvoiceData): string {
+  const metaRows: [string, string][] = [
+    ["Invoice No.", inv.invoice_number],
+    ["Date", new Date(inv.at).toLocaleString()],
+  ];
+  if (inv.customer_name) metaRows.push(["Customer", inv.customer_name]);
+  const meta = metaRows
+    .map(([k, v]) => `<tr><th style="width:35%">${esc(k)}</th><td>${esc(v)}</td></tr>`)
+    .join("");
+  const body = `<table>${meta}</table>
+    <table style="margin-top:14px"><thead><tr><th>Part Number</th><th>Description</th><th>Amount</th></tr></thead>
+      <tbody><tr><td>${esc(inv.part_number)}</td><td>${esc(inv.description || "-")}</td><td>${money(inv.price)}</td></tr></tbody>
+    </table>
+    <table style="margin-top:12px"><tbody>
+      <tr><th style="width:70%">Taxable Amount</th><td>${money(inv.price)}</td></tr>
+      <tr><th>GST (${(inv.gst_rate * 100).toFixed(0)}%)</th><td>${money(inv.gst_amount)}</td></tr>
+      <tr><th>Total</th><td><b>${money(inv.total)}</b></td></tr>
+    </tbody></table>`;
+  return wrap("Tax Invoice", b, body);
+}
+
+// Native: render the invoice to a PDF file and hand it to the OS share sheet
+// (WhatsApp, email, save-to-Drive, etc.) so the customer can be sent a copy
+// without a physical printer. Web has no equivalent file-share surface, so it
+// falls back to the same print-dialog flow as everything else in this file —
+// "Save as PDF" from that dialog covers the same need.
+export async function shareInvoicePdf(b: Branding, inv: InvoiceData): Promise<void> {
+  const html = invoiceHtml(b, inv);
+  if (Platform.OS === "web") {
+    await printHtml(html);
+    return;
+  }
+  const { uri } = await Print.printToFileAsync({ html });
+  const available = await Sharing.isAvailableAsync();
+  if (available) {
+    await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: `Invoice ${inv.invoice_number}` });
+  } else {
+    // No share sheet available on this device — fall back to the direct
+    // print dialog rather than leaving the user with no way out.
+    await Print.printAsync({ html });
+  }
 }
 
 export async function printReport(

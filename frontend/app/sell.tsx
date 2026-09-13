@@ -88,7 +88,11 @@ export default function Sell() {
           : "Sold — stock reduced",
         "success",
       );
-      router.replace(`/part/${encodeURIComponent(partNumber)}` as any);
+      if (res.invoice?.id) {
+        router.replace(`/invoice/${res.invoice.id}` as any);
+      } else {
+        router.replace(`/part/${encodeURIComponent(partNumber)}` as any);
+      }
     } catch (e: any) {
       const d = e?.detail;
       show(d?.message || e?.message || "Sell failed", "error");

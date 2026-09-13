@@ -1461,6 +1461,28 @@ async def buy(body: BuyIn, store_id: Optional[str] = None, user=Depends(require(
     return {"ok": True, "unit": unit, "limit": new_limit}
 
 
+# ---------------- GST Invoicing ----------------
+# Fixed flat rate — no slab lookup, per the shop's requirements.
+GST_RATE = 0.18
+
+
+def _financial_year_label(dt: datetime) -> str:
+    """Indian financial year: Apr 1 - Mar 31, formatted like "2026-27"."""
+    start_year = dt.year if dt.month >= 4 else dt.year - 1
+    return f"{start_year}-{str(start_year + 1)[-2:]}"
+
+
+async def _next_invoice_number(store_id: Optional[str], fy_label: str) -> str:
+    # Numbering is derived fresh from how many invoices already exist for this
+    # store+financial-year, rather than a stored counter — same "never let a
+    # cached total drift from what actually justifies it" approach used by
+    # compute_customer_balance() below. A tiny race between two concurrent
+    # sells could in theory produce a duplicate number; acceptable here since
+    # invoice_number is a display label, not a uniqueness key.
+    count = await db.invoices.count_documents({"store_id": store_id, "fy_label": fy_label})
+    return f"INV/{fy_label}/{count + 1:04d}"
+
+
 # ---------------- Sell (decreases stock) ----------------
 @api.post("/sell")
 async def sell(body: SellIn, store_id: Optional[str] = None, user=Depends(require("sell"))):
@@ -1498,7 +1520,41 @@ async def sell(body: SellIn, store_id: Optional[str] = None, user=Depends(requir
         }
         await db.customer_ledger.insert_one(dict(entry))
         result["credit_balance"] = await compute_customer_balance(sid, body.customer_id)
+
+    # Every successful sale gets an invoice — even when price is missing (a
+    # part sold with no price recorded), so the invoice trail always matches
+    # the transaction trail. Financial fields are left null rather than
+    # silently treated as zero, same "unknown, don't fake a number" approach
+    # used for missing cost prices in the profit report.
+    at = now_iso()
+    fy_label = _financial_year_label(datetime.now(timezone.utc))
+    invoice_number = await _next_invoice_number(sid, fy_label)
+    part = await db.parts.find_one({"store_id": sid, "part_number": pn}, {"_id": 0, "name": 1})
+    store = await db.stores.find_one({"id": sid}, {"_id": 0, "name": 1, "gst": 1})
+    price = body.price
+    gst_amount = round(price * GST_RATE, 2) if price is not None else None
+    total = round(price + gst_amount, 2) if price is not None else None
+    invoice = {
+        "id": new_id(), "invoice_number": invoice_number, "fy_label": fy_label,
+        "store_id": sid, "store_name": (store or {}).get("name", ""), "store_gst": (store or {}).get("gst", ""),
+        "unit_id": unit["id"], "transaction_id": txn["id"],
+        "part_number": pn, "description": (part or {}).get("name", "") or "",
+        "customer_id": body.customer_id, "customer_name": (customer or {}).get("name", ""),
+        "price": price, "gst_rate": GST_RATE, "gst_amount": gst_amount, "total": total,
+        "by": user["username"], "at": at,
+    }
+    await db.invoices.insert_one(dict(invoice))
+    invoice.pop("_id", None)
+    result["invoice"] = invoice
     return result
+
+
+@api.get("/invoices/{invoice_id}")
+async def get_invoice(invoice_id: str, store_id: Optional[str] = None, user=Depends(require("sell"))):
+    inv = await db.invoices.find_one(sq(user, {"id": invoice_id}, store_id), {"_id": 0})
+    if not inv:
+        raise HTTPException(404, "Invoice not found")
+    return inv
 
 
 # ---------------- Customer Ledger (Grahak Khata) ----------------
