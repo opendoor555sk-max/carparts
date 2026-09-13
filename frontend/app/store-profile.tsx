@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View, Alert, Linking } from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, View, Alert, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";

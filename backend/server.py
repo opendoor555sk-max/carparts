@@ -1309,7 +1309,6 @@ async def create_part(body: PartCreate, store_id: Optional[str] = None, user=Dep
 
 @api.get("/parts/{part_number}")
 async def get_part(part_number: str, store_id: Optional[str] = None, user=Depends(get_current_user)):
-    sid = resolve_store(user, store_id)
     part = await db.parts.find_one(sq(user, {"part_number": part_number}, store_id), {"_id": 0})
     if not part:
         raise HTTPException(404, "Part not found")

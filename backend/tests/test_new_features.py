@@ -11,7 +11,6 @@ import os
 import uuid
 import requests
 import pytest
-from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv("/app/backend/.env")

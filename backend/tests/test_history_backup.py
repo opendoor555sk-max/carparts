@@ -1,9 +1,7 @@
 """Tests for iteration 13: Transactions history + bulk delete, Backup export/import, regression."""
-import os
 import time
 import json
 import requests
-import pytest
 
 
 # ---------- Transactions history + bulk delete ----------
@@ -45,7 +43,6 @@ class TestTransactionsHistory:
         r = requests.post(f"{base_url}/api/buy", headers=admin_headers,
                           json={"part_number": pn, "price": 111, "override": True}, timeout=30)
         assert r.status_code == 200, r.text
-        buy_res = r.json()
         # extract txn id from history
         r = requests.get(f"{base_url}/api/transactions?type=buy", headers=admin_headers, timeout=30)
         rows = [t for t in r.json() if t.get("part_number") == pn]

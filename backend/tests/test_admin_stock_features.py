@@ -4,7 +4,6 @@
  - Physical stock verification (/api/stock/verification + /api/stock/verify)
 """
 import os
-import time
 import uuid
 import pytest
 import requests

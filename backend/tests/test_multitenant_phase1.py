@@ -7,7 +7,6 @@
 """
 import os
 import uuid
-import time
 import pytest
 import requests
 

@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import {
   FlatList,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Linking } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";

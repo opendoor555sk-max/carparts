@@ -189,7 +189,11 @@ class TestStickerTemplateStoreIsolation:
 
             # B cannot delete A's template
             rDel = requests.delete(f"{API}/sticker-templates/{tid_a}", headers=_auth(storeB["token"]), timeout=15)
-            # delete returns 200 {ok:true} regardless — verify A's still there
+            # The endpoint returns 200 {ok:true} regardless of whether it matched
+            # anything (no 403/404 signal either way) — assert that documented
+            # behavior explicitly, then verify the real security property below:
+            # A's template must still exist, i.e. B's delete was actually a no-op.
+            assert rDel.status_code == 200, rDel.text
             rA2 = requests.get(f"{API}/sticker-templates", headers=_auth(teststore1_token), timeout=15)
             assert tid_a in [t["id"] for t in rA2.json()], "storeB was able to delete storeA's template!"
         finally:
