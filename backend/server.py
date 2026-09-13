@@ -571,6 +571,20 @@ class CustomerPaymentIn(BaseModel):
     note: Optional[str] = ""
 
 
+class VendorIn(BaseModel):
+    name: str
+    phone: str
+    address: Optional[str] = ""
+    notes: Optional[str] = ""
+
+
+class VendorUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+
+
 class KnownPartIn(BaseModel):
     part_number: str
     company: Optional[str] = "All"
@@ -1599,6 +1613,80 @@ async def record_customer_payment(customer_id: str, body: CustomerPaymentIn, sto
     await db.customer_ledger.insert_one(dict(entry))
     entry.pop("_id", None)
     return {"ok": True, "entry": entry, "balance": await compute_customer_balance(sid, customer_id)}
+
+
+# ---------------- Vendor Directory (Supplier Records) ----------------
+# A plain directory, not a ledger — no balance/credit tracking like Customers
+# above (vendors are who parts are bought FROM; nothing here records what's
+# owed to them). Same CRUD shape and phone-based dedup as Customers though,
+# since both are "a person/business record with a phone number" at heart.
+@api.post("/vendors")
+async def create_vendor(body: VendorIn, store_id: Optional[str] = None, user=Depends(require("buy"))):
+    name = body.name.strip()
+    phone = body.phone.strip()
+    if not name or not phone:
+        raise HTTPException(400, "Name and phone are required")
+    sid = resolve_store(user, store_id, require_write=True)
+    # One record per phone number per store — same reasoning as Customers:
+    # avoid the same real vendor fragmenting into two untracked records.
+    if await db.vendors.find_one({"store_id": sid, "phone": phone}):
+        raise HTTPException(400, "A vendor with this phone number already exists")
+    doc = {
+        "id": new_id(), "store_id": sid, "name": name, "phone": phone,
+        "address": body.address or "", "notes": body.notes or "",
+        "created_at": now_iso(), "created_by": user["username"],
+    }
+    await db.vendors.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@api.get("/vendors")
+async def list_vendors(q: Optional[str] = None, phone: Optional[str] = None,
+                       store_id: Optional[str] = None, user=Depends(get_current_user)):
+    query = sq(user, None, store_id)
+    if phone:
+        query["phone"] = phone.strip()
+    elif q:
+        rx = {"$regex": re.escape(q.strip()[:64]), "$options": "i"}
+        query["$or"] = [{"name": rx}, {"phone": rx}]
+    return await db.vendors.find(query, {"_id": 0}).sort("name", 1).to_list(500)
+
+
+@api.get("/vendors/{vendor_id}")
+async def get_vendor(vendor_id: str, store_id: Optional[str] = None, user=Depends(get_current_user)):
+    vendor = await db.vendors.find_one(sq(user, {"id": vendor_id}, store_id), {"_id": 0})
+    if not vendor:
+        raise HTTPException(404, "Vendor not found")
+    return vendor
+
+
+@api.patch("/vendors/{vendor_id}")
+async def update_vendor(vendor_id: str, body: VendorUpdate, store_id: Optional[str] = None,
+                        user=Depends(require("buy"))):
+    updates = {k: v.strip() if isinstance(v, str) else v for k, v in body.dict().items() if v is not None}
+    if not updates:
+        return await get_vendor(vendor_id, store_id, user)
+    sid = resolve_store(user, store_id, require_write=True)
+    if updates.get("phone"):
+        dupe = await db.vendors.find_one({"store_id": sid, "phone": updates["phone"], "id": {"$ne": vendor_id}})
+        if dupe:
+            raise HTTPException(400, "A vendor with this phone number already exists")
+    r = await db.vendors.update_one({"store_id": sid, "id": vendor_id}, {"$set": updates})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Vendor not found")
+    return await get_vendor(vendor_id, sid, user)
+
+
+@api.delete("/vendors/{vendor_id}")
+async def delete_vendor(vendor_id: str, user=Depends(require_admin)):
+    vendor = await db.vendors.find_one({"id": vendor_id})
+    if not vendor:
+        raise HTTPException(404, "Vendor not found")
+    if user.get("role") != "super_admin" and vendor.get("store_id") != user.get("store_id"):
+        raise HTTPException(403, "બીજા store નું vendor delete ન કરાય")
+    await db.vendors.delete_one({"id": vendor_id})
+    return {"ok": True}
 
 
 # ---------------- Inventory ----------------
