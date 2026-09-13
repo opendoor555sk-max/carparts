@@ -189,6 +189,20 @@ export default function Home() {
               <Ionicons name="chevron-forward" size={18} color={colors.info} />
             </Pressable>
           ))}
+          <Pressable
+            style={styles.report}
+            onPress={() => router.push("/profit-report" as any)}
+            testID="report-profit"
+          >
+            <View style={[styles.reportIcon, { borderColor: colors.warning }]}>
+              <Ionicons name="trending-up" size={22} color={colors.warning} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reportTitle}>Profit / Margin</Text>
+              <Text style={styles.reportSub}>Revenue vs cost, by date range and part</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.info} />
+          </Pressable>
         </View>
 
         {user?.role === "super_admin" ? (

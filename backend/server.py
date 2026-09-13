@@ -2506,6 +2506,103 @@ async def list_transactions(type: Optional[str] = None, store_id: Optional[str] 
     return out
 
 
+# ---------------- Profit / Margin Report (Admin) ----------------
+@api.get("/reports/profit")
+async def profit_report(store_id: Optional[str] = None, date_from: Optional[str] = None,
+                        date_to: Optional[str] = None, part_number: Optional[str] = None,
+                        user=Depends(require_admin)):
+    """Per-unit profit = that unit's sell price minus the price it was bought
+    at, joined by unit_id (the same db.stock document's id — set on both its
+    buy and sell transaction, since both are recorded against `unit["id"]` at
+    the time). Not part_number-average cost: two units of the same part can
+    have been bought at different prices (a very real case for used auto
+    parts), so joining by the specific physical unit is the only way to get
+    an actually-correct number per sale, not an approximation.
+
+    Older purchases recorded with no price (BuyIn.price is optional, and was
+    only made mandatory-in-practice much later) have nothing to subtract —
+    those sales are counted in revenue/units_sold but excluded from cost/
+    profit and separately tallied as unknown_cost_units, never silently
+    treated as zero cost (which would inflate profit) or dropped entirely
+    (which would hide that a real sale happened).
+    """
+    sid = resolve_store(user, store_id)
+    base: Dict[str, Any] = {"store_id": sid} if sid is not None else {}
+    q: Dict[str, Any] = {**base, "type": "sell"}
+    if part_number:
+        q["part_number"] = part_number.strip()
+    if date_from or date_to:
+        rng: Dict[str, Any] = {}
+        if date_from:
+            rng["$gte"] = date_from
+        if date_to:
+            rng["$lte"] = date_to + "T23:59:59"
+        q["at"] = rng
+    sells = await db.transactions.find(q, {"_id": 0}).sort("at", -1).to_list(5000)
+
+    by_part: Dict[str, Dict[str, Any]] = {}
+    units_sold = 0
+    units_unknown_cost = 0
+    total_revenue = 0.0
+    total_cost = 0.0
+    # Summed independently from total_revenue - total_cost on purpose: those
+    # two totals cover different sets of units (revenue includes unknown-cost
+    # sales, cost doesn't), so subtracting them would silently treat an
+    # unknown cost as zero and inflate profit — exactly what this endpoint
+    # exists to avoid. total_profit only ever adds a unit's own
+    # revenue-minus-cost, and only when both sides of that are known.
+    total_profit = 0.0
+
+    for s in sells:
+        pn = s.get("part_number") or "?"
+        units_sold += 1
+        revenue = s.get("price")
+        buy_txn = None
+        if s.get("unit_id"):
+            buy_txn = await db.transactions.find_one(
+                {**base, "type": "buy", "unit_id": s["unit_id"]}, {"_id": 0, "price": 1})
+        cost = buy_txn.get("price") if buy_txn else None
+        known_cost = cost is not None and revenue is not None
+
+        row = by_part.setdefault(pn, {
+            "part_number": pn, "units_sold": 0, "revenue": 0.0, "cost": 0.0,
+            "profit": 0.0, "unknown_cost_units": 0,
+        })
+        row["units_sold"] += 1
+        if revenue is not None:
+            row["revenue"] += revenue
+            total_revenue += revenue
+        if known_cost:
+            row["cost"] += cost
+            row["profit"] += revenue - cost
+            total_cost += cost
+            total_profit += revenue - cost
+        else:
+            row["unknown_cost_units"] += 1
+            units_unknown_cost += 1
+
+    # Attach part name for display, same enrichment list_transactions does.
+    for pn, row in by_part.items():
+        p = await db.parts.find_one({**base, "part_number": pn}, {"_id": 0, "name": 1})
+        row["part_name"] = (p or {}).get("name", "")
+        row["revenue"] = round(row["revenue"], 2)
+        row["cost"] = round(row["cost"], 2)
+        row["profit"] = round(row["profit"], 2)
+
+    parts_list = sorted(by_part.values(), key=lambda r: r["profit"], reverse=True)
+    return {
+        "date_from": date_from, "date_to": date_to,
+        "summary": {
+            "units_sold": units_sold,
+            "total_revenue": round(total_revenue, 2),
+            "total_cost": round(total_cost, 2),
+            "total_profit": round(total_profit, 2),
+            "units_with_unknown_cost": units_unknown_cost,
+        },
+        "by_part": parts_list,
+    }
+
+
 class TxnDeleteIn(BaseModel):
     ids: List[str]
     remove_stock: bool = True
