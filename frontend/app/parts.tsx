@@ -5,10 +5,12 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
 import { EmptyState, Header, Loading, StatusChip } from "@/src/components/ui";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 export default function PartsList() {
   const { category, company, title } = useLocalSearchParams<{ category: string; company: string; title: string }>();
+  const { t } = useLanguage();
   const router = useRouter();
   const [parts, setParts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,11 +36,11 @@ export default function PartsList() {
 
   return (
     <View style={styles.flex}>
-      <Header title={(title as string) || "Parts"} subtitle="Part masters" onBack={() => router.back()} />
+      <Header title={(title as string) || t("parts.title")} subtitle={t("parts.subtitle")} onBack={() => router.back()} />
       {loading ? (
         <Loading />
       ) : parts.length === 0 ? (
-        <EmptyState icon="documents-outline" title="No parts" subtitle="No part master in this category yet" />
+        <EmptyState icon="documents-outline" title={t("parts.empty")} subtitle={t("parts.emptySub")} />
       ) : (
         <FlatList
           data={parts}
@@ -53,7 +55,7 @@ export default function PartsList() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.pn}>{item.part_number}</Text>
                 {item.name ? <Text style={styles.name}>{item.name}</Text> : null}
-                <Text style={styles.meta}>{item.company} • Stock: {item.stock_count ?? 0}</Text>
+                <Text style={styles.meta}>{item.company} • {t("common.stock")}: {item.stock_count ?? 0}</Text>
               </View>
               <StatusChip status={item.verification_status} />
               <Ionicons name="chevron-forward" size={18} color={colors.info} />

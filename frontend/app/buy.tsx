@@ -30,6 +30,7 @@ import { extractPartNumber } from "@/src/utils/barcode";
 import { printReceipt, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 
 // This screen used to be "Multiple Buy" (fast scan -> draft -> confirm) with a
 // separate, richer single-part "Buy" screen for condition/photos/price/print/
@@ -87,6 +88,7 @@ export default function Buy() {
   const { company: routeCompany = "All", pn: routePn } = useLocalSearchParams<{ company: string; pn: string }>();
   const { show } = useToast();
   const { user, can } = useAuth();
+  const { t, tStatus } = useLanguage();
   const isSuperAdmin = user?.role === "super_admin";
   const [permission, requestPermission] = useCameraPermissions();
   const [manual, setManual] = useState("");
@@ -156,7 +158,7 @@ export default function Buy() {
         withTiming(0, { duration: 500, easing: Easing.in(Easing.quad) }),
       );
       setDangerBorder(true);
-      setStopMessage(`STOP BUYING ${pn} — Limit Reached`);
+      setStopMessage(`${t("buy.stopBuying")} ${pn} — ${t("buy.limitReached")}`);
       if (dangerTimeout.current) clearTimeout(dangerTimeout.current);
       dangerTimeout.current = setTimeout(() => {
         setDangerBorder(false);
@@ -173,7 +175,7 @@ export default function Buy() {
         // best-effort — a missing/failed sound must never block the actual warning
       }
     },
-    [dangerFlashOpacity, dangerPlayer],
+    [dangerFlashOpacity, dangerPlayer, t],
   );
 
   // Live, per-scan check against GET /limits/{part_number} — the same
@@ -223,12 +225,12 @@ export default function Buy() {
           vehicles: l.vehicles || (src?.compatible_vehicles?.length ? src.compatible_vehicles.join(", ") : ""),
           company: src?.company && src.company !== "All" && (l.company === "All" || !l.company) ? src.company : l.company,
         }));
-        if (!res.part && res.catalog) show(`${pn}: auto-filled from Common Catalog`, "info");
+        if (!res.part && res.catalog) show(`${pn}: ${t("buy.autoFilledCatalog")}`, "info");
       } catch {
         updateLine(pn, { infoLoading: false });
       }
     },
-    [updateLine, show],
+    [updateLine, show, t],
   );
 
   useEffect(() => {
@@ -364,20 +366,20 @@ export default function Buy() {
           vehicles: r.models?.length ? r.models.join(", ") : l.vehicles,
           variant: r.variants?.length ? r.variants.join(", ") : l.variant,
         }));
-        show(r.cached ? "Autofilled from library (100% verified)" : `Autofilled — ${r.result_count || 0} web results`, "success");
+        show(r.cached ? t("buy.autofilledLibrary") : `${t("buy.autofilledWeb")} — ${r.result_count || 0} ${t("buy.webResults")}`, "success");
       } catch (e: any) {
         const d = e?.detail;
         if (d?.code === "NO_KEY") {
-          show("No Google key — add it in Settings", "error");
+          show(t("buy.noGoogleKey"), "error");
           router.push("/settings" as any);
         } else {
-          show(d?.message || e?.message || "Search failed", "error");
+          show(d?.message || e?.message || t("buy.searchFailed"), "error");
         }
       } finally {
         updateLine(pn, { searching: false });
       }
     },
-    [lines, updateLine, show, router],
+    [lines, updateLine, show, router, t],
   );
 
   const doUploadFor = useCallback(
@@ -389,44 +391,44 @@ export default function Buy() {
         updateLine(pn, (l) => ({ photos: [...l.photos, { path, display }] }));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {
-        show("Photo upload failed", "error");
+        show(t("buy.photoUploadFailed"), "error");
       } finally {
         updateLine(pn, { uploading: false });
       }
     },
-    [updateLine, show],
+    [updateLine, show, t],
   );
 
   const takePhotoFor = useCallback(
     async (pn: string) => {
       const line = lines.find((l) => l.pn === pn);
-      if ((line?.photos.length || 0) >= 6) return show("Maximum 6 photos", "info");
+      if ((line?.photos.length || 0) >= 6) return show(t("buy.maxPhotos"), "info");
       let perm = await ImagePicker.getCameraPermissionsAsync();
       if (!perm.granted && perm.canAskAgain) perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert("Camera needed", "Allow camera to take part photos.", [
-          { text: "Cancel", style: "cancel" },
-          { text: "Open Settings", onPress: () => Linking.openSettings() },
+        Alert.alert(t("buy.cameraNeededTitle"), t("buy.cameraNeededMsg"), [
+          { text: t("ui.cancel"), style: "cancel" },
+          { text: t("scan.openSettings"), onPress: () => Linking.openSettings() },
         ]);
         return;
       }
       const res = await ImagePicker.launchCameraAsync({ quality: 0.6 });
       if (!res.canceled && res.assets?.[0]?.uri) await doUploadFor(pn, res.assets[0].uri);
     },
-    [lines, show, doUploadFor],
+    [lines, show, doUploadFor, t],
   );
 
   const pickGalleryFor = useCallback(
     async (pn: string) => {
       const line = lines.find((l) => l.pn === pn);
       const current = line?.photos.length || 0;
-      if (current >= 6) return show("Maximum 6 photos", "info");
+      if (current >= 6) return show(t("buy.maxPhotos"), "info");
       let perm = await ImagePicker.getMediaLibraryPermissionsAsync();
       if (!perm.granted && perm.canAskAgain) perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert("Gallery needed", "Allow gallery to add photos.", [
-          { text: "Cancel", style: "cancel" },
-          { text: "Open Settings", onPress: () => Linking.openSettings() },
+        Alert.alert(t("buy.galleryNeededTitle"), t("buy.galleryNeededMsg"), [
+          { text: t("ui.cancel"), style: "cancel" },
+          { text: t("scan.openSettings"), onPress: () => Linking.openSettings() },
         ]);
         return;
       }
@@ -442,7 +444,7 @@ export default function Buy() {
         }
       }
     },
-    [lines, show, doUploadFor],
+    [lines, show, doUploadFor, t],
   );
 
   const removePhotoFor = useCallback(
@@ -499,7 +501,7 @@ export default function Buy() {
           });
           ok++;
         } catch (e: any) {
-          stopReason = e?.detail?.code === "LIMIT_REACHED" ? "limit reached" : (e?.detail?.message || e?.message || "failed");
+          stopReason = e?.detail?.code === "LIMIT_REACHED" ? t("buy.limitReachedLower") : (e?.detail?.message || e?.message || t("common.failed").toLowerCase());
           break;
         }
       }
@@ -507,23 +509,23 @@ export default function Buy() {
       const left = line.qty - ok;
       if (left > 0) {
         remaining.push({ ...line, qty: left });
-        issues.push(`${line.pn}: added ${ok}/${line.qty}${stopReason ? ` — ${stopReason}` : ""}`);
+        issues.push(`${line.pn}: ${t("buy.added")} ${ok}/${line.qty}${stopReason ? ` — ${stopReason}` : ""}`);
       }
     }
     setLines(remaining);
     setConfirming(false);
     if (issues.length) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      show(`Added ${added} unit(s) — ${issues.length} line(s) still need attention`, added ? "info" : "error");
+      show(`${t("buy.added")} ${added} ${t("buy.unitS")} — ${issues.length} ${t("buy.linesNeedAttention")}`, added ? "info" : "error");
       // Refresh the shown limit/stock for whatever got requeued, so the card
       // isn't left displaying stale pre-purchase numbers.
       remaining.forEach((l) => loadLineInfo(l.pn));
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      show(`Added ${added} unit(s) to stock`, "success");
+      show(`${t("buy.added")} ${added} ${t("buy.unitsToStock")}`, "success");
       router.replace("/(tabs)/inventory" as any);
     }
-  }, [lines, confirming, gps, show, router, loadLineInfo]);
+  }, [lines, confirming, gps, show, router, loadLineInfo, t]);
 
   const onBarcode = useCallback(
     ({ data }: { data: string }) => {
@@ -537,7 +539,7 @@ export default function Buy() {
 
   return (
     <View style={[styles.flex, dangerBorder && styles.dangerBorder]} testID="batch-danger-border">
-      <Header title="Buy" subtitle={isSuperAdmin ? (gps ? "📍 GPS ✓" : "GPS…") : undefined} onBack={() => router.back()} />
+      <Header title={t("buy.title")} subtitle={isSuperAdmin ? (gps ? `📍 ${t("buy.gpsOk")}` : t("buy.gpsEllipsis")) : undefined} onBack={() => router.back()} />
       {stopMessage ? (
         <View style={styles.stopBanner} testID="batch-stop-banner">
           <Ionicons name="hand-left" size={20} color={colors.onError} />
@@ -555,25 +557,25 @@ export default function Buy() {
         ) : (
           <View style={styles.center}>
             <Ionicons name="camera" size={40} color={colors.brand} />
-            <Text style={styles.dim}>Allow camera for quick scanning</Text>
-            <Button title="Allow Camera" onPress={requestPermission} icon="camera" testID="batch-grant" />
+            <Text style={styles.dim}>{t("buy.allowCameraQuick")}</Text>
+            <Button title={t("scan.allowCamera")} onPress={requestPermission} icon="camera" testID="batch-grant" />
           </View>
         )}
         <Animated.View style={[styles.flashOverlay, flashStyle]} pointerEvents="none" testID="batch-scan-flash" />
         <Animated.View style={[styles.dangerFlashOverlay, dangerFlashStyle]} pointerEvents="none" testID="batch-danger-flash" />
         <View style={styles.overlay} pointerEvents="none">
           <View style={[styles.bracket, dangerBorder && styles.bracketDanger]} />
-          <Text style={styles.hint}>Scan → adds to draft below (+1 qty). Nothing saved until you confirm.</Text>
+          <Text style={styles.hint}>{t("buy.scanHint")}</Text>
         </View>
         <View style={styles.counterWrap} pointerEvents="none" testID="batch-total-counter">
-          <Text style={styles.counterLabel}>TOTAL</Text>
+          <Text style={styles.counterLabel}>{t("buy.total").toUpperCase()}</Text>
           <Animated.Text style={[styles.counterValue, counterStyle]}>{total}</Animated.Text>
         </View>
       </View>
 
       <View style={styles.inputRow}>
         <View style={{ flex: 1 }}>
-          <Field value={manual} onChangeText={setManual} placeholder="Manual part no. +1" autoCapitalize="characters" onSubmitEditing={() => { addOne(manual); setManual(""); }} returnKeyType="done" testID="batch-manual" />
+          <Field value={manual} onChangeText={setManual} placeholder={t("buy.manualPlaceholder")} autoCapitalize="characters" onSubmitEditing={() => { addOne(manual); setManual(""); }} returnKeyType="done" testID="batch-manual" />
         </View>
         <Pressable style={styles.addBtn} onPress={() => { addOne(manual); setManual(""); }} testID="batch-add"><Ionicons name="add" size={24} color={colors.onBrand} /></Pressable>
       </View>
@@ -582,7 +584,7 @@ export default function Buy() {
         <View style={styles.gpsStrip}>
           <Ionicons name="location" size={16} color={gps ? colors.success : colors.warning} />
           <Text style={[styles.gpsStripText, { color: gps ? colors.success : colors.warning }]} numberOfLines={1}>
-            {gps ? `Live GPS: ${gps}` : "Getting GPS…"}
+            {gps ? `${t("buy.liveGps")}: ${gps}` : t("scan.gettingGps")}
           </Text>
         </View>
       ) : null}
@@ -593,7 +595,7 @@ export default function Buy() {
           keyExtractor={(c) => c.pn}
           contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm, paddingBottom: insets.bottom + 90 }}
           keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={<Text style={styles.empty}>Nothing scanned yet</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>{t("buy.nothingScanned")}</Text>}
           renderItem={({ item }) => {
             const limit = item.info?.limit;
             const isStop = limit?.limit_enabled && limit?.remaining !== null && limit?.remaining <= 0;
@@ -605,10 +607,10 @@ export default function Buy() {
                     <Text style={styles.pn} numberOfLines={2}>{item.pn}</Text>
                     {limit?.limit_enabled ? (
                       <Text style={[styles.lineLimitHint, { color: isStop ? colors.error : colors.info }]}>
-                        Stock {limit.existing_stock} / Limit {limit.allowed_limit}
+                        {t("common.stock")} {limit.existing_stock} / {t("buy.limit")} {limit.allowed_limit}
                       </Text>
                     ) : item.infoLoading ? (
-                      <Text style={styles.lineLimitHint}>Loading…</Text>
+                      <Text style={styles.lineLimitHint}>{t("common.loading")}</Text>
                     ) : null}
                   </View>
                   <View style={styles.qtyControls}>
@@ -630,24 +632,24 @@ export default function Buy() {
                   <View style={styles.lineBody}>
                     {/* Limit meter */}
                     <View style={styles.rowBetween}>
-                      <Text style={styles.cardTitle}>PURCHASE LIMIT</Text>
+                      <Text style={styles.cardTitle}>{t("buy.purchaseLimit").toUpperCase()}</Text>
                       {item.info?.status ? <StatusChip status={item.info.status} /> : null}
                     </View>
                     <LimitBar existing={limit?.existing_stock ?? 0} allowed={limit?.allowed_limit ?? null} />
                     {isStop && !item.override ? (
                       <View style={styles.doNotBuy} testID={`batch-do-not-buy-${item.pn}`}>
                         <Ionicons name="hand-left" size={18} color={colors.onError} />
-                        <Text style={styles.doNotBuyText}>DO NOT BUY — limit reached</Text>
+                        <Text style={styles.doNotBuyText}>{tStatus("DO NOT BUY")} — {t("buy.limitReachedLower")}</Text>
                       </View>
                     ) : isWarn ? (
                       <View style={styles.warnBanner}>
                         <Ionicons name="warning" size={16} color={colors.onWarning} />
-                        <Text style={styles.warnText}>WARNING — near limit</Text>
+                        <Text style={styles.warnText}>{tStatus("WARNING")} — {t("buy.nearLimit")}</Text>
                       </View>
                     ) : null}
 
                     {/* Condition */}
-                    <Text style={styles.sectionTitle}>CONDITION</Text>
+                    <Text style={styles.sectionTitle}>{t("buy.condition").toUpperCase()}</Text>
                     <View style={styles.condGrid}>
                       {CONDITIONS.map((c) => (
                         <Pressable
@@ -659,15 +661,15 @@ export default function Buy() {
                           ]}
                           testID={`batch-cond-${item.pn}-${c}`}
                         >
-                          <Text style={{ color: item.condition === c ? colors.onBrand : colors.onSurface2, fontWeight: "700", fontSize: font.sm }}>{c}</Text>
+                          <Text style={{ color: item.condition === c ? colors.onBrand : colors.onSurface2, fontWeight: "700", fontSize: font.sm }}>{tStatus(c)}</Text>
                         </Pressable>
                       ))}
                     </View>
 
                     {/* Part & compatibility */}
-                    <Text style={styles.sectionTitle}>PART & COMPATIBILITY</Text>
+                    <Text style={styles.sectionTitle}>{t("buy.partCompat").toUpperCase()}</Text>
                     <Button
-                      title="🔍 Google Autofill (your key)"
+                      title={`🔍 ${t("buy.googleAutofill")}`}
                       onPress={() => googleAutofillFor(item.pn)}
                       loading={item.searching}
                       variant="secondary"
@@ -675,35 +677,35 @@ export default function Buy() {
                       testID={`batch-autofill-${item.pn}`}
                       style={{ marginBottom: spacing.md }}
                     />
-                    <Field label="Name" value={item.name} onChangeText={(v) => updateLine(item.pn, { name: v })} placeholder="Part name" testID={`batch-name-${item.pn}`} />
-                    <Text style={styles.pickLabel}>COMPANY</Text>
+                    <Field label={t("common.name")} value={item.name} onChangeText={(v) => updateLine(item.pn, { name: v })} placeholder={t("common.partName")} testID={`batch-name-${item.pn}`} />
+                    <Text style={styles.pickLabel}>{t("common.company").toUpperCase()}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pickRow}>
                       {COMPANIES.map((c) => (
                         <FilterChip key={c} label={c} active={item.company === c} onPress={() => updateLine(item.pn, { company: c })} testID={`batch-co-${item.pn}-${c}`} />
                       ))}
                     </ScrollView>
-                    <Field label="Category" value={item.category} onChangeText={(v) => updateLine(item.pn, { category: v })} placeholder="Category" testID={`batch-category-${item.pn}`} />
+                    <Field label={t("common.category")} value={item.category} onChangeText={(v) => updateLine(item.pn, { category: v })} placeholder={t("common.category")} testID={`batch-category-${item.pn}`} />
                     <Field
-                      label="Compatible Vehicles (comma separated)"
+                      label={t("buy.compatibleVehicles")}
                       value={item.vehicles}
                       onChangeText={(v) => updateLine(item.pn, { vehicles: v })}
                       placeholder="Hyundai Creta, Kia Seltos"
                       testID={`batch-vehicles-${item.pn}`}
                     />
-                    <Field label="Variant" value={item.variant} onChangeText={(v) => updateLine(item.pn, { variant: v })} placeholder="e.g. HTC Diesel" testID={`batch-variant-${item.pn}`} />
+                    <Field label={t("buy.variant")} value={item.variant} onChangeText={(v) => updateLine(item.pn, { variant: v })} placeholder="e.g. HTC Diesel" testID={`batch-variant-${item.pn}`} />
 
                     {/* Location */}
-                    <Text style={styles.sectionTitle}>LOCATION (Rack → Shelf → Box → Position)</Text>
+                    <Text style={styles.sectionTitle}>{t("buy.locationHeader")}</Text>
                     <View style={styles.locGrid}>
-                      <View style={styles.locItem}><Field label="Rack" value={item.rack} onChangeText={(v) => updateLine(item.pn, { rack: v })} placeholder="R1" testID={`batch-rack-${item.pn}`} /></View>
-                      <View style={styles.locItem}><Field label="Shelf" value={item.shelf} onChangeText={(v) => updateLine(item.pn, { shelf: v })} placeholder="S2" testID={`batch-shelf-${item.pn}`} /></View>
-                      <View style={styles.locItem}><Field label="Box" value={item.box} onChangeText={(v) => updateLine(item.pn, { box: v })} placeholder="B3" testID={`batch-box-${item.pn}`} /></View>
-                      <View style={styles.locItem}><Field label="Position" value={item.position} onChangeText={(v) => updateLine(item.pn, { position: v })} placeholder="P4" testID={`batch-position-${item.pn}`} /></View>
+                      <View style={styles.locItem}><Field label={t("buy.rack")} value={item.rack} onChangeText={(v) => updateLine(item.pn, { rack: v })} placeholder="R1" testID={`batch-rack-${item.pn}`} /></View>
+                      <View style={styles.locItem}><Field label={t("buy.shelf")} value={item.shelf} onChangeText={(v) => updateLine(item.pn, { shelf: v })} placeholder="S2" testID={`batch-shelf-${item.pn}`} /></View>
+                      <View style={styles.locItem}><Field label={t("buy.box")} value={item.box} onChangeText={(v) => updateLine(item.pn, { box: v })} placeholder="B3" testID={`batch-box-${item.pn}`} /></View>
+                      <View style={styles.locItem}><Field label={t("buy.position")} value={item.position} onChangeText={(v) => updateLine(item.pn, { position: v })} placeholder="P4" testID={`batch-position-${item.pn}`} /></View>
                     </View>
 
                     {/* Photos */}
                     <View style={styles.rowBetween}>
-                      <Text style={styles.sectionTitle}>PART PHOTOS (6-side)</Text>
+                      <Text style={styles.sectionTitle}>{t("buy.photosHeader")}</Text>
                       <Text style={styles.photoCount}>{item.photos.length}/6</Text>
                     </View>
                     <View style={styles.photoGrid}>
@@ -718,13 +720,13 @@ export default function Buy() {
                       {item.photos.length < 6 ? (
                         <Pressable style={styles.addPhoto} onPress={() => takePhotoFor(item.pn)} disabled={item.uploading} testID={`batch-take-photo-${item.pn}`}>
                           <Ionicons name={item.uploading ? "hourglass" : "camera"} size={20} color={colors.brand} />
-                          <Text style={styles.addPhotoText}>Camera</Text>
+                          <Text style={styles.addPhotoText}>{t("buy.camera")}</Text>
                         </Pressable>
                       ) : null}
                       {item.photos.length < 6 ? (
                         <Pressable style={styles.addPhoto} onPress={() => pickGalleryFor(item.pn)} disabled={item.uploading} testID={`batch-pick-gallery-${item.pn}`}>
                           <Ionicons name="images" size={20} color={colors.brand} />
-                          <Text style={styles.addPhotoText}>Gallery</Text>
+                          <Text style={styles.addPhotoText}>{t("buy.gallery")}</Text>
                         </Pressable>
                       ) : null}
                     </View>
@@ -732,7 +734,7 @@ export default function Buy() {
                     {/* Admin-only price */}
                     {can("view_price") ? (
                       <>
-                        <Text style={styles.sectionTitle}>PURCHASE PRICE (this line)</Text>
+                        <Text style={styles.sectionTitle}>{t("buy.purchasePrice").toUpperCase()}</Text>
                         <Field value={item.price} onChangeText={(v) => updateLine(item.pn, { price: v })} placeholder="₹ 0" keyboardType="numeric" testID={`batch-price-${item.pn}`} />
                       </>
                     ) : null}
@@ -741,8 +743,8 @@ export default function Buy() {
                     {can("manage_limits") ? (
                       <View style={styles.rowBetween}>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.overrideTitle}>Admin Override</Text>
-                          <Text style={styles.dimText}>Buy this line ignoring the limit</Text>
+                          <Text style={styles.overrideTitle}>{t("buy.adminOverride")}</Text>
+                          <Text style={styles.dimText}>{t("buy.overrideHint")}</Text>
                         </View>
                         <Switch
                           value={item.override}
@@ -755,7 +757,7 @@ export default function Buy() {
                     ) : null}
 
                     <Button
-                      title="Print Slip"
+                      title={t("buy.printSlip")}
                       onPress={() => printSlipFor(item)}
                       variant="secondary"
                       icon="print"
@@ -771,7 +773,7 @@ export default function Buy() {
       </KeyboardAvoidingView>
       <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
         <Button
-          title={confirming ? "Adding to stock…" : `Confirm & Add to Stock (${total})`}
+          title={confirming ? t("buy.addingToStock") : `${t("buy.confirmAdd")} (${total})`}
           onPress={confirmAndAddToStock}
           loading={confirming}
           disabled={confirming || lines.length === 0}

@@ -13,11 +13,13 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/context/AuthContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Field } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 export default function SignUp() {
   const { register } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [storeName, setStoreName] = useState("");
@@ -32,15 +34,15 @@ export default function SignUp() {
   const onSubmit = async () => {
     setErr("");
     if (!storeName.trim() || !username.trim() || !password) {
-      setErr("Store name, username and password are required");
+      setErr(t("signup.errRequired"));
       return;
     }
     if (!contact.trim()) {
-      setErr("Contact number is required");
+      setErr(t("signup.errContact"));
       return;
     }
     if (password.length < 6) {
-      setErr("Password must be at least 6 characters");
+      setErr(t("signup.errPasswordLen"));
       return;
     }
     setLoading(true);
@@ -54,7 +56,7 @@ export default function SignUp() {
       });
       router.replace("/(tabs)");
     } catch (e: any) {
-      setErr(e?.message || "Sign up failed");
+      setErr(e?.message || t("signup.errFailed"));
     } finally {
       setLoading(false);
     }
@@ -70,27 +72,27 @@ export default function SignUp() {
           <View style={styles.logoBox}>
             <Ionicons name="storefront" size={38} color={colors.brand} />
           </View>
-          <Text style={styles.title}>Create New Store</Text>
-          <Text style={styles.subtitle}>Start your own Auto Parts Store</Text>
+          <Text style={styles.title}>{t("signup.title")}</Text>
+          <Text style={styles.subtitle}>{t("signup.subtitle")}</Text>
         </View>
 
         <View style={styles.form}>
           <Field
-            label="STORE NAME"
+            label={t("signup.storeName").toUpperCase()}
             value={storeName}
             onChangeText={setStoreName}
-            placeholder="e.g. Raja Auto Parts"
+            placeholder={t("signup.storeNamePlaceholder")}
             testID="signup-store"
           />
           <Field
-            label="YOUR NAME"
+            label={t("signup.yourName").toUpperCase()}
             value={name}
             onChangeText={setName}
-            placeholder="Owner name"
+            placeholder={t("signup.yourNamePlaceholder")}
             testID="signup-name"
           />
           <Field
-            label="CONTACT NUMBER"
+            label={t("signup.contact").toUpperCase()}
             value={contact}
             onChangeText={setContact}
             placeholder="e.g. +91 98xxxxxxxx"
@@ -98,21 +100,21 @@ export default function SignUp() {
             testID="signup-contact"
           />
           <Field
-            label="USERNAME (for login)"
+            label={t("signup.usernameLabel")}
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder="username"
+            placeholder={t("login.username")}
             testID="signup-username"
           />
           <View>
             <Field
-              label="PASSWORD"
+              label={t("login.password").toUpperCase()}
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPw}
-              placeholder="At least 6 characters"
+              placeholder={t("signup.passwordPlaceholder")}
               testID="signup-password"
               onSubmitEditing={onSubmit}
               returnKeyType="go"
@@ -130,7 +132,7 @@ export default function SignUp() {
           ) : null}
 
           <Button
-            title="Create Store & Sign In"
+            title={t("signup.submit")}
             onPress={onSubmit}
             loading={loading}
             icon="add-circle"
@@ -140,8 +142,8 @@ export default function SignUp() {
         </View>
 
         <Pressable onPress={() => router.replace("/login")} style={styles.linkRow} testID="go-login">
-          <Text style={styles.linkText}>Already have an account? </Text>
-          <Text style={[styles.linkText, { color: colors.brand, fontWeight: "800" }]}>Sign In</Text>
+          <Text style={styles.linkText}>{t("signup.haveAccount")} </Text>
+          <Text style={[styles.linkText, { color: colors.brand, fontWeight: "800" }]}>{t("login.signIn")}</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>

@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, font, radius, spacing, statusColor } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 
 // ---------- Screen header (sticky, safe-area aware) ----------
 export function Header({
@@ -75,18 +76,19 @@ export function Header({
 // the login screen, which is now correct there too.
 export function SignOutButton({ testID = "quick-signout" }: { testID?: string }) {
   const { logout } = useAuth();
+  const { t } = useLanguage();
   const [confirming, setConfirming] = useState(false);
   return (
     <>
       <Pressable style={styles.signOutBtn} onPress={() => setConfirming(true)} hitSlop={8} testID={testID}>
         <Ionicons name="log-out-outline" size={14} color={colors.error} />
-        <Text style={styles.signOutText}>Sign Out</Text>
+        <Text style={styles.signOutText}>{t("ui.signOut")}</Text>
       </Pressable>
       <ConfirmModal
         visible={confirming}
-        title="Sign out?"
-        message="You'll need to log in again to continue."
-        confirmText="Sign Out"
+        title={t("ui.signOutTitle")}
+        message={t("ui.signOutMessage")}
+        confirmText={t("ui.signOut")}
         danger
         onConfirm={async () => {
           setConfirming(false);
@@ -108,10 +110,11 @@ export function SignOutButton({ testID = "quick-signout" }: { testID?: string })
 
 // ---------- Status chip ----------
 export function StatusChip({ status, testID }: { status: string; testID?: string }) {
+  const { tStatus } = useLanguage();
   const c = statusColor(status);
   return (
     <View style={[styles.chip, { backgroundColor: c.bg, borderColor: c.border }]} testID={testID}>
-      <Text style={[styles.chipText, { color: c.fg }]}>{status}</Text>
+      <Text style={[styles.chipText, { color: c.fg }]}>{tStatus(status)}</Text>
     </View>
   );
 }
@@ -232,6 +235,7 @@ export function Card({ children, style, testID }: { children: React.ReactNode; s
 
 // ---------- Verification badge ----------
 export function VerificationBadge({ status }: { status: string }) {
+  const { t } = useLanguage();
   const verified = status === "Verified";
   return (
     <View style={styles.verifyRow}>
@@ -241,7 +245,7 @@ export function VerificationBadge({ status }: { status: string }) {
         color={verified ? colors.success : colors.warning}
       />
       <Text style={{ color: verified ? colors.success : colors.warning, fontWeight: "700", fontSize: font.sm }}>
-        {verified ? "Verified" : "Unverified"}
+        {verified ? t("ui.verified") : t("ui.unverified")}
       </Text>
     </View>
   );
@@ -340,8 +344,8 @@ export function ConfirmModal({
   visible,
   title,
   message,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  confirmText,
+  cancelText,
   danger = false,
   loading = false,
   onConfirm,
@@ -357,6 +361,7 @@ export function ConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={cstyles.wrap}>
@@ -365,9 +370,9 @@ export function ConfirmModal({
           <Text style={cstyles.title}>{title}</Text>
           {message ? <Text style={cstyles.msg}>{message}</Text> : null}
           <View style={cstyles.row}>
-            <Button title={cancelText} onPress={onCancel} variant="secondary" style={{ flex: 1 }} testID="confirm-cancel" />
+            <Button title={cancelText ?? t("ui.cancel")} onPress={onCancel} variant="secondary" style={{ flex: 1 }} testID="confirm-cancel" />
             <Button
-              title={confirmText}
+              title={confirmText ?? t("ui.confirm")}
               onPress={onConfirm}
               loading={loading}
               variant={danger ? "danger" : "primary"}

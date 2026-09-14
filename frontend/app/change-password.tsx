@@ -8,6 +8,7 @@ import * as Haptics from "expo-haptics";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, Field, Header } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -16,6 +17,7 @@ export default function ChangePassword() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { show } = useToast();
+  const { t } = useLanguage();
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -23,22 +25,22 @@ export default function ChangePassword() {
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
-    if (!current.trim()) return show("Enter current password", "error");
-    if (next.length < 6) return show("New password must be at least 6 characters", "error");
-    if (next !== confirm) return show("Passwords do not match", "error");
-    if (next === current) return show("New password must be different from the old one", "error");
+    if (!current.trim()) return show(t("cp.errCurrent"), "error");
+    if (next.length < 6) return show(t("cp.errLen"), "error");
+    if (next !== confirm) return show(t("cp.errMismatch"), "error");
+    if (next === current) return show(t("cp.errSame"), "error");
     setSaving(true);
     try {
       await api.post("/auth/change-password", { current_password: current, new_password: next });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      show("Password changed ✓", "success");
+      show(t("cp.success"), "success");
       setCurrent("");
       setNext("");
       setConfirm("");
       router.back();
     } catch (e: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      show(e?.message || "Failed to change password", "error");
+      show(e?.message || t("cp.errFailed"), "error");
     } finally {
       setSaving(false);
     }
@@ -46,7 +48,7 @@ export default function ChangePassword() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Change Password" subtitle={user?.username} onBack={() => router.back()} />
+      <Header title={t("cp.title")} subtitle={user?.username} onBack={() => router.back()} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 40, gap: spacing.md }}
@@ -54,44 +56,42 @@ export default function ChangePassword() {
         >
           <View style={styles.info}>
             <Ionicons name="lock-closed" size={18} color={colors.brand} />
-            <Text style={styles.infoText}>
-              Change your own login password here. Remember the new password after changing.
-            </Text>
+            <Text style={styles.infoText}>{t("cp.info")}</Text>
           </View>
 
           <Card>
-            <Text style={styles.title}>PASSWORD</Text>
+            <Text style={styles.title}>{t("cp.title").toUpperCase()}</Text>
             <Field
-              label="Current Password"
+              label={t("cp.current")}
               value={current}
               onChangeText={setCurrent}
-              placeholder="Current password"
+              placeholder={t("cp.current")}
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
               testID="cp-current"
             />
             <Field
-              label="New Password (at least 6 characters)"
+              label={t("cp.new")}
               value={next}
               onChangeText={setNext}
-              placeholder="New password"
+              placeholder={t("cp.newPlaceholder")}
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
               testID="cp-new"
             />
             <Field
-              label="Re-enter New Password"
+              label={t("cp.reenter")}
               value={confirm}
               onChangeText={setConfirm}
-              placeholder="Confirm new password"
+              placeholder={t("cp.confirmPlaceholder")}
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
               testID="cp-confirm"
             />
-            <Button title="Update Password" onPress={submit} loading={saving} icon="save" testID="cp-save" />
+            <Button title={t("cp.submit")} onPress={submit} loading={saving} icon="save" testID="cp-save" />
           </Card>
         </ScrollView>
       </KeyboardAvoidingView>

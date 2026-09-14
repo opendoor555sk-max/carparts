@@ -12,6 +12,8 @@ import { Button, Field, Header } from "@/src/components/ui";
 import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
+import { useLanguage } from "@/src/context/LanguageContext";
+import type { TranslationKey } from "@/src/i18n/translations";
 import * as Location from "expo-location";
 
 // "buy" used to route here too (Home's old "BUY" tile), on to buy.tsx's single-
@@ -27,9 +29,11 @@ export default function ScanWeb() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const isSuperAdmin = user?.role === "super_admin";
   const { mode = "search", company = "All" } = useLocalSearchParams<{ mode: string; company: string }>();
   const meta = MODE_META[mode as string] || MODE_META.search;
+  const modeTitle = t(`module.${mode}` as TranslationKey);
 
   const [manual, setManual] = useState("");
   const [gps, setGps] = useState("");
@@ -165,11 +169,11 @@ export default function ScanWeb() {
 
   return (
     <View style={styles.flex}>
-      <Header title={`${meta.title} — Scan`} subtitle={`Company: ${company}`} onBack={() => router.back()} />
+      <Header title={`${modeTitle} — ${t("scan.scan")}`} subtitle={`${t("common.company")}: ${company}`} onBack={() => router.back()} />
       {isSuperAdmin ? (
         <View style={styles.gpsBar} testID="scan-gps">
           <Ionicons name="location" size={14} color={gps ? colors.success : colors.info} />
-          <Text style={styles.gpsText}>{gps ? `GPS: ${gps}` : "Getting GPS location…"}</Text>
+          <Text style={styles.gpsText}>{gps ? `GPS: ${gps}` : t("scan.gettingGps")}</Text>
         </View>
       ) : null}
       <View style={{ flex: 1 }}>
@@ -179,10 +183,10 @@ export default function ScanWeb() {
             <View style={[styles.bracket, { borderColor: meta.color }]} />
             <Text style={styles.scanHint}>
               {status === "denied"
-                ? "Allow camera permission (browser lock icon → Camera → Allow)"
+                ? t("scan.webDenied")
                 : status === "error"
-                  ? "This browser does not support camera scan — use manual entry"
-                  : "Keep the Barcode/QR clear inside the bracket — it will auto scan"}
+                  ? t("scan.webError")
+                  : t("scan.webHint")}
             </Text>
           </View>
         </View>
@@ -190,13 +194,13 @@ export default function ScanWeb() {
         {status === "denied" ? (
           <View style={styles.permBar}>
             <Ionicons name="lock-closed" size={16} color={colors.warning} />
-            <Text style={styles.permText}>Camera blocked — allow it from browser settings</Text>
-            <Button title="Settings" onPress={() => Linking.openURL("app-settings:")} variant="ghost" testID="web-open-settings" />
+            <Text style={styles.permText}>{t("scan.webBlocked")}</Text>
+            <Button title={t("scan.settingsShort")} onPress={() => Linking.openURL("app-settings:")} variant="ghost" testID="web-open-settings" />
           </View>
         ) : null}
 
         <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg }]}>
-          <Text style={styles.manualLabel}>MANUAL PART NUMBER</Text>
+          <Text style={styles.manualLabel}>{t("scan.manualLabel").toUpperCase()}</Text>
           <Field
             value={manual}
             onChangeText={setManual}
@@ -208,7 +212,7 @@ export default function ScanWeb() {
             testID="manual-part-input"
           />
           <Button
-            title={`${meta.title} — Continue`}
+            title={`${modeTitle} — ${t("scan.continue")}`}
             onPress={() => proceed(manual)}
             icon="arrow-forward"
             disabled={!manual.trim()}

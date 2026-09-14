@@ -14,11 +14,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as LocalAuthentication from "expo-local-authentication";
 
 import { useAuth } from "@/src/context/AuthContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Field } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 export default function Login() {
   const { login, biometricUnlock, hasStoredToken, user } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [username, setUsername] = useState("");
@@ -44,7 +46,7 @@ export default function Login() {
   const onLogin = async () => {
     setErr("");
     if (!username.trim() || !password) {
-      setErr("Username and password are required");
+      setErr(t("login.errRequired"));
       return;
     }
     setLoading(true);
@@ -52,7 +54,7 @@ export default function Login() {
       await login(username.trim(), password);
       router.replace("/(tabs)");
     } catch (e: any) {
-      setErr(e?.message || "Login failed");
+      setErr(e?.message || t("login.errFailed"));
     } finally {
       setLoading(false);
     }
@@ -61,7 +63,7 @@ export default function Login() {
   const onBio = async () => {
     const ok = await biometricUnlock();
     if (ok) router.replace("/(tabs)");
-    else setErr("Biometric unlock failed — use password");
+    else setErr(t("login.errBiometric"));
   };
 
   return (
@@ -78,26 +80,26 @@ export default function Login() {
             <Ionicons name="hardware-chip" size={40} color={colors.brand} />
           </View>
           <Text style={styles.title}>Auto Parts Store</Text>
-          <Text style={styles.subtitle}>Auto Electrical Scrap Parts ERP</Text>
+          <Text style={styles.subtitle}>{t("login.tagline")}</Text>
         </View>
 
         <View style={styles.form}>
           <Field
-            label="USERNAME"
+            label={t("login.username").toUpperCase()}
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder="username"
+            placeholder={t("login.username")}
             testID="login-username"
           />
           <View>
             <Field
-              label="PASSWORD"
+              label={t("login.password").toUpperCase()}
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPw}
-              placeholder="password"
+              placeholder={t("login.password")}
               testID="login-password"
               onSubmitEditing={onLogin}
               returnKeyType="go"
@@ -120,7 +122,7 @@ export default function Login() {
           ) : null}
 
           <Button
-            title="Sign In"
+            title={t("login.signIn")}
             onPress={onLogin}
             loading={loading}
             icon="log-in"
@@ -130,7 +132,7 @@ export default function Login() {
 
           {bioAvailable ? (
             <Button
-              title="Unlock with Fingerprint"
+              title={t("login.unlockFingerprint")}
               onPress={onBio}
               variant="secondary"
               icon="finger-print"
@@ -140,7 +142,7 @@ export default function Login() {
           ) : null}
 
           <Button
-            title="Create New Store (Sign Up)"
+            title={t("login.createStore")}
             onPress={() => router.push("/signup" as any)}
             variant="secondary"
             icon="storefront"
@@ -149,7 +151,7 @@ export default function Login() {
           />
         </View>
 
-        <Text style={styles.footer}>Every person who downloads can create their own separate store</Text>
+        <Text style={styles.footer}>{t("login.footer")}</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

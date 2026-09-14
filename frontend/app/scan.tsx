@@ -16,6 +16,8 @@ import { Button, Field, Header } from "@/src/components/ui";
 import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
+import { useLanguage } from "@/src/context/LanguageContext";
+import type { TranslationKey } from "@/src/i18n/translations";
 
 // "buy" used to route here too (Home's old "BUY" tile), on to buy.tsx's single-
 // item form. buy.tsx now does its own scanning directly (Home's "BUY" tile
@@ -30,9 +32,11 @@ export default function Scan() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const isSuperAdmin = user?.role === "super_admin";
   const { mode = "search", company = "All" } = useLocalSearchParams<{ mode: string; company: string }>();
   const meta = MODE_META[mode as string] || MODE_META.search;
+  const modeTitle = t(`module.${mode}` as TranslationKey);
 
   const [permission, requestPermission] = useCameraPermissions();
   const [manual, setManual] = useState("");
@@ -100,7 +104,7 @@ export default function Scan() {
       return (
         <View style={styles.cameraFallback}>
           <Ionicons name="camera-outline" size={48} color={colors.info} />
-          <Text style={styles.permSub}>Camera is getting ready…</Text>
+          <Text style={styles.permSub}>{t("scan.cameraReady")}</Text>
         </View>
       );
     }
@@ -109,20 +113,20 @@ export default function Scan() {
       return (
         <View style={styles.cameraFallback}>
           <Ionicons name="camera-outline" size={48} color={colors.brand} />
-          <Text style={styles.permTitle}>Camera is needed to scan Barcode / QR</Text>
-          <Text style={styles.permSub}>Allow camera to automatically capture the part number</Text>
+          <Text style={styles.permTitle}>{t("scan.cameraNeeded")}</Text>
+          <Text style={styles.permSub}>{t("scan.cameraAllow")}</Text>
           {permission.canAskAgain ? (
-            <Button title="Allow Camera" onPress={requestPermission} icon="camera" testID="grant-camera" />
+            <Button title={t("scan.allowCamera")} onPress={requestPermission} icon="camera" testID="grant-camera" />
           ) : (
             <Button
-              title="Open Settings"
+              title={t("scan.openSettings")}
               onPress={() => Linking.openSettings()}
               variant="secondary"
               icon="settings"
               testID="open-settings"
             />
           )}
-          <Text style={styles.orText}>or use manual entry below</Text>
+          <Text style={styles.orText}>{t("scan.orManual")}</Text>
         </View>
       );
     }
@@ -139,7 +143,7 @@ export default function Scan() {
         />
         <View style={styles.overlay} pointerEvents="none">
           <View style={[styles.bracket, { borderColor: meta.color }]} />
-          <Text style={styles.scanHint}>Hold the part number barcode/QR in front of the camera</Text>
+          <Text style={styles.scanHint}>{t("scan.holdHint")}</Text>
         </View>
       </View>
     );
@@ -148,21 +152,21 @@ export default function Scan() {
   return (
     <View style={styles.flex}>
       <Header
-        title={`${meta.title} — Scan`}
-        subtitle={`Company: ${company}`}
+        title={`${modeTitle} — ${t("scan.scan")}`}
+        subtitle={`${t("common.company")}: ${company}`}
         onBack={() => router.back()}
       />
       {isSuperAdmin ? (
         <View style={styles.gpsBar} testID="scan-gps">
           <Ionicons name="location" size={14} color={gps ? colors.success : colors.info} />
-          <Text style={styles.gpsText}>{gps ? `GPS: ${gps}` : "Getting GPS location…"}</Text>
+          <Text style={styles.gpsText}>{gps ? `GPS: ${gps}` : t("scan.gettingGps")}</Text>
         </View>
       ) : null}
       <View style={{ flex: 1 }}>
         {renderCameraArea()}
 
         <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg }]}>
-          <Text style={styles.manualLabel}>MANUAL PART NUMBER</Text>
+          <Text style={styles.manualLabel}>{t("scan.manualLabel").toUpperCase()}</Text>
           <View style={styles.manualRow}>
             <View style={{ flex: 1 }}>
               <Field
@@ -178,7 +182,7 @@ export default function Scan() {
             </View>
           </View>
           <Button
-            title={`${meta.title} — Continue`}
+            title={`${modeTitle} — ${t("scan.continue")}`}
             onPress={() => proceed(manual)}
             icon="arrow-forward"
             disabled={!manual.trim()}

@@ -8,6 +8,7 @@ import * as Haptics from "expo-haptics";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, Field, Header, Loading, StatusChip, EmptyState } from "@/src/components/ui";
 import { printReceipt, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
@@ -19,6 +20,7 @@ export default function Sell() {
   const insets = useSafeAreaInsets();
   const { can, user } = useAuth();
   const { show } = useToast();
+  const { t } = useLanguage();
 
   const [part, setPart] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -69,7 +71,7 @@ export default function Sell() {
 
   const submit = async () => {
     if (selectedCustomer && !price) {
-      show("Price required to record a sale on credit", "error");
+      show(t("sell.errCreditPrice"), "error");
       return;
     }
     setSubmitting(true);
@@ -84,8 +86,8 @@ export default function Sell() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       show(
         selectedCustomer
-          ? `Sold on credit — ${selectedCustomer.name}'s balance is now ₹${res.credit_balance?.toFixed(2)}`
-          : "Sold — stock reduced",
+          ? `${t("sell.soldOnCredit")} — ${selectedCustomer.name}${t("sell.balanceIsNow")} ₹${res.credit_balance?.toFixed(2)}`
+          : t("sell.soldReduced"),
         "success",
       );
       if (res.invoice?.id) {
@@ -95,7 +97,7 @@ export default function Sell() {
       }
     } catch (e: any) {
       const d = e?.detail;
-      show(d?.message || e?.message || "Sell failed", "error");
+      show(d?.message || e?.message || t("sell.errFailed"), "error");
     } finally {
       setSubmitting(false);
     }
@@ -104,7 +106,7 @@ export default function Sell() {
   if (loading) {
     return (
       <View style={styles.flex}>
-        <Header title="Sell" onBack={() => router.back()} />
+        <Header title={t("sell.title")} onBack={() => router.back()} />
         <Loading />
       </View>
     );
@@ -115,21 +117,21 @@ export default function Sell() {
 
   return (
     <View style={styles.flex}>
-      <Header title="SELL" subtitle={partNumber} onBack={() => router.back()} />
+      <Header title={t("sell.title").toUpperCase()} subtitle={partNumber} onBack={() => router.back()} />
       {!hasStock ? (
         <EmptyState
           icon="close-circle-outline"
-          title="No stock"
-          subtitle="This part number is not in stock — cannot sell"
-          action={<Button title="Back" onPress={() => router.back()} variant="secondary" testID="sell-back" />}
+          title={t("sell.noStock")}
+          subtitle={t("sell.noStockSub")}
+          action={<Button title={t("common.back")} onPress={() => router.back()} variant="secondary" testID="sell-back" />}
         />
       ) : (
         <>
           <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 100, gap: spacing.md }}>
             <Card>
               <View style={styles.rowBetween}>
-                <Text style={styles.cardTitle}>AVAILABLE STOCK</Text>
-                <Text style={styles.count}>{units.length} units</Text>
+                <Text style={styles.cardTitle}>{t("sell.availableStock").toUpperCase()}</Text>
+                <Text style={styles.count}>{units.length} {t("common.units")}</Text>
               </View>
               {units.map((u: any) => (
                 <Pressable
@@ -147,7 +149,7 @@ export default function Sell() {
                     <Text style={styles.unitLoc}>
                       {[u.location?.rack, u.location?.shelf, u.location?.box, u.location?.position]
                         .filter(Boolean)
-                        .join(" → ") || "No location"}
+                        .join(" → ") || t("common.noLocation")}
                     </Text>
                   </View>
                   <StatusChip status={u.condition} />
@@ -158,10 +160,10 @@ export default function Sell() {
             {can("view_price") ? (
               <Card>
                 <View style={styles.rowBetween}>
-                  <Text style={styles.cardTitle}>SALE PRICE</Text>
+                  <Text style={styles.cardTitle}>{t("sell.salePrice").toUpperCase()}</Text>
                   <View style={styles.adminTag}>
                     <Ionicons name="lock-closed" size={11} color={colors.brand} />
-                    <Text style={styles.adminTagText}>Admin only</Text>
+                    <Text style={styles.adminTagText}>{t("common.adminOnly")}</Text>
                   </View>
                 </View>
                 <Field value={price} onChangeText={setPrice} placeholder="₹ 0" keyboardType="numeric" testID="sell-price" />
@@ -169,18 +171,18 @@ export default function Sell() {
             ) : null}
 
             <Card>
-              <Text style={styles.cardTitle}>BUYER (optional)</Text>
-              <Field value={buyer} onChangeText={setBuyer} placeholder="Buyer name" testID="sell-buyer" />
+              <Text style={styles.cardTitle}>{t("sell.buyerOptional").toUpperCase()}</Text>
+              <Field value={buyer} onChangeText={setBuyer} placeholder={t("sell.buyerName")} testID="sell-buyer" />
             </Card>
 
             <Card testID="sell-credit-card">
-              <Text style={styles.cardTitle}>SELL ON CREDIT (Grahak Khata) — optional</Text>
+              <Text style={styles.cardTitle}>{t("sell.creditCardTitle").toUpperCase()}</Text>
               {selectedCustomer ? (
                 <View style={styles.customerChip} testID="sell-selected-customer">
                   <Ionicons name="person" size={18} color={colors.brand} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.customerChipName}>{selectedCustomer.name}</Text>
-                    <Text style={styles.customerChipPhone}>{selectedCustomer.phone} • Current balance: ₹{selectedCustomer.balance?.toFixed(2) ?? "0.00"}</Text>
+                    <Text style={styles.customerChipPhone}>{selectedCustomer.phone} • {t("sell.currentBalance")}: ₹{selectedCustomer.balance?.toFixed(2) ?? "0.00"}</Text>
                   </View>
                   <Pressable onPress={() => { setSelectedCustomer(null); setCustomerQuery(""); }} testID="sell-unlink-customer">
                     <Ionicons name="close-circle" size={22} color={colors.error} />
@@ -191,10 +193,10 @@ export default function Sell() {
                   <Field
                     value={customerQuery}
                     onChangeText={searchCustomers}
-                    placeholder="Search customer by name or phone"
+                    placeholder={t("sell.searchCustomer")}
                     testID="sell-customer-search"
                   />
-                  {searchingCustomer ? <Loading text="Searching…" /> : null}
+                  {searchingCustomer ? <Loading text={t("common.searching")} /> : null}
                   {customerResults.map((c) => (
                     <Pressable
                       key={c.id}
@@ -203,22 +205,20 @@ export default function Sell() {
                       testID={`sell-customer-result-${c.id}`}
                     >
                       <Text style={styles.customerChipName}>{c.name}</Text>
-                      <Text style={styles.customerChipPhone}>{c.phone} • Balance: ₹{c.balance.toFixed(2)}</Text>
+                      <Text style={styles.customerChipPhone}>{c.phone} • {t("common.balance")}: ₹{c.balance.toFixed(2)}</Text>
                     </Pressable>
                   ))}
                 </>
               )}
               <Text style={styles.creditHint}>
-                {selectedCustomer
-                  ? "This sale will be added to the customer's balance instead of collected now."
-                  : "Leave blank for a normal cash sale."}
+                {selectedCustomer ? t("sell.creditHintOn") : t("sell.creditHintOff")}
               </Text>
             </Card>
           </ScrollView>
 
           <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
             <Button
-              title="Print Bill"
+              title={t("common.printBill")}
               onPress={async () => {
                 const u = units.find((x: any) => x.id === selectedUnit) || units[0];
                 printReceipt(await brandingFromUser(user), "SELL", {
@@ -236,7 +236,7 @@ export default function Sell() {
               testID="print-sell"
               style={{ marginBottom: spacing.sm }}
             />
-            <Button title="Confirm Sell (Stock −1)" onPress={submit} loading={submitting} icon="cash" testID="confirm-sell" />
+            <Button title={t("sell.confirmSell")} onPress={submit} loading={submitting} icon="cash" testID="confirm-sell" />
           </View>
         </>
       )}

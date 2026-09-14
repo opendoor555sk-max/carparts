@@ -14,8 +14,10 @@ import * as Location from "expo-location";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, Field, Header } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
+import type { TranslationKey } from "@/src/i18n/translations";
 
 const PRIORITIES = ["High", "Medium", "Low"];
 
@@ -24,6 +26,7 @@ export default function RequirementNew() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { show } = useToast();
+  const { t } = useLanguage();
 
   const [partNumber, setPartNumber] = useState(decodeURIComponent(pn as string));
   const [name, setName] = useState("");
@@ -55,7 +58,7 @@ export default function RequirementNew() {
 
   const submit = async () => {
     if (!partNumber.trim()) {
-      show("Part number required", "error");
+      show(t("common.errPartNumberRequired"), "error");
       return;
     }
     setSubmitting(true);
@@ -70,10 +73,10 @@ export default function RequirementNew() {
         note,
         gps,
       });
-      show("Requirement added", "success");
+      show(t("reqNew.added"), "success");
       router.replace("/(tabs)/requirements" as any);
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     } finally {
       setSubmitting(false);
     }
@@ -83,20 +86,20 @@ export default function RequirementNew() {
 
   return (
     <View style={styles.flex}>
-      <Header title="New Requirement" subtitle="Add a requirement" onBack={() => router.back()} />
+      <Header title={t("reqNew.title")} subtitle={t("reqNew.subtitle")} onBack={() => router.back()} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 100, gap: spacing.md }}
           keyboardShouldPersistTaps="handled"
         >
           <Card>
-            <Field label="PART NUMBER" value={partNumber} onChangeText={setPartNumber} autoCapitalize="characters" placeholder="e.g. 39100-2B000" testID="req-pn" />
-            <Field label="NAME" value={name} onChangeText={setName} placeholder="Part name" testID="req-name" />
-            <Field label="CATEGORY" value={category} onChangeText={setCategory} placeholder="Category" testID="req-category" />
-            <Field label="QUANTITY" value={quantity} onChangeText={setQuantity} keyboardType="numeric" testID="req-qty" />
-            <Field label="NOTE" value={note} onChangeText={setNote} placeholder="Optional" multiline testID="req-note" />
+            <Field label={t("common.partNumber").toUpperCase()} value={partNumber} onChangeText={setPartNumber} autoCapitalize="characters" placeholder="e.g. 39100-2B000" testID="req-pn" />
+            <Field label={t("common.name").toUpperCase()} value={name} onChangeText={setName} placeholder={t("common.partName")} testID="req-name" />
+            <Field label={t("common.category").toUpperCase()} value={category} onChangeText={setCategory} placeholder={t("common.category")} testID="req-category" />
+            <Field label={t("common.quantity").toUpperCase()} value={quantity} onChangeText={setQuantity} keyboardType="numeric" testID="req-qty" />
+            <Field label={t("common.note").toUpperCase()} value={note} onChangeText={setNote} placeholder={t("common.optional")} multiline testID="req-note" />
 
-            <Text style={styles.label}>PRIORITY</Text>
+            <Text style={styles.label}>{t("reqNew.priority").toUpperCase()}</Text>
             <View style={styles.prRow}>
               {PRIORITIES.map((p) => (
                 <Pressable
@@ -109,7 +112,7 @@ export default function RequirementNew() {
                   testID={`req-priority-${p}`}
                 >
                   <Text style={{ color: priority === p ? colors.onError : colors.onSurface2, fontWeight: "800", fontSize: font.base }}>
-                    {p}
+                    {t(`common.priority.${p}` as TranslationKey)}
                   </Text>
                 </Pressable>
               ))}
@@ -117,7 +120,7 @@ export default function RequirementNew() {
           </Card>
         </ScrollView>
         <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
-          <Button title="Add Requirement" onPress={submit} loading={submitting} icon="add-circle" testID="submit-req" />
+          <Button title={t("reqNew.submit")} onPress={submit} loading={submitting} icon="add-circle" testID="submit-req" />
         </View>
       </KeyboardAvoidingView>
     </View>
