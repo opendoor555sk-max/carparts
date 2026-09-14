@@ -8,7 +8,7 @@ import { useAuth } from "@/src/context/AuthContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Header, Loading, FilterChip } from "@/src/components/ui";
 import { LANGUAGES } from "@/src/i18n/translations";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 type Stats = {
   total_parts: number;
@@ -302,6 +302,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
     gap: spacing.xs,
+    ...shadow.sm,
   },
   statValue: { fontSize: font.xxl, fontWeight: "800" },
   statLabel: { color: colors.info, fontSize: font.sm - 1 },
@@ -314,6 +315,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.lg,
+    ...shadow.sm,
   },
   linkIcon: {
     width: 44,

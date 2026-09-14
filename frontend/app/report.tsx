@@ -10,7 +10,7 @@ import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { EmptyState, FilterChip, Header, Loading, StatusChip } from "@/src/components/ui";
 import { printReport, brandingFromUser } from "@/src/utils/print";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 import type { TranslationKey } from "@/src/i18n/translations";
 
 type Item = {
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   coText: { color: colors.brand, fontSize: font.base, fontWeight: "800", letterSpacing: 0.5 },
   catText: { color: colors.onSurface3, fontSize: font.sm, fontWeight: "800", marginTop: spacing.xs, marginLeft: spacing.sm },
   catCount: { color: colors.info, fontWeight: "700" },
-  itemRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
+  itemRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, ...shadow.sm },
   pn: { color: colors.onSurface, fontSize: font.base, fontWeight: "800", letterSpacing: 0.5 },
   name: { color: colors.onSurface3, fontSize: font.sm, marginTop: 1 },
   meta: { color: colors.info, fontSize: font.sm - 1, marginTop: 2 },

@@ -11,7 +11,7 @@ import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { ConfirmModal, EmptyState, FilterChip, Header, Loading } from "@/src/components/ui";
 import { printReport, brandingFromUser } from "@/src/utils/print";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 type Txn = {
   id: string;
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
   selAll: { color: colors.brand, fontSize: font.base, fontWeight: "800" },
   tabs: { flexDirection: "row", gap: spacing.sm, padding: spacing.lg, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.divider },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg, ...shadow.sm },
   rowOn: { borderColor: colors.brand, backgroundColor: colors.brandFaint },
   pn: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800", letterSpacing: 0.5 },
   name: { color: colors.onSurface3, fontSize: font.sm, marginTop: 1 },

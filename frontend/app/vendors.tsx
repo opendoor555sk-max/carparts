@@ -6,7 +6,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { api } from "@/src/api/client";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, EmptyState, Field, Header, Loading } from "@/src/components/ui";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 type Vendor = { id: string; name: string; phone: string; address?: string; notes?: string };
 
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
   searchRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider },
   iconBtn: { width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg, ...shadow.sm },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brandFaint, alignItems: "center", justifyContent: "center" },
   name: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
   phone: { color: colors.info, fontSize: font.sm, marginTop: 2 },

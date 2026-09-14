@@ -7,7 +7,7 @@ import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, EmptyState, Field, FilterChip, Header, Loading } from "@/src/components/ui";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 import type { TranslationKey } from "@/src/i18n/translations";
 
 type RecordType = "customer_return" | "damaged_stock" | "vendor_return";
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: spacing.md,
   },
   actionText: { color: colors.onSurface2, fontSize: font.sm - 1, fontWeight: "700", textAlign: "center" },
-  row: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg, ...shadow.sm },
   avatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
   rowTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm },
   pn: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800", flexShrink: 1 },

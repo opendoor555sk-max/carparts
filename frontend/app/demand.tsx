@@ -7,7 +7,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { api } from "@/src/api/client";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { EmptyState, FilterChip, Header, Loading, StatusChip } from "@/src/components/ui";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 import type { TranslationKey } from "@/src/i18n/translations";
 
 // labelKey resolved at render time — a module-level const can't react to a
@@ -208,13 +208,13 @@ const styles = StyleSheet.create({
   toSep: { color: colors.info, fontSize: font.sm },
   applyBtn: { backgroundColor: colors.brand, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   applyText: { color: colors.onBrand, fontWeight: "800", fontSize: font.sm },
-  hotBox: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.error, borderRadius: radius.md, padding: spacing.lg, marginBottom: spacing.md },
+  hotBox: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.error, borderRadius: radius.md, padding: spacing.lg, marginBottom: spacing.md, ...shadow.sm },
   hotHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.md },
   hotTitle: { color: colors.error, fontSize: font.sm, fontWeight: "800", letterSpacing: 0.5, flex: 1 },
   hotRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: spacing.xs },
   hotPn: { color: colors.onSurface, fontSize: font.base, fontWeight: "700" },
   hotCount: { color: colors.error, fontSize: font.sm, fontWeight: "700" },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg, ...shadow.sm },
   pn: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
   name: { color: colors.onSurface3, fontSize: font.sm, marginTop: 1 },
   meta: { color: colors.info, fontSize: font.sm, marginTop: 2 },

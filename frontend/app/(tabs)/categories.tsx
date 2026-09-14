@@ -15,7 +15,7 @@ import { useRouter } from "expo-router";
 import { api } from "@/src/api/client";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Header, Loading, SignOutButton } from "@/src/components/ui";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -114,7 +114,7 @@ export default function Categories() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
-  group: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden" },
+  group: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden", ...shadow.sm },
   groupHead: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.lg },
   groupIcon: {
     width: 40,

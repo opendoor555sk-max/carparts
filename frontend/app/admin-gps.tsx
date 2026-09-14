@@ -7,7 +7,7 @@ import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Header, Loading } from "@/src/components/ui";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 type GpsPoint = {
   type: "Requirement" | "Purchase";
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   chipText: { color: colors.onSurface2, fontSize: font.sm, fontWeight: "700" },
   chipTextActive: { color: colors.onBrand },
-  card: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
+  card: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, ...shadow.sm },
   typeIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: "center", justifyContent: "center" },
   pn: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
   meta: { color: colors.info, fontSize: font.sm, marginTop: 2 },

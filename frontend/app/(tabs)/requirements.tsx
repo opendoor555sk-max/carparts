@@ -18,7 +18,7 @@ import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Header, StatusChip, Loading, EmptyState, FilterChip, SignOutButton } from "@/src/components/ui";
 import { printRequirements, brandingFromUser } from "@/src/utils/print";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 import type { TranslationKey } from "@/src/i18n/translations";
 
 type Req = {
@@ -194,6 +194,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.lg,
+    ...shadow.sm,
   },
   pnRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   pn: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },

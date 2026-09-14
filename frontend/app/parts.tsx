@@ -6,7 +6,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { api } from "@/src/api/client";
 import { EmptyState, Header, Loading, StatusChip } from "@/src/components/ui";
 import { useLanguage } from "@/src/context/LanguageContext";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 export default function PartsList() {
   const { category, company, title } = useLocalSearchParams<{ category: string; company: string; title: string }>();
@@ -69,7 +69,7 @@ export default function PartsList() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg, ...shadow.sm },
   pn: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
   name: { color: colors.onSurface3, fontSize: font.base, marginTop: 2 },
   meta: { color: colors.info, fontSize: font.sm, marginTop: spacing.xs },

@@ -6,7 +6,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { api } from "@/src/api/client";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Header, Loading, EmptyState } from "@/src/components/ui";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 type Store = {
   id: string;
@@ -107,7 +107,7 @@ function Stat({ label, value, icon }: { label: string; value: number; icon: keyo
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
-  card: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg, gap: spacing.md },
+  card: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg, gap: spacing.md, ...shadow.sm },
   rowTop: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   iconBox: {
     width: 44,
