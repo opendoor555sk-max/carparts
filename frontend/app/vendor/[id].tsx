@@ -5,6 +5,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, ConfirmModal, EmptyState, Field, Header, Loading } from "@/src/components/ui";
 import { colors, font, spacing } from "@/src/theme";
 
@@ -14,6 +15,7 @@ export default function VendorDetail() {
   const router = useRouter();
   const { user } = useAuth();
   const { show } = useToast();
+  const { t } = useLanguage();
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
   const [vendor, setVendor] = useState<any>(null);
@@ -38,12 +40,12 @@ export default function VendorDetail() {
       setAddress(v.address || "");
       setNotes(v.notes || "");
     } catch (e: any) {
-      show(e?.message || "Failed to load vendor", "error");
+      show(e?.message || t("vendors.loadFailed"), "error");
       setVendor(null);
     } finally {
       setLoading(false);
     }
-  }, [vendorId, show]);
+  }, [vendorId, show, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -54,7 +56,7 @@ export default function VendorDetail() {
 
   const saveEdit = async () => {
     if (!name.trim() || !phone.trim()) {
-      show("Name and phone are required", "error");
+      show(t("customers.errRequired"), "error");
       return;
     }
     setSaving(true);
@@ -62,11 +64,11 @@ export default function VendorDetail() {
       await api.patch(`/vendors/${encodeURIComponent(vendorId)}`, {
         name: name.trim(), phone: phone.trim(), address: address.trim(), notes: notes.trim(),
       });
-      show("Vendor updated", "success");
+      show(t("vendors.updated"), "success");
       setEditing(false);
       load();
     } catch (e: any) {
-      show(e?.detail?.message || e?.detail || e?.message || "Update failed", "error");
+      show(e?.detail?.message || e?.detail || e?.message || t("common.updateFailed"), "error");
     } finally {
       setSaving(false);
     }
@@ -76,10 +78,10 @@ export default function VendorDetail() {
     setDeleting(true);
     try {
       await api.del(`/vendors/${encodeURIComponent(vendorId)}`);
-      show("Vendor deleted", "success");
+      show(t("vendors.deleted"), "success");
       router.replace("/vendors" as any);
     } catch (e: any) {
-      show(e?.detail?.message || e?.detail || e?.message || "Delete failed", "error");
+      show(e?.detail?.message || e?.detail || e?.message || t("vendors.deleteFailed"), "error");
     } finally {
       setDeleting(false);
       setConfirmDelete(false);
@@ -89,7 +91,7 @@ export default function VendorDetail() {
   if (loading) {
     return (
       <View style={styles.flex}>
-        <Header title="Vendor" onBack={() => router.back()} />
+        <Header title={t("vendors.detailTitle")} onBack={() => router.back()} />
         <Loading />
       </View>
     );
@@ -98,8 +100,8 @@ export default function VendorDetail() {
   if (!vendor) {
     return (
       <View style={styles.flex}>
-        <Header title="Vendor" onBack={() => router.back()} />
-        <EmptyState icon="briefcase-outline" title="Vendor not found" />
+        <Header title={t("vendors.detailTitle")} onBack={() => router.back()} />
+        <EmptyState icon="briefcase-outline" title={t("vendors.notFound")} />
       </View>
     );
   }
@@ -111,9 +113,9 @@ export default function VendorDetail() {
         <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
           <Card>
             <View style={styles.rowBetween}>
-              <Text style={styles.cardTitle}>DETAILS</Text>
+              <Text style={styles.cardTitle}>{t("vendors.details").toUpperCase()}</Text>
               <Button
-                title={editing ? "Cancel" : "Edit"}
+                title={editing ? t("ui.cancel") : t("common.edit")}
                 onPress={() => setEditing((e) => !e)}
                 variant="ghost"
                 icon={editing ? "close" : "pencil"}
@@ -122,34 +124,34 @@ export default function VendorDetail() {
             </View>
             {editing ? (
               <>
-                <Field label="Name" value={name} onChangeText={setName} placeholder="Vendor name" testID="edit-vendor-name" />
-                <Field label="Phone" value={phone} onChangeText={setPhone} placeholder="Phone number" keyboardType="phone-pad" testID="edit-vendor-phone" />
-                <Field label="Address" value={address} onChangeText={setAddress} placeholder="Address" multiline testID="edit-vendor-address" />
-                <Field label="Notes" value={notes} onChangeText={setNotes} placeholder="e.g. Electrical parts, OEM Maruti" multiline testID="edit-vendor-notes" />
-                <Button title="Save Changes" onPress={saveEdit} loading={saving} icon="checkmark-circle" testID="vendor-edit-save" />
+                <Field label={t("common.name")} value={name} onChangeText={setName} placeholder={t("vendors.namePlaceholder")} testID="edit-vendor-name" />
+                <Field label={t("common.phone")} value={phone} onChangeText={setPhone} placeholder={t("common.phoneNumber")} keyboardType="phone-pad" testID="edit-vendor-phone" />
+                <Field label={t("common.address")} value={address} onChangeText={setAddress} placeholder={t("common.address")} multiline testID="edit-vendor-address" />
+                <Field label={t("vendors.notes")} value={notes} onChangeText={setNotes} placeholder="e.g. Electrical parts, OEM Maruti" multiline testID="edit-vendor-notes" />
+                <Button title={t("common.saveChanges")} onPress={saveEdit} loading={saving} icon="checkmark-circle" testID="vendor-edit-save" />
               </>
             ) : (
               <>
                 {vendor.address ? (
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Address</Text>
+                    <Text style={styles.detailLabel}>{t("common.address")}</Text>
                     <Text style={styles.detailValue}>{vendor.address}</Text>
                   </View>
                 ) : null}
                 {vendor.notes ? (
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Notes</Text>
+                    <Text style={styles.detailLabel}>{t("vendors.notes")}</Text>
                     <Text style={styles.detailValue}>{vendor.notes}</Text>
                   </View>
                 ) : null}
-                {!vendor.address && !vendor.notes ? <Text style={styles.emptyDetail}>No address or notes on file</Text> : null}
+                {!vendor.address && !vendor.notes ? <Text style={styles.emptyDetail}>{t("vendors.noAddressNotes")}</Text> : null}
               </>
             )}
           </Card>
 
           {isAdmin ? (
             <Button
-              title="Delete Vendor"
+              title={t("vendors.delete")}
               onPress={() => setConfirmDelete(true)}
               variant="danger"
               icon="trash"
@@ -161,9 +163,9 @@ export default function VendorDetail() {
 
       <ConfirmModal
         visible={confirmDelete}
-        title="Delete this vendor?"
-        message={`${vendor.name} will be permanently removed from the directory.`}
-        confirmText="Delete"
+        title={t("vendors.deleteConfirmTitle")}
+        message={`${vendor.name} ${t("vendors.deleteConfirmMsg")}`}
+        confirmText={t("common.delete")}
         danger
         loading={deleting}
         onConfirm={doDelete}

@@ -4,12 +4,14 @@ import { useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, Field, Header } from "@/src/components/ui";
 import { spacing, colors } from "@/src/theme";
 
 export default function VendorNew() {
   const router = useRouter();
   const { show } = useToast();
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -18,16 +20,16 @@ export default function VendorNew() {
 
   const save = async () => {
     if (!name.trim() || !phone.trim()) {
-      show("Name and phone are required", "error");
+      show(t("customers.errRequired"), "error");
       return;
     }
     setSaving(true);
     try {
       const v = await api.post("/vendors", { name: name.trim(), phone: phone.trim(), address: address.trim(), notes: notes.trim() });
-      show("Vendor added", "success");
+      show(t("vendors.added"), "success");
       router.replace(`/vendor/${v.id}` as any);
     } catch (e: any) {
-      show(e?.detail?.message || e?.detail || e?.message || "Save failed", "error");
+      show(e?.detail?.message || e?.detail || e?.message || t("common.saveFailed"), "error");
     } finally {
       setSaving(false);
     }
@@ -35,16 +37,16 @@ export default function VendorNew() {
 
   return (
     <View style={styles.flex}>
-      <Header title="New Vendor" subtitle="Vendor Directory" onBack={() => router.back()} />
+      <Header title={t("vendors.newTitle")} subtitle={t("vendors.title")} onBack={() => router.back()} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
           <Card>
-            <Field label="Name" value={name} onChangeText={setName} placeholder="Vendor / supplier name" testID="vendor-name" />
-            <Field label="Phone" value={phone} onChangeText={setPhone} placeholder="10-digit phone number" keyboardType="phone-pad" testID="vendor-phone" />
-            <Field label="Address (optional)" value={address} onChangeText={setAddress} placeholder="Address" multiline testID="vendor-address" />
-            <Field label="Notes (optional)" value={notes} onChangeText={setNotes} placeholder="e.g. Electrical parts, OEM Maruti" multiline testID="vendor-notes" />
+            <Field label={t("common.name")} value={name} onChangeText={setName} placeholder={t("vendors.namePlaceholder")} testID="vendor-name" />
+            <Field label={t("common.phone")} value={phone} onChangeText={setPhone} placeholder={t("customers.phonePlaceholder")} keyboardType="phone-pad" testID="vendor-phone" />
+            <Field label={t("common.addressOptional")} value={address} onChangeText={setAddress} placeholder={t("common.address")} multiline testID="vendor-address" />
+            <Field label={t("vendors.notesOptional")} value={notes} onChangeText={setNotes} placeholder="e.g. Electrical parts, OEM Maruti" multiline testID="vendor-notes" />
           </Card>
-          <Button title="Save Vendor" onPress={save} loading={saving} icon="checkmark-circle" testID="vendor-save" />
+          <Button title={t("vendors.save")} onPress={save} loading={saving} icon="checkmark-circle" testID="vendor-save" />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

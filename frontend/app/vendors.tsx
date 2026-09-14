@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, EmptyState, Field, Header, Loading } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -14,6 +15,7 @@ type Vendor = { id: string; name: string; phone: string; address?: string; notes
 // (vendors are who parts are bought FROM; no credit is tracked here).
 export default function Vendors() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [q, setQ] = useState("");
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,11 +47,11 @@ export default function Vendors() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Vendor Directory" subtitle="Supplier records" onBack={() => router.back()} />
+      <Header title={t("vendors.title")} subtitle={t("vendors.subtitle")} onBack={() => router.back()} />
 
       <View style={styles.searchRow}>
         <View style={{ flex: 1 }}>
-          <Field value={q} onChangeText={onChangeQuery} placeholder="Search by name or phone" testID="vendor-search" />
+          <Field value={q} onChangeText={onChangeQuery} placeholder={t("customers.searchPlaceholder")} testID="vendor-search" />
         </View>
         <Pressable style={styles.iconBtn} onPress={() => router.push("/vendor-new" as any)} testID="vendor-add-btn">
           <Ionicons name="add" size={24} color={colors.onBrand} />
@@ -61,9 +63,9 @@ export default function Vendors() {
       ) : vendors.length === 0 ? (
         <EmptyState
           icon="briefcase-outline"
-          title="No vendors"
-          subtitle={q ? `Nothing found for "${q}"` : "Add a vendor to start your supplier directory"}
-          action={<Button title="Add Vendor" onPress={() => router.push("/vendor-new" as any)} icon="add-circle" testID="vendor-add-empty" />}
+          title={t("vendors.empty")}
+          subtitle={q ? `${t("common.nothingFoundFor")} "${q}"` : t("vendors.emptySub")}
+          action={<Button title={t("vendors.add")} onPress={() => router.push("/vendor-new" as any)} icon="add-circle" testID="vendor-add-empty" />}
         />
       ) : (
         <FlatList

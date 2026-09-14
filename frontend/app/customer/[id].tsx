@@ -5,6 +5,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, EmptyState, Field, Header, Loading } from "@/src/components/ui";
 import { exportExcel } from "@/src/utils/excelExport";
 import { colors, font, spacing } from "@/src/theme";
@@ -25,6 +26,7 @@ export default function CustomerDetail() {
   const customerId = id as string;
   const router = useRouter();
   const { show } = useToast();
+  const { t } = useLanguage();
 
   const [customer, setCustomer] = useState<any>(null);
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
@@ -53,11 +55,11 @@ export default function CustomerDetail() {
       setPhone(res.customer.phone);
       setAddress(res.customer.address || "");
     } catch (e: any) {
-      show(e?.message || "Failed to load customer", "error");
+      show(e?.message || t("customers.loadFailed"), "error");
     } finally {
       setLoading(false);
     }
-  }, [customerId, show]);
+  }, [customerId, show, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -68,7 +70,7 @@ export default function CustomerDetail() {
 
   const saveEdit = async () => {
     if (!name.trim() || !phone.trim()) {
-      show("Name and phone are required", "error");
+      show(t("customers.errRequired"), "error");
       return;
     }
     setSavingEdit(true);
@@ -78,11 +80,11 @@ export default function CustomerDetail() {
         phone: phone.trim(),
         address: address.trim(),
       });
-      show("Customer updated", "success");
+      show(t("customers.updated"), "success");
       setEditing(false);
       load();
     } catch (e: any) {
-      show(e?.detail?.message || e?.detail || e?.message || "Update failed", "error");
+      show(e?.detail?.message || e?.detail || e?.message || t("common.updateFailed"), "error");
     } finally {
       setSavingEdit(false);
     }
@@ -91,19 +93,19 @@ export default function CustomerDetail() {
   const recordPayment = async () => {
     const amt = parseFloat(payAmount);
     if (!amt || amt <= 0) {
-      show("Enter a valid payment amount", "error");
+      show(t("customers.errPaymentAmount"), "error");
       return;
     }
     setRecordingPayment(true);
     try {
       await api.post(`/customers/${encodeURIComponent(customerId)}/payments`, { amount: amt, note: payNote.trim() });
-      show("Payment recorded", "success");
+      show(t("customers.paymentRecorded"), "success");
       setPayAmount("");
       setPayNote("");
       setShowPayForm(false);
       load();
     } catch (e: any) {
-      show(e?.detail?.message || e?.detail || e?.message || "Payment failed", "error");
+      show(e?.detail?.message || e?.detail || e?.message || t("customers.paymentFailed"), "error");
     } finally {
       setRecordingPayment(false);
     }
@@ -115,7 +117,7 @@ export default function CustomerDetail() {
       await exportExcel(`/customers/${encodeURIComponent(customerId)}/ledger/excel`,
         `ledger_${customer.name.replace(/\s+/g, "_")}.xlsx`);
     } catch (e: any) {
-      show(e?.message || "Export failed", "error");
+      show(e?.message || t("common.exportFailed"), "error");
     } finally {
       setExporting(false);
     }
@@ -124,7 +126,7 @@ export default function CustomerDetail() {
   if (loading) {
     return (
       <View style={styles.flex}>
-        <Header title="Customer" onBack={() => router.back()} />
+        <Header title={t("customers.detailTitle")} onBack={() => router.back()} />
         <Loading />
       </View>
     );
@@ -133,8 +135,8 @@ export default function CustomerDetail() {
   if (!customer) {
     return (
       <View style={styles.flex}>
-        <Header title="Customer" onBack={() => router.back()} />
-        <EmptyState icon="person-remove-outline" title="Customer not found" />
+        <Header title={t("customers.detailTitle")} onBack={() => router.back()} />
+        <EmptyState icon="person-remove-outline" title={t("customers.notFound")} />
       </View>
     );
   }
@@ -149,9 +151,9 @@ export default function CustomerDetail() {
         <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl }}>
           <Card testID="customer-balance-card">
             <View style={styles.rowBetween}>
-              <Text style={styles.cardTitle}>BALANCE</Text>
+              <Text style={styles.cardTitle}>{t("customers.balance").toUpperCase()}</Text>
               <Button
-                title={editing ? "Cancel" : "Edit"}
+                title={editing ? t("ui.cancel") : t("common.edit")}
                 onPress={() => setEditing((e) => !e)}
                 variant="ghost"
                 icon={editing ? "close" : "pencil"}
@@ -162,47 +164,47 @@ export default function CustomerDetail() {
               ₹{Math.abs(balance).toFixed(2)}
             </Text>
             <Text style={styles.balanceSub}>
-              {owesMoney ? "owed to the store" : inAdvance ? "in advance (store owes customer)" : "settled — no dues"}
+              {owesMoney ? t("customers.owedToStore") : inAdvance ? t("customers.storeOwes") : t("customers.settledNoDues")}
             </Text>
           </Card>
 
           {editing ? (
             <Card>
-              <Text style={styles.cardTitle}>EDIT CUSTOMER</Text>
-              <Field label="Name" value={name} onChangeText={setName} placeholder="Customer name" testID="edit-name" />
-              <Field label="Phone" value={phone} onChangeText={setPhone} placeholder="Phone number" keyboardType="phone-pad" testID="edit-phone" />
-              <Field label="Address" value={address} onChangeText={setAddress} placeholder="Address" multiline testID="edit-address" />
-              <Button title="Save Changes" onPress={saveEdit} loading={savingEdit} icon="checkmark-circle" testID="edit-save" />
+              <Text style={styles.cardTitle}>{t("customers.editCustomer").toUpperCase()}</Text>
+              <Field label={t("common.name")} value={name} onChangeText={setName} placeholder={t("customers.namePlaceholder")} testID="edit-name" />
+              <Field label={t("common.phone")} value={phone} onChangeText={setPhone} placeholder={t("common.phoneNumber")} keyboardType="phone-pad" testID="edit-phone" />
+              <Field label={t("common.address")} value={address} onChangeText={setAddress} placeholder={t("common.address")} multiline testID="edit-address" />
+              <Button title={t("common.saveChanges")} onPress={saveEdit} loading={savingEdit} icon="checkmark-circle" testID="edit-save" />
             </Card>
           ) : customer.address ? (
             <Card>
-              <Text style={styles.cardTitle}>ADDRESS</Text>
+              <Text style={styles.cardTitle}>{t("common.address").toUpperCase()}</Text>
               <Text style={styles.addressText}>{customer.address}</Text>
             </Card>
           ) : null}
 
           <Card>
             <View style={styles.rowBetween}>
-              <Text style={styles.cardTitle}>RECORD PAYMENT</Text>
+              <Text style={styles.cardTitle}>{t("customers.recordPayment").toUpperCase()}</Text>
               {!showPayForm ? (
-                <Button title="Record Payment" onPress={() => setShowPayForm(true)} icon="cash" testID="show-payment-form" />
+                <Button title={t("customers.recordPayment")} onPress={() => setShowPayForm(true)} icon="cash" testID="show-payment-form" />
               ) : null}
             </View>
             {showPayForm ? (
               <View style={{ marginTop: spacing.sm }}>
-                <Field label="Amount received" value={payAmount} onChangeText={setPayAmount} placeholder="₹ 0" keyboardType="numeric" testID="payment-amount" />
-                <Field label="Note (optional)" value={payNote} onChangeText={setPayNote} placeholder="e.g. Cash, UPI" testID="payment-note" />
-                <Button title="Confirm Payment" onPress={recordPayment} loading={recordingPayment} icon="checkmark-circle" testID="confirm-payment" />
+                <Field label={t("customers.amountReceived")} value={payAmount} onChangeText={setPayAmount} placeholder="₹ 0" keyboardType="numeric" testID="payment-amount" />
+                <Field label={t("common.noteOptional")} value={payNote} onChangeText={setPayNote} placeholder="e.g. Cash, UPI" testID="payment-note" />
+                <Button title={t("customers.confirmPayment")} onPress={recordPayment} loading={recordingPayment} icon="checkmark-circle" testID="confirm-payment" />
               </View>
             ) : null}
           </Card>
 
           <Card testID="customer-ledger-card">
             <View style={styles.rowBetween}>
-              <Text style={styles.cardTitle}>TRANSACTION HISTORY</Text>
+              <Text style={styles.cardTitle}>{t("customers.transactionHistory").toUpperCase()}</Text>
               {entries.length > 0 ? (
                 <Button
-                  title="Export"
+                  title={t("common.export")}
                   onPress={doExport}
                   loading={exporting}
                   variant="ghost"
@@ -212,7 +214,7 @@ export default function CustomerDetail() {
               ) : null}
             </View>
             {entries.length === 0 ? (
-              <Text style={styles.emptyLedger}>No transactions yet</Text>
+              <Text style={styles.emptyLedger}>{t("customers.noTransactions")}</Text>
             ) : (
               entries.map((e) => (
                 <View key={e.id} style={styles.entryRow} testID={`ledger-entry-${e.id}`}>
@@ -223,7 +225,7 @@ export default function CustomerDetail() {
                   />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.entryTitle}>
-                      {e.type === "sale" ? `Sale${e.part_number ? ` — ${e.part_number}` : ""}` : "Payment received"}
+                      {e.type === "sale" ? `${t("customers.sale")}${e.part_number ? ` — ${e.part_number}` : ""}` : t("customers.paymentReceived")}
                     </Text>
                     {e.note ? <Text style={styles.entryNote}>{e.note}</Text> : null}
                     <Text style={styles.entryMeta}>{new Date(e.at).toLocaleString()} • {e.by}</Text>
@@ -232,7 +234,7 @@ export default function CustomerDetail() {
                     <Text style={[styles.entryAmount, { color: e.type === "sale" ? colors.error : colors.success }]}>
                       {e.type === "sale" ? "+" : "−"}₹{e.amount.toFixed(2)}
                     </Text>
-                    <Text style={styles.entryRunning}>Bal: ₹{e.running_balance.toFixed(2)}</Text>
+                    <Text style={styles.entryRunning}>{t("customers.bal")}: ₹{e.running_balance.toFixed(2)}</Text>
                   </View>
                 </View>
               ))

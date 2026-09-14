@@ -7,6 +7,7 @@ import * as Haptics from "expo-haptics";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, EmptyState, Field, Header, Loading } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -19,6 +20,7 @@ type Customer = { id: string; name: string; phone: string; address?: string; bal
 export default function Customers() {
   const router = useRouter();
   const { show } = useToast();
+  const { t } = useLanguage();
   const [q, setQ] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,13 +60,13 @@ export default function Customers() {
         if (matches.length) {
           router.push(`/customer/${matches[0].id}` as any);
         } else {
-          show(`No customer found for ${phone}`, "info");
+          show(`${t("customers.noCustomerFound")} ${phone}`, "info");
         }
       } catch (e: any) {
-        show(e?.message || "Lookup failed", "error");
+        show(e?.message || t("customers.lookupFailed"), "error");
       }
     },
-    [router, show],
+    [router, show, t],
   );
 
   const openScanner = async () => {
@@ -74,10 +76,10 @@ export default function Customers() {
       scannedRef.current = false;
       setScannerOpen(true);
     } else if (perm && !perm.canAskAgain) {
-      show("Camera blocked — enable it in Settings", "error");
+      show(t("customers.cameraBlocked"), "error");
       Linking.openSettings();
     } else {
-      show("Camera permission needed to scan", "error");
+      show(t("customers.cameraNeeded"), "error");
     }
   };
 
@@ -91,14 +93,14 @@ export default function Customers() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Grahak Khata" subtitle="Customer ledger" onBack={() => router.back()} />
+      <Header title={t("customers.title")} subtitle={t("customers.subtitle")} onBack={() => router.back()} />
 
       <View style={styles.searchRow}>
         <View style={{ flex: 1 }}>
           <Field
             value={q}
             onChangeText={onChangeQuery}
-            placeholder="Search by name or phone"
+            placeholder={t("customers.searchPlaceholder")}
             keyboardType="default"
             testID="customer-search"
           />
@@ -116,9 +118,9 @@ export default function Customers() {
       ) : customers.length === 0 ? (
         <EmptyState
           icon="people-outline"
-          title="No customers"
-          subtitle={q ? `Nothing found for "${q}"` : "Add a customer to start their ledger"}
-          action={<Button title="Add Customer" onPress={() => router.push("/customer-new" as any)} icon="person-add" testID="customer-add-empty" />}
+          title={t("customers.empty")}
+          subtitle={q ? `${t("common.nothingFoundFor")} "${q}"` : t("customers.emptySub")}
+          action={<Button title={t("customers.add")} onPress={() => router.push("/customer-new" as any)} icon="person-add" testID="customer-add-empty" />}
         />
       ) : (
         <FlatList
@@ -139,7 +141,7 @@ export default function Customers() {
                 <Text style={styles.phone}>{item.phone}</Text>
               </View>
               <View style={styles.balanceWrap}>
-                <Text style={styles.balanceLabel}>{item.balance > 0 ? "OWES" : item.balance < 0 ? "ADVANCE" : "SETTLED"}</Text>
+                <Text style={styles.balanceLabel}>{item.balance > 0 ? t("customers.owes") : item.balance < 0 ? t("customers.advance") : t("customers.settled")}</Text>
                 <Text style={[styles.balance, { color: item.balance > 0 ? colors.error : item.balance < 0 ? colors.success : colors.info }]}>
                   ₹{Math.abs(item.balance).toFixed(2)}
                 </Text>
@@ -162,7 +164,7 @@ export default function Customers() {
           />
           <View style={styles.scanOverlay} pointerEvents="none">
             <View style={styles.scanBracket} />
-            <Text style={styles.scanHint}>Scan the customer ID/card barcode</Text>
+            <Text style={styles.scanHint}>{t("customers.scanHint")}</Text>
           </View>
           <Pressable style={styles.scanClose} onPress={() => setScannerOpen(false)} testID="customer-scan-close">
             <Ionicons name="close" size={26} color="#fff" />

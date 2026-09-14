@@ -4,12 +4,14 @@ import { useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, Field, Header } from "@/src/components/ui";
 import { spacing, colors } from "@/src/theme";
 
 export default function CustomerNew() {
   const router = useRouter();
   const { show } = useToast();
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -17,16 +19,16 @@ export default function CustomerNew() {
 
   const save = async () => {
     if (!name.trim() || !phone.trim()) {
-      show("Name and phone are required", "error");
+      show(t("customers.errRequired"), "error");
       return;
     }
     setSaving(true);
     try {
       const c = await api.post("/customers", { name: name.trim(), phone: phone.trim(), address: address.trim() });
-      show("Customer added", "success");
+      show(t("customers.added"), "success");
       router.replace(`/customer/${c.id}` as any);
     } catch (e: any) {
-      show(e?.detail?.message || e?.detail || e?.message || "Save failed", "error");
+      show(e?.detail?.message || e?.detail || e?.message || t("common.saveFailed"), "error");
     } finally {
       setSaving(false);
     }
@@ -34,15 +36,15 @@ export default function CustomerNew() {
 
   return (
     <View style={styles.flex}>
-      <Header title="New Customer" subtitle="Grahak Khata" onBack={() => router.back()} />
+      <Header title={t("customers.newTitle")} subtitle={t("customers.subtitle")} onBack={() => router.back()} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
           <Card>
-            <Field label="Name" value={name} onChangeText={setName} placeholder="Customer name" testID="customer-name" />
-            <Field label="Phone" value={phone} onChangeText={setPhone} placeholder="10-digit phone number" keyboardType="phone-pad" testID="customer-phone" />
-            <Field label="Address (optional)" value={address} onChangeText={setAddress} placeholder="Address" multiline testID="customer-address" />
+            <Field label={t("common.name")} value={name} onChangeText={setName} placeholder={t("customers.namePlaceholder")} testID="customer-name" />
+            <Field label={t("common.phone")} value={phone} onChangeText={setPhone} placeholder={t("customers.phonePlaceholder")} keyboardType="phone-pad" testID="customer-phone" />
+            <Field label={t("common.addressOptional")} value={address} onChangeText={setAddress} placeholder={t("common.address")} multiline testID="customer-address" />
           </Card>
-          <Button title="Save Customer" onPress={save} loading={saving} icon="checkmark-circle" testID="customer-save" />
+          <Button title={t("customers.save")} onPress={save} loading={saving} icon="checkmark-circle" testID="customer-save" />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
