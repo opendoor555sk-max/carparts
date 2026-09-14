@@ -29,7 +29,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: `${t("tabs.home")} ✅ OTA TEST`,
+          title: t("tabs.home"),
           tabBarIcon: ({ color, size }) => <Ionicons name="grid" size={size} color={color} />,
         }}
       />

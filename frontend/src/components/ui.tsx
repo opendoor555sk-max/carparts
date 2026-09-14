@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, font, radius, spacing, statusColor } from "@/src/theme";
+import { colors, font, radius, shadow, spacing, statusColor } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 
@@ -176,10 +176,10 @@ export function Button({
   testID?: string;
   style?: ViewStyle;
 }) {
-  const map: Record<string, { bg: string; fg: string; border: string }> = {
-    primary: { bg: colors.brand, fg: colors.onBrand, border: colors.brand },
+  const map: Record<string, { bg: string; fg: string; border: string; lift?: boolean }> = {
+    primary: { bg: colors.brand, fg: colors.onBrand, border: colors.brand, lift: true },
     secondary: { bg: colors.surface2, fg: colors.onSurface, border: colors.borderStrong },
-    danger: { bg: colors.error, fg: colors.onError, border: colors.error },
+    danger: { bg: colors.error, fg: colors.onError, border: colors.error, lift: true },
     ghost: { bg: "transparent", fg: colors.brand, border: "transparent" },
   };
   const c = map[variant];
@@ -191,6 +191,7 @@ export function Button({
       testID={testID}
       style={[
         styles.btn,
+        c.lift && !isOff ? shadow.sm : null,
         { backgroundColor: c.bg, borderColor: c.border, opacity: isOff ? 0.5 : 1 },
         style,
       ]}
@@ -227,7 +228,7 @@ export function Field({
 // ---------- Card ----------
 export function Card({ children, style, testID }: { children: React.ReactNode; style?: ViewStyle; testID?: string }) {
   return (
-    <View style={[styles.card, style]} testID={testID}>
+    <View style={[styles.card, shadow.sm, style]} testID={testID}>
       {children}
     </View>
   );
@@ -331,7 +332,9 @@ export function EmptyState({
 }) {
   return (
     <View style={styles.center}>
-      <Ionicons name={icon} size={56} color={colors.borderStrong} />
+      <View style={styles.emptyIconWrap}>
+        <Ionicons name={icon} size={40} color={colors.onSurface3} />
+      </View>
       <Text style={styles.emptyTitle}>{title}</Text>
       {subtitle ? <Text style={styles.dim}>{subtitle}</Text> : null}
       {action ? <View style={{ marginTop: spacing.lg }}>{action}</View> : null}
@@ -388,7 +391,7 @@ export function ConfirmModal({
 
 const cstyles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center", padding: spacing.xl },
-  box: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.xl, alignItems: "center", gap: spacing.sm, width: "100%" },
+  box: { backgroundColor: colors.surface2, borderRadius: radius.lg, padding: spacing.xl, alignItems: "center", gap: spacing.sm, width: "100%", ...shadow.lg },
   title: { color: colors.onSurface, fontSize: font.xl, fontWeight: "800", marginTop: spacing.sm, textAlign: "center" },
   msg: { color: colors.info, fontSize: font.base, textAlign: "center", lineHeight: 20 },
   row: { flexDirection: "row", gap: spacing.md, marginTop: spacing.lg, width: "100%" },
@@ -396,11 +399,12 @@ const cstyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface2,
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
+    ...shadow.sm,
   },
   headerRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   backBtn: { width: 26 },
@@ -478,6 +482,14 @@ const styles = StyleSheet.create({
   meterLabel: { color: colors.onSurface3, fontSize: font.sm, fontWeight: "700" },
   limitOff: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.sm },
+  emptyIconWrap: {
+    width: 84,
+    height: 84,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface3,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   emptyTitle: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800", marginTop: spacing.sm },
   dim: { color: colors.info, fontSize: font.base, textAlign: "center" },
 });

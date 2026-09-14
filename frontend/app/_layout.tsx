@@ -42,7 +42,7 @@ export default function RootLayout() {
         <LanguageProvider>
           <AuthProvider>
             <ToastProvider>
-              <StatusBar style="light" />
+              <StatusBar style="dark" />
               <View style={{ flex: 1, backgroundColor: colors.surface }}>
                 <LocationGate>
                   <Stack
