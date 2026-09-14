@@ -6,21 +6,25 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Card, EmptyState, Field, FilterChip, Header, Loading } from "@/src/components/ui";
 import { exportExcel } from "@/src/utils/excelExport";
 import { colors, font, radius, spacing } from "@/src/theme";
+import type { TranslationKey } from "@/src/i18n/translations";
 
 // Reuses report.tsx's date-range chip pattern (resolveRange -> date_from/
 // date_to on the query string) but adds "This Week" per this feature's own
 // spec, and the aggregation is server-computed (revenue/cost/profit summed
 // per part) rather than a flat transaction list, since a profit report is a
 // summary, not a ledger.
-const RANGES = [
-  { key: "today", label: "Today" },
-  { key: "week", label: "This Week" },
-  { key: "month", label: "This Month" },
-  { key: "all", label: "All" },
-  { key: "custom", label: "Custom" },
+// Labels are resolved at render time via labelKey (module-level consts can't
+// react to a language change — see modeTitle()/typeLabel() elsewhere).
+const RANGES: { key: string; labelKey: TranslationKey }[] = [
+  { key: "today", labelKey: "common.today" },
+  { key: "week", labelKey: "common.thisWeek" },
+  { key: "month", labelKey: "common.thisMonth" },
+  { key: "all", labelKey: "common.all" },
+  { key: "custom", labelKey: "common.custom" },
 ];
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -49,6 +53,7 @@ type Report = {
 export default function ProfitReport() {
   const router = useRouter();
   const { show } = useToast();
+  const { t } = useLanguage();
 
   const [range, setRange] = useState("month");
   const [customFrom, setCustomFrom] = useState(iso(new Date()));
@@ -90,12 +95,12 @@ export default function ProfitReport() {
       const qs = buildParams().toString();
       setReport(await api.get<Report>(`/reports/profit${qs ? `?${qs}` : ""}`));
     } catch (e: any) {
-      show(e?.detail?.message || e?.detail || e?.message || "Load failed", "error");
+      show(e?.detail?.message || e?.detail || e?.message || t("common.loadFailed"), "error");
       setReport(null);
     } finally {
       setLoading(false);
     }
-  }, [buildParams, show]);
+  }, [buildParams, show, t]);
 
   const exportToExcel = async () => {
     setExporting(true);
@@ -103,7 +108,7 @@ export default function ProfitReport() {
       const qs = buildParams().toString();
       await exportExcel(`/reports/profit/excel${qs ? `?${qs}` : ""}`, "profit_report.xlsx");
     } catch (e: any) {
-      show(e?.message || "Export failed", "error");
+      show(e?.message || t("common.exportFailed"), "error");
     } finally {
       setExporting(false);
     }
@@ -128,8 +133,8 @@ export default function ProfitReport() {
   return (
     <View style={styles.flex}>
       <Header
-        title="Profit / Margin"
-        subtitle="Revenue vs cost"
+        title={t("profitReport.title")}
+        subtitle={t("profitReport.subtitle")}
         onBack={() => router.back()}
         right={
           exporting ? (
@@ -143,10 +148,10 @@ export default function ProfitReport() {
       />
 
       <View style={styles.filters}>
-        <Text style={styles.flabel}>DATE RANGE</Text>
+        <Text style={styles.flabel}>{t("profitReport.dateRange")}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {RANGES.map((r) => (
-            <FilterChip key={r.key} label={r.label} active={range === r.key} onPress={() => setRange(r.key)} testID={`profit-range-${r.key}`} />
+            <FilterChip key={r.key} label={t(r.labelKey)} active={range === r.key} onPress={() => setRange(r.key)} testID={`profit-range-${r.key}`} />
           ))}
         </ScrollView>
 
@@ -158,7 +163,7 @@ export default function ProfitReport() {
                 <Text style={styles.toSep}>to</Text>
                 <TextInput style={styles.dateInput} value={customTo} onChangeText={setCustomTo} placeholder="YYYY-MM-DD" placeholderTextColor={colors.info} testID="profit-date-to" />
                 <Pressable style={styles.applyBtn} onPress={load} testID="profit-apply-custom">
-                  <Text style={styles.applyText}>Apply</Text>
+                  <Text style={styles.applyText}>{t("common.apply")}</Text>
                 </Pressable>
               </>
             ) : (
@@ -173,7 +178,7 @@ export default function ProfitReport() {
                   <Text style={styles.dateBtnText}>{customTo}</Text>
                 </Pressable>
                 <Pressable style={styles.applyBtn} onPress={load} testID="profit-apply-custom">
-                  <Text style={styles.applyText}>Apply</Text>
+                  <Text style={styles.applyText}>{t("common.apply")}</Text>
                 </Pressable>
               </>
             )}
@@ -191,16 +196,16 @@ export default function ProfitReport() {
           />
         ) : null}
 
-        <Text style={styles.flabel}>PART NUMBER (optional)</Text>
+        <Text style={styles.flabel}>{t("profitReport.partNumberOptional")}</Text>
         <View style={{ paddingHorizontal: spacing.lg }}>
-          <Field value={partFilter} onChangeText={setPartFilter} onSubmitEditing={load} placeholder="Filter to one part number" autoCapitalize="characters" testID="profit-part-filter" />
+          <Field value={partFilter} onChangeText={setPartFilter} onSubmitEditing={load} placeholder={t("profitReport.filterToPart")} autoCapitalize="characters" testID="profit-part-filter" />
         </View>
       </View>
 
       {loading ? (
         <Loading />
       ) : !report || report.summary.units_sold === 0 ? (
-        <EmptyState icon="trending-up-outline" title="No sales in this range" subtitle="Try a wider date range" />
+        <EmptyState icon="trending-up-outline" title={t("profitReport.noSales")} subtitle={t("profitReport.tryWiderRange")} />
       ) : (
         <FlatList
           data={topParts}
@@ -209,22 +214,22 @@ export default function ProfitReport() {
           ListHeaderComponent={
             <View style={{ gap: spacing.md, marginBottom: spacing.md }}>
               <Card testID="profit-summary-card">
-                <Text style={styles.cardTitle}>SUMMARY</Text>
+                <Text style={styles.cardTitle}>{t("profitReport.summary")}</Text>
                 <View style={styles.summaryRow}>
-                  <SummaryStat label="Revenue" value={report.summary.total_revenue} color={colors.onSurface} />
-                  <SummaryStat label="Cost" value={report.summary.total_cost} color={colors.onSurface} />
-                  <SummaryStat label="Profit" value={report.summary.total_profit} color={report.summary.total_profit >= 0 ? colors.success : colors.error} big />
+                  <SummaryStat label={t("profitReport.revenue")} value={report.summary.total_revenue} color={colors.onSurface} />
+                  <SummaryStat label={t("profitReport.cost")} value={report.summary.total_cost} color={colors.onSurface} />
+                  <SummaryStat label={t("profitReport.profit")} value={report.summary.total_profit} color={report.summary.total_profit >= 0 ? colors.success : colors.error} big />
                 </View>
                 <View style={styles.rowBetween}>
-                  <Text style={styles.unitsText}>{report.summary.units_sold} unit(s) sold</Text>
+                  <Text style={styles.unitsText}>{report.summary.units_sold} {t("profitReport.unitsSoldSuffix")}</Text>
                   {report.summary.units_with_unknown_cost > 0 ? (
                     <Text style={styles.unknownText}>
-                      ⚠ {report.summary.units_with_unknown_cost} unit(s) had no recorded purchase price — excluded from cost/profit
+                      ⚠ {report.summary.units_with_unknown_cost} {t("profitReport.noCostWarningSuffix")}
                     </Text>
                   ) : null}
                 </View>
               </Card>
-              <Text style={styles.sectionLabel}>BY PART (top profit first)</Text>
+              <Text style={styles.sectionLabel}>{t("profitReport.byPartHeader")}</Text>
             </View>
           }
           renderItem={({ item }) => (
@@ -233,10 +238,10 @@ export default function ProfitReport() {
                 <Text style={styles.pn}>{item.part_number}</Text>
                 {item.part_name ? <Text style={styles.name}>{item.part_name}</Text> : null}
                 <Text style={styles.meta}>
-                  {item.units_sold} sold • Rev ₹{item.revenue.toFixed(2)} • Cost {item.unknown_cost_units === item.units_sold ? "unknown" : `₹${item.cost.toFixed(2)}`}
+                  {item.units_sold} {t("profitReport.soldSuffix")} • {t("profitReport.rev")} ₹{item.revenue.toFixed(2)} • {t("profitReport.cost")} {item.unknown_cost_units === item.units_sold ? t("profitReport.unknownCost") : `₹${item.cost.toFixed(2)}`}
                 </Text>
                 {item.unknown_cost_units > 0 ? (
-                  <Text style={styles.unknownInline}>{item.unknown_cost_units} unit(s) unknown cost</Text>
+                  <Text style={styles.unknownInline}>{item.unknown_cost_units} {t("profitReport.unknownCostUnitsSuffix")}</Text>
                 ) : null}
               </View>
               <Text style={[styles.profit, { color: item.profit >= 0 ? colors.success : colors.error }]}>

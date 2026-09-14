@@ -9,6 +9,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, EmptyState, Header, Loading } from "@/src/components/ui";
 import { EMPTY_LOCATION, LocationPicker, isLocationEmpty, type AssignedLocation } from "@/src/components/LocationPicker";
 import { extractPartNumber } from "@/src/utils/barcode";
@@ -27,6 +28,7 @@ export default function StoreArrangement() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { show } = useToast();
+  const { t } = useLanguage();
   const isSuperAdmin = user?.role === "super_admin";
 
   const [manual, setManual] = useState("");
@@ -56,12 +58,12 @@ export default function StoreArrangement() {
         setPart(res);
       } catch (e: any) {
         setPart(null);
-        show(e?.message || `Part "${pn}" not found`, "error");
+        show(e?.message || `${t("storeArrangement.partNotFoundPre")} "${pn}" ${t("storeArrangement.partNotFoundPost")}`, "error");
       } finally {
         setLoadingPart(false);
       }
     },
-    [show],
+    [show, t],
   );
 
   const openScanner = async () => {
@@ -73,10 +75,10 @@ export default function StoreArrangement() {
       scannedRef.current = false;
       setScannerOpen(true);
     } else if (perm && !perm.canAskAgain) {
-      show("Camera blocked — enable it in Settings", "error");
+      show(t("inventory.cameraBlocked"), "error");
       Linking.openSettings();
     } else {
-      show("Camera permission needed to scan", "error");
+      show(t("inventory.cameraPermissionNeeded"), "error");
     }
   };
 
@@ -106,7 +108,7 @@ export default function StoreArrangement() {
   const saveLocation = useCallback(async () => {
     if (!part || !targetUnit) return;
     if (isLocationEmpty(loc)) {
-      show("Pick at least one location field", "error");
+      show(t("storeArrangement.pickLocationField"), "error");
       return;
     }
     setSaving(true);
@@ -114,16 +116,16 @@ export default function StoreArrangement() {
       await api.patch(`/stock/unit/${targetUnit.id}`, { assigned_location: loc });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSessionConfirmed((prev) => ({ ...prev, [part.part_number]: (prev[part.part_number] || 0) + 1 }));
-      show("Location saved", "success");
+      show(t("storeArrangement.locationSaved"), "success");
       const fresh = await api.get<PartInfo>(`/parts/${encodeURIComponent(part.part_number)}`);
       setPart(fresh);
     } catch (e: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      show(e?.message || "Failed to save location", "error");
+      show(e?.message || t("storeArrangement.saveLocationFailed"), "error");
     } finally {
       setSaving(false);
     }
-  }, [part, targetUnit, loc, show]);
+  }, [part, targetUnit, loc, show, t]);
 
   const printSticker = useCallback(async () => {
     if (!part) return;
@@ -131,13 +133,13 @@ export default function StoreArrangement() {
       const b = await brandingFromUser(user);
       await printLocationSticker(b, part.part_number, loc, part.name);
     } catch (e: any) {
-      show(e?.message || "Print failed", "error");
+      show(e?.message || t("storeArrangement.printFailed"), "error");
     }
-  }, [part, loc, user, show]);
+  }, [part, loc, user, show, t]);
 
   return (
     <View style={styles.flex}>
-      <Header title="Store Arrangement" subtitle="Place bought stock physically" onBack={() => router.back()} />
+      <Header title={t("storeArrangement.title")} subtitle={t("storeArrangement.subtitle")} onBack={() => router.back()} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: insets.bottom + spacing.xxxl }}>
         <View style={styles.pnRow}>
           <TextInput
@@ -146,7 +148,7 @@ export default function StoreArrangement() {
             onChangeText={setManual}
             onSubmitEditing={() => loadPart(manual)}
             returnKeyType="search"
-            placeholder="Scan or type part number"
+            placeholder={t("storeArrangement.scanOrType")}
             placeholderTextColor={colors.info}
             autoCapitalize="characters"
             autoCorrect={false}
@@ -154,12 +156,12 @@ export default function StoreArrangement() {
           />
           <Pressable style={styles.scanBtn} onPress={openScanner} testID="arrange-scan">
             <Ionicons name="barcode-outline" size={20} color={colors.onBrand} />
-            <Text style={styles.scanBtnText}>Scan</Text>
+            <Text style={styles.scanBtnText}>{t("inventory.scan")}</Text>
           </Pressable>
         </View>
 
         {loadingPart ? (
-          <Loading text="Looking up part…" />
+          <Loading text={t("storeArrangement.lookingUp")} />
         ) : part ? (
           <>
             <Card testID="arrange-part-card">
@@ -168,36 +170,36 @@ export default function StoreArrangement() {
               <View style={styles.statRow}>
                 <View style={styles.statBox}>
                   <Text style={styles.statNum}>{expected}</Text>
-                  <Text style={styles.statLbl}>Expected</Text>
+                  <Text style={styles.statLbl}>{t("storeArrangement.expected")}</Text>
                 </View>
                 <View style={styles.statBox}>
                   <Text style={[styles.statNum, { color: colors.success }]}>{arrangedCount}</Text>
-                  <Text style={styles.statLbl}>Arranged</Text>
+                  <Text style={styles.statLbl}>{t("storeArrangement.arranged")}</Text>
                 </View>
                 <View style={styles.statBox}>
                   <Text style={[styles.statNum, { color: mismatch ? colors.warning : colors.success }]}>{confirmed}</Text>
-                  <Text style={styles.statLbl}>Confirmed (session)</Text>
+                  <Text style={styles.statLbl}>{t("storeArrangement.confirmedSession")}</Text>
                 </View>
               </View>
 
               {expected === 0 ? (
                 <View style={styles.warnBanner} testID="arrange-no-stock">
                   <Ionicons name="alert-circle" size={16} color={colors.onWarning} />
-                  <Text style={styles.warnBannerText}>No stock on file for this part.</Text>
+                  <Text style={styles.warnBannerText}>{t("storeArrangement.noStockOnFile")}</Text>
                 </View>
               ) : mismatch ? (
                 <View style={styles.warnBanner} testID="arrange-mismatch">
                   <Ionicons name="warning" size={16} color={colors.onWarning} />
                   <Text style={styles.warnBannerText}>
                     {confirmed < expected
-                      ? `⚠️ Short by ${expected - confirmed} unit(s) this session`
-                      : `⚠️ ${confirmed - expected} extra confirmation(s) this session`}
+                      ? `${t("storeArrangement.shortByPre")} ${expected - confirmed} ${t("storeArrangement.shortBySuffix")}`
+                      : `⚠️ ${confirmed - expected} ${t("storeArrangement.extraConfirmSuffix")}`}
                   </Text>
                 </View>
               ) : (
                 <View style={styles.okBanner} testID="arrange-matched">
                   <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                  <Text style={styles.okBannerText}>All {expected} unit(s) confirmed this session</Text>
+                  <Text style={styles.okBannerText}>{t("storeArrangement.allConfirmedPre")} {expected} {t("storeArrangement.allConfirmedSuffix")}</Text>
                 </View>
               )}
             </Card>
@@ -206,12 +208,12 @@ export default function StoreArrangement() {
               value={loc}
               onChange={setLoc}
               showStoreName={isSuperAdmin}
-              label="Assign Location"
+              label={t("storeArrangement.assignLocation")}
               testIDPrefix="arrange-loc"
             />
 
             <Button
-              title={saving ? "Saving…" : "Save Location"}
+              title={saving ? t("storeArrangement.saving") : t("storeArrangement.saveLocation")}
               onPress={saveLocation}
               loading={saving}
               disabled={saving || !targetUnit}
@@ -219,7 +221,7 @@ export default function StoreArrangement() {
               testID="arrange-save"
             />
             <Button
-              title="Print Location Sticker"
+              title={t("storeArrangement.printSticker")}
               onPress={printSticker}
               variant="secondary"
               icon="print"
@@ -230,8 +232,8 @@ export default function StoreArrangement() {
         ) : (
           <EmptyState
             icon="cube-outline"
-            title="Scan a part to begin"
-            subtitle="Look up a part you just bought, then set its shelf/rack location"
+            title={t("storeArrangement.scanToBegin")}
+            subtitle={t("storeArrangement.scanToBeginSub")}
           />
         )}
       </ScrollView>
@@ -248,7 +250,7 @@ export default function StoreArrangement() {
           />
           <View style={styles.scanOverlay} pointerEvents="none">
             <View style={styles.scanBracket} />
-            <Text style={styles.scanHint}>Point the camera at any Barcode or QR code</Text>
+            <Text style={styles.scanHint}>{t("inventory.scanHint")}</Text>
           </View>
           <Pressable style={styles.scanClose} onPress={() => setScannerOpen(false)} testID="scan-close">
             <Ionicons name="close" size={26} color="#fff" />
