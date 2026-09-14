@@ -409,3 +409,59 @@ async def test_stock_adjust_and_buy_share_the_same_lock():
 
         inv = await client.get("/api/inventory", headers=headers)
         assert len(inv.json()) == 5
+
+
+@pytest.mark.asyncio
+async def test_already_over_limit_blocks_everything_immediately():
+    """Edge case: the limit is set AFTER stock already exceeds it (e.g. an
+    admin sets limit=10 on a part that already has 12 units in stock, or
+    lowers an existing limit below current stock). remaining = allowed -
+    existing_stock goes NEGATIVE here, not just to zero — confirm the
+    `remaining <= 0` checks in both /buy and /stock/adjust treat negative
+    the same as zero: EVERY further attempt is blocked immediately, with
+    no "one more sneaks through because remaining rounded to -0" type bug,
+    and stock never changes as a side effect of a blocked attempt."""
+    transport = httpx.ASGITransport(app=srv.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        suffix = uuid.uuid4().hex[:8]
+        reg = await client.post("/api/auth/register", json={
+            "store_name": f"OVER_{suffix}", "name": "Over Owner",
+            "username": f"over_{suffix}", "password": "Test@1234", "contact": "9999999999",
+        })
+        assert reg.status_code == 200, reg.text
+        headers = {"Authorization": f"Bearer {reg.json()['access_token']}"}
+        pn = f"OVERPN{suffix.upper()}"
+
+        # 12 units bought with no limit configured yet...
+        for _ in range(12):
+            r = await client.post("/api/buy", json={"part_number": pn, "condition": "Working"}, headers=headers)
+            assert r.status_code == 200, r.text
+
+        # ...THEN a limit of 10 is set — below current stock.
+        r = await client.post("/api/limits/part", json={"part_number": pn, "limit": 10, "enabled": True},
+                              headers=headers)
+        assert r.status_code == 200
+        limit = r.json()
+        assert limit["existing_stock"] == 12
+        assert limit["remaining"] == -2, "remaining must go negative, not clamp to 0"
+        assert limit["status"] == "STOP"
+
+        # Every /buy attempt must be blocked — 0 allowed, not "remaining+1".
+        for _ in range(4):
+            r = await client.post("/api/buy", json={"part_number": pn, "condition": "Working"}, headers=headers)
+            assert r.status_code == 409, r.text
+            assert r.json()["detail"]["code"] == "LIMIT_REACHED"
+            assert r.json()["detail"]["limit"]["remaining"] <= 0
+
+        inv = await client.get("/api/inventory", headers=headers)
+        assert len(inv.json()) == 12, "blocked /buy attempts must never change stock"
+
+        # Same for the /stock/adjust quick-add path.
+        for _ in range(3):
+            r = await client.post("/api/stock/adjust", json={"part_number": pn, "delta": 1}, headers=headers)
+            assert r.status_code == 200, r.text
+            d = r.json()
+            assert d["added"] == 0 and d["limit_reached"] is True
+
+        inv = await client.get("/api/inventory", headers=headers)
+        assert len(inv.json()) == 12, "blocked /stock/adjust attempts must never change stock either"
