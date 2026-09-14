@@ -43,10 +43,23 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="reports"
+        options={{
+          title: t("tabs.reports"),
+          tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart" size={size} color={color} />,
+        }}
+      />
+      {/* Requirements/Needs kept as a real, navigable route (still linked
+          from Home, admin.tsx, requirement-new.tsx, and the new Reports
+          tab above) but no longer its own bottom-tab button — href: null
+          hides it from the tab bar without removing the route, keeping
+          the bar at 5 tabs instead of 6. */}
+      <Tabs.Screen
         name="requirements"
         options={{
           title: t("tabs.needs"),
           tabBarIcon: ({ color, size }) => <Ionicons name="list-circle" size={size} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen

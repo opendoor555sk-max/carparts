@@ -26,6 +26,7 @@ const dict = {
     "tabs.home": "હોમ",
     "tabs.inventory": "ઈન્વેન્ટરી",
     "tabs.needs": "જરૂરિયાત",
+    "tabs.reports": "રિપોર્ટ્સ",
     "tabs.catalog": "કેટલોગ",
     "tabs.admin": "એડમિન",
 
@@ -865,6 +866,7 @@ const dict = {
     "tabs.home": "होम",
     "tabs.inventory": "इन्वेंटरी",
     "tabs.needs": "ज़रूरतें",
+    "tabs.reports": "रिपोर्ट",
     "tabs.catalog": "कैटलॉग",
     "tabs.admin": "एडमिन",
 
@@ -1704,6 +1706,7 @@ const dict = {
     "tabs.home": "Home",
     "tabs.inventory": "Inventory",
     "tabs.needs": "Needs",
+    "tabs.reports": "Reports",
     "tabs.catalog": "Catalog",
     "tabs.admin": "Admin",
 

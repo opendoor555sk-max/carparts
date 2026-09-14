@@ -318,14 +318,12 @@ export default function Home() {
         {/* Standalone entry point at the very bottom of the screen — a
             single, always-visible way back into Reports regardless of how
             far a user has scrolled or which admin-only sections they can
-            see above. There's no separate "reports overview" screen, so
-            per the fallback this just re-links into the same reports
-            already listed higher up (defaulting to Purchases, same as
-            that tile does). */}
+            see above. Now routes to the dedicated Reports tab (see
+            (tabs)/reports.tsx) rather than a single fixed report mode. */}
         <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>{t("home.reports").toUpperCase()}</Text>
         <Pressable
           style={styles.report}
-          onPress={() => router.push("/report?mode=buy" as any)}
+          onPress={() => router.push("/(tabs)/reports" as any)}
           testID="home-view-all-reports"
         >
           <View style={[styles.reportIcon, { borderColor: colors.brand }]}>
