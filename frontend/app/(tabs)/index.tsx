@@ -265,7 +265,7 @@ export default function Home() {
           ) : null}
         </View>
 
-        {user?.role === "super_admin" ? (
+        {isAdmin ? (
           <>
             <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>STICKER PRINTING</Text>
             <View style={{ gap: spacing.md }}>

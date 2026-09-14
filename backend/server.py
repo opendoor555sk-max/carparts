@@ -1044,9 +1044,11 @@ async def create_user(body: UserCreate, store_id: Optional[str] = None, user=Dep
     if await db.users.find_one({"username": body.username.lower().strip()}):
         raise HTTPException(400, "Username already exists")
     sid = resolve_store(user, store_id, require_write=True)
-    # SEC-001: only super_admin may create admin-role users; store staff can only make staff.
+    # SEC-001: only admin/super_admin may create admin-role users (within their own
+    # store, since sid above is already locked to it for a non-super-admin caller);
+    # plain staff can only make staff.
     role = "staff"
-    if body.role == "admin" and user.get("role") == "super_admin":
+    if body.role == "admin" and user.get("role") in ("admin", "super_admin"):
         role = "admin"
     doc = {
         "id": new_id(), "name": body.name, "username": body.username.lower().strip(),
@@ -1068,8 +1070,10 @@ async def update_user(user_id: str, body: UserUpdate, user=Depends(require("mana
     # store isolation
     if user.get("role") != "super_admin" and target.get("store_id") != user.get("store_id"):
         raise HTTPException(403, "બીજા store નો user edit ન કરાય")
-    # SEC-001: a non-super-admin cannot modify an admin/super_admin account other than self.
-    if target["role"] in ("admin", "super_admin") and user.get("role") != "super_admin" and target["id"] != user["id"]:
+    # SEC-001: plain staff cannot modify an admin/super_admin account other than self.
+    # admin/super_admin themselves can — the store-isolation check above already
+    # guarantees the target is in their own store unless the caller is super_admin.
+    if target["role"] in ("admin", "super_admin") and user.get("role") not in ("admin", "super_admin") and target["id"] != user["id"]:
         raise HTTPException(403, "Admin account બીજા staff દ્વારા બદલી ન શકાય")
     updates = {}
     if body.name is not None and body.name.strip():

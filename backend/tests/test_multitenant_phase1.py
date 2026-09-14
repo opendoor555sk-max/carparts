@@ -211,18 +211,31 @@ class TestSec004:
             assert "google_cx" not in u, "SEC-004: google_cx leaked"
 
 
-# ----- SEC-001: store admin creating admin-role user should get staff -----
+# ----- SEC-001: admin/super_admin have unrestricted access within their own
+# store — including creating/editing other admin-role accounts there. Plain
+# staff (no manage_users permission by default) still can't touch this at
+# all, and cross-store isolation is unchanged (see TestSec001 below). -----
 class TestSec001:
-    def test_store_admin_cannot_create_admin(self, store_a):
-        un = f"test_staff_{uuid.uuid4().hex[:6]}"
+    def test_store_admin_can_create_admin(self, store_a):
+        un = f"test_newadmin_{uuid.uuid4().hex[:6]}"
         r = _post("/admin/users",
-                  {"name": "TEST Staff", "username": un, "password": "Test@1234",
+                  {"name": "TEST New Admin", "username": un, "password": "Test@1234",
                    "role": "admin"},
                   token=store_a["token"])
         assert r.status_code == 200, r.text
         d = r.json()
-        assert d["role"] == "staff", f"SEC-001: role should be forced to staff, got {d['role']}"
+        assert d["role"] == "admin", f"admin should be able to create another admin, got {d['role']}"
         assert d["store_id"] == store_a["user"]["store_id"]
+        return d
+
+    def test_store_admin_can_edit_another_same_store_admin(self, store_a):
+        created = self.test_store_admin_can_create_admin(store_a)
+        r = requests.patch(API + f"/admin/users/{created['id']}",
+                           headers={"Authorization": f"Bearer {store_a['token']}",
+                                    "Content-Type": "application/json"},
+                           json={"name": "Renamed By Peer Admin"}, timeout=30)
+        assert r.status_code == 200, r.text
+        assert r.json()["name"] == "Renamed By Peer Admin"
 
     def test_cross_store_user_edit_blocked(self, store_a, store_b):
         # Create a staff in store B, then try to edit from store A
