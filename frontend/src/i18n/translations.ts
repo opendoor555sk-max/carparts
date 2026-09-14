@@ -816,6 +816,14 @@ const dict = {
     "scanSticker.pageMarginEdgeToEdge": "પેજ માર્જિન (મીમી) — 0 = એજ-ટુ-એજ",
     "scanSticker.printSheetLabel": "શીટ પ્રિન્ટ કરો",
     "scanSticker.emptyStateHint": "સ્ટીકરનો ફોટો પસંદ કરો. એપ તેને વાંચે છે અને સ્વચ્છ, સીધું સ્ટીકર બનાવે છે (હંમેશા સીધું). પાર્ટ નંબર / કોઈપણ લાઇન એડિટ કરો, પછી પ્રિન્ટ કરો.",
+
+    "demand.title": "માંગ અને શોધ",
+    "demand.subtitle": "વધુ માંગ શોધ",
+    "demand.noSearchData": "કોઈ શોધ ડેટા નથી",
+    "demand.highDemandHeader": "વધુ માંગ — શોધાયું પણ સ્ટોક નથી",
+    "demand.searchedPrefix": "શોધાયું",
+    "demand.lastColon": "છેલ્લું:",
+    "demand.searchedCountSuffix": "× શોધાયું",
   },
   hi: {
     "tabs.home": "होम",
@@ -1611,6 +1619,14 @@ const dict = {
     "scanSticker.pageMarginEdgeToEdge": "पेज मार्जिन (मिमी) — 0 = एज-टू-एज",
     "scanSticker.printSheetLabel": "शीट प्रिंट करें",
     "scanSticker.emptyStateHint": "स्टिकर की फोटो चुनें. ऐप उसे पढ़ता है और एक साफ, सीधा स्टिकर बनाता है (हमेशा सीधा). पार्ट नंबर / कोई भी लाइन एडिट करें, फिर प्रिंट करें.",
+
+    "demand.title": "मांग और खोज",
+    "demand.subtitle": "उच्च-मांग पहचान",
+    "demand.noSearchData": "कोई खोज डेटा नहीं",
+    "demand.highDemandHeader": "उच्च मांग — खोजा गया पर स्टॉक नहीं",
+    "demand.searchedPrefix": "खोजा गया",
+    "demand.lastColon": "आखिरी:",
+    "demand.searchedCountSuffix": "× खोजा गया",
   },
   en: {
     "tabs.home": "Home",
@@ -2406,6 +2422,14 @@ const dict = {
     "scanSticker.pageMarginEdgeToEdge": "PAGE MARGIN (mm) — 0 = edge-to-edge",
     "scanSticker.printSheetLabel": "Print Sheet",
     "scanSticker.emptyStateHint": "Pick a sticker photo. The app reads it and generates a clean, straight sticker (always upright). Edit the part number / any line, then print.",
+
+    "demand.title": "Demand & Search",
+    "demand.subtitle": "High-demand detection",
+    "demand.noSearchData": "No search data",
+    "demand.highDemandHeader": "HIGH DEMAND — searched but no stock",
+    "demand.searchedPrefix": "Searched",
+    "demand.lastColon": "last:",
+    "demand.searchedCountSuffix": "× searched",
   },
 } as const;
 

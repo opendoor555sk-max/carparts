@@ -5,21 +5,26 @@ import { useFocusEffect, useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { api } from "@/src/api/client";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { EmptyState, FilterChip, Header, Loading, StatusChip } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
+import type { TranslationKey } from "@/src/i18n/translations";
 
-const RANGES = [
-  { key: "all", label: "All" },
-  { key: "month", label: "This Month" },
-  { key: "year", label: "This Year" },
-  { key: "today", label: "Today" },
-  { key: "custom", label: "Custom" },
+// labelKey resolved at render time — a module-level const can't react to a
+// language change (see modeTitle()/typeLabel() elsewhere).
+const RANGES: { key: string; labelKey: TranslationKey }[] = [
+  { key: "all", labelKey: "common.all" },
+  { key: "month", labelKey: "common.thisMonth" },
+  { key: "year", labelKey: "report.thisYear" },
+  { key: "today", labelKey: "common.today" },
+  { key: "custom", labelKey: "common.custom" },
 ];
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 export default function Demand() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [demand, setDemand] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,13 +87,13 @@ export default function Demand() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Demand & Search" subtitle="High-demand detection" onBack={() => router.back()} />
+      <Header title={t("demand.title")} subtitle={t("demand.subtitle")} onBack={() => router.back()} />
 
       <View style={styles.filters}>
-        <Text style={styles.flabel}>DATE</Text>
+        <Text style={styles.flabel}>{t("report.date")}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {RANGES.map((r) => (
-            <FilterChip key={r.key} label={r.label} active={range === r.key} onPress={() => setRange(r.key)} testID={`range-${r.key}`} />
+            <FilterChip key={r.key} label={t(r.labelKey)} active={range === r.key} onPress={() => setRange(r.key)} testID={`range-${r.key}`} />
           ))}
         </ScrollView>
 
@@ -100,7 +105,7 @@ export default function Demand() {
                 <Text style={styles.toSep}>to</Text>
                 <TextInput style={styles.dateInput} value={customTo} onChangeText={setCustomTo} placeholder="YYYY-MM-DD" placeholderTextColor={colors.info} testID="date-to" />
                 <Pressable style={styles.applyBtn} onPress={load} testID="apply-custom">
-                  <Text style={styles.applyText}>Apply</Text>
+                  <Text style={styles.applyText}>{t("common.apply")}</Text>
                 </Pressable>
               </>
             ) : (
@@ -115,7 +120,7 @@ export default function Demand() {
                   <Text style={styles.dateBtnText}>{customTo}</Text>
                 </Pressable>
                 <Pressable style={styles.applyBtn} onPress={load} testID="apply-custom">
-                  <Text style={styles.applyText}>Apply</Text>
+                  <Text style={styles.applyText}>{t("common.apply")}</Text>
                 </Pressable>
               </>
             )}
@@ -133,16 +138,16 @@ export default function Demand() {
           />
         ) : null}
 
-        <Text style={styles.flabel}>COMPANY</Text>
+        <Text style={styles.flabel}>{t("report.companyLabel")}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {allCompanies.map((c) => (
-            <FilterChip key={c} label={c} active={company === c} onPress={() => setCompany(c)} testID={`co-${c}`} />
+            <FilterChip key={c} label={c === "All" ? t("common.all") : c} active={company === c} onPress={() => setCompany(c)} testID={`co-${c}`} />
           ))}
         </ScrollView>
-        <Text style={styles.flabel}>CATEGORY</Text>
+        <Text style={styles.flabel}>{t("report.categoryLabel")}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {allCategories.map((c) => (
-            <FilterChip key={c} label={c} active={category === c} onPress={() => setCategory(c)} testID={`cat-${c}`} />
+            <FilterChip key={c} label={c === "All" ? t("common.all") : c} active={category === c} onPress={() => setCategory(c)} testID={`cat-${c}`} />
           ))}
         </ScrollView>
       </View>
@@ -150,7 +155,7 @@ export default function Demand() {
       {loading ? (
         <Loading />
       ) : history.length === 0 ? (
-        <EmptyState icon="trending-up" title="No search data" subtitle="Try another date / company / category" />
+        <EmptyState icon="trending-up" title={t("demand.noSearchData")} subtitle={t("report.tryAnother")} />
       ) : (
         <FlatList
           data={history}
@@ -161,12 +166,12 @@ export default function Demand() {
               <View style={styles.hotBox}>
                 <View style={styles.hotHead}>
                   <Ionicons name="flame" size={18} color={colors.error} />
-                  <Text style={styles.hotTitle}>HIGH DEMAND — searched but no stock</Text>
+                  <Text style={styles.hotTitle}>{t("demand.highDemandHeader")}</Text>
                 </View>
                 {demand.map((d) => (
                   <View key={d.part_number} style={styles.hotRow}>
                     <Text style={styles.hotPn}>{d.part_number}</Text>
-                    <Text style={styles.hotCount}>{d.count}× searched</Text>
+                    <Text style={styles.hotCount}>{d.count}{t("demand.searchedCountSuffix")}</Text>
                   </View>
                 ))}
               </View>
@@ -178,7 +183,7 @@ export default function Demand() {
                 <Text style={styles.pn}>{item.part_number}</Text>
                 {item.part_name ? <Text style={styles.name}>{item.part_name}</Text> : null}
                 <Text style={styles.meta}>
-                  Searched {item.count}× • last: {item.last_status}
+                  {t("demand.searchedPrefix")} {item.count}× • {t("demand.lastColon")} {item.last_status}
                   {item.company && item.company !== "All" ? `  •  ${item.company}` : ""}
                 </Text>
               </View>
