@@ -28,7 +28,7 @@ import { useToast } from "@/src/context/ToastContext";
 import { Button, Field, FilterChip, Header, LimitBar, StatusChip } from "@/src/components/ui";
 import { extractPartNumber } from "@/src/utils/barcode";
 import { printReceipt, brandingFromUser } from "@/src/utils/print";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 
@@ -830,7 +830,7 @@ const styles = StyleSheet.create({
   empty: { color: colors.info, textAlign: "center", marginTop: spacing.xl },
   gpsStrip: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.surface2, borderBottomWidth: 1, borderBottomColor: colors.divider },
   gpsStripText: { fontSize: font.base, fontWeight: "700", flex: 1 },
-  lineCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden" },
+  lineCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden", ...shadow.sm },
   lineCardStop: { borderColor: colors.error },
   lineHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.lg },
   lineLimitHint: { fontSize: font.sm, fontWeight: "700", marginTop: 2 },

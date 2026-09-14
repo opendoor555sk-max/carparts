@@ -13,7 +13,7 @@ import { FilterChip, Header } from "@/src/components/ui";
 import { printHtml } from "@/src/utils/print";
 import { CODE_TYPES, codeSvg as genCodeSvg, svgRatio } from "@/src/utils/codegen";
 import { Box, SHEET_LAYOUTS, StickerTemplate, TplLine, generateComposedSheetHtml } from "@/src/utils/labelSheet";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 type ScanResult = { aspect: number; part_number: string; lines: { text: string; bold?: boolean }[]; code: { type: string } | null; logo: Box | null };
 type CodeType = string;
@@ -898,7 +898,7 @@ const styles = StyleSheet.create({
   pickRow: { flexDirection: "row", gap: spacing.md },
   pickBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.md },
   pickText: { color: colors.onBrand, fontWeight: "800", fontSize: font.base },
-  manualCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
+  manualCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, ...shadow.sm },
   manualTitle: { color: colors.brand, fontSize: font.sm, fontWeight: "800", letterSpacing: 0.5 },
   manualRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
   manualInput: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.onSurface, fontSize: font.base },
@@ -938,7 +938,7 @@ const styles = StyleSheet.create({
   sizeValText: { color: colors.onSurface, fontWeight: "800", fontSize: font.base },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chipRow: { gap: spacing.sm, paddingVertical: spacing.xs },
-  gridCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, alignItems: "center" },
+  gridCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, alignItems: "center", ...shadow.sm },
   grid: { flexDirection: "row", flexWrap: "wrap", alignSelf: "center" },
   cell: { borderWidth: 0.5, borderColor: colors.border, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
   cellOn: { backgroundColor: colors.brand },
@@ -951,7 +951,7 @@ const styles = StyleSheet.create({
   fmtBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.sm, marginTop: spacing.xs },
   fmtText: { color: colors.onBrand, fontSize: font.sm, fontWeight: "800" },
   batchToggle: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: spacing.sm, marginTop: spacing.sm },
-  batchBox: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, marginTop: spacing.xs },
+  batchBox: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, marginTop: spacing.xs, ...shadow.sm },
   batchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, borderBottomWidth: 0.5, borderBottomColor: colors.border, paddingVertical: 6 },
   batchName: { flex: 1, color: colors.onSurface, fontSize: font.sm, fontWeight: "700" },
   qtyGroup: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
