@@ -7,18 +7,22 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { FilterChip, Header } from "@/src/components/ui";
 import { printHtml } from "@/src/utils/print";
 import { qrSvg } from "@/src/utils/qr";
 import { barcodeSvg } from "@/src/utils/barcode128";
 import { CodeType, SHEET_LAYOUTS, generateSheetHtml } from "@/src/utils/labelSheet";
 import { colors, font, radius, spacing } from "@/src/theme";
+import type { TranslationKey } from "@/src/i18n/translations";
 
-const CODE_OPTS: { key: CodeType; label: string }[] = [
-  { key: "barcode", label: "Barcode" },
-  { key: "qr", label: "QR Code" },
-  { key: "both", label: "Both" },
-  { key: "none", label: "Text only" },
+// labelKey resolved at render time — a module-level const can't react to a
+// language change (see modeTitle()/typeLabel() elsewhere).
+const CODE_OPTS: { key: CodeType; labelKey: TranslationKey }[] = [
+  { key: "barcode", labelKey: "labels.codeBarcode" },
+  { key: "qr", labelKey: "labels.codeQr" },
+  { key: "both", labelKey: "labels.codeBoth" },
+  { key: "none", labelKey: "labels.codeTextOnly" },
 ];
 
 export default function Labels() {
@@ -26,6 +30,7 @@ export default function Labels() {
   const router = useRouter();
   const { user } = useAuth();
   const { show } = useToast();
+  const { t } = useLanguage();
 
   const [partNumber, setPartNumber] = useState((params.pn as string) || "");
   const [line1, setLine1] = useState((params.company as string) || user?.store_name || "");
@@ -50,10 +55,10 @@ export default function Labels() {
       scannedRef.current = false;
       setScannerOpen(true);
     } else if (perm && !perm.canAskAgain) {
-      show("Camera blocked — enable it in Settings", "error");
+      show(t("inventory.cameraBlocked"), "error");
       Linking.openSettings();
     } else {
-      show("Camera permission needed to scan", "error");
+      show(t("inventory.cameraPermissionNeeded"), "error");
     }
   };
 
@@ -62,7 +67,7 @@ export default function Labels() {
     scannedRef.current = true;
     setPartNumber(data.trim());
     setScannerOpen(false);
-    show(`Scanned: ${data.trim()}`, "success");
+    show(`${t("labels.scannedPrefix")} ${data.trim()}`, "success");
   };
 
   const layout = useMemo(() => SHEET_LAYOUTS.find((l) => l.code === layoutCode)!, [layoutCode]);
@@ -88,11 +93,11 @@ export default function Labels() {
 
   const onPrint = async () => {
     if (!partNumber.trim() && code !== "none") {
-      show("Enter a Part Number", "error");
+      show(t("labels.enterPartNumber"), "error");
       return;
     }
     if (selectedCount === 0) {
-      show("Tap the blocks you want to print on", "error");
+      show(t("labels.tapBlocksToPrintOn"), "error");
       return;
     }
     try {
@@ -102,7 +107,7 @@ export default function Labels() {
       );
       await printHtml(html);
     } catch (e: any) {
-      show(e?.message || "Print failed", "error");
+      show(e?.message || t("storeArrangement.printFailed"), "error");
     }
   };
 
@@ -114,24 +119,24 @@ export default function Labels() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Sticker Sheet Print" subtitle="A4 label sheets — anti-wastage" onBack={() => router.back()} />
+      <Header title={t("labels.title")} subtitle={t("labels.subtitle")} onBack={() => router.back()} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl }}>
         {/* Content */}
-        <Text style={styles.section}>LABEL CONTENT</Text>
+        <Text style={styles.section}>{t("labels.labelContent")}</Text>
         <View style={styles.pnRow}>
-          <TextInput style={[styles.input, { flex: 1 }]} value={partNumber} onChangeText={setPartNumber} placeholder="Part Number" placeholderTextColor={colors.info} autoCapitalize="characters" testID="lbl-pn" />
+          <TextInput style={[styles.input, { flex: 1 }]} value={partNumber} onChangeText={setPartNumber} placeholder={t("labels.partNumberPlaceholder")} placeholderTextColor={colors.info} autoCapitalize="characters" testID="lbl-pn" />
           <Pressable style={styles.scanBtn} onPress={openScanner} testID="lbl-scan">
             <Ionicons name="barcode-outline" size={20} color={colors.onBrand} />
-            <Text style={styles.scanBtnText}>Scan</Text>
+            <Text style={styles.scanBtnText}>{t("inventory.scan")}</Text>
           </Pressable>
         </View>
-        <TextInput style={styles.input} value={line1} onChangeText={setLine1} placeholder="Line 1 (company / store)" placeholderTextColor={colors.info} testID="lbl-l1" />
-        <TextInput style={styles.input} value={line2} onChangeText={setLine2} placeholder="Line 2 (name / note) — optional" placeholderTextColor={colors.info} testID="lbl-l2" />
+        <TextInput style={styles.input} value={line1} onChangeText={setLine1} placeholder={t("labels.line1Placeholder")} placeholderTextColor={colors.info} testID="lbl-l1" />
+        <TextInput style={styles.input} value={line2} onChangeText={setLine2} placeholder={t("labels.line2Placeholder")} placeholderTextColor={colors.info} testID="lbl-l2" />
 
-        <Text style={styles.flabel}>CODE</Text>
+        <Text style={styles.flabel}>{t("labels.code")}</Text>
         <View style={styles.chipWrap}>
           {CODE_OPTS.map((c) => (
-            <FilterChip key={c.key} label={c.label} active={code === c.key} onPress={() => setCode(c.key)} testID={`code-${c.key}`} />
+            <FilterChip key={c.key} label={t(c.labelKey)} active={code === c.key} onPress={() => setCode(c.key)} testID={`code-${c.key}`} />
           ))}
         </View>
 
@@ -143,7 +148,7 @@ export default function Labels() {
         ) : null}
 
         {/* Sheet layout */}
-        <Text style={styles.section}>A4 SHEET LAYOUT</Text>
+        <Text style={styles.section}>{t("labels.sheetLayout")}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {SHEET_LAYOUTS.map((l) => (
             <FilterChip
@@ -159,18 +164,18 @@ export default function Labels() {
           ))}
         </ScrollView>
         <Text style={styles.dim}>
-          {layout.total} labels • {layout.w} × {layout.h} mm • {layout.rows} rows × {layout.cols} cols
+          {layout.total} {t("labels.labelsSuffix")} • {layout.w} × {layout.h} {t("labels.mmSuffix")} • {layout.rows} {t("labels.rowsSuffix")} × {layout.cols} {t("labels.colsSuffix")}
         </Text>
 
         {/* Interactive grid */}
         <View style={styles.gridHead}>
-          <Text style={styles.flabel}>TAP ANY BLOCKS TO PRINT ({selectedCount} selected)</Text>
+          <Text style={styles.flabel}>{t("labels.tapBlocks")} ({selectedCount} {t("labels.selectedSuffix")})</Text>
           <View style={styles.gridActions}>
             <Pressable style={styles.miniBtn} onPress={selectAll} testID="lbl-selectall">
-              <Text style={styles.miniText}>All</Text>
+              <Text style={styles.miniText}>{t("common.all")}</Text>
             </Pressable>
             <Pressable style={styles.miniBtn} onPress={clearAll} testID="lbl-clear">
-              <Text style={styles.miniText}>Clear</Text>
+              <Text style={styles.miniText}>{t("history.clear")}</Text>
             </Pressable>
           </View>
         </View>
@@ -192,41 +197,41 @@ export default function Labels() {
             })}
           </View>
           <View style={styles.legend}>
-            <View style={styles.legRow}><View style={[styles.dot, styles.cell]} /><Text style={styles.legText}>Empty (skip)</Text></View>
-            <View style={styles.legRow}><View style={[styles.dot, styles.cellFilled]} /><Text style={styles.legText}>Will print</Text></View>
+            <View style={styles.legRow}><View style={[styles.dot, styles.cell]} /><Text style={styles.legText}>{t("labels.emptySkip")}</Text></View>
+            <View style={styles.legRow}><View style={[styles.dot, styles.cellFilled]} /><Text style={styles.legText}>{t("labels.willPrint")}</Text></View>
           </View>
         </View>
 
         <View style={styles.borderRow}>
-          <Text style={styles.borderLabel}>Show cut guide lines</Text>
+          <Text style={styles.borderLabel}>{t("labels.showCutGuideLines")}</Text>
           <Switch value={showBorder} onValueChange={setShowBorder} trackColor={{ true: colors.brand }} testID="lbl-border" />
         </View>
 
-        <Text style={styles.flabel}>PAPER MARGIN (mm) — blank = auto</Text>
+        <Text style={styles.flabel}>{t("labels.paperMargin")}</Text>
         <View style={styles.chipWrap}>
-          <TextInput style={styles.mInput} value={marginTop} onChangeText={setMarginTop} placeholder="Top" placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="margin-top" />
-          <TextInput style={styles.mInput} value={marginLeft} onChangeText={setMarginLeft} placeholder="Left" placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="margin-left" />
+          <TextInput style={styles.mInput} value={marginTop} onChangeText={setMarginTop} placeholder={t("labels.top")} placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="margin-top" />
+          <TextInput style={styles.mInput} value={marginLeft} onChangeText={setMarginLeft} placeholder={t("labels.left")} placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="margin-left" />
           <Pressable style={styles.zeroBtn} onPress={() => { setMarginTop("0"); setMarginLeft("0"); }} testID="margin-zero">
             <Text style={styles.resetText}>0 / 0</Text>
           </Pressable>
         </View>
 
-        <Text style={styles.flabel}>PAGE MARGIN (mm) — 0 = edge-to-edge (no border)</Text>
+        <Text style={styles.flabel}>{t("labels.pageMargin")}</Text>
         <View style={styles.chipWrap}>
           <TextInput style={styles.mInput} value={pageMargin} onChangeText={setPageMargin} placeholder="0" placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="page-margin" />
           <Pressable style={styles.zeroBtn} onPress={() => setPageMargin("0")} testID="page-margin-zero">
-            <Text style={styles.resetText}>Set 0</Text>
+            <Text style={styles.resetText}>{t("labels.setZero")}</Text>
           </Pressable>
         </View>
-        <Text style={styles.dim}>In the print dialog also pick Margins = None &amp; Scale = 100% for exact edge-to-edge.</Text>
+        <Text style={styles.dim}>{t("labels.printDialogTip")}</Text>
 
-        <Text style={styles.dim}>Printing {selectedCount} label{selectedCount === 1 ? "" : "s"} on selected blocks</Text>
+        <Text style={styles.dim}>{t("labels.printingPrefix")} {selectedCount} {t("labels.printingSuffix")}</Text>
 
         <Pressable style={styles.printBtn} onPress={onPrint} testID="lbl-print">
           <Ionicons name="print" size={20} color={colors.onBrand} />
-          <Text style={styles.printText}>Print A4 Sheet</Text>
+          <Text style={styles.printText}>{t("labels.printA4Sheet")}</Text>
         </Pressable>
-        {Platform.OS === "web" ? <Text style={styles.dim}>Tip: on web this opens the browser print dialog — choose Save as PDF.</Text> : null}
+        {Platform.OS === "web" ? <Text style={styles.dim}>{t("labels.webPrintTip")}</Text> : null}
       </ScrollView>
 
       <Modal visible={scannerOpen} animationType="slide" onRequestClose={() => setScannerOpen(false)}>
@@ -241,7 +246,7 @@ export default function Labels() {
           />
           <View style={styles.scanOverlay} pointerEvents="none">
             <View style={styles.scanBracket} />
-            <Text style={styles.scanHint}>Point the camera at any Barcode or QR code</Text>
+            <Text style={styles.scanHint}>{t("inventory.scanHint")}</Text>
           </View>
           <Pressable style={styles.scanClose} onPress={() => setScannerOpen(false)} testID="scan-close">
             <Ionicons name="close" size={26} color="#fff" />
