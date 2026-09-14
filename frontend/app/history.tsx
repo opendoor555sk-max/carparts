@@ -9,7 +9,7 @@ import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
-import { ConfirmModal, EmptyState, FilterChip, Header, Loading } from "@/src/components/ui";
+import { Button, ConfirmModal, EmptyState, FilterChip, Header, Loading } from "@/src/components/ui";
 import { printReport, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
@@ -142,12 +142,14 @@ export default function History() {
 
       {selectedIds.length > 0 ? (
         <View style={[styles.bar, { paddingBottom: insets.bottom + spacing.md }]}>
-          <Pressable style={styles.delBtn} onPress={() => setConfirmOpen(true)} disabled={deleting} testID="bulk-delete">
-            <Ionicons name="trash" size={20} color={colors.onError} />
-            <Text style={styles.delText}>
-              {deleting ? t("history.deletingEllipsis") : `${t("common.delete")} ${selectedIds.length} ${t("history.entries")}`}
-            </Text>
-          </Pressable>
+          <Button
+            title={deleting ? t("history.deletingEllipsis") : `${t("common.delete")} ${selectedIds.length} ${t("history.entries")}`}
+            onPress={() => setConfirmOpen(true)}
+            loading={deleting}
+            variant="danger"
+            icon="trash"
+            testID="bulk-delete"
+          />
         </View>
       ) : null}
 
@@ -176,6 +178,4 @@ const styles = StyleSheet.create({
   meta: { color: colors.info, fontSize: font.sm, marginTop: 2 },
   price: { color: colors.success, fontSize: font.lg, fontWeight: "800" },
   bar: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.lg },
-  delBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.error, borderRadius: radius.md, paddingVertical: spacing.md },
-  delText: { color: colors.onError, fontSize: font.lg, fontWeight: "800" },
 });
