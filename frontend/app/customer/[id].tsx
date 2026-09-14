@@ -6,6 +6,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
 import { Button, Card, EmptyState, Field, Header, Loading } from "@/src/components/ui";
+import { exportExcel } from "@/src/utils/excelExport";
 import { colors, font, spacing } from "@/src/theme";
 
 type LedgerEntry = {
@@ -40,6 +41,7 @@ export default function CustomerDetail() {
   const [payNote, setPayNote] = useState("");
   const [showPayForm, setShowPayForm] = useState(false);
   const [recordingPayment, setRecordingPayment] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -104,6 +106,18 @@ export default function CustomerDetail() {
       show(e?.detail?.message || e?.detail || e?.message || "Payment failed", "error");
     } finally {
       setRecordingPayment(false);
+    }
+  };
+
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      await exportExcel(`/customers/${encodeURIComponent(customerId)}/ledger/excel`,
+        `ledger_${customer.name.replace(/\s+/g, "_")}.xlsx`);
+    } catch (e: any) {
+      show(e?.message || "Export failed", "error");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -184,7 +198,19 @@ export default function CustomerDetail() {
           </Card>
 
           <Card testID="customer-ledger-card">
-            <Text style={styles.cardTitle}>TRANSACTION HISTORY</Text>
+            <View style={styles.rowBetween}>
+              <Text style={styles.cardTitle}>TRANSACTION HISTORY</Text>
+              {entries.length > 0 ? (
+                <Button
+                  title="Export"
+                  onPress={doExport}
+                  loading={exporting}
+                  variant="ghost"
+                  icon="download"
+                  testID="customer-export-excel"
+                />
+              ) : null}
+            </View>
             {entries.length === 0 ? (
               <Text style={styles.emptyLedger}>No transactions yet</Text>
             ) : (

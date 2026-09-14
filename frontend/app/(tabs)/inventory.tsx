@@ -29,6 +29,7 @@ import {
   type AssignedLocation,
 } from "@/src/components/LocationPicker";
 import { printInventory, brandingFromUser } from "@/src/utils/print";
+import { exportExcel } from "@/src/utils/excelExport";
 import { extractPartNumber } from "@/src/utils/barcode";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -66,6 +67,7 @@ export default function Inventory() {
   const [cond, setCond] = useState("All");
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Unit | null>(null);
+  const [exporting, setExporting] = useState(false);
   // Scan-to-filter: a barcode scan (or typed text) narrows the list to that part number.
   const [pnFilter, setPnFilter] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -86,12 +88,18 @@ export default function Inventory() {
   // part_number -> threshold, for parts currently at/below their low-stock alert.
   const [lowStockMap, setLowStockMap] = useState<Record<string, number>>({});
 
+  // Shared by load() and the Excel export so the export always reflects
+  // exactly the condition/part filters currently applied on screen.
+  const buildParams = useCallback(() => {
+    const params = new URLSearchParams();
+    if (cond !== "All") params.set("condition", cond);
+    if (pnFilter.trim()) params.set("q", pnFilter.trim());
+    return params;
+  }, [cond, pnFilter]);
+
   const load = useCallback(async () => {
     try {
-      const params = new URLSearchParams();
-      if (cond !== "All") params.set("condition", cond);
-      if (pnFilter.trim()) params.set("q", pnFilter.trim());
-      const qs = params.toString();
+      const qs = buildParams().toString();
       const data = await api.get<Unit[]>(`/inventory${qs ? `?${qs}` : ""}`);
       setUnits(data);
     } catch {
@@ -103,7 +111,19 @@ export default function Inventory() {
       const low = await api.get<{ part_number: string; low_stock_threshold: number }[]>("/inventory/low-stock");
       setLowStockMap(Object.fromEntries(low.map((l) => [l.part_number, l.low_stock_threshold])));
     } catch {}
-  }, [cond, pnFilter]);
+  }, [buildParams]);
+
+  const exportToExcel = async () => {
+    setExporting(true);
+    try {
+      const qs = buildParams().toString();
+      await exportExcel(`/inventory/excel${qs ? `?${qs}` : ""}`, "inventory.xlsx");
+    } catch (e: any) {
+      show(e?.message || "Export failed", "error");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Calls GET /inventory/location-check for `pn`, comparing it against the part's
   // assigned_location using the structured address the staff member picked
@@ -207,13 +227,22 @@ export default function Inventory() {
         subtitle="Physical stock units"
         right={
           units.length ? (
-            <Pressable
-              onPress={async () => printInventory(await brandingFromUser(user), units)}
-              hitSlop={12}
-              testID="print-inventory"
-            >
-              <Ionicons name="print" size={22} color={colors.brand} />
-            </Pressable>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+              {exporting ? (
+                <ActivityIndicator color={colors.brand} />
+              ) : (
+                <Pressable onPress={exportToExcel} hitSlop={12} testID="export-inventory-excel">
+                  <Ionicons name="download" size={22} color={colors.brand} />
+                </Pressable>
+              )}
+              <Pressable
+                onPress={async () => printInventory(await brandingFromUser(user), units)}
+                hitSlop={12}
+                testID="print-inventory"
+              >
+                <Ionicons name="print" size={22} color={colors.brand} />
+              </Pressable>
+            </View>
           ) : undefined
         }
         center={<SignOutButton />}

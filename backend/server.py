@@ -1658,12 +1658,7 @@ async def update_customer(customer_id: str, body: CustomerUpdate, store_id: Opti
     return await get_customer(customer_id, sid, user)
 
 
-@api.get("/customers/{customer_id}/ledger")
-async def get_customer_ledger(customer_id: str, store_id: Optional[str] = None, user=Depends(get_current_user)):
-    customer = await db.customers.find_one(sq(user, {"id": customer_id}, store_id), {"_id": 0})
-    if not customer:
-        raise HTTPException(404, "Customer not found")
-    sid = customer.get("store_id")
+async def _customer_ledger_data(customer_id: str, sid: Optional[str]) -> Dict[str, Any]:
     entries = await db.customer_ledger.find({"store_id": sid, "customer_id": customer_id}, {"_id": 0}) \
         .sort("at", -1).to_list(2000)
     balance = 0.0
@@ -1671,7 +1666,31 @@ async def get_customer_ledger(customer_id: str, store_id: Optional[str] = None, 
         amt = e.get("amount") or 0
         balance += amt if e.get("type") == "sale" else -amt
         e["running_balance"] = round(balance, 2)
-    return {"customer": customer, "balance": round(balance, 2), "entries": entries}
+    return {"balance": round(balance, 2), "entries": entries}
+
+
+@api.get("/customers/{customer_id}/ledger")
+async def get_customer_ledger(customer_id: str, store_id: Optional[str] = None, user=Depends(get_current_user)):
+    customer = await db.customers.find_one(sq(user, {"id": customer_id}, store_id), {"_id": 0})
+    if not customer:
+        raise HTTPException(404, "Customer not found")
+    data = await _customer_ledger_data(customer_id, customer.get("store_id"))
+    return {"customer": customer, **data}
+
+
+@api.get("/customers/{customer_id}/ledger/excel")
+async def get_customer_ledger_excel(customer_id: str, store_id: Optional[str] = None, user=Depends(get_current_user)):
+    customer = await db.customers.find_one(sq(user, {"id": customer_id}, store_id), {"_id": 0})
+    if not customer:
+        raise HTTPException(404, "Customer not found")
+    data = await _customer_ledger_data(customer_id, customer.get("store_id"))
+    rows = [["Date", "Type", "Part Number", "Note", "Amount", "Running Balance", "By"]]
+    for e in data["entries"]:
+        rows.append([e.get("at", ""), e.get("type", ""), e.get("part_number", "") or "",
+                    e.get("note", "") or "", e.get("amount") or 0, e["running_balance"], e.get("by", "")])
+    summary = [["Customer", customer["name"]], ["Phone", customer["phone"]], ["Balance", data["balance"]]]
+    fname = f"ledger_{customer['name'].replace(' ', '_')}.xlsx"
+    return _xlsx_response(fname, {"Customer": summary, "Transactions": rows})
 
 
 @api.post("/customers/{customer_id}/payments")
@@ -1767,11 +1786,9 @@ async def delete_vendor(vendor_id: str, user=Depends(require_admin)):
 
 
 # ---------------- Inventory ----------------
-@api.get("/inventory")
-async def inventory(condition: Optional[str] = None, q: Optional[str] = None, store_id: Optional[str] = None,
-                    company: Optional[str] = None, category: Optional[str] = None,
-                    date_from: Optional[str] = None, date_to: Optional[str] = None,
-                    user=Depends(get_current_user)):
+async def _inventory_list(user: dict, condition: Optional[str], q: Optional[str], store_id: Optional[str],
+                          company: Optional[str], category: Optional[str],
+                          date_from: Optional[str], date_to: Optional[str]) -> List[Dict[str, Any]]:
     query: Dict[str, Any] = sq(user, {"sold": {"$ne": True}}, store_id)
     if condition:
         query["condition"] = condition
@@ -1798,6 +1815,29 @@ async def inventory(condition: Optional[str] = None, q: Optional[str] = None, st
             continue
         out.append(u)
     return out
+
+
+@api.get("/inventory")
+async def inventory(condition: Optional[str] = None, q: Optional[str] = None, store_id: Optional[str] = None,
+                    company: Optional[str] = None, category: Optional[str] = None,
+                    date_from: Optional[str] = None, date_to: Optional[str] = None,
+                    user=Depends(get_current_user)):
+    return await _inventory_list(user, condition, q, store_id, company, category, date_from, date_to)
+
+
+@api.get("/inventory/excel")
+async def inventory_excel(condition: Optional[str] = None, q: Optional[str] = None, store_id: Optional[str] = None,
+                          company: Optional[str] = None, category: Optional[str] = None,
+                          date_from: Optional[str] = None, date_to: Optional[str] = None,
+                          user=Depends(get_current_user)):
+    units = await _inventory_list(user, condition, q, store_id, company, category, date_from, date_to)
+    rows = [["Part Number", "Name", "Company", "Category", "Condition", "Location", "Added By", "Added At"]]
+    for u in units:
+        loc = u.get("location") or {}
+        loc_str = " -> ".join(str(loc[k]) for k in ("rack", "shelf", "box", "position") if loc.get(k))
+        rows.append([u["part_number"], u.get("part_name", ""), u.get("company", ""), u.get("category", ""),
+                    u.get("condition", ""), loc_str, u.get("added_by", ""), u.get("created_at", "")])
+    return _xlsx_response("inventory.xlsx", {"Stock": rows})
 
 
 @api.get("/inventory/low-stock")
@@ -2723,10 +2763,8 @@ async def list_transactions(type: Optional[str] = None, store_id: Optional[str] 
 
 
 # ---------------- Profit / Margin Report (Admin) ----------------
-@api.get("/reports/profit")
-async def profit_report(store_id: Optional[str] = None, date_from: Optional[str] = None,
-                        date_to: Optional[str] = None, part_number: Optional[str] = None,
-                        user=Depends(require_admin)):
+async def _compute_profit_report(sid: Optional[str], date_from: Optional[str],
+                                 date_to: Optional[str], part_number: Optional[str]) -> Dict[str, Any]:
     """Per-unit profit = that unit's sell price minus the price it was bought
     at, joined by unit_id (the same db.stock document's id — set on both its
     buy and sell transaction, since both are recorded against `unit["id"]` at
@@ -2741,8 +2779,13 @@ async def profit_report(store_id: Optional[str] = None, date_from: Optional[str]
     profit and separately tallied as unknown_cost_units, never silently
     treated as zero cost (which would inflate profit) or dropped entirely
     (which would hide that a real sale happened).
+
+    Factored out of the /reports/profit endpoint so the Excel export
+    (/reports/profit/excel below) computes the exact same numbers instead of
+    a second, independently-maintained copy of this logic drifting out of
+    sync with it — see the total_profit comment below for why that
+    duplication risk matters here specifically.
     """
-    sid = resolve_store(user, store_id)
     base: Dict[str, Any] = {"store_id": sid} if sid is not None else {}
     q: Dict[str, Any] = {**base, "type": "sell"}
     if part_number:
@@ -2819,6 +2862,38 @@ async def profit_report(store_id: Optional[str] = None, date_from: Optional[str]
     }
 
 
+@api.get("/reports/profit")
+async def profit_report(store_id: Optional[str] = None, date_from: Optional[str] = None,
+                        date_to: Optional[str] = None, part_number: Optional[str] = None,
+                        user=Depends(require_admin)):
+    sid = resolve_store(user, store_id)
+    return await _compute_profit_report(sid, date_from, date_to, part_number)
+
+
+@api.get("/reports/profit/excel")
+async def profit_report_excel(store_id: Optional[str] = None, date_from: Optional[str] = None,
+                              date_to: Optional[str] = None, part_number: Optional[str] = None,
+                              user=Depends(require_admin)):
+    sid = resolve_store(user, store_id)
+    report = await _compute_profit_report(sid, date_from, date_to, part_number)
+    s = report["summary"]
+    summary_rows = [
+        ["Metric", "Value"],
+        ["Units sold", s["units_sold"]],
+        ["Total revenue", s["total_revenue"]],
+        ["Total cost", s["total_cost"]],
+        ["Total profit", s["total_profit"]],
+        ["Units with unknown cost", s["units_with_unknown_cost"]],
+        ["Date from", date_from or "(all time)"],
+        ["Date to", date_to or "(all time)"],
+    ]
+    part_rows = [["Part Number", "Name", "Units Sold", "Revenue", "Cost", "Profit", "Unknown Cost Units"]]
+    for r in report["by_part"]:
+        part_rows.append([r["part_number"], r.get("part_name", ""), r["units_sold"],
+                          r["revenue"], r["cost"], r["profit"], r["unknown_cost_units"]])
+    return _xlsx_response("profit_report.xlsx", {"Summary": summary_rows, "By Part": part_rows})
+
+
 class TxnDeleteIn(BaseModel):
     ids: List[str]
     remove_stock: bool = True
@@ -2886,33 +2961,47 @@ async def backup_import(body: BackupImportIn, user=Depends(require_admin)):
     return {"ok": True, "imported": summary}
 
 
-@api.get("/backup/excel")
-async def backup_excel(user=Depends(require_admin)):
+def _xlsx_response(filename: str, sheets: Dict[str, List[List[Any]]]) -> Response:
+    """Build an .xlsx file from {sheet_name: [[header...], [row...], ...]} and
+    return it as a downloadable response. openpyxl is already a backend
+    dependency (this helper generalizes what /backup/excel did inline below)
+    — no frontend spreadsheet library needed at all: the client just
+    downloads/shares these bytes the same way it already does for
+    /backup/excel, so every "Export to Excel" button in the app reuses this
+    one code path.
+    """
     from openpyxl import Workbook
     import io
 
-    sid = resolve_store(user, None, require_write=True)
     wb = Workbook()
     wb.remove(wb.active)
-    sheets = {
-        "Parts": ("parts", ["part_number", "name", "company", "category", "variant", "verification_status"]),
-        "Stock": ("stock", ["part_number", "condition", "sold", "added_by", "created_at"]),
-        "Transactions": ("transactions", ["type", "part_number", "price", "by", "at"]),
-    }
-    for sheet_name, (col, cols) in sheets.items():
-        ws = wb.create_sheet(sheet_name)
-        ws.append(cols)
-        docs = await db[col].find({"store_id": sid}, {"_id": 0}).to_list(100000)
-        for d in docs:
-            ws.append([str(d.get(c, "")) for c in cols])
+    for sheet_name, rows in sheets.items():
+        ws = wb.create_sheet(sheet_name[:31])  # Excel sheet-name length limit
+        for row in rows:
+            ws.append(row)
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
     return Response(
         content=buf.read(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=store_backup.xlsx"},
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+@api.get("/backup/excel")
+async def backup_excel(user=Depends(require_admin)):
+    sid = resolve_store(user, None, require_write=True)
+    cols = {
+        "Parts": ("parts", ["part_number", "name", "company", "category", "variant", "verification_status"]),
+        "Stock": ("stock", ["part_number", "condition", "sold", "added_by", "created_at"]),
+        "Transactions": ("transactions", ["type", "part_number", "price", "by", "at"]),
+    }
+    sheets: Dict[str, List[List[Any]]] = {}
+    for sheet_name, (col, fields) in cols.items():
+        docs = await db[col].find({"store_id": sid}, {"_id": 0}).to_list(100000)
+        sheets[sheet_name] = [fields] + [[str(d.get(c, "")) for c in fields] for d in docs]
+    return _xlsx_response("store_backup.xlsx", sheets)
 
 
 # ---------------- AI Sticker Scanner (Gemini vision) ----------------

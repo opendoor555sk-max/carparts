@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -7,6 +7,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
 import { Card, EmptyState, Field, FilterChip, Header, Loading } from "@/src/components/ui";
+import { exportExcel } from "@/src/utils/excelExport";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 // Reuses report.tsx's date-range chip pattern (resolveRange -> date_from/
@@ -56,6 +57,7 @@ export default function ProfitReport() {
   const [partFilter, setPartFilter] = useState("");
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   const resolveRange = useCallback((): { from?: string; to?: string } => {
     const now = new Date();
@@ -70,23 +72,42 @@ export default function ProfitReport() {
     return {};
   }, [range, customFrom, customTo]);
 
+  // Shared by both load() and the Excel export so they always query the
+  // exact same date-range/part filter — no risk of the export silently
+  // drifting from what's on screen.
+  const buildParams = useCallback(() => {
+    const { from, to } = resolveRange();
+    const params = new URLSearchParams();
+    if (from) params.set("date_from", from);
+    if (to) params.set("date_to", to);
+    if (partFilter.trim()) params.set("part_number", partFilter.trim());
+    return params;
+  }, [resolveRange, partFilter]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { from, to } = resolveRange();
-      const params = new URLSearchParams();
-      if (from) params.set("date_from", from);
-      if (to) params.set("date_to", to);
-      if (partFilter.trim()) params.set("part_number", partFilter.trim());
-      const qs = params.toString() ? `?${params.toString()}` : "";
-      setReport(await api.get<Report>(`/reports/profit${qs}`));
+      const qs = buildParams().toString();
+      setReport(await api.get<Report>(`/reports/profit${qs ? `?${qs}` : ""}`));
     } catch (e: any) {
       show(e?.detail?.message || e?.detail || e?.message || "Load failed", "error");
       setReport(null);
     } finally {
       setLoading(false);
     }
-  }, [resolveRange, partFilter, show]);
+  }, [buildParams, show]);
+
+  const exportToExcel = async () => {
+    setExporting(true);
+    try {
+      const qs = buildParams().toString();
+      await exportExcel(`/reports/profit/excel${qs ? `?${qs}` : ""}`, "profit_report.xlsx");
+    } catch (e: any) {
+      show(e?.message || "Export failed", "error");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -106,7 +127,20 @@ export default function ProfitReport() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Profit / Margin" subtitle="Revenue vs cost" onBack={() => router.back()} />
+      <Header
+        title="Profit / Margin"
+        subtitle="Revenue vs cost"
+        onBack={() => router.back()}
+        right={
+          exporting ? (
+            <ActivityIndicator color={colors.brand} />
+          ) : (
+            <Pressable onPress={exportToExcel} hitSlop={12} testID="profit-export-excel">
+              <Ionicons name="download" size={22} color={colors.brand} />
+            </Pressable>
+          )
+        }
+      />
 
       <View style={styles.filters}>
         <Text style={styles.flabel}>DATE RANGE</Text>
