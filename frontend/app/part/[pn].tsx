@@ -741,7 +741,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   aiNoteText: { color: colors.onBrandFaint, fontSize: font.sm, flex: 1 },
-  notFound: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: "#3a3300", borderRadius: radius.sm, padding: spacing.sm, marginTop: spacing.xs },
+  notFound: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.warningFaint, borderRadius: radius.sm, padding: spacing.sm, marginTop: spacing.xs },
   notFoundText: { color: colors.warning, fontSize: font.sm, flex: 1 },
   dbTag: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.sm },
   dbTagText: { color: colors.success, fontSize: font.sm, fontWeight: "700" },

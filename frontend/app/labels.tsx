@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   miniText: { color: colors.brand, fontWeight: "800", fontSize: font.sm },
   grid: { flexDirection: "row", flexWrap: "wrap", alignSelf: "center" },
   cell: { borderWidth: 0.5, borderColor: colors.border, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
-  cellUsed: { backgroundColor: "#3a2a10" },
+  cellUsed: { backgroundColor: colors.warningFaint },
   cellFilled: { backgroundColor: colors.brand },
   cellText: { color: colors.info, fontSize: 9, fontWeight: "700" },
   cellTextOn: { color: colors.onBrand },

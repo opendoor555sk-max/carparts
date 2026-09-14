@@ -198,7 +198,7 @@ export default function StoreArrangement() {
                 </View>
               ) : (
                 <View style={styles.okBanner} testID="arrange-matched">
-                  <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                  <Ionicons name="checkmark-circle" size={16} color={colors.onSuccess} />
                   <Text style={styles.okBannerText}>{t("storeArrangement.allConfirmedPre")} {expected} {t("storeArrangement.allConfirmedSuffix")}</Text>
                 </View>
               )}
@@ -273,10 +273,10 @@ const styles = StyleSheet.create({
   statBox: { flex: 1, alignItems: "center", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: spacing.md },
   statNum: { color: colors.onSurface, fontSize: font.xl, fontWeight: "800" },
   statLbl: { color: colors.info, fontSize: font.sm - 1, marginTop: 2, textAlign: "center", paddingHorizontal: 4 },
-  warnBanner: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: "#3a3300", borderWidth: 1, borderColor: colors.warning, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
+  warnBanner: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.warningFaint, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
   warnBannerText: { flex: 1, color: colors.warning, fontWeight: "700", fontSize: font.sm },
   okBanner: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.success, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
-  okBannerText: { flex: 1, color: "#fff", fontWeight: "700", fontSize: font.sm },
+  okBannerText: { flex: 1, color: colors.onSuccess, fontWeight: "700", fontSize: font.sm },
   scanModal: { flex: 1, backgroundColor: "#000" },
   scanOverlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
   scanBracket: { width: 240, height: 160, borderWidth: 3, borderColor: colors.brand, borderRadius: radius.md },

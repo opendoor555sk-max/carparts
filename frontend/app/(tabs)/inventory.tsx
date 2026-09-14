@@ -32,7 +32,7 @@ import {
 import { printInventory, brandingFromUser } from "@/src/utils/print";
 import { exportExcel } from "@/src/utils/excelExport";
 import { extractPartNumber } from "@/src/utils/barcode";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 type LocationCheckResult = {
   part_number: string;
@@ -311,7 +311,7 @@ export default function Inventory() {
         </View>
       ) : locCheck && (locCheck.location_mismatch || (locCheck.inconsistent_locations && locCheck.inconsistent_locations.length > 1)) ? (
         <View style={styles.locBannerBad} testID="loc-warning">
-          <Ionicons name="warning" size={22} color="#fff" />
+          <Ionicons name="warning" size={22} color={colors.onError} />
           <Text style={styles.locBannerBadText}>
             {locCheck.location_mismatch
               ? `${t("inventory.wrongLocation")} ${formatAssignedLocation(locCheck.assigned_location) || t("inventory.unknown")}`
@@ -320,7 +320,7 @@ export default function Inventory() {
         </View>
       ) : locCheck && locCheck.assigned_location ? (
         <View style={styles.locBannerGood} testID="loc-ok">
-          <Ionicons name="checkmark-circle" size={22} color="#fff" />
+          <Ionicons name="checkmark-circle" size={22} color={colors.onSuccess} />
           <Text style={styles.locBannerGoodText}>{t("inventory.correctLocation")} {formatAssignedLocation(locCheck.assigned_location)}</Text>
         </View>
       ) : locCheck ? (
@@ -498,14 +498,14 @@ const styles = StyleSheet.create({
   scanHint: { color: "#fff", fontSize: font.base, marginTop: spacing.lg, textAlign: "center", paddingHorizontal: spacing.xl },
   scanClose: { position: "absolute", top: 48, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
   locBannerBad: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.error, marginHorizontal: spacing.lg, marginTop: spacing.sm, borderRadius: radius.md, padding: spacing.md },
-  locBannerBadText: { flex: 1, color: "#fff", fontWeight: "900", fontSize: font.base, letterSpacing: 0.3 },
+  locBannerBadText: { flex: 1, color: colors.onError, fontWeight: "900", fontSize: font.base, letterSpacing: 0.3 },
   locBannerGood: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.success, marginHorizontal: spacing.lg, marginTop: spacing.sm, borderRadius: radius.md, padding: spacing.md },
-  locBannerGoodText: { flex: 1, color: "#fff", fontWeight: "800", fontSize: font.base },
+  locBannerGoodText: { flex: 1, color: colors.onSuccess, fontWeight: "800", fontSize: font.base },
   locBannerNeutral: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, marginHorizontal: spacing.lg, marginTop: spacing.sm, borderRadius: radius.md, padding: spacing.md },
   locBannerNeutralText: { flex: 1, color: colors.info, fontSize: font.sm, fontWeight: "600" },
   chipScroller: { maxHeight: 56, borderBottomWidth: 1, borderBottomColor: colors.divider },
   chipRow: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, alignItems: "center" },
-  card: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden" },
+  card: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden", ...shadow.sm },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
   arrangedText: { color: colors.success, fontSize: font.sm, fontWeight: "700" },
   pendingBadge: {
     alignSelf: "flex-start",
-    backgroundColor: "#3a3300",
+    backgroundColor: colors.warningFaint,
     borderWidth: 1,
     borderColor: colors.warning,
     borderRadius: radius.sm,
