@@ -51,21 +51,21 @@ export default function Admin() {
 
   const statCards: { label: string; value: number; color: string; icon: keyof typeof Ionicons.glyphMap; route: string }[] = stats
     ? [
-        { label: "Parts", value: stats.total_parts, color: colors.brand, icon: "documents", route: "/report?mode=stock" },
-        { label: "In Stock", value: stats.in_stock_units, color: colors.success, icon: "cube", route: "/report?mode=stock" },
-        { label: "Sold", value: stats.sold_units, color: colors.info, icon: "cash", route: "/report?mode=sell" },
-        { label: "Pending Needs", value: stats.pending_requirements, color: colors.warning, icon: "list", route: "/(tabs)/requirements" },
-        { label: "AI Pending", value: stats.pending_ai, color: colors.warning, icon: "sparkles", route: "/ai-approvals" },
-        { label: "Verified", value: stats.verified_parts, color: colors.success, icon: "shield-checkmark", route: "/report?mode=stock" },
+        { label: t("admin.statParts"), value: stats.total_parts, color: colors.brand, icon: "documents", route: "/report?mode=stock" },
+        { label: t("admin.statInStock"), value: stats.in_stock_units, color: colors.success, icon: "cube", route: "/report?mode=stock" },
+        { label: t("admin.statSold"), value: stats.sold_units, color: colors.info, icon: "cash", route: "/report?mode=sell" },
+        { label: t("admin.statPendingNeeds"), value: stats.pending_requirements, color: colors.warning, icon: "list", route: "/(tabs)/requirements" },
+        { label: t("admin.statAiPending"), value: stats.pending_ai, color: colors.warning, icon: "sparkles", route: "/ai-approvals" },
+        { label: t("admin.statVerified"), value: stats.verified_parts, color: colors.success, icon: "shield-checkmark", route: "/report?mode=stock" },
       ]
     : [];
 
   const links: { title: string; sub: string; icon: keyof typeof Ionicons.glyphMap; route: string; perm: string }[] = [
-    { title: "AI Approvals", sub: "Gemini research pending approval", icon: "sparkles", route: "/ai-approvals", perm: "ai_approve" },
-    { title: "Google Search Setup", sub: "Your own API key — free 100/day", icon: "key", route: "/settings", perm: "search" },
-    { title: "Purchase Limits", sub: "Global + per-part limits, low stock alerts", icon: "speedometer", route: "/limits", perm: "manage_limits" },
-    { title: "Manage Users", sub: "Change username + password for all users", icon: "people", route: "/users", perm: "manage_users" },
-    { title: "Demand & Search", sub: "High-demand detection", icon: "trending-up", route: "/demand", perm: "view_stats" },
+    { title: t("aiApprovals.title"), sub: t("admin.linkAiApprovalsSub"), icon: "sparkles", route: "/ai-approvals", perm: "ai_approve" },
+    { title: t("settings.title"), sub: t("admin.linkGoogleSearchSub"), icon: "key", route: "/settings", perm: "search" },
+    { title: t("limits.title"), sub: t("admin.linkPurchaseLimitsSub"), icon: "speedometer", route: "/limits", perm: "manage_limits" },
+    { title: t("users.title"), sub: t("admin.linkManageUsersSub"), icon: "people", route: "/users", perm: "manage_users" },
+    { title: t("demand.title"), sub: t("admin.linkDemandSearchSub"), icon: "trending-up", route: "/demand", perm: "view_stats" },
   ];
 
   return (
@@ -110,8 +110,8 @@ export default function Admin() {
                   <Ionicons name="business" size={22} color={colors.brand} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.linkTitle}>All Stores</Text>
-                  <Text style={styles.linkSub}>View data of all stores</Text>
+                  <Text style={styles.linkTitle}>{t("stores.title")}</Text>
+                  <Text style={styles.linkSub}>{t("admin.linkAllStoresSub")}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
@@ -126,8 +126,8 @@ export default function Admin() {
                   <Ionicons name="location" size={22} color={colors.success} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.linkTitle}>GPS Locations Map</Text>
-                  <Text style={styles.linkSub}>All searches & inquiries on the map</Text>
+                  <Text style={styles.linkTitle}>{t("admin.linkGpsTitle")}</Text>
+                  <Text style={styles.linkSub}>{t("admin.linkGpsSub")}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
@@ -165,8 +165,8 @@ export default function Admin() {
                   <Ionicons name="clipboard" size={22} color={colors.brand} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.linkTitle}>Stock Verification</Text>
-                  <Text style={styles.linkSub}>Count physical stock and find missing parts</Text>
+                  <Text style={styles.linkTitle}>{t("stockVerify.title")}</Text>
+                  <Text style={styles.linkSub}>{t("admin.linkStockVerifySub")}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
@@ -182,8 +182,8 @@ export default function Admin() {
                   <Ionicons name="warning" size={22} color={colors.warning} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.linkTitle}>Unlinked Stock</Text>
-                  <Text style={styles.linkSub}>Units with no purchase record — link them properly</Text>
+                  <Text style={styles.linkTitle}>{t("unlinkedStock.title")}</Text>
+                  <Text style={styles.linkSub}>{t("admin.linkUnlinkedStockSub")}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
@@ -199,8 +199,8 @@ export default function Admin() {
                   <Ionicons name="receipt" size={22} color={colors.brand} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.linkTitle}>Purchase / Sale History</Text>
-                  <Text style={styles.linkSub}>Select multiple entries and delete</Text>
+                  <Text style={styles.linkTitle}>{t("history.title")}</Text>
+                  <Text style={styles.linkSub}>{t("admin.linkHistorySub")}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
@@ -216,8 +216,8 @@ export default function Admin() {
                   <Ionicons name="cloud-download" size={22} color={colors.brand} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.linkTitle}>Backup & Restore</Text>
-                  <Text style={styles.linkSub}>Data export (Excel/JSON) and import</Text>
+                  <Text style={styles.linkTitle}>{t("backup.title")}</Text>
+                  <Text style={styles.linkSub}>{t("admin.linkBackupSub")}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
@@ -256,8 +256,8 @@ export default function Admin() {
                   <Ionicons name="storefront" size={22} color={colors.brand} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.linkTitle}>Store Profile / Branding</Text>
-                  <Text style={styles.linkSub}>Logo, GST number, phone for receipts</Text>
+                  <Text style={styles.linkTitle}>{t("admin.linkStoreProfileTitle")}</Text>
+                  <Text style={styles.linkSub}>{t("admin.linkStoreProfileSub")}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
@@ -271,8 +271,8 @@ export default function Admin() {
                 <Ionicons name="key" size={22} color={colors.brand} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.linkTitle}>My Own Password</Text>
-                <Text style={styles.linkSub}>Change only your login password</Text>
+                <Text style={styles.linkTitle}>{t("admin.linkMyPasswordTitle")}</Text>
+                <Text style={styles.linkSub}>{t("admin.linkMyPasswordSub")}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.info} />
             </Pressable>
@@ -280,7 +280,7 @@ export default function Admin() {
             {!isAdmin ? (
               <View style={styles.note}>
                 <Ionicons name="information-circle" size={16} color={colors.info} />
-                <Text style={styles.noteText}>You are staff — some admin controls are locked.</Text>
+                <Text style={styles.noteText}>{t("admin.staffNote")}</Text>
               </View>
             ) : null}
           </>

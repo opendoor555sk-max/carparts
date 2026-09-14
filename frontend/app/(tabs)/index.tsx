@@ -217,9 +217,9 @@ export default function Home() {
         <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>{t("home.reports").toUpperCase()}</Text>
         <View style={{ gap: spacing.md }}>
           {[
-            { key: "buy", title: "Purchases", sub: "All buys — date / company / category + Print", icon: "download" as const, color: colors.success },
-            { key: "sell", title: "Sales", sub: "All sales — date / company / category + Print", icon: "cash" as const, color: colors.brand },
-            { key: "stock", title: "Stock Report", sub: "Current stock by company / category + Print", icon: "cube" as const, color: colors.info },
+            { key: "buy", titleKey: "report.purchases", subKey: "home.reportBuySub", icon: "download" as const, color: colors.success },
+            { key: "sell", titleKey: "report.sales", subKey: "home.reportSellSub", icon: "cash" as const, color: colors.brand },
+            { key: "stock", titleKey: "report.stockReport", subKey: "home.reportStockSub", icon: "cube" as const, color: colors.info },
           ].map((r) => (
             <Pressable
               key={r.key}
@@ -231,8 +231,8 @@ export default function Home() {
                 <Ionicons name={r.icon} size={22} color={r.color} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.reportTitle}>{r.title}</Text>
-                <Text style={styles.reportSub}>{r.sub}</Text>
+                <Text style={styles.reportTitle}>{t(r.titleKey as TranslationKey)}</Text>
+                <Text style={styles.reportSub}>{t(r.subKey as TranslationKey)}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.info} />
             </Pressable>
@@ -246,8 +246,8 @@ export default function Home() {
               <Ionicons name="trending-up" size={22} color={colors.warning} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.reportTitle}>Profit / Margin</Text>
-              <Text style={styles.reportSub}>Revenue vs cost, by date range and part</Text>
+              <Text style={styles.reportTitle}>{t("profitReport.title")}</Text>
+              <Text style={styles.reportSub}>{t("home.reportProfitSub")}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.info} />
           </Pressable>
