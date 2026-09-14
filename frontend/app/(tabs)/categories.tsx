@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Header, Loading, SignOutButton } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -32,6 +33,7 @@ const GROUP_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
 
 export default function Categories() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [groups, setGroups] = useState<Group[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -59,7 +61,7 @@ export default function Categories() {
   if (loading) {
     return (
       <View style={styles.flex}>
-        <Header title="Category Master" center={<SignOutButton />} />
+        <Header title={t("categories.title")} center={<SignOutButton />} />
         <Loading />
       </View>
     );
@@ -67,7 +69,7 @@ export default function Categories() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Category Master" subtitle={`${total} items • 5 groups`} center={<SignOutButton />} />
+      <Header title={t("categories.title")} subtitle={`${total} ${t("categories.items")} • 5 ${t("categories.groups")}`} center={<SignOutButton />} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.md }}>
         {groups.map((g) => {
           const isOpen = open[g.group];
@@ -79,7 +81,7 @@ export default function Categories() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.groupTitle}>{g.group}</Text>
-                  <Text style={styles.groupCount}>{g.items.length} items</Text>
+                  <Text style={styles.groupCount}>{g.items.length} {t("categories.items")}</Text>
                 </View>
                 <Ionicons name={isOpen ? "chevron-up" : "chevron-down"} size={20} color={colors.info} />
               </Pressable>

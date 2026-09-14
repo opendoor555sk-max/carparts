@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Card, EmptyState, Header, Loading } from "@/src/components/ui";
 import { formatAssignedLocation, type AssignedLocation } from "@/src/components/LocationPicker";
 import { colors, font, radius, spacing } from "@/src/theme";
@@ -23,6 +24,7 @@ type UnlinkedUnit = {
 export default function UnlinkedStock() {
   const router = useRouter();
   const { show } = useToast();
+  const { t } = useLanguage();
   const [units, setUnits] = useState<UnlinkedUnit[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,11 +33,11 @@ export default function UnlinkedStock() {
       const data = await api.get<UnlinkedUnit[]>("/inventory/unlinked-stock");
       setUnits(data);
     } catch (e: any) {
-      show(e?.message || "Load failed", "error");
+      show(e?.message || t("common.loadFailed"), "error");
     } finally {
       setLoading(false);
     }
-  }, [show]);
+  }, [show, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -54,17 +56,17 @@ export default function UnlinkedStock() {
   return (
     <View style={styles.flex}>
       <Header
-        title="Unlinked Stock"
-        subtitle="Units with no purchase record on file"
+        title={t("unlinkedStock.title")}
+        subtitle={t("unlinkedStock.subtitle")}
         onBack={() => router.back()}
       />
       {loading ? (
-        <Loading text="Checking stock for untracked units…" />
+        <Loading text={t("unlinkedStock.checking")} />
       ) : units.length === 0 ? (
         <EmptyState
           icon="checkmark-done-circle"
-          title="All clear"
-          subtitle="Every active stock unit has a matching purchase record"
+          title={t("unlinkedStock.allClear")}
+          subtitle={t("unlinkedStock.allClearSub")}
         />
       ) : (
         <FlatList
@@ -75,7 +77,7 @@ export default function UnlinkedStock() {
             <View style={styles.warnBanner} testID="unlinked-count">
               <Ionicons name="warning" size={18} color={colors.onWarning} />
               <Text style={styles.warnText}>
-                {units.length} unit{units.length === 1 ? "" : "s"} found with no traceable buy transaction
+                {units.length} {t("unlinkedStock.foundNoTrace")}
               </Text>
             </View>
           }
@@ -85,8 +87,8 @@ export default function UnlinkedStock() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.pn}>{item.part_number}</Text>
                   <Text style={styles.meta}>
-                    {item.condition} • added {new Date(item.created_at).toLocaleDateString()}
-                    {item.added_by ? ` by ${item.added_by}` : ""}
+                    {item.condition} • {t("unlinkedStock.added")} {new Date(item.created_at).toLocaleDateString()}
+                    {item.added_by ? ` ${t("unlinkedStock.by")} ${item.added_by}` : ""}
                   </Text>
                   {item.assigned_location ? (
                     <View style={styles.locRow}>
@@ -97,7 +99,7 @@ export default function UnlinkedStock() {
                 </View>
                 <Pressable style={styles.linkBtn} onPress={() => linkUnit(item)} testID={`link-${item.id}`}>
                   <Ionicons name="link" size={16} color={colors.onBrand} />
-                  <Text style={styles.linkBtnText}>Create Buy Entry</Text>
+                  <Text style={styles.linkBtnText}>{t("unlinkedStock.createBuyEntry")}</Text>
                 </Pressable>
               </View>
             </Card>

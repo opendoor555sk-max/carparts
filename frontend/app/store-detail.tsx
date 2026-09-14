@@ -3,6 +3,7 @@ import { FlatList, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { EmptyState, FilterChip, Header, Loading, StatusChip } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -11,6 +12,7 @@ type Tab = "inventory" | "buy" | "sell";
 export default function StoreDetail() {
   const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
   const router = useRouter();
+  const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>("inventory");
   const [rows, setRows] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -40,19 +42,19 @@ export default function StoreDetail() {
     () =>
       stats
         ? [
-            { label: "Parts", value: stats.total_parts },
-            { label: "In Stock", value: stats.in_stock_units },
-            { label: "Sold", value: stats.sold_units },
-            { label: "Buys", value: stats.total_buys },
-            { label: "Sells", value: stats.total_sells },
+            { label: t("parts.title"), value: stats.total_parts },
+            { label: t("storeDetail.inStock"), value: stats.in_stock_units },
+            { label: t("storeDetail.sold"), value: stats.sold_units },
+            { label: t("storeDetail.buys"), value: stats.total_buys },
+            { label: t("storeDetail.sells"), value: stats.total_sells },
           ]
         : [],
-    [stats],
+    [stats, t],
   );
 
   return (
     <View style={styles.flex}>
-      <Header title={name || "Store"} subtitle="Admin view" onBack={() => router.back()} />
+      <Header title={name || t("storeDetail.store")} subtitle={t("storeDetail.adminView")} onBack={() => router.back()} />
 
       {statCards.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsRow}>
@@ -66,15 +68,15 @@ export default function StoreDetail() {
       ) : null}
 
       <View style={styles.tabs}>
-        <FilterChip label="Inventory" active={tab === "inventory"} onPress={() => setTab("inventory")} testID="sd-inv" />
-        <FilterChip label="Purchases" active={tab === "buy"} onPress={() => setTab("buy")} testID="sd-buy" />
-        <FilterChip label="Sales" active={tab === "sell"} onPress={() => setTab("sell")} testID="sd-sell" />
+        <FilterChip label={t("tabs.inventory")} active={tab === "inventory"} onPress={() => setTab("inventory")} testID="sd-inv" />
+        <FilterChip label={t("storeDetail.purchases")} active={tab === "buy"} onPress={() => setTab("buy")} testID="sd-buy" />
+        <FilterChip label={t("storeDetail.sales")} active={tab === "sell"} onPress={() => setTab("sell")} testID="sd-sell" />
       </View>
 
       {loading ? (
         <Loading />
       ) : rows.length === 0 ? (
-        <EmptyState icon="documents-outline" title="Nothing here" subtitle="This store has no data in this tab" />
+        <EmptyState icon="documents-outline" title={t("storeDetail.nothingHere")} subtitle={t("storeDetail.nothingHereSub")} />
       ) : (
         <FlatList
           data={rows}

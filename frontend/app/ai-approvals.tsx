@@ -5,12 +5,14 @@ import { useFocusEffect, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, EmptyState, Header, Loading, Meter, StatusChip } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 export default function AiApprovals() {
   const router = useRouter();
   const { show } = useToast();
+  const { t } = useLanguage();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,29 +35,29 @@ export default function AiApprovals() {
   const approve = async (id: string) => {
     try {
       await api.post(`/ai/research/${id}/approve`);
-      show("Approved & Verified", "success");
+      show(t("aiApprovals.approvedVerified"), "success");
       load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     }
   };
   const reject = async (id: string) => {
     try {
       await api.post(`/ai/research/${id}/reject`);
-      show("Rejected", "info");
+      show(t("partDetail.rejected"), "info");
       load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     }
   };
 
   return (
     <View style={styles.flex}>
-      <Header title="AI Approvals" subtitle="Gemini research pending" onBack={() => router.back()} />
+      <Header title={t("aiApprovals.title")} subtitle={t("aiApprovals.subtitle")} onBack={() => router.back()} />
       {loading ? (
         <Loading />
       ) : items.length === 0 ? (
-        <EmptyState icon="sparkles" title="No pending AI research" subtitle="Run AI research from a part detail" />
+        <EmptyState icon="sparkles" title={t("aiApprovals.empty")} subtitle={t("aiApprovals.emptySub")} />
       ) : (
         <FlatList
           data={items}
@@ -70,19 +72,19 @@ export default function AiApprovals() {
               <Meter
                 value={item.confidence || 0}
                 color={item.confidence >= 70 ? colors.success : item.confidence >= 40 ? colors.warning : colors.error}
-                label="Confidence"
+                label={t("partDetail.confidence")}
               />
               <Text style={styles.detail}>{item.result?.name || "—"} • {item.result?.category || "—"}</Text>
               <Text style={styles.dim}>{(item.result?.compatible_vehicles || []).join(", ")}</Text>
               {item.conflict ? (
                 <View style={styles.conflict}>
                   <Ionicons name="warning" size={14} color={colors.onWarning} />
-                  <Text style={styles.conflictText}>Information Conflict — Admin Verification Required</Text>
+                  <Text style={styles.conflictText}>{t("aiApprovals.conflictNote")}</Text>
                 </View>
               ) : null}
               <View style={styles.actions}>
-                <Button title="Approve" onPress={() => approve(item.id)} icon="checkmark" style={{ flex: 1 }} testID={`approve-${item.part_number}`} />
-                <Button title="Reject" onPress={() => reject(item.id)} variant="danger" icon="close" style={{ flex: 1 }} testID={`reject-${item.part_number}`} />
+                <Button title={t("aiApprovals.approve")} onPress={() => approve(item.id)} icon="checkmark" style={{ flex: 1 }} testID={`approve-${item.part_number}`} />
+                <Button title={t("common.reject")} onPress={() => reject(item.id)} variant="danger" icon="close" style={{ flex: 1 }} testID={`reject-${item.part_number}`} />
               </View>
             </Card>
           )}

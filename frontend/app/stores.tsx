@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Header, Loading, EmptyState } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -19,6 +20,7 @@ type Store = {
 
 export default function Stores() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,11 +44,11 @@ export default function Stores() {
 
   return (
     <View style={styles.flex}>
-      <Header title="All Stores" subtitle="Admin — all stores" onBack={() => router.back()} />
+      <Header title={t("stores.title")} subtitle={t("stores.subtitle")} onBack={() => router.back()} />
       {loading ? (
         <Loading />
       ) : stores.length === 0 ? (
-        <EmptyState icon="storefront-outline" title="No stores" subtitle="The first store is created via Sign Up" />
+        <EmptyState icon="storefront-outline" title={t("stores.empty")} subtitle={t("stores.emptySub")} />
       ) : (
         <FlatList
           data={stores}
@@ -81,9 +83,9 @@ export default function Stores() {
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </View>
               <View style={styles.stats}>
-                <Stat label="Users" value={item.users} icon="people" />
-                <Stat label="Parts" value={item.parts} icon="documents" />
-                <Stat label="In Stock" value={item.in_stock} icon="cube" />
+                <Stat label={t("stores.users")} value={item.users} icon="people" />
+                <Stat label={t("parts.title")} value={item.parts} icon="documents" />
+                <Stat label={t("storeDetail.inStock")} value={item.in_stock} icon="cube" />
               </View>
             </Pressable>
           )}

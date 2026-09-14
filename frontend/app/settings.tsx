@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, Field, Header } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -15,6 +16,7 @@ export default function Settings() {
   const insets = useSafeAreaInsets();
   const { refresh } = useAuth();
   const { show } = useToast();
+  const { t: lang } = useLanguage();
   const [apiKey, setApiKey] = useState("");
   const [cx, setCx] = useState("");
   const [hasKey, setHasKey] = useState(false);
@@ -32,7 +34,7 @@ export default function Settings() {
 
   const save = async () => {
     if (!apiKey.trim() && !hasKey) {
-      show("Enter API Key", "error");
+      show(lang("settings.enterApiKey"), "error");
       return;
     }
     setSaving(true);
@@ -43,9 +45,9 @@ export default function Settings() {
       setHasKey(!!r.has_google_key);
       setApiKey("");
       await refresh();
-      show("Google API settings saved", "success");
+      show(lang("settings.saved"), "success");
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || lang("common.failed"), "error");
     } finally {
       setSaving(false);
     }
@@ -53,30 +55,28 @@ export default function Settings() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Google Search Setup" subtitle="BYO-Key — free 100/day" onBack={() => router.back()} />
+      <Header title={lang("settings.title")} subtitle={lang("settings.subtitle")} onBack={() => router.back()} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 40, gap: spacing.md }} keyboardShouldPersistTaps="handled">
           <View style={styles.info}>
             <Ionicons name="key" size={18} color={colors.brand} />
-            <Text style={styles.infoText}>
-              Use your own Google key → 100 free searches per day, ZERO host credit. Key is stored securely on the host.
-            </Text>
+            <Text style={styles.infoText}>{lang("settings.infoText")}</Text>
           </View>
 
           <Card>
-            <Text style={styles.title}>YOUR GOOGLE CREDENTIALS</Text>
+            <Text style={styles.title}>{lang("settings.yourCredentials").toUpperCase()}</Text>
             <Field
-              label={hasKey ? "API KEY (saved — enter a new one to change)" : "GOOGLE API KEY"}
+              label={hasKey ? lang("settings.apiKeySaved").toUpperCase() : lang("settings.googleApiKey").toUpperCase()}
               value={apiKey}
               onChangeText={setApiKey}
-              placeholder={hasKey ? "•••••••• (already set)" : "AIza..."}
+              placeholder={hasKey ? lang("settings.alreadySet") : "AIza..."}
               autoCapitalize="none"
               autoCorrect={false}
               secureTextEntry
               testID="google-api-key"
             />
             <Field
-              label="SEARCH ENGINE ID (CX)"
+              label={lang("settings.searchEngineId").toUpperCase()}
               value={cx}
               onChangeText={setCx}
               placeholder="e.g. a1b2c3d4e5f6g7h8i"
@@ -84,23 +84,23 @@ export default function Settings() {
               autoCorrect={false}
               testID="google-cx"
             />
-            <Button title="Save Settings" onPress={save} loading={saving} icon="save" testID="save-settings" />
+            <Button title={lang("settings.saveSettings")} onPress={save} loading={saving} icon="save" testID="save-settings" />
             {hasKey ? (
               <View style={styles.okRow}>
                 <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                <Text style={styles.okText}>Google key configured ✓</Text>
+                <Text style={styles.okText}>{lang("settings.keyConfigured")}</Text>
               </View>
             ) : null}
           </Card>
 
           <Card>
-            <Text style={styles.title}>How to get the key (free, no card)</Text>
-            <Step n="1" t="console.cloud.google.com → create a new project" />
-            <Step n="2" t="Enable 'Custom Search API' → Credentials → create an API Key" />
-            <Step n="3" t="programmablesearchengine.google.com → new search engine (Search entire web) → get Search Engine ID (CX)" />
-            <Step n="4" t="Paste both above and Save" />
+            <Text style={styles.title}>{lang("settings.howToGetKey")}</Text>
+            <Step n="1" t={lang("settings.step1")} />
+            <Step n="2" t={lang("settings.step2")} />
+            <Step n="3" t={lang("settings.step3")} />
+            <Step n="4" t={lang("settings.step4")} />
             <Button
-              title="Open Google Console"
+              title={lang("settings.openConsole")}
               onPress={() => Linking.openURL("https://console.cloud.google.com/apis/library/customsearch.googleapis.com")}
               variant="secondary"
               icon="open"
