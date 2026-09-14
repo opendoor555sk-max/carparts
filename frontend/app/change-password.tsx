@@ -104,12 +104,10 @@ const styles = StyleSheet.create({
   info: {
     flexDirection: "row",
     gap: spacing.sm,
-    backgroundColor: colors.surface2,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.brandFaint,
     borderRadius: radius.md,
     padding: spacing.md,
   },
-  infoText: { color: colors.onSurface3, fontSize: font.sm, flex: 1, lineHeight: 18 },
+  infoText: { color: colors.onBrandFaint, fontSize: font.sm, flex: 1, lineHeight: 18 },
   title: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1, marginBottom: spacing.md },
 });
