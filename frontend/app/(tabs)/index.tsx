@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,12 +12,14 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
+import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { FilterChip, SignOutButton } from "@/src/components/ui";
 import { storage } from "@/src/utils/storage";
 import { useLowStockCount } from "@/src/hooks/use-low-stock-count";
+import { brandingFromUser, shareDailySalesOnWhatsApp, shareLowStockOnWhatsApp, type LowStockRow } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
 import type { TranslationKey } from "@/src/i18n/translations";
 
@@ -57,7 +60,10 @@ export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [company, setCompany] = useState("All");
+  const [sharingLowStock, setSharingLowStock] = useState(false);
+  const [sharingSales, setSharingSales] = useState(false);
   const lowStockCount = useLowStockCount();
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
   useEffect(() => {
     (async () => {
@@ -80,6 +86,35 @@ export default function Home() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const sep = m.route.includes("?") ? "&" : "?";
     router.push(`${m.route}${sep}company=${encodeURIComponent(company)}` as any);
+  };
+
+  const shareLowStock = async () => {
+    setSharingLowStock(true);
+    try {
+      const rows = await api.get<LowStockRow[]>("/inventory/low-stock");
+      if (!rows.length) {
+        show(t("home.noLowStock"), "info");
+        return;
+      }
+      await shareLowStockOnWhatsApp(await brandingFromUser(user), rows);
+    } catch (e: any) {
+      show(e?.message || t("common.failed"), "error");
+    } finally {
+      setSharingLowStock(false);
+    }
+  };
+
+  const shareDailySales = async () => {
+    setSharingSales(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const report = await api.get<{ summary: any }>(`/reports/profit?date_from=${today}&date_to=${today}`);
+      await shareDailySalesOnWhatsApp(await brandingFromUser(user), report.summary, new Date().toLocaleDateString());
+    } catch (e: any) {
+      show(e?.message || t("common.failed"), "error");
+    } finally {
+      setSharingSales(false);
+    }
   };
 
   return (
@@ -106,17 +141,28 @@ export default function Home() {
         showsVerticalScrollIndicator={false}
       >
         {lowStockCount > 0 ? (
-          <Pressable
-            style={styles.lowStockBanner}
-            onPress={() => router.push("/(tabs)/inventory" as any)}
-            testID="home-low-stock-banner"
-          >
-            <Ionicons name="alert-circle" size={20} color={colors.onError} />
-            <Text style={styles.lowStockText}>
-              {lowStockCount} part{lowStockCount === 1 ? "" : "s"} low on stock — tap to view
-            </Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.onError} />
-          </Pressable>
+          <View style={styles.lowStockBanner}>
+            <Pressable
+              style={styles.lowStockMain}
+              onPress={() => router.push("/(tabs)/inventory" as any)}
+              testID="home-low-stock-banner"
+            >
+              <Ionicons name="alert-circle" size={20} color={colors.onError} />
+              <Text style={styles.lowStockText}>
+                {lowStockCount} part{lowStockCount === 1 ? "" : "s"} low on stock — tap to view
+              </Text>
+            </Pressable>
+            {sharingLowStock ? (
+              <ActivityIndicator color={colors.onError} />
+            ) : (
+              <Pressable onPress={shareLowStock} hitSlop={10} testID="home-low-stock-whatsapp">
+                <Ionicons name="logo-whatsapp" size={20} color={colors.onError} />
+              </Pressable>
+            )}
+            <Pressable onPress={() => router.push("/(tabs)/inventory" as any)} hitSlop={10} testID="home-low-stock-chevron">
+              <Ionicons name="chevron-forward" size={18} color={colors.onError} />
+            </Pressable>
+          </View>
         ) : null}
 
         <Text style={styles.sectionLabel}>{t("home.companyGate").toUpperCase()}</Text>
@@ -205,6 +251,18 @@ export default function Home() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.info} />
           </Pressable>
+          {isAdmin ? (
+            <Pressable style={styles.report} onPress={shareDailySales} disabled={sharingSales} testID="home-share-daily-sales">
+              <View style={[styles.reportIcon, { borderColor: "#25D366" }]}>
+                <Ionicons name="logo-whatsapp" size={22} color="#25D366" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.reportTitle}>{t("home.shareDailySales")}</Text>
+                <Text style={styles.reportSub}>{t("home.shareDailySalesSub")}</Text>
+              </View>
+              {sharingSales ? <ActivityIndicator color={colors.brand} /> : <Ionicons name="chevron-forward" size={18} color={colors.info} />}
+            </Pressable>
+          ) : null}
         </View>
 
         {user?.role === "super_admin" ? (
@@ -265,12 +323,13 @@ const styles = StyleSheet.create({
   lowStockBanner: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.md,
     backgroundColor: colors.error,
     borderRadius: radius.md,
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
+  lowStockMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   lowStockText: { flex: 1, color: colors.onError, fontWeight: "800", fontSize: font.sm },
   chipRow: { gap: spacing.sm, paddingRight: spacing.lg },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },

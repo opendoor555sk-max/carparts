@@ -7,7 +7,7 @@ import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, EmptyState, Header, Loading } from "@/src/components/ui";
-import { brandingFromUser, shareInvoicePdf } from "@/src/utils/print";
+import { brandingFromUser, shareInvoiceOnWhatsApp, shareInvoicePdf } from "@/src/utils/print";
 import { colors, font, spacing } from "@/src/theme";
 
 function money(v?: number | null): string {
@@ -25,6 +25,7 @@ export default function InvoiceDetail() {
   const [invoice, setInvoice] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [sharing, setSharing] = useState(false);
+  const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -53,6 +54,18 @@ export default function InvoiceDetail() {
       show(e?.message || t("invoice.shareFailed"), "error");
     } finally {
       setSharing(false);
+    }
+  };
+
+  const doShareWhatsApp = async () => {
+    if (!invoice) return;
+    setSharingWhatsApp(true);
+    try {
+      await shareInvoiceOnWhatsApp(await brandingFromUser(user), invoice);
+    } catch (e: any) {
+      show(e?.message || t("invoice.shareFailed"), "error");
+    } finally {
+      setSharingWhatsApp(false);
     }
   };
 
@@ -116,6 +129,15 @@ export default function InvoiceDetail() {
         ) : null}
 
         <Button title={t("invoice.shareAsPdf")} onPress={doShare} loading={sharing} icon="share-social" testID="invoice-share" />
+        <Button
+          title={t("invoice.shareOnWhatsApp")}
+          onPress={doShareWhatsApp}
+          loading={sharingWhatsApp}
+          icon="logo-whatsapp"
+          variant="secondary"
+          style={{ marginTop: spacing.sm }}
+          testID="invoice-share-whatsapp"
+        />
       </ScrollView>
     </View>
   );

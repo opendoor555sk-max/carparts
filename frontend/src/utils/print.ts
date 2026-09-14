@@ -1,6 +1,7 @@
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import { Platform } from "react-native";
+import * as FileSystem from "expo-file-system/legacy";
+import { Linking, Platform } from "react-native";
 
 import { fileUrl } from "@/src/api/client";
 import { barcodeSvg } from "@/src/utils/barcode128";
@@ -285,6 +286,103 @@ export async function shareInvoicePdf(b: Branding, inv: InvoiceData): Promise<vo
     // print dialog rather than leaving the user with no way out.
     await Print.printAsync({ html });
   }
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp sharing — free, manual, no WhatsApp Business API, no native module.
+//
+// WhatsApp's "click-to-chat" web link (wa.me) is a plain https:// URL: it
+// opens the WhatsApp app directly with a message pre-filled (falling back to
+// WhatsApp Web / the app/play store if WhatsApp isn't installed), the exact
+// same Linking.openURL mechanism already used elsewhere in this app (tel:,
+// maps links, the Google Console link in settings.tsx). No canOpenURL check
+// is needed since it's a universal https link, not the whatsapp:// scheme.
+// An optional `phone` (digits only, with country code) preselects a specific
+// chat; omitted, the user picks a contact or group after WhatsApp opens.
+//
+// This only carries text: wa.me has no attachment parameter, so a file (the
+// invoice PDF below) still has to go through the OS share sheet — there is
+// no native-module-free way to hand a file to WhatsApp specifically, so that
+// path keeps using the same Sharing.shareAsync flow as shareInvoicePdf.
+export async function shareTextOnWhatsApp(text: string, phone?: string): Promise<void> {
+  const digits = phone ? phone.replace(/[^0-9]/g, "") : "";
+  const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  try {
+    await Linking.openURL(waUrl);
+  } catch {
+    // No handler for the link (rare) -- fall back to the generic OS share
+    // sheet so the user can still pick WhatsApp manually themselves.
+    if (Platform.OS !== "web" && (await Sharing.isAvailableAsync())) {
+      const uri = FileSystem.cacheDirectory + "whatsapp-share.txt";
+      await FileSystem.writeAsStringAsync(uri, text);
+      await Sharing.shareAsync(uri, { mimeType: "text/plain", dialogTitle: "Share" });
+    } else {
+      throw new Error("Could not open WhatsApp");
+    }
+  }
+}
+
+// Plain-text mirror of invoiceHtml above, for the WhatsApp text-summary share
+// (kept in English like every other print/receipt/invoice document in this
+// file — these are business records, not app-chrome UI, so they sit outside
+// the language-toggle sweep the same way invoiceHtml/printReport/etc. do).
+export function invoiceWhatsAppText(b: Branding, inv: InvoiceData): string {
+  const lines = [`*${b.name}*`, `Invoice: ${inv.invoice_number}`, `Date: ${new Date(inv.at).toLocaleDateString()}`];
+  if (inv.customer_name) lines.push(`Customer: ${inv.customer_name}`);
+  lines.push(
+    `Part: ${inv.part_number}${inv.description ? " - " + inv.description : ""}`,
+    `Amount: ${money(inv.price)}`,
+    `GST (${(inv.gst_rate * 100).toFixed(0)}%): ${money(inv.gst_amount)}`,
+    `*Total: ${money(inv.total)}*`,
+    "",
+    "Thank you for your business!",
+  );
+  return lines.join("\n");
+}
+
+export async function shareInvoiceOnWhatsApp(b: Branding, inv: InvoiceData): Promise<void> {
+  await shareTextOnWhatsApp(invoiceWhatsAppText(b, inv));
+}
+
+export type LowStockRow = { part_number: string; name?: string; stock_count: number; low_stock_threshold: number };
+
+export function lowStockWhatsAppText(b: Branding, rows: LowStockRow[]): string {
+  const lines = [`*Low Stock Alert — ${b.name}*`, new Date().toLocaleDateString(), ""];
+  rows.forEach((r, i) => {
+    lines.push(`${i + 1}. ${r.part_number}${r.name ? " - " + r.name : ""} — ${r.stock_count} left (alert ≤ ${r.low_stock_threshold})`);
+  });
+  lines.push("", `Total: ${rows.length} part(s) low on stock.`);
+  return lines.join("\n");
+}
+
+export async function shareLowStockOnWhatsApp(b: Branding, rows: LowStockRow[]): Promise<void> {
+  await shareTextOnWhatsApp(lowStockWhatsAppText(b, rows));
+}
+
+export type DailySalesSummary = {
+  units_sold: number;
+  total_revenue: number;
+  total_cost: number;
+  total_profit: number;
+  units_with_unknown_cost: number;
+};
+
+export function dailySalesWhatsAppText(b: Branding, s: DailySalesSummary, dateLabel: string): string {
+  const lines = [
+    `*Daily Sales Summary — ${b.name}*`,
+    dateLabel,
+    "",
+    `Units sold: ${s.units_sold}`,
+    `Revenue: ${money(s.total_revenue)}`,
+    `Cost: ${money(s.total_cost)}`,
+    `*Profit: ${money(s.total_profit)}*`,
+  ];
+  if (s.units_with_unknown_cost > 0) lines.push(`(${s.units_with_unknown_cost} unit(s) had no recorded cost)`);
+  return lines.join("\n");
+}
+
+export async function shareDailySalesOnWhatsApp(b: Branding, s: DailySalesSummary, dateLabel: string): Promise<void> {
+  await shareTextOnWhatsApp(dailySalesWhatsAppText(b, s, dateLabel));
 }
 
 export async function printReport(
