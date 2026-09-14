@@ -44,7 +44,7 @@ const MODULES: Module[] = [
   { key: "requirement", title: "REQUIREMENT", gujarati: "Inquiry / Need", icon: "add-circle", perm: "requirement", route: "/scan?mode=requirement", color: colors.warning },
   { key: "customers", title: "CUSTOMERS", gujarati: "Grahak Khata", icon: "people", perm: "sell", route: "/customers", color: colors.brand },
   { key: "vendors", title: "VENDORS", gujarati: "Supplier records", icon: "briefcase", perm: "buy", route: "/vendors", color: colors.success },
-  { key: "damaged", title: "DAMAGED ITEMS", gujarati: "Damaged / scrap log", icon: "alert-circle", perm: "buy", route: "/damaged", color: colors.error },
+  { key: "damaged-returns", title: "DAMAGED / RETURNS", gujarati: "Returns & spoilage", icon: "return-up-back", perm: "sell", route: "/damaged-returns", color: colors.error },
   { key: "arrange", title: "STORE ARRANGEMENT", gujarati: "Place bought stock", icon: "location", perm: "buy", route: "/store-arrangement", wide: true, color: colors.info },
 ];
 
