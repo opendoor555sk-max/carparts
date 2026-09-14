@@ -150,8 +150,8 @@ export default function StockVerify() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
-  info: { flexDirection: "row", gap: spacing.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
-  infoText: { color: colors.onSurface3, fontSize: font.sm, flex: 1, lineHeight: 18 },
+  info: { flexDirection: "row", gap: spacing.sm, backgroundColor: colors.brandFaint, borderRadius: radius.md, padding: spacing.md },
+  infoText: { color: colors.onBrandFaint, fontSize: font.sm, flex: 1, lineHeight: 18 },
   cardTitle: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1, marginBottom: spacing.md },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   pn: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800", letterSpacing: 0.5 },

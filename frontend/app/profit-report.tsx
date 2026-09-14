@@ -9,7 +9,7 @@ import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Card, EmptyState, Field, FilterChip, Header, Loading } from "@/src/components/ui";
 import { exportExcel } from "@/src/utils/excelExport";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 import type { TranslationKey } from "@/src/i18n/translations";
 
 // Reuses report.tsx's date-range chip pattern (resolveRange -> date_from/
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.md, flexWrap: "wrap", gap: spacing.xs },
   unitsText: { color: colors.info, fontSize: font.sm, fontWeight: "700" },
   unknownText: { color: colors.warning, fontSize: font.sm - 1, flexShrink: 1 },
-  partRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
+  partRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, ...shadow.sm },
   pn: { color: colors.onSurface, fontSize: font.base, fontWeight: "800", letterSpacing: 0.5 },
   name: { color: colors.onSurface3, fontSize: font.sm, marginTop: 1 },
   meta: { color: colors.info, fontSize: font.sm - 1, marginTop: 2 },

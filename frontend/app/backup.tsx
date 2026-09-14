@@ -175,8 +175,8 @@ export default function Backup() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
-  info: { flexDirection: "row", gap: spacing.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
-  infoText: { color: colors.onSurface3, fontSize: font.sm, flex: 1, lineHeight: 19 },
+  info: { flexDirection: "row", gap: spacing.sm, backgroundColor: colors.successFaint, borderRadius: radius.md, padding: spacing.md },
+  infoText: { color: colors.onSuccessFaint, fontSize: font.sm, flex: 1, lineHeight: 19 },
   cardTitle: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1 },
   sub: { color: colors.onSurface3, fontSize: font.sm, marginTop: spacing.xs },
 });

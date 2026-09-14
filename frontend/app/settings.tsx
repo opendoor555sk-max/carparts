@@ -127,8 +127,8 @@ function Step({ n, t }: { n: string; t: string }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
-  info: { flexDirection: "row", gap: spacing.sm, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
-  infoText: { color: colors.onSurface3, fontSize: font.sm, flex: 1, lineHeight: 18 },
+  info: { flexDirection: "row", gap: spacing.sm, backgroundColor: colors.brandFaint, borderRadius: radius.md, padding: spacing.md },
+  infoText: { color: colors.onBrandFaint, fontSize: font.sm, flex: 1, lineHeight: 18 },
   title: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1, marginBottom: spacing.md },
   okRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.md },
   okText: { color: colors.success, fontWeight: "700", fontSize: font.base },
