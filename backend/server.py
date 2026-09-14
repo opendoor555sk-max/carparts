@@ -1945,6 +1945,56 @@ async def delete_unit(unit_id: str, user=Depends(require_admin)):
     return {"ok": True, "remaining_stock": remaining}
 
 
+# ---------------- Damaged Parts ----------------
+# Deliberately minimal, like db.customer_ledger / db.invoices: reference the
+# stock unit by id and denormalize just part_number for display, rather than
+# copying the whole unit doc. Marking a unit damaged is the same weight of
+# action as editing it (StockUnitEditIn/edit_unit above) — a normal part of
+# handling stock, not an admin-only action — so it's gated the same way,
+# require("buy"), not require_admin.
+class DamagedIn(BaseModel):
+    unit_id: str
+    reason: str
+
+
+@api.post("/damaged")
+async def mark_damaged(body: DamagedIn, user=Depends(require("buy"))):
+    unit = await db.stock.find_one({"id": body.unit_id, "sold": {"$ne": True}})
+    if not unit:
+        raise HTTPException(404, "Unit not found in sellable stock")
+    if user.get("role") != "super_admin" and unit.get("store_id") != user.get("store_id"):
+        raise HTTPException(403, "તમારા store નું unit જ damaged mark કરી શકાય")
+    reason = body.reason.strip()
+    if not reason:
+        raise HTTPException(400, "Reason required")
+    at = now_iso()
+    await db.stock.update_one({"id": unit["id"]},
+                               {"$set": {"sold": True, "sold_at": at, "sold_by": user["username"],
+                                         "removed_reason": "damaged"}})
+    entry = {
+        "id": new_id(), "store_id": unit.get("store_id"), "unit_id": unit["id"],
+        "part_number": unit.get("part_number"), "reason": reason,
+        "marked_by": user["username"], "at": at,
+    }
+    await db.damaged_items.insert_one(dict(entry))
+    entry.pop("_id", None)
+    return {"ok": True, "damaged": entry}
+
+
+@api.get("/damaged")
+async def list_damaged(store_id: Optional[str] = None, date_from: Optional[str] = None,
+                        date_to: Optional[str] = None, user=Depends(require("buy"))):
+    q = sq(user, {}, store_id)
+    if date_from or date_to:
+        rng: Dict[str, Any] = {}
+        if date_from:
+            rng["$gte"] = date_from
+        if date_to:
+            rng["$lte"] = date_to + "T23:59:59"
+        q["at"] = rng
+    return await db.damaged_items.find(q, {"_id": 0}).sort("at", -1).to_list(5000)
+
+
 # ---------------- Physical stock verification (Admin only) ----------------
 async def _expected_stock(store_id: Optional[str]) -> Dict[str, int]:
     base = {"store_id": store_id} if store_id is not None else {}

@@ -72,6 +72,9 @@ export default function PartDetail() {
   const [pendingUnit, setPendingUnit] = useState<string | null>(null);
   const [deletingUnit, setDeletingUnit] = useState(false);
   const [qrMm, setQrMm] = useState(30);
+  const [damageUnit, setDamageUnit] = useState<string | null>(null);
+  const [damageReason, setDamageReason] = useState("");
+  const [markingDamaged, setMarkingDamaged] = useState(false);
 
   const adjustStock = async (delta: number) => {
     try {
@@ -98,6 +101,27 @@ export default function PartDetail() {
       show(e?.message || "Failed", "error");
     } finally {
       setDeletingUnit(false);
+    }
+  };
+
+  const openMarkDamaged = (unitId: string) => {
+    setDamageReason("");
+    setDamageUnit(unitId);
+  };
+
+  const performMarkDamaged = async () => {
+    if (!damageUnit || !damageReason.trim()) return;
+    setMarkingDamaged(true);
+    try {
+      await api.post("/damaged", { unit_id: damageUnit, reason: damageReason.trim() });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      show("Unit marked damaged — removed from sellable stock", "success");
+      setDamageUnit(null);
+      load();
+    } catch (e: any) {
+      show(e?.detail?.message || e?.detail || e?.message || "Failed", "error");
+    } finally {
+      setMarkingDamaged(false);
     }
   };
 
@@ -517,6 +541,11 @@ export default function PartDetail() {
                     </View>
                   ) : null}
                 </View>
+                {can("buy") ? (
+                  <Pressable onPress={() => openMarkDamaged(u.id)} hitSlop={10} testID={`pd-damage-${u.id}`}>
+                    <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
+                  </Pressable>
+                ) : null}
                 {isAdmin ? (
                   <Pressable onPress={() => deleteUnit(u.id)} hitSlop={10} testID={`pd-del-${u.id}`}>
                     <Ionicons name="trash-outline" size={18} color={colors.error} />
@@ -578,6 +607,41 @@ export default function PartDetail() {
         onConfirm={performDeleteUnit}
         onCancel={() => setPendingUnit(null)}
       />
+
+      {/* Mark unit damaged — reason required, unlike delete this keeps a
+          record (db.damaged_items) rather than removing the unit outright. */}
+      <Modal visible={!!damageUnit} transparent animationType="fade" onRequestClose={() => setDamageUnit(null)}>
+        <View style={styles.modalWrap}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={styles.modal}>
+              <View style={styles.modalHead}>
+                <Text style={styles.modalTitle}>Mark Unit Damaged</Text>
+                <Pressable onPress={() => setDamageUnit(null)} testID="close-damage-modal">
+                  <Ionicons name="close" size={24} color={colors.onSurface} />
+                </Pressable>
+              </View>
+              <Text style={styles.modalPn}>{partNumber}</Text>
+              <Field
+                label="REASON"
+                value={damageReason}
+                onChangeText={setDamageReason}
+                placeholder="e.g. Cracked casing, water damage"
+                multiline
+                testID="damage-reason"
+              />
+              <Button
+                title="Mark Damaged"
+                onPress={performMarkDamaged}
+                loading={markingDamaged}
+                variant="danger"
+                icon="alert-circle"
+                disabled={!damageReason.trim()}
+                testID="confirm-mark-damaged"
+              />
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
 
       {/* Edit / Approve details modal */}
       <Modal visible={editModal} transparent animationType="slide" onRequestClose={() => setEditModal(false)}>
