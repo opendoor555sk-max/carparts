@@ -7,9 +7,11 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { EmptyState, FilterChip, Header, Loading, StatusChip } from "@/src/components/ui";
 import { printReport, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
+import type { TranslationKey } from "@/src/i18n/translations";
 
 type Item = {
   id: string;
@@ -26,20 +28,22 @@ type Item = {
 
 type Mode = "buy" | "sell" | "stock";
 
-const RANGES = [
-  { key: "all", label: "All" },
-  { key: "month", label: "This Month" },
-  { key: "year", label: "This Year" },
-  { key: "today", label: "Today" },
-  { key: "custom", label: "Custom" },
+// labelKey resolved at render time — a module-level const can't react to a
+// language change (see modeTitle()/typeLabel() elsewhere).
+const RANGES: { key: string; labelKey: TranslationKey }[] = [
+  { key: "all", labelKey: "common.all" },
+  { key: "month", labelKey: "common.thisMonth" },
+  { key: "year", labelKey: "report.thisYear" },
+  { key: "today", labelKey: "common.today" },
+  { key: "custom", labelKey: "common.custom" },
 ];
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-const TITLES: Record<Mode, string> = {
-  buy: "Purchases",
-  sell: "Sales",
-  stock: "Stock Report",
+const TITLE_KEYS: Record<Mode, TranslationKey> = {
+  buy: "report.purchases",
+  sell: "report.sales",
+  stock: "report.stockReport",
 };
 
 export default function Report() {
@@ -48,7 +52,9 @@ export default function Report() {
   const router = useRouter();
   const { user, can } = useAuth();
   const { show } = useToast();
+  const { t } = useLanguage();
   const showPrice = can("view_price");
+  const title = t(TITLE_KEYS[m]);
 
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,11 +107,11 @@ export default function Report() {
         setItems(await api.get<Item[]>(`/transactions${qs}${sep}type=${m}`));
       }
     } catch (e: any) {
-      show(e?.message || "Load failed", "error");
+      show(e?.message || t("common.loadFailed"), "error");
     } finally {
       setLoading(false);
     }
-  }, [m, resolveRange, company, category, show]);
+  }, [m, resolveRange, company, category, show, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -120,7 +126,7 @@ export default function Report() {
     const g: Record<string, Record<string, Item[]>> = {};
     for (const it of items) {
       const co = it.company || "All";
-      const cat = it.category || "Uncategorized";
+      const cat = it.category || t("report.uncategorized");
       g[co] = g[co] || {};
       g[co][cat] = g[co][cat] || [];
       g[co][cat].push(it);
@@ -134,20 +140,20 @@ export default function Report() {
       });
     });
     return rows;
-  }, [items]);
+  }, [items, t]);
 
   const total = useMemo(() => items.reduce((s, t) => s + (Number(t.price) || 0), 0), [items]);
 
   return (
     <View style={styles.flex}>
       <Header
-        title={TITLES[m]}
+        title={title}
         subtitle={user?.store_name}
         onBack={() => router.back()}
         right={
           items.length ? (
             <Pressable
-              onPress={async () => printReport(await brandingFromUser(user), TITLES[m], items, showPrice && m !== "stock")}
+              onPress={async () => printReport(await brandingFromUser(user), title, items, showPrice && m !== "stock")}
               testID="print-report"
             >
               <Ionicons name="print" size={22} color={colors.brand} />
@@ -157,10 +163,10 @@ export default function Report() {
       />
 
       <View style={styles.filters}>
-        <Text style={styles.flabel}>DATE</Text>
+        <Text style={styles.flabel}>{t("report.date")}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {RANGES.map((r) => (
-            <FilterChip key={r.key} label={r.label} active={range === r.key} onPress={() => setRange(r.key)} testID={`range-${r.key}`} />
+            <FilterChip key={r.key} label={t(r.labelKey)} active={range === r.key} onPress={() => setRange(r.key)} testID={`range-${r.key}`} />
           ))}
         </ScrollView>
 
@@ -172,7 +178,7 @@ export default function Report() {
                 <Text style={styles.toSep}>to</Text>
                 <TextInput style={styles.dateInput} value={customTo} onChangeText={setCustomTo} placeholder="YYYY-MM-DD" placeholderTextColor={colors.info} testID="date-to" />
                 <Pressable style={styles.applyBtn} onPress={load} testID="apply-custom">
-                  <Text style={styles.applyText}>Apply</Text>
+                  <Text style={styles.applyText}>{t("common.apply")}</Text>
                 </Pressable>
               </>
             ) : (
@@ -187,7 +193,7 @@ export default function Report() {
                   <Text style={styles.dateBtnText}>{customTo}</Text>
                 </Pressable>
                 <Pressable style={styles.applyBtn} onPress={load} testID="apply-custom">
-                  <Text style={styles.applyText}>Apply</Text>
+                  <Text style={styles.applyText}>{t("common.apply")}</Text>
                 </Pressable>
               </>
             )}
@@ -205,16 +211,16 @@ export default function Report() {
           />
         ) : null}
 
-        <Text style={styles.flabel}>COMPANY</Text>
+        <Text style={styles.flabel}>{t("report.companyLabel")}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {companies.map((c) => (
-            <FilterChip key={c} label={c} active={company === c} onPress={() => setCompany(c)} testID={`co-${c}`} />
+            <FilterChip key={c} label={c === "All" ? t("common.all") : c} active={company === c} onPress={() => setCompany(c)} testID={`co-${c}`} />
           ))}
         </ScrollView>
-        <Text style={styles.flabel}>CATEGORY</Text>
+        <Text style={styles.flabel}>{t("report.categoryLabel")}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {categories.map((c) => (
-            <FilterChip key={c} label={c} active={category === c} onPress={() => setCategory(c)} testID={`cat-${c}`} />
+            <FilterChip key={c} label={c === "All" ? t("common.all") : c} active={category === c} onPress={() => setCategory(c)} testID={`cat-${c}`} />
           ))}
         </ScrollView>
       </View>
@@ -222,12 +228,12 @@ export default function Report() {
       {loading ? (
         <Loading />
       ) : items.length === 0 ? (
-        <EmptyState icon="documents-outline" title="Nothing found" subtitle="Try another date / company / category" />
+        <EmptyState icon="documents-outline" title={t("report.nothingFound")} subtitle={t("report.tryAnother")} />
       ) : (
         <>
           <View style={styles.summary}>
-            <Text style={styles.summaryText}>{items.length} items</Text>
-            {showPrice && m !== "stock" ? <Text style={styles.summaryTotal}>Total Rs.{total}</Text> : null}
+            <Text style={styles.summaryText}>{items.length} {t("report.itemsSuffix")}</Text>
+            {showPrice && m !== "stock" ? <Text style={styles.summaryTotal}>{t("report.totalPrefix")}{total}</Text> : null}
           </View>
           <FlatList
             data={sections}
