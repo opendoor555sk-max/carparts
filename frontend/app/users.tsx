@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, Field, Header, Loading, StatusChip } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -23,6 +24,7 @@ export default function Users() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { show } = useToast();
+  const { t } = useLanguage();
   const [users, setUsers] = useState<any[]>([]);
   const [allPerms, setAllPerms] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +60,7 @@ export default function Users() {
       const res = await api.get<{ password: string }>(`/admin/users/${u.id}/password`);
       setRevealed((r) => ({ ...r, [u.id]: res.password }));
     } catch (e: any) {
-      show(e?.detail?.message || e?.message || "Password not found", "error");
+      show(e?.detail?.message || e?.message || t("users.passwordNotFound"), "error");
     }
   };
 
@@ -75,7 +77,7 @@ export default function Users() {
     if (eName.trim() && eName.trim() !== editUser.name) body.name = eName.trim();
     if (eUsername.trim() && eUsername.trim() !== editUser.username) body.username = eUsername.trim();
     if (ePassword) {
-      if (ePassword.length < 6) return show("Password must be at least 6 characters", "error");
+      if (ePassword.length < 6) return show(t("users.passwordMinLength"), "error");
       body.password = ePassword;
     }
     if (Object.keys(body).length === 0) {
@@ -85,7 +87,7 @@ export default function Users() {
     setSavingEdit(true);
     try {
       await api.patch(`/admin/users/${editUser.id}`, body);
-      show("Updated ✓", "success");
+      show(t("users.updated"), "success");
       setRevealed((r) => {
         const c = { ...r };
         delete c[editUser.id];
@@ -94,7 +96,7 @@ export default function Users() {
       setEditUser(null);
       load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     } finally {
       setSavingEdit(false);
     }
@@ -107,11 +109,11 @@ export default function Users() {
       setAllPerms(p.all);
       if (perms.length === 0) setPerms(p.staff_default);
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -126,20 +128,20 @@ export default function Users() {
 
   const create = async () => {
     if (!name.trim() || !username.trim() || !password) {
-      show("Fill all fields", "error");
+      show(t("users.fillAllFields"), "error");
       return;
     }
     setCreating(true);
     try {
       await api.post("/admin/users", { name, username, password, role: "staff", permissions: perms });
-      show("Staff created", "success");
+      show(t("users.staffCreated"), "success");
       setModal(false);
       setName("");
       setUsername("");
       setPassword("");
       load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     } finally {
       setCreating(false);
     }
@@ -150,7 +152,7 @@ export default function Users() {
       await api.patch(`/admin/users/${u.id}`, { disabled: !u.disabled });
       load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     }
   };
 
@@ -159,11 +161,11 @@ export default function Users() {
     setRemoving(true);
     try {
       await api.del(`/admin/users/${confirmRemove.id}`);
-      show(`${confirmRemove.name} removed`, "success");
+      show(`${confirmRemove.name} ${t("users.removedSuffix")}`, "success");
       setConfirmRemove(null);
       load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     } finally {
       setRemoving(false);
     }
@@ -175,15 +177,15 @@ export default function Users() {
       await api.patch(`/admin/users/${u.id}`, { permissions: next });
       load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     }
   };
 
   return (
     <View style={styles.flex}>
       <Header
-        title="Manage Users"
-        subtitle="Staff & permissions"
+        title={t("users.title")}
+        subtitle={t("users.subtitle")}
         onBack={() => router.back()}
         right={
           <Pressable onPress={() => setModal(true)} style={styles.addBtn} testID="add-user">
@@ -215,17 +217,17 @@ export default function Users() {
                 </View>
                 <Pressable style={styles.pwBtn} onPress={() => revealPw(u)} testID={`reveal-${u.username}`}>
                   <Ionicons name={revealed[u.id] ? "eye-off" : "eye"} size={16} color={colors.brand} />
-                  <Text style={styles.pwBtnText}>{revealed[u.id] ? "Hide" : "View"}</Text>
+                  <Text style={styles.pwBtnText}>{revealed[u.id] ? t("users.hide") : t("users.view")}</Text>
                 </Pressable>
                 <Pressable style={styles.pwBtn} onPress={() => openEdit(u)} testID={`edit-${u.username}`}>
                   <Ionicons name="create-outline" size={16} color={colors.brand} />
-                  <Text style={styles.pwBtnText}>Change</Text>
+                  <Text style={styles.pwBtnText}>{t("users.change")}</Text>
                 </Pressable>
               </View>
 
               {u.role !== "admin" ? (
                 <>
-                  <Text style={styles.permLabel}>PERMISSIONS (tap to toggle)</Text>
+                  <Text style={styles.permLabel}>{t("users.permissionsTapToggle")}</Text>
                   <View style={styles.permGrid}>
                     {allPerms.map((perm) => {
                       const on = u.permissions.includes(perm);
@@ -242,7 +244,7 @@ export default function Users() {
                     })}
                   </View>
                   <View style={[styles.rowBetween, { marginTop: spacing.md }]}>
-                    <Text style={styles.label}>Disabled</Text>
+                    <Text style={styles.label}>{t("users.disabled")}</Text>
                     <Switch
                       value={!!u.disabled}
                       onValueChange={() => toggleDisable(u)}
@@ -253,11 +255,11 @@ export default function Users() {
                   </View>
                   <Pressable style={styles.removeBtn} onPress={() => setConfirmRemove(u)} testID={`remove-${u.username}`}>
                     <Ionicons name="trash" size={16} color={colors.error} />
-                    <Text style={styles.removeText}>Remove user</Text>
+                    <Text style={styles.removeText}>{t("users.removeUser")}</Text>
                   </Pressable>
                 </>
               ) : (
-                <Text style={styles.adminNote}>Main Admin — all permissions</Text>
+                <Text style={styles.adminNote}>{t("users.mainAdminNote")}</Text>
               )}
             </Card>
           ))}
@@ -269,16 +271,16 @@ export default function Users() {
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
             <View style={styles.modal}>
               <View style={styles.modalHead}>
-                <Text style={styles.modalTitle}>New Staff</Text>
+                <Text style={styles.modalTitle}>{t("users.newStaff")}</Text>
                 <Pressable onPress={() => setModal(false)} testID="close-user-modal">
                   <Ionicons name="close" size={24} color={colors.onSurface} />
                 </Pressable>
               </View>
               <ScrollView keyboardShouldPersistTaps="handled">
-                <Field label="Name" value={name} onChangeText={setName} testID="new-user-name" />
-                <Field label="Username" value={username} onChangeText={setUsername} autoCapitalize="none" testID="new-user-username" />
-                <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry testID="new-user-password" />
-                <Text style={styles.permLabel}>PERMISSIONS</Text>
+                <Field label={t("common.name")} value={name} onChangeText={setName} testID="new-user-name" />
+                <Field label={t("users.username")} value={username} onChangeText={setUsername} autoCapitalize="none" testID="new-user-username" />
+                <Field label={t("users.password")} value={password} onChangeText={setPassword} secureTextEntry testID="new-user-password" />
+                <Text style={styles.permLabel}>{t("users.permissions")}</Text>
                 <View style={styles.permGrid}>
                   {allPerms.map((perm) => {
                     const on = perms.includes(perm);
@@ -294,7 +296,7 @@ export default function Users() {
                     );
                   })}
                 </View>
-                <Button title="Create Staff" onPress={create} loading={creating} icon="checkmark" testID="create-user" style={{ marginTop: spacing.lg }} />
+                <Button title={t("users.createStaff")} onPress={create} loading={creating} icon="checkmark" testID="create-user" style={{ marginTop: spacing.lg }} />
               </ScrollView>
             </View>
           </KeyboardAvoidingView>
@@ -307,24 +309,24 @@ export default function Users() {
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
             <View style={styles.modal}>
               <View style={styles.modalHead}>
-                <Text style={styles.modalTitle}>Change Username / Password</Text>
+                <Text style={styles.modalTitle}>{t("users.changeUsernamePassword")}</Text>
                 <Pressable onPress={() => setEditUser(null)} testID="close-edit-modal">
                   <Ionicons name="close" size={24} color={colors.onSurface} />
                 </Pressable>
               </View>
               <ScrollView keyboardShouldPersistTaps="handled">
                 <Text style={styles.editWho}>{editUser?.name} (@{editUser?.username})</Text>
-                <Field label="Name" value={eName} onChangeText={setEName} testID="edit-name" />
-                <Field label="Username (login name)" value={eUsername} onChangeText={setEUsername} autoCapitalize="none" testID="edit-username" />
+                <Field label={t("common.name")} value={eName} onChangeText={setEName} testID="edit-name" />
+                <Field label={t("users.usernameLoginName")} value={eUsername} onChangeText={setEUsername} autoCapitalize="none" testID="edit-username" />
                 <Field
-                  label="New Password (leave empty to keep unchanged)"
+                  label={t("users.newPasswordLabel")}
                   value={ePassword}
                   onChangeText={setEPassword}
-                  placeholder="new password"
+                  placeholder={t("users.newPasswordPlaceholder")}
                   autoCapitalize="none"
                   testID="edit-password"
                 />
-                <Button title="Save Changes" onPress={saveEdit} loading={savingEdit} icon="save" testID="save-edit" style={{ marginTop: spacing.lg }} />
+                <Button title={t("common.saveChanges")} onPress={saveEdit} loading={savingEdit} icon="save" testID="save-edit" style={{ marginTop: spacing.lg }} />
               </ScrollView>
             </View>
           </KeyboardAvoidingView>
@@ -336,13 +338,13 @@ export default function Users() {
         <View style={styles.confirmWrap}>
           <View style={styles.confirmBox}>
             <Ionicons name="warning" size={40} color={colors.error} />
-            <Text style={styles.confirmTitle}>Remove this user?</Text>
+            <Text style={styles.confirmTitle}>{t("users.removeThisUser")}</Text>
             <Text style={styles.confirmSub}>
-              {confirmRemove?.name} (@{confirmRemove?.username}) will be removed. They will not be able to log in.
+              {confirmRemove?.name} (@{confirmRemove?.username}) {t("users.removeConfirmSuffix")}
             </Text>
             <View style={styles.confirmRow}>
-              <Button title="Cancel" onPress={() => setConfirmRemove(null)} variant="secondary" style={{ flex: 1 }} testID="cancel-remove" />
-              <Button title="Remove" onPress={removeUser} loading={removing} variant="danger" style={{ flex: 1 }} testID="confirm-remove" />
+              <Button title={t("ui.cancel")} onPress={() => setConfirmRemove(null)} variant="secondary" style={{ flex: 1 }} testID="cancel-remove" />
+              <Button title={t("users.remove")} onPress={removeUser} loading={removing} variant="danger" style={{ flex: 1 }} testID="confirm-remove" />
             </View>
           </View>
         </View>
