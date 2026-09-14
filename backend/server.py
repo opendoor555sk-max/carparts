@@ -554,6 +554,27 @@ class SellIn(BaseModel):
     customer_id: Optional[str] = None
 
 
+class CustomerReturnIn(BaseModel):
+    part_number: str
+    unit_id: Optional[str] = None
+    customer_id: Optional[str] = None
+    condition: str  # "good" (reusable -> back into sellable stock) | "damaged" (not reusable)
+    note: Optional[str] = ""
+
+
+class DamagedStockIn(BaseModel):
+    part_number: str
+    unit_id: Optional[str] = None
+    note: Optional[str] = ""
+
+
+class VendorReturnIn(BaseModel):
+    part_number: str
+    unit_id: Optional[str] = None
+    vendor_id: Optional[str] = None
+    reason: Optional[str] = ""
+
+
 class CustomerIn(BaseModel):
     name: str
     phone: str
@@ -1943,6 +1964,145 @@ async def delete_unit(unit_id: str, user=Depends(require_admin)):
     remaining = await db.stock.count_documents({"store_id": unit.get("store_id"),
                                                 "part_number": unit["part_number"], "sold": {"$ne": True}})
     return {"ok": True, "remaining_stock": remaining}
+
+
+# ---------------- Damaged / Return Tracking ----------------
+# db.stock_adjustments is the audit trail for all three record types below
+# (customer_return / damaged_stock / vendor_return) — one place to list past
+# records, regardless of what (if anything) it did to db.stock. The actual
+# stock-state change reuses the SAME mechanism /stock/adjust's delta<0 branch
+# already established for "removed without a sale": sold=True plus a
+# removed_reason discriminator. Every existing "is this unit available"
+# query in the app already filters on plain `sold != True` (see compute_limit,
+# compute_low_stock, /inventory, /inventory/low-stock, /stats, etc.) — so a
+# unit marked damaged this way is automatically excluded from stock counts,
+# low-stock counts and purchase-limit counts everywhere, with no separate
+# "damaged" filter needed at any of those call sites.
+async def _find_unit(sid: Optional[str], pn: str, unit_id: Optional[str], sold: Optional[bool]) -> Optional[dict]:
+    query: Dict[str, Any] = {"store_id": sid, "part_number": pn}
+    if sold is not None:
+        query["sold"] = sold if sold else {"$ne": True}
+    if unit_id:
+        query["id"] = unit_id
+    return await db.stock.find_one(query)
+
+
+@api.post("/returns/customer")
+async def customer_return(body: CustomerReturnIn, store_id: Optional[str] = None, user=Depends(require("sell"))):
+    pn = body.part_number.strip().upper()
+    if not pn:
+        raise HTTPException(400, "Part number required")
+    condition = (body.condition or "").strip().lower()
+    if condition not in ("good", "damaged"):
+        raise HTTPException(400, "condition must be 'good' or 'damaged'")
+    sid = resolve_store(user, store_id, require_write=True)
+    if body.customer_id and not await db.customers.find_one({"store_id": sid, "id": body.customer_id}, {"_id": 0}):
+        raise HTTPException(404, "Customer not found")
+    # A previously-sold unit of this part, if one can be traced (linking to
+    # the original sale is optional per the spec, not required).
+    unit = await _find_unit(sid, pn, body.unit_id, sold=True)
+    if unit:
+        if condition == "good":
+            await db.stock.update_one({"id": unit["id"]},
+                                      {"$set": {"sold": False},
+                                       "$unset": {"sold_at": "", "sold_by": "", "removed_reason": ""}})
+        else:
+            await db.stock.update_one({"id": unit["id"]}, {"$set": {"removed_reason": "customer_return_damaged"}})
+    elif condition == "good":
+        # No traceable prior sale — still honor "goes back into sellable
+        # stock" by adding a fresh available unit, the same way /buy creates
+        # one when the part has no existing stock document yet.
+        cat = await db.catalog.find_one({"part_number": pn}, {"_id": 0}) or {}
+        part = await db.parts.find_one({"store_id": sid, "part_number": pn}, {"_id": 0})
+        if not part:
+            part = {
+                "id": new_id(), "store_id": sid, "part_number": pn, "company": cat.get("company", "All") or "All",
+                "name": cat.get("name", "") or "", "category": cat.get("category", "") or "",
+                "compatible_vehicles": cat.get("compatible_vehicles", []) or [], "variant": cat.get("variant", "") or "",
+                "year": "", "old_number": "", "new_number": "", "barcode": "", "sticker_color": "",
+                "technical_info": "", "photos": [], "source": "CustomerReturn", "verification_status": "Unverified",
+                "created_at": now_iso(), "created_by": user["username"], "purchase_limit": None, "limit_enabled": False,
+            }
+            await db.parts.insert_one(dict(part))
+            await upsert_catalog(pn, part, sid)
+        unit = {
+            "id": new_id(), "store_id": sid, "part_number": pn, "condition": "Working",
+            "location": {}, "assigned_location": None, "photos": [], "barcode": "",
+            "sold": False, "created_at": now_iso(), "added_by": user["username"], "source": "CustomerReturn",
+        }
+        await db.stock.insert_one(dict(unit))
+    unit_id = unit["id"] if unit else None
+    record = {
+        "id": new_id(), "store_id": sid, "type": "customer_return", "part_number": pn,
+        "unit_id": unit_id, "customer_id": body.customer_id, "condition": condition,
+        "note": (body.note or "").strip(), "by": user["username"], "at": now_iso(),
+    }
+    await db.stock_adjustments.insert_one(dict(record))
+    await db.transactions.insert_one({"id": new_id(), "store_id": sid, "type": "customer_return",
+                                      "part_number": pn, "unit_id": unit_id, "by": user["username"], "at": now_iso()})
+    record.pop("_id", None)
+    return {"ok": True, "record": record}
+
+
+@api.post("/returns/damaged")
+async def mark_damaged(body: DamagedStockIn, store_id: Optional[str] = None, user=Depends(require("buy"))):
+    pn = body.part_number.strip().upper()
+    if not pn:
+        raise HTTPException(400, "Part number required")
+    sid = resolve_store(user, store_id, require_write=True)
+    unit = await _find_unit(sid, pn, body.unit_id, sold=False)
+    if not unit:
+        raise HTTPException(409, detail={"code": "NO_STOCK", "message": "No in-stock unit found for this part"})
+    await db.stock.update_one({"id": unit["id"]}, {"$set": {
+        "sold": True, "sold_at": now_iso(), "sold_by": user["username"], "removed_reason": "damaged",
+    }})
+    record = {
+        "id": new_id(), "store_id": sid, "type": "damaged_stock", "part_number": pn,
+        "unit_id": unit["id"], "condition": "damaged", "note": (body.note or "").strip(),
+        "by": user["username"], "at": now_iso(),
+    }
+    await db.stock_adjustments.insert_one(dict(record))
+    await db.transactions.insert_one({"id": new_id(), "store_id": sid, "type": "damaged_stock",
+                                      "part_number": pn, "unit_id": unit["id"], "by": user["username"], "at": now_iso()})
+    remaining = await db.stock.count_documents({"store_id": sid, "part_number": pn, "sold": {"$ne": True}})
+    record.pop("_id", None)
+    return {"ok": True, "record": record, "remaining_stock": remaining}
+
+
+@api.post("/returns/vendor")
+async def vendor_return(body: VendorReturnIn, store_id: Optional[str] = None, user=Depends(require("buy"))):
+    pn = body.part_number.strip().upper()
+    if not pn:
+        raise HTTPException(400, "Part number required")
+    sid = resolve_store(user, store_id, require_write=True)
+    unit = await _find_unit(sid, pn, body.unit_id, sold=False)
+    if not unit:
+        raise HTTPException(409, detail={"code": "NO_STOCK", "message": "No in-stock unit found for this part"})
+    if body.vendor_id and not await db.vendors.find_one({"store_id": sid, "id": body.vendor_id}, {"_id": 0}):
+        raise HTTPException(404, "Vendor not found")
+    # Leaves the shop entirely — same as an admin's /stock/unit/{id} delete,
+    # not a "sold" state, so it doesn't stay around in any damaged list either.
+    await db.stock.delete_one({"id": unit["id"]})
+    record = {
+        "id": new_id(), "store_id": sid, "type": "vendor_return", "part_number": pn,
+        "unit_id": unit["id"], "vendor_id": body.vendor_id, "note": (body.reason or "").strip(),
+        "by": user["username"], "at": now_iso(),
+    }
+    await db.stock_adjustments.insert_one(dict(record))
+    await db.transactions.insert_one({"id": new_id(), "store_id": sid, "type": "vendor_return", "part_number": pn,
+                                      "unit_id": unit["id"], "vendor_id": body.vendor_id,
+                                      "by": user["username"], "at": now_iso()})
+    remaining = await db.stock.count_documents({"store_id": sid, "part_number": pn, "sold": {"$ne": True}})
+    record.pop("_id", None)
+    return {"ok": True, "record": record, "remaining_stock": remaining}
+
+
+@api.get("/returns")
+async def list_returns(type: Optional[str] = None, store_id: Optional[str] = None, user=Depends(get_current_user)):
+    query = sq(user, None, store_id)
+    if type:
+        query["type"] = type
+    return await db.stock_adjustments.find(query, {"_id": 0}).sort("at", -1).to_list(500)
 
 
 # ---------------- Physical stock verification (Admin only) ----------------
