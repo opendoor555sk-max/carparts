@@ -13,10 +13,12 @@ import * as Haptics from "expo-haptics";
 
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { FilterChip, SignOutButton } from "@/src/components/ui";
 import { storage } from "@/src/utils/storage";
 import { useLowStockCount } from "@/src/hooks/use-low-stock-count";
 import { colors, font, radius, spacing } from "@/src/theme";
+import type { TranslationKey } from "@/src/i18n/translations";
 
 const COMPANIES = ["All", "Maruti Suzuki", "Hyundai", "Tata", "Mahindra", "Kia", "Toyota", "Honda", "Nissan", "Renault", "Ford", "Volkswagen", "Skoda", "MG", "Datsun", "Chevrolet"];
 
@@ -51,6 +53,7 @@ const MODULES: Module[] = [
 export default function Home() {
   const { user, can } = useAuth();
   const { show } = useToast();
+  const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [company, setCompany] = useState("All");
@@ -116,7 +119,7 @@ export default function Home() {
           </Pressable>
         ) : null}
 
-        <Text style={styles.sectionLabel}>COMPANY GATE</Text>
+        <Text style={styles.sectionLabel}>{t("home.companyGate").toUpperCase()}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -134,7 +137,7 @@ export default function Home() {
           ))}
         </ScrollView>
 
-        <Text style={styles.sectionLabel}>MODULES</Text>
+        <Text style={styles.sectionLabel}>{t("home.modules").toUpperCase()}</Text>
         <View style={styles.grid}>
           {MODULES.map((m) => {
             const allowed = can(m.perm);
@@ -149,7 +152,7 @@ export default function Home() {
                   <Ionicons name={m.icon} size={26} color={m.color} />
                 </View>
                 <View>
-                  <Text style={styles.tileTitle}>{m.title}</Text>
+                  <Text style={styles.tileTitle}>{t(`module.${m.key}` as TranslationKey)}</Text>
                   <Text style={styles.tileGuj}>{m.gujarati}</Text>
                 </View>
                 {!allowed ? (
@@ -162,12 +165,10 @@ export default function Home() {
 
         <View style={styles.hintBox}>
           <Ionicons name="information-circle" size={18} color={colors.brand} />
-          <Text style={styles.hintText}>
-            SEARCH, BUY, SELL are never mixed — each is a separate module. Primary ID = Part Number.
-          </Text>
+          <Text style={styles.hintText}>{t("home.hint")}</Text>
         </View>
 
-        <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>REPORTS</Text>
+        <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>{t("home.reports").toUpperCase()}</Text>
         <View style={{ gap: spacing.md }}>
           {[
             { key: "buy", title: "Purchases", sub: "All buys — date / company / category + Print", icon: "download" as const, color: colors.success },

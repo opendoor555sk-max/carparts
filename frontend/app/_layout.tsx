@@ -9,6 +9,7 @@ import { StatusBar } from "expo-status-bar";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider } from "@/src/context/AuthContext";
 import { ToastProvider } from "@/src/context/ToastContext";
+import { LanguageProvider } from "@/src/context/LanguageContext";
 import { LocationGate } from "@/src/components/LocationGate";
 import { colors } from "@/src/theme";
 
@@ -38,22 +39,24 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surface }}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <ToastProvider>
-            <StatusBar style="light" />
-            <View style={{ flex: 1, backgroundColor: colors.surface }}>
-              <LocationGate>
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: { backgroundColor: colors.surface },
-                    animation: "slide_from_right",
-                  }}
-                />
-              </LocationGate>
-            </View>
-          </ToastProvider>
-        </AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <StatusBar style="light" />
+              <View style={{ flex: 1, backgroundColor: colors.surface }}>
+                <LocationGate>
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: colors.surface },
+                      animation: "slide_from_right",
+                    }}
+                  />
+                </LocationGate>
+              </View>
+            </ToastProvider>
+          </AuthProvider>
+        </LanguageProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

@@ -5,7 +5,9 @@ import { useFocusEffect, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
-import { Header, Loading } from "@/src/components/ui";
+import { useLanguage } from "@/src/context/LanguageContext";
+import { Header, Loading, FilterChip } from "@/src/components/ui";
+import { LANGUAGES } from "@/src/i18n/translations";
 import { colors, font, radius, spacing } from "@/src/theme";
 
 type Stats = {
@@ -23,6 +25,7 @@ type Stats = {
 
 export default function Admin() {
   const { user, logout, can } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,7 +71,7 @@ export default function Admin() {
   return (
     <View style={styles.flex}>
       <Header
-        title="Admin Panel"
+        title={t("admin.title")}
         subtitle={user?.store_name ? `${user?.name} · ${user?.store_name}` : user?.name}
         right={
           <Pressable onPress={logout} hitSlop={12} testID="logout-btn">
@@ -83,7 +86,7 @@ export default function Admin() {
           <>
             {stats ? (
               <>
-                <Text style={styles.section}>STATISTICS</Text>
+                <Text style={styles.section}>{t("admin.statistics").toUpperCase()}</Text>
                 <View style={styles.statGrid}>
                   {statCards.map((s) => (
                     <Pressable key={s.label} style={styles.statCard} onPress={() => router.push(s.route as any)} testID={`stat-${s.label}`}>
@@ -96,7 +99,7 @@ export default function Admin() {
               </>
             ) : null}
 
-            <Text style={[styles.section, { marginTop: spacing.xl }]}>MANAGEMENT</Text>
+            <Text style={[styles.section, { marginTop: spacing.xl }]}>{t("admin.management").toUpperCase()}</Text>
             {isSuperAdmin ? (
               <Pressable
                 style={[styles.link, { marginBottom: spacing.md, borderColor: colors.brand }]}
@@ -220,7 +223,29 @@ export default function Admin() {
               </Pressable>
             ) : null}
 
-            <Text style={[styles.section, { marginTop: spacing.xl }]}>ACCOUNT</Text>
+            <Text style={[styles.section, { marginTop: spacing.xl }]}>{t("admin.account").toUpperCase()}</Text>
+            <View style={[styles.link, { flexDirection: "column", alignItems: "stretch", marginBottom: spacing.md }]} testID="admin-language">
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.md }}>
+                <View style={styles.linkIcon}>
+                  <Ionicons name="language" size={22} color={colors.brand} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.linkTitle}>{t("admin.language")}</Text>
+                  <Text style={styles.linkSub}>{t("admin.languageSub")}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" }}>
+                {LANGUAGES.map((l) => (
+                  <FilterChip
+                    key={l.code}
+                    label={l.label}
+                    active={language === l.code}
+                    onPress={() => setLanguage(l.code)}
+                    testID={`admin-language-${l.code}`}
+                  />
+                ))}
+              </View>
+            </View>
             {isAdmin ? (
               <Pressable
                 style={[styles.link, { marginBottom: spacing.md }]}
