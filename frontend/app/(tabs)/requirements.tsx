@@ -15,9 +15,11 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Header, StatusChip, Loading, EmptyState, FilterChip, SignOutButton } from "@/src/components/ui";
 import { printRequirements, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
+import type { TranslationKey } from "@/src/i18n/translations";
 
 type Req = {
   id: string;
@@ -40,6 +42,7 @@ export default function Requirements() {
   const router = useRouter();
   const { show } = useToast();
   const { user } = useAuth();
+  const { t, tStatus } = useLanguage();
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   const [reqs, setReqs] = useState<Req[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,10 +71,10 @@ export default function Requirements() {
     const next = NEXT[r.status] || "Pending";
     try {
       await api.patch(`/requirements/${r.id}`, { status: next });
-      show(`Status: ${next}`, "success");
+      show(`${t("limits.status")}: ${tStatus(next)}`, "success");
       load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     }
   };
 
@@ -80,8 +83,8 @@ export default function Requirements() {
   return (
     <View style={styles.flex}>
       <Header
-        title="Requirements"
-        subtitle="Requirement list"
+        title={t("requirements.title")}
+        subtitle={t("requirements.subtitle")}
         right={
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
             {reqs.length ? (
@@ -107,14 +110,14 @@ export default function Requirements() {
         contentContainerStyle={styles.chipRow}
       >
         {STATUSES.map((s) => (
-          <FilterChip key={s} label={s} active={status === s} onPress={() => setStatus(s)} testID={`reqstatus-${s}`} />
+          <FilterChip key={s} label={s === "All" ? t("common.all") : tStatus(s)} active={status === s} onPress={() => setStatus(s)} testID={`reqstatus-${s}`} />
         ))}
       </ScrollView>
 
       {loading ? (
         <Loading />
       ) : reqs.length === 0 ? (
-        <EmptyState icon="list-outline" title="No requirements" subtitle="Add one with the + button above" />
+        <EmptyState icon="list-outline" title={t("requirements.empty")} subtitle={t("requirements.emptySub")} />
       ) : (
         <FlatList
           data={reqs}
@@ -136,11 +139,11 @@ export default function Requirements() {
                 <View style={styles.pnRow}>
                   <Text style={styles.pn}>{item.part_number}</Text>
                   <View style={[styles.dot, { backgroundColor: prColor[item.priority] || colors.info }]} />
-                  <Text style={[styles.pr, { color: prColor[item.priority] || colors.info }]}>{item.priority}</Text>
+                  <Text style={[styles.pr, { color: prColor[item.priority] || colors.info }]}>{t(`common.priority.${item.priority}` as TranslationKey)}</Text>
                 </View>
                 {item.name ? <Text style={styles.name}>{item.name}</Text> : null}
                 <Text style={styles.meta}>
-                  Qty: {item.quantity} • In stock: {item.stock_count ?? 0}
+                  {t("common.quantity")}: {item.quantity} • {t("storeDetail.inStock")}: {item.stock_count ?? 0}
                 </Text>
                 {isAdmin && (item.by_contact || item.gps) ? (
                   <View style={styles.trackRow}>
@@ -153,7 +156,7 @@ export default function Requirements() {
                     {item.gps ? (
                       <Pressable onPress={() => Linking.openURL(`https://maps.google.com/?q=${item.gps}`)} testID={`req-gps-${item.id}`} style={styles.trackChip}>
                         <Ionicons name="location" size={12} color={colors.brand} />
-                        <Text style={styles.trackText}>View on map</Text>
+                        <Text style={styles.trackText}>{t("requirements.viewOnMap")}</Text>
                       </Pressable>
                     ) : null}
                   </View>

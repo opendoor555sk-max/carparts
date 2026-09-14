@@ -20,6 +20,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { ConfirmModal, Header, StatusChip, Loading, EmptyState, FilterChip, Button, SignOutButton } from "@/src/components/ui";
 import {
   EMPTY_LOCATION,
@@ -59,6 +60,7 @@ export default function Inventory() {
   const router = useRouter();
   const { user } = useAuth();
   const { show } = useToast();
+  const { t, tStatus } = useLanguage();
   const isAdmin = user?.role === "admin";
   const isSuperAdmin = user?.role === "super_admin";
   const [units, setUnits] = useState<Unit[]>([]);
@@ -119,7 +121,7 @@ export default function Inventory() {
       const qs = buildParams().toString();
       await exportExcel(`/inventory/excel${qs ? `?${qs}` : ""}`, "inventory.xlsx");
     } catch (e: any) {
-      show(e?.message || "Export failed", "error");
+      show(e?.message || t("common.exportFailed"), "error");
     } finally {
       setExporting(false);
     }
@@ -159,10 +161,10 @@ export default function Inventory() {
       scannedRef.current = false;
       setScannerOpen(true);
     } else if (perm && !perm.canAskAgain) {
-      show("Camera blocked — enable it in Settings", "error");
+      show(t("inventory.cameraBlocked"), "error");
       Linking.openSettings();
     } else {
-      show("Camera permission needed to scan", "error");
+      show(t("inventory.cameraPermissionNeeded"), "error");
     }
   };
 
@@ -172,7 +174,7 @@ export default function Inventory() {
     const pn = extractPartNumber(data);
     setPnFilter(pn);
     setScannerOpen(false);
-    show(`Filtering by: ${pn}`, "success");
+    show(`${t("inventory.filteringBy")} ${pn}`, "success");
     checkLocation(pn);
   };
 
@@ -191,7 +193,7 @@ export default function Inventory() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     } finally {
       setBusy(false);
     }
@@ -205,11 +207,11 @@ export default function Inventory() {
     try {
       await api.del(`/stock/unit/${pendingDelete.id}`);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      show("Unit deleted", "success");
+      show(t("inventory.unitDeleted"), "success");
       setPendingDelete(null);
       await load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     } finally {
       setBusy(false);
     }
@@ -217,14 +219,14 @@ export default function Inventory() {
 
   const locStr = (l: Record<string, string>) => {
     const parts = [l.rack, l.shelf, l.box, l.position].filter(Boolean);
-    return parts.length ? parts.join(" → ") : "No location";
+    return parts.length ? parts.join(" → ") : t("common.noLocation");
   };
 
   return (
     <View style={styles.flex}>
       <Header
-        title="Inventory"
-        subtitle="Physical stock units"
+        title={t("inventory.title")}
+        subtitle={t("inventory.subtitle")}
         right={
           units.length ? (
             <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
@@ -254,7 +256,7 @@ export default function Inventory() {
           onChangeText={(t) => { setPnFilter(t); setLocCheck(null); }}
           onSubmitEditing={() => checkLocation(pnFilter)}
           returnKeyType="search"
-          placeholder="Filter by part number"
+          placeholder={t("inventory.filterByPartNumber")}
           placeholderTextColor={colors.info}
           autoCapitalize="characters"
           autoCorrect={false}
@@ -267,14 +269,14 @@ export default function Inventory() {
         ) : null}
         <Pressable style={styles.scanBtn} onPress={openScanner} testID="inv-scan">
           <Ionicons name="barcode-outline" size={20} color={colors.onBrand} />
-          <Text style={styles.scanBtnText}>Scan</Text>
+          <Text style={styles.scanBtnText}>{t("inventory.scan")}</Text>
         </Pressable>
       </View>
 
       <Pressable style={styles.rackRow} onPress={() => setLocPickerOpen((o) => !o)} testID="inv-current-loc-toggle">
         <Ionicons name="location-outline" size={16} color={colors.info} />
         <Text style={styles.rackToggleText} numberOfLines={1}>
-          {formatAssignedLocation(currentLoc) || "Current Location (where you're checking from)"}
+          {formatAssignedLocation(currentLoc) || t("inventory.currentLocationHint")}
         </Text>
         <Ionicons name={locPickerOpen ? "chevron-up" : "chevron-down"} size={16} color={colors.info} />
       </Pressable>
@@ -287,7 +289,7 @@ export default function Inventory() {
             testIDPrefix="inv-loc"
           />
           <Button
-            title="Check Location"
+            title={t("inventory.checkLocation")}
             onPress={() => checkLocation(locCheck?.part_number || pnFilter)}
             icon="search"
             testID="inv-check-location"
@@ -298,26 +300,26 @@ export default function Inventory() {
       {checkingLoc ? (
         <View style={styles.locBannerNeutral} testID="loc-checking">
           <ActivityIndicator size="small" color={colors.info} />
-          <Text style={styles.locBannerNeutralText}>Checking location…</Text>
+          <Text style={styles.locBannerNeutralText}>{t("inventory.checkingLocation")}</Text>
         </View>
       ) : locCheck && (locCheck.location_mismatch || (locCheck.inconsistent_locations && locCheck.inconsistent_locations.length > 1)) ? (
         <View style={styles.locBannerBad} testID="loc-warning">
           <Ionicons name="warning" size={22} color="#fff" />
           <Text style={styles.locBannerBadText}>
             {locCheck.location_mismatch
-              ? `⚠️ WRONG LOCATION — should be at: ${formatAssignedLocation(locCheck.assigned_location) || "unknown"}`
-              : `⚠️ INCONSISTENT LOCATIONS ON RECORD: ${(locCheck.inconsistent_locations || []).map((l) => formatAssignedLocation(l)).join(", ")}`}
+              ? `${t("inventory.wrongLocation")} ${formatAssignedLocation(locCheck.assigned_location) || t("inventory.unknown")}`
+              : `${t("inventory.inconsistentLocations")} ${(locCheck.inconsistent_locations || []).map((l) => formatAssignedLocation(l)).join(", ")}`}
           </Text>
         </View>
       ) : locCheck && locCheck.assigned_location ? (
         <View style={styles.locBannerGood} testID="loc-ok">
           <Ionicons name="checkmark-circle" size={22} color="#fff" />
-          <Text style={styles.locBannerGoodText}>✅ Correct location: {formatAssignedLocation(locCheck.assigned_location)}</Text>
+          <Text style={styles.locBannerGoodText}>{t("inventory.correctLocation")} {formatAssignedLocation(locCheck.assigned_location)}</Text>
         </View>
       ) : locCheck ? (
         <View style={styles.locBannerNeutral} testID="loc-none">
           <Ionicons name="information-circle" size={16} color={colors.info} />
-          <Text style={styles.locBannerNeutralText}>No assigned location on record for {locCheck.part_number}.</Text>
+          <Text style={styles.locBannerNeutralText}>{locCheck.part_number} {t("inventory.noAssignedLocationFor")}</Text>
         </View>
       ) : null}
       <ScrollView
@@ -327,7 +329,7 @@ export default function Inventory() {
         contentContainerStyle={styles.chipRow}
       >
         {CONDITIONS.map((c) => (
-          <FilterChip key={c} label={c} active={cond === c} onPress={() => setCond(c)} testID={`cond-${c}`} />
+          <FilterChip key={c} label={c === "All" ? t("common.all") : tStatus(c)} active={cond === c} onPress={() => setCond(c)} testID={`cond-${c}`} />
         ))}
       </ScrollView>
 
@@ -336,8 +338,8 @@ export default function Inventory() {
       ) : units.length === 0 ? (
         <EmptyState
           icon="cube-outline"
-          title={pnFilter ? "No match" : "No stock"}
-          subtitle={pnFilter ? `Nothing found for "${pnFilter}"` : "Add stock from the Buy module"}
+          title={pnFilter ? t("inventory.noMatch") : t("inventory.noStock")}
+          subtitle={pnFilter ? `${t("common.nothingFoundFor")} "${pnFilter}"` : t("inventory.addFromBuy")}
         />
       ) : (
         <FlatList
@@ -375,14 +377,14 @@ export default function Inventory() {
                     </View>
                   ) : (
                     <View style={styles.pendingBadge} testID={`pending-${item.id}`}>
-                      <Text style={styles.pendingBadgeText}>⏳ Location Pending</Text>
+                      <Text style={styles.pendingBadgeText}>⏳ {t("inventory.locationPending")}</Text>
                     </View>
                   )}
                   {item.part_number in lowStockMap ? (
                     <View style={styles.lowStockBadge} testID={`lowstock-${item.id}`}>
                       <Ionicons name="alert-circle" size={12} color={colors.onError} />
                       <Text style={styles.lowStockBadgeText}>
-                        LOW STOCK (alert at ≤ {lowStockMap[item.part_number]})
+                        {t("inventory.lowStock")} ({t("inventory.alertAt")} ≤ {lowStockMap[item.part_number]})
                       </Text>
                     </View>
                   ) : null}
@@ -397,7 +399,7 @@ export default function Inventory() {
                     testID={`dec-${item.id}`}
                   >
                     <Ionicons name="remove" size={18} color={colors.warning} />
-                    <Text style={[styles.adminBtnText, { color: colors.warning }]}>Reduce</Text>
+                    <Text style={[styles.adminBtnText, { color: colors.warning }]}>{t("inventory.reduce")}</Text>
                   </Pressable>
                   <Pressable
                     style={styles.adminBtn}
@@ -405,11 +407,11 @@ export default function Inventory() {
                     testID={`inc-${item.id}`}
                   >
                     <Ionicons name="add" size={18} color={colors.success} />
-                    <Text style={[styles.adminBtnText, { color: colors.success }]}>Add</Text>
+                    <Text style={[styles.adminBtnText, { color: colors.success }]}>{t("inventory.add")}</Text>
                   </Pressable>
                   <Pressable style={styles.adminBtn} onPress={() => confirmDelete(item)} testID={`del-${item.id}`}>
                     <Ionicons name="trash" size={16} color={colors.error} />
-                    <Text style={[styles.adminBtnText, { color: colors.error }]}>Delete</Text>
+                    <Text style={[styles.adminBtnText, { color: colors.error }]}>{t("common.delete")}</Text>
                   </Pressable>
                 </View>
               ) : null}
@@ -420,9 +422,9 @@ export default function Inventory() {
 
       <ConfirmModal
         visible={!!pendingDelete}
-        title="Delete this unit?"
-        message={pendingDelete ? `One unit of ${pendingDelete.part_number} will be permanently deleted.` : ""}
-        confirmText="Delete"
+        title={t("inventory.deleteUnitTitle")}
+        message={pendingDelete ? `${pendingDelete.part_number} ${t("inventory.unitDeleteMsg")}` : ""}
+        confirmText={t("common.delete")}
         danger
         loading={busy}
         onConfirm={performDelete}
@@ -441,7 +443,7 @@ export default function Inventory() {
           />
           <View style={styles.scanOverlay} pointerEvents="none">
             <View style={styles.scanBracket} />
-            <Text style={styles.scanHint}>Point the camera at any Barcode or QR code</Text>
+            <Text style={styles.scanHint}>{t("inventory.scanHint")}</Text>
           </View>
           <Pressable style={styles.scanClose} onPress={() => setScannerOpen(false)} testID="scan-close">
             <Ionicons name="close" size={26} color="#fff" />
