@@ -8,6 +8,7 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { FilterChip, Header } from "@/src/components/ui";
 import { printHtml } from "@/src/utils/print";
 import { CODE_TYPES, codeSvg as genCodeSvg, svgRatio } from "@/src/utils/codegen";
@@ -106,6 +107,7 @@ export default function ScanSticker() {
   const router = useRouter();
   const { show } = useToast();
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   const [busy, setBusy] = useState(false);
   const [tpl, setTpl] = useState<StickerTemplate | null>(null);
@@ -151,10 +153,10 @@ export default function ScanSticker() {
   // Only the app owner (admin) may create stickers.
   useEffect(() => {
     if (user && user.role !== "super_admin") {
-      show("Only Admin can create stickers", "error");
+      show(t("scanSticker.onlyAdminCanCreate"), "error");
       router.back();
     }
-  }, [user, router, show]);
+  }, [user, router, show, t]);
 
   // Re-apply a saved company format's arrangement onto freshly-scanned lines.
   // Lines are matched by their field key (text before ':' with digits stripped),
@@ -183,7 +185,7 @@ export default function ScanSticker() {
   const saveNamedFormat = async () => {
     if (!tpl) return;
     const name = formatName.trim();
-    if (!name) return show("Enter a format name", "error");
+    if (!name) return show(t("scanSticker.enterFormatName"), "error");
     try {
       const template = {
         lines: tpl.lines.map((l) => ({ text: l.text, x: l.x, y: l.y, size: l.size, bold: l.bold })),
@@ -191,10 +193,10 @@ export default function ScanSticker() {
         logo: tpl.logo ? { box: tpl.logo.box } : null,
       };
       await api.post("/company-formats", { company: name, template });
-      show(`Saved format "${name}"`, "success");
+      show(`${t("scanSticker.savedFormatPrefix")} "${name}"`, "success");
       setFormatName("");
       loadSaved();
-    } catch (e: any) { show(e?.message || "Save failed", "error"); }
+    } catch (e: any) { show(e?.message || t("common.saveFailed"), "error"); }
   };
 
   // Rebuild the template from a saved format's exact positions/sizes, matching the
@@ -226,10 +228,10 @@ export default function ScanSticker() {
     if (tpl && rawLines.length) {
       buildTplFromFormat(rawLines, f, tpl.aspect, !!tpl.code, partNumber, company);
       setPendingFormatId(null);
-      show(`Applied "${f.company}" format`, "success");
+      show(`${t("scanSticker.appliedFormatPrefix")} "${f.company}" ${t("scanSticker.formatSuffix")}`, "success");
     } else {
       setPendingFormatId(f.id);
-      show(`"${f.company}" will apply to your next scan`, "info");
+      show(`"${f.company}" ${t("scanSticker.willApplyNextScanSuffix")}`, "info");
     }
   };
   const cancelPendingFormat = () => setPendingFormatId(null);
@@ -263,7 +265,7 @@ export default function ScanSticker() {
 
   const addLogo = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return show("Gallery permission needed", "error");
+    if (!perm.granted) return show(t("scanSticker.galleryPermissionNeeded"), "error");
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], base64: true, quality: 0.9 });
     if (r.canceled || !r.assets?.[0]?.base64) return;
     try {
@@ -273,10 +275,10 @@ export default function ScanSticker() {
       const oo = await rr.saveAsync({ format: SaveFormat.PNG, base64: true });
       const dataUrl = `data:image/png;base64,${oo.base64}`;
       await api.post("/logos", { name: "Logo", data_url: dataUrl });
-      show("Logo saved", "success");
+      show(t("scanSticker.logoSaved"), "success");
       loadSaved();
       applyLogo(dataUrl);
-    } catch (e: any) { show(e?.message || "Logo save failed", "error"); }
+    } catch (e: any) { show(e?.message || t("scanSticker.logoSaveFailed"), "error"); }
   };
   const deleteLogo = async (id: string) => { try { await api.del(`/logos/${id}`); loadSaved(); } catch {} };
 
@@ -324,7 +326,7 @@ export default function ScanSticker() {
         setCodeType(ct);
         setCellMap({});
         setPendingFormatId(null);
-        show(`Sticker generated (format: ${pendingFmt.company})`, "success");
+        show(`${t("scanSticker.stickerGenerated")} (${t("scanSticker.formatColon")} ${pendingFmt.company})`, "success");
       } else {
         buildTpl(rl, aspect, hasCode, ct, pn, null, comp, codeSize);
         // If the user saved a format for this company, re-apply their arrangement.
@@ -337,10 +339,10 @@ export default function ScanSticker() {
         setPartNumber(pn);
         setCodeType(ct);
         setCellMap({});
-        show(`Sticker generated${fmt ? ` (${comp} saved format)` : FORMATTED_COMPANIES.includes(comp) ? ` (${comp} format)` : ""}`, "success");
+        show(`${t("scanSticker.stickerGenerated")}${fmt ? ` (${comp} ${t("scanSticker.savedFormatSuffix")})` : FORMATTED_COMPANIES.includes(comp) ? ` (${comp} ${t("scanSticker.formatSuffix")})` : ""}`, "success");
       }
     } catch (e: any) {
-      show(e?.message || "Scan failed", "error");
+      show(e?.message || t("scanSticker.scanFailed"), "error");
     } finally {
       setBusy(false);
     }
@@ -354,7 +356,7 @@ export default function ScanSticker() {
   // Create a blank sticker straight from a typed part number (no photo scan needed).
   const createManual = () => {
     const pn = manualPn.trim();
-    if (!pn) return show("Enter a part number first", "error");
+    if (!pn) return show(t("scanSticker.enterPartNumberFirst"), "error");
     const aspect = 1.6;
     const comp = company;
     let ct: CodeType = FORMATTED_COMPANIES.includes(comp) ? "datamatrix" : "qr";
@@ -371,7 +373,7 @@ export default function ScanSticker() {
     setCodeType(ct);
     setCellMap({});
     setManualPn("");
-    show("Blank sticker created — edit & print below", "success");
+    show(t("scanSticker.blankStickerCreated"), "success");
   };
 
   const applyCompany = (comp: string) => {
@@ -399,13 +401,13 @@ export default function ScanSticker() {
 
   const pickGallery = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return show("Gallery permission needed", "error");
+    if (!perm.granted) return show(t("scanSticker.galleryPermissionNeeded"), "error");
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], base64: true, quality: 0.9 });
     if (!r.canceled && r.assets?.[0]?.base64) processImage(r.assets[0]);
   };
   const takePhoto = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) return show("Camera permission needed", "error");
+    if (!perm.granted) return show(t("scanSticker.cameraPermissionNeeded"), "error");
     const r = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.9 });
     if (!r.canceled && r.assets?.[0]?.base64) processImage(r.assets[0]);
   };
@@ -465,9 +467,9 @@ export default function ScanSticker() {
     if (!tpl) return;
     try {
       await api.post("/sticker-templates", { name: (partNumber || "Sticker").trim(), bg_data_url: JSON.stringify(tpl), aspect: tpl.aspect, pn_box: null, part_number: partNumber, company });
-      show("Template saved — part added to inventory", "success");
+      show(t("scanSticker.templateSaved"), "success");
       loadSaved();
-    } catch (e: any) { show(e?.message || "Save failed", "error"); }
+    } catch (e: any) { show(e?.message || t("common.saveFailed"), "error"); }
   };
 
   const saveCompanyFormat = async () => {
@@ -481,8 +483,8 @@ export default function ScanSticker() {
       };
       await api.post("/company-formats", { company, template });
       setCompanyFormats((m) => ({ ...m, [company]: template }));
-      show(`Saved as ${company} format`, "success");
-    } catch (e: any) { show(e?.message || "Save failed", "error"); }
+      show(`${t("scanSticker.savedAsPrefix")} ${company} ${t("scanSticker.formatSuffix")}`, "success");
+    } catch (e: any) { show(e?.message || t("common.saveFailed"), "error"); }
   };
   const openTemplate = (t: any) => {
     try {
@@ -499,7 +501,7 @@ export default function ScanSticker() {
       setCompany(comp);
       setRawLines(rawT);
       setCellMap({});
-    } catch { show("Could not open template", "error"); }
+    } catch { show(t("scanSticker.couldNotOpenTemplate"), "error"); }
   };
   const deleteTemplate = async (id: string) => { try { await api.del(`/sticker-templates/${id}`); loadSaved(); } catch {} };
 
@@ -518,33 +520,33 @@ export default function ScanSticker() {
     });
   const autoFill = () => {
     const q = Math.max(0, parseInt(fillQty, 10) || 0);
-    if (q <= 0) return show("Enter a quantity", "error");
+    if (q <= 0) return show(t("scanSticker.enterQuantity"), "error");
     setCellMap((m) => {
       const n = { ...m };
       let placed = 0;
       for (let i = 1; i <= layout.total && placed < q; i++) {
         if (!n[i]) { n[i] = activeId; placed++; }
       }
-      if (placed < q) show(`Only ${placed} empty blocks left on this sheet`, "info");
+      if (placed < q) show(`${t("scanSticker.onlyPrefix")} ${placed} ${t("scanSticker.emptyBlocksLeftSuffix")}`, "info");
       return n;
     });
   };
 
   const onPrint = async () => {
     const nums = Object.keys(cellMap);
-    if (nums.length === 0) return show("Place at least one sticker on a block", "error");
+    if (nums.length === 0) return show(t("scanSticker.placeAtLeastOne"), "error");
     const cellTpls: Record<number, StickerTemplate> = {};
     for (const k of nums) {
-      const t = tplForId(cellMap[Number(k)]);
-      if (t) cellTpls[Number(k)] = t;
+      const tp = tplForId(cellMap[Number(k)]);
+      if (tp) cellTpls[Number(k)] = tp;
     }
-    if (Object.keys(cellTpls).length === 0) return show("Selected stickers unavailable", "error");
+    if (Object.keys(cellTpls).length === 0) return show(t("scanSticker.selectedUnavailable"), "error");
     try {
       const mt = marginTop.trim() === "" ? null : Math.max(0, parseFloat(marginTop) || 0);
       const ml = marginLeft.trim() === "" ? null : Math.max(0, parseFloat(marginLeft) || 0);
       const pm = pageMargin.trim() === "" ? 0 : Math.max(0, parseFloat(pageMargin) || 0);
       await printHtml(generateComposedSheetHtml(cellTpls, { layout, cells: [], showBorder: false, marginTop: mt, marginLeft: ml, pageMargin: pm }));
-    } catch (e: any) { show(e?.message || "Print failed", "error"); }
+    } catch (e: any) { show(e?.message || t("storeArrangement.printFailed"), "error"); }
   };
 
   const previewH = tpl ? PREVIEW_W / (tpl.aspect || 1.6) : 220;
@@ -583,31 +585,31 @@ export default function ScanSticker() {
 
   return (
     <View style={styles.flex}>
-      <Header title="AI Sticker Scanner" subtitle="Generate a clean sticker → change part no → print" onBack={() => router.back()} />
+      <Header title={t("scanSticker.title")} subtitle={t("scanSticker.subtitle")} onBack={() => router.back()} />
       {tpl && !busy ? (
         <View style={styles.previewPin}>
-          <Text style={styles.pinLabel}>LIVE PREVIEW (stays here while you edit below)</Text>
+          <Text style={styles.pinLabel}>{t("scanSticker.livePreview")}</Text>
           {renderPreview()}
         </View>
       ) : null}
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl }}>
         <View style={styles.pickRow}>
           <Pressable style={styles.pickBtn} onPress={pickGallery} disabled={busy} testID="pick-gallery">
-            <Ionicons name="images" size={20} color={colors.onBrand} /><Text style={styles.pickText}>Gallery</Text>
+            <Ionicons name="images" size={20} color={colors.onBrand} /><Text style={styles.pickText}>{t("scanSticker.gallery")}</Text>
           </Pressable>
           <Pressable style={styles.pickBtn} onPress={takePhoto} disabled={busy} testID="take-photo">
-            <Ionicons name="camera" size={20} color={colors.onBrand} /><Text style={styles.pickText}>Camera</Text>
+            <Ionicons name="camera" size={20} color={colors.onBrand} /><Text style={styles.pickText}>{t("scanSticker.camera")}</Text>
           </Pressable>
         </View>
 
         <View style={styles.manualCard}>
-          <Text style={styles.manualTitle}>OR CREATE BY PART NUMBER (no photo)</Text>
+          <Text style={styles.manualTitle}>{t("scanSticker.orCreateByPartNumber")}</Text>
           <View style={styles.manualRow}>
             <TextInput
               style={styles.manualInput}
               value={manualPn}
               onChangeText={setManualPn}
-              placeholder="e.g. 39100-2B000"
+              placeholder={t("scanSticker.manualPnPlaceholder")}
               placeholderTextColor={colors.onSurface3}
               autoCapitalize="characters"
               autoCorrect={false}
@@ -617,14 +619,14 @@ export default function ScanSticker() {
             />
             <Pressable style={styles.manualBtn} onPress={createManual} disabled={busy} testID="create-manual">
               <Ionicons name="add-circle" size={18} color={colors.onBrand} />
-              <Text style={styles.pickText}>Create</Text>
+              <Text style={styles.pickText}>{t("scanSticker.create")}</Text>
             </Pressable>
           </View>
         </View>
 
         {saved.length ? (
           <>
-            <Text style={styles.section}>SAVED STICKERS (tap to reuse)</Text>
+            <Text style={styles.section}>{t("scanSticker.savedStickers")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.savedRow}>
               {saved.map((t) => (
                 <View key={t.id} style={styles.savedCard}>
@@ -643,7 +645,7 @@ export default function ScanSticker() {
 
         {formats.length ? (
           <>
-            <Text style={styles.section}>LOAD FORMAT (exact layout, matched by line order)</Text>
+            <Text style={styles.section}>{t("scanSticker.loadFormat")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.savedRow}>
               {formats.map((f) => (
                 <Pressable key={f.id} onPress={() => loadFormat(f)} style={[styles.savedCard, pendingFormatId === f.id && styles.savedCardActive]} testID={`format-${f.id}`}>
@@ -658,7 +660,7 @@ export default function ScanSticker() {
               <View style={styles.pendingBanner}>
                 <Ionicons name="time" size={16} color={colors.brand} />
                 <Text style={styles.pendingText}>
-                  Next scan uses &quot;{formats.find((f) => f.id === pendingFormatId)?.company}&quot; — scan now to apply it.
+                  {t("scanSticker.nextScanUsesPrefix")} &quot;{formats.find((f) => f.id === pendingFormatId)?.company}&quot; {t("scanSticker.scanNowToApply")}
                 </Text>
                 <Pressable onPress={cancelPendingFormat} testID="format-cancel-pending">
                   <Ionicons name="close-circle" size={18} color={colors.error} />
@@ -669,15 +671,15 @@ export default function ScanSticker() {
         ) : null}
 
         {busy ? (
-          <View style={styles.busy}><ActivityIndicator size="large" color={colors.brand} /><Text style={styles.dim}>Generating clean sticker… (a few seconds)</Text></View>
+          <View style={styles.busy}><ActivityIndicator size="large" color={colors.brand} /><Text style={styles.dim}>{t("scanSticker.generatingClean")}</Text></View>
         ) : null}
 
         {tpl ? (
           <>
-            <Text style={styles.section}>PART NUMBER</Text>
+            <Text style={styles.section}>{t("scanSticker.partNumberLabel")}</Text>
             <TextInput style={styles.input} value={partNumber} onChangeText={applyPn} autoCapitalize="characters" testID="scan-pn" />
 
-            <Text style={styles.flabel}>COMPANY FORMAT (tap to switch layout)</Text>
+            <Text style={styles.flabel}>{t("scanSticker.companyFormatLabel")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
               {COMPANIES.map((c) => (
                 <FilterChip
@@ -691,19 +693,19 @@ export default function ScanSticker() {
             </ScrollView>
             <Text style={styles.hint}>
               {FORMATTED_COMPANIES.includes(company)
-                ? `★ ${company} format: arrange each line's place (L-Top / R-Top / L-Mid / Bottom), reorder, move logo. DataMatrix on the right.`
-                : `${company}: standard layout. A dedicated format can be added later.`}
+                ? `★ ${company} ${t("scanSticker.formattedHintSuffix")}`
+                : `${company}: ${t("scanSticker.standardHintSuffix")}`}
             </Text>
 
-            <Text style={styles.flabel}>COMPANY LOGO (tap to set on sticker)</Text>
+            <Text style={styles.flabel}>{t("scanSticker.companyLogoLabel")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.savedRow}>
               <Pressable style={styles.logoAdd} onPress={addLogo} testID="logo-add">
                 <Ionicons name="add" size={20} color={colors.brand} />
-                <Text style={styles.saveText}>Add</Text>
+                <Text style={styles.saveText}>{t("inventory.add")}</Text>
               </Pressable>
               <Pressable style={styles.logoAdd} onPress={() => applyLogo(null)} testID="logo-none">
                 <Ionicons name="ban" size={18} color={colors.info} />
-                <Text style={styles.savedName}>None</Text>
+                <Text style={styles.savedName}>{t("scanSticker.none")}</Text>
               </Pressable>
               {logos.map((lg) => (
                 <View key={lg.id} style={styles.logoCard}>
@@ -718,7 +720,7 @@ export default function ScanSticker() {
             </ScrollView>
             {tpl.logo ? (
               <>
-                <Text style={styles.subHint}>Logo — move &amp; resize (step {nudgeStep})</Text>
+                <Text style={styles.subHint}>{t("scanSticker.logoMoveResize")} {nudgeStep})</Text>
                 <View style={styles.sizeRow}>
                   <Pressable style={styles.sizeBtn} onPress={() => nudgeLogo(-1, 0)} testID="logo-left"><Ionicons name="chevron-back" size={20} color={colors.onSurface} /></Pressable>
                   <Pressable style={styles.sizeBtn} onPress={() => nudgeLogo(0, -1)} testID="logo-up"><Ionicons name="chevron-up" size={20} color={colors.onSurface} /></Pressable>
@@ -730,25 +732,25 @@ export default function ScanSticker() {
               </>
             ) : null}
 
-            <Text style={styles.flabel}>CODE TYPE ({CODE_TYPES.length} types)</Text>
+            <Text style={styles.flabel}>{t("scanSticker.codeTypeLabel")} ({CODE_TYPES.length} {t("scanSticker.typesSuffix")})</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
               {CODE_TYPES.map((c) => (
                 <FilterChip key={c.key} label={c.label} active={codeType === c.key} onPress={() => setCode(c.key)} testID={`ct-${c.key}`} />
               ))}
             </ScrollView>
 
-            <Text style={styles.subHint}>Code size: {codeSize} mm</Text>
+            <Text style={styles.subHint}>{t("scanSticker.codeSizeLabel")} {codeSize} {t("labels.mmSuffix")}</Text>
             <View style={styles.sizeRow}>
               <Pressable style={styles.sizeBtn} onPress={() => changeCodeSize(-1)} testID="code-size-minus">
                 <Ionicons name="remove" size={20} color={colors.onSurface} />
               </Pressable>
-              <View style={styles.sizeVal}><Text style={styles.sizeValText}>{codeSize} mm</Text></View>
+              <View style={styles.sizeVal}><Text style={styles.sizeValText}>{codeSize} {t("labels.mmSuffix")}</Text></View>
               <Pressable style={styles.sizeBtn} onPress={() => changeCodeSize(1)} testID="code-size-plus">
                 <Ionicons name="add" size={20} color={colors.onSurface} />
               </Pressable>
             </View>
 
-            <Text style={styles.subHint}>Move code (step {nudgeStep})</Text>
+            <Text style={styles.subHint}>{t("scanSticker.moveCodeLabel")} {nudgeStep})</Text>
             <View style={styles.sizeRow}>
               <Pressable style={styles.sizeBtn} onPress={() => moveCode(-1, 0)} testID="code-left"><Ionicons name="chevron-back" size={20} color={colors.onSurface} /></Pressable>
               <Pressable style={styles.sizeBtn} onPress={() => moveCode(0, -1)} testID="code-up"><Ionicons name="chevron-up" size={20} color={colors.onSurface} /></Pressable>
@@ -756,14 +758,14 @@ export default function ScanSticker() {
               <Pressable style={styles.sizeBtn} onPress={() => moveCode(1, 0)} testID="code-right"><Ionicons name="chevron-forward" size={20} color={colors.onSurface} /></Pressable>
             </View>
 
-            <Text style={styles.flabel}>ARRANGE — select lines, then move / resize together</Text>
+            <Text style={styles.flabel}>{t("scanSticker.arrangeLabel")}</Text>
             <View style={styles.arrangeTop}>
-              <Text style={styles.subHint}>Step</Text>
+              <Text style={styles.subHint}>{t("scanSticker.step")}</Text>
               {[1, 2, 3, 5].map((s) => (
                 <FilterChip key={s} label={`${s}`} active={nudgeStep === s} onPress={() => setNudgeStep(s)} testID={`step-${s}`} />
               ))}
-              <Pressable style={styles.miniBtn} onPress={selectAllLines} testID="sel-all"><Text style={styles.miniBtnText}>All</Text></Pressable>
-              <Pressable style={styles.miniBtn} onPress={clearLineSel} testID="sel-clear"><Text style={styles.miniBtnText}>Clear</Text></Pressable>
+              <Pressable style={styles.miniBtn} onPress={selectAllLines} testID="sel-all"><Text style={styles.miniBtnText}>{t("common.all")}</Text></Pressable>
+              <Pressable style={styles.miniBtn} onPress={clearLineSel} testID="sel-clear"><Text style={styles.miniBtnText}>{t("history.clear")}</Text></Pressable>
             </View>
             <View style={styles.padWrap}>
               <View style={styles.pad}>
@@ -782,32 +784,32 @@ export default function ScanSticker() {
               </View>
             </View>
 
-            <Text style={styles.flabel}>TEXT LINES (tap ☐ to select, tap text to edit)</Text>
+            <Text style={styles.flabel}>{t("scanSticker.textLinesLabel")}</Text>
             {tpl.lines.map((ln, i) => (
               <View key={`e${i}`} style={[styles.lineTopRow, selLines.has(i) && styles.lineSelected]}>
                 <Pressable style={styles.checkBtn} onPress={() => toggleLineSel(i)} testID={`sel-${i}`}>
                   <Ionicons name={selLines.has(i) ? "checkbox" : "square-outline"} size={22} color={selLines.has(i) ? colors.brand : colors.info} />
                 </Pressable>
-                <TextInput style={styles.lineInputFlex} value={ln.text} onChangeText={(t) => editLine(i, t)} testID={`line-${i}`} />
+                <TextInput style={styles.lineInputFlex} value={ln.text} onChangeText={(txt) => editLine(i, txt)} testID={`line-${i}`} />
               </View>
             ))}
 
             <Pressable style={styles.saveBtn} onPress={saveTemplate} testID="save-template">
-              <Ionicons name="bookmark" size={18} color={colors.brand} /><Text style={styles.saveText}>Save this sticker{FORMATTED_COMPANIES.includes(company) ? ` (${company})` : ""}</Text>
+              <Ionicons name="bookmark" size={18} color={colors.brand} /><Text style={styles.saveText}>{t("scanSticker.saveThisSticker")}{FORMATTED_COMPANIES.includes(company) ? ` (${company})` : ""}</Text>
             </Pressable>
             <Pressable style={styles.fmtBtn} onPress={saveCompanyFormat} testID="save-company-format">
               <Ionicons name="albums" size={18} color={colors.onBrand} />
-              <Text style={styles.fmtText}>Save as {company} FORMAT{companyFormats[company] ? " (update)" : ""}</Text>
+              <Text style={styles.fmtText}>{t("scanSticker.saveAsPrefix")} {company} {t("scanSticker.formatCaps")}{companyFormats[company] ? ` ${t("scanSticker.updateSuffix")}` : ""}</Text>
             </Pressable>
-            <Text style={styles.dim}>Format = your arrangement (positions, code, logo). Next scan of {company} auto-uses it.</Text>
+            <Text style={styles.dim}>{t("scanSticker.formatExplain")}</Text>
 
-            <Text style={styles.flabel}>SAVE AS A NAMED FORMAT (pick it later from LOAD FORMAT above)</Text>
+            <Text style={styles.flabel}>{t("scanSticker.saveAsNamedFormatLabel")}</Text>
             <View style={styles.manualRow}>
               <TextInput
                 style={styles.manualInput}
                 value={formatName}
                 onChangeText={setFormatName}
-                placeholder="e.g. Small Front Sticker"
+                placeholder={t("scanSticker.formatNamePlaceholder")}
                 placeholderTextColor={colors.onSurface3}
                 autoCorrect={false}
                 onSubmitEditing={saveNamedFormat}
@@ -816,33 +818,33 @@ export default function ScanSticker() {
               />
               <Pressable style={styles.manualBtn} onPress={saveNamedFormat} testID="save-as-format">
                 <Ionicons name="save" size={18} color={colors.onBrand} />
-                <Text style={styles.pickText}>Save</Text>
+                <Text style={styles.pickText}>{t("scanSticker.save")}</Text>
               </Pressable>
             </View>
-            <Text style={styles.dim}>Saves exact line positions/sizes, code box and logo box. On a future scan, pick it from LOAD FORMAT to snap new text into this exact layout — no auto-layout.</Text>
+            <Text style={styles.dim}>{t("scanSticker.namedFormatExplain")}</Text>
 
-            <Text style={styles.section}>PRINT — place any sticker on any block</Text>
+            <Text style={styles.section}>{t("scanSticker.printSectionLabel")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
               {SHEET_LAYOUTS.map((l) => (
                 <FilterChip key={l.code} label={`${l.code} (${l.total})`} active={layoutCode === l.code} onPress={() => { setLayoutCode(l.code); setCellMap({}); }} testID={`layout-${l.code}`} />
               ))}
             </ScrollView>
 
-            <Text style={styles.flabel}>1. PICK STICKER TO PLACE</Text>
+            <Text style={styles.flabel}>{t("scanSticker.pickStickerLabel")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              <FilterChip label="◆ This design" active={activeId === "__current__"} onPress={() => setActiveId("__current__")} testID="active-current" />
-              {saved.map((t) => (
-                <FilterChip key={t.id} label={t.part_number || t.name} active={activeId === t.id} onPress={() => setActiveId(t.id)} testID={`active-${t.id}`} />
+              <FilterChip label={t("scanSticker.thisDesign")} active={activeId === "__current__"} onPress={() => setActiveId("__current__")} testID="active-current" />
+              {saved.map((s) => (
+                <FilterChip key={s.id} label={s.part_number || s.name} active={activeId === s.id} onPress={() => setActiveId(s.id)} testID={`active-${s.id}`} />
               ))}
             </ScrollView>
             <View style={styles.arrangeTop}>
-              <Text style={styles.subHint}>Auto-fill</Text>
-              <TextInput style={styles.marginInput} value={fillQty} onChangeText={setFillQty} placeholder="Qty" placeholderTextColor={colors.info} keyboardType="number-pad" testID="fill-qty" />
-              <Pressable style={styles.miniBtn} onPress={autoFill} testID="fill-go"><Text style={styles.miniBtnText}>Fill empty</Text></Pressable>
-              <Pressable style={styles.miniBtn} onPress={() => setCellMap({})} testID="cells-clear"><Text style={styles.miniBtnText}>Clear</Text></Pressable>
+              <Text style={styles.subHint}>{t("scanSticker.autoFill")}</Text>
+              <TextInput style={styles.marginInput} value={fillQty} onChangeText={setFillQty} placeholder={t("scanSticker.qtyPlaceholder")} placeholderTextColor={colors.info} keyboardType="number-pad" testID="fill-qty" />
+              <Pressable style={styles.miniBtn} onPress={autoFill} testID="fill-go"><Text style={styles.miniBtnText}>{t("scanSticker.fillEmpty")}</Text></Pressable>
+              <Pressable style={styles.miniBtn} onPress={() => setCellMap({})} testID="cells-clear"><Text style={styles.miniBtnText}>{t("history.clear")}</Text></Pressable>
             </View>
 
-            <Text style={styles.flabel}>2. TAP BLOCKS ({Object.keys(cellMap).length} placed)</Text>
+            <Text style={styles.flabel}>{t("scanSticker.tapBlocksLabel")} ({Object.keys(cellMap).length} {t("scanSticker.placedSuffix")})</Text>
             <View style={styles.gridCard}>
               <View style={[styles.grid, { width: cellW * layout.cols + 2 }]}>
                 {Array.from({ length: layout.total }).map((_, i) => {
@@ -858,32 +860,32 @@ export default function ScanSticker() {
               </View>
             </View>
 
-            <Text style={styles.flabel}>PAPER MARGIN (mm) — blank = auto</Text>
+            <Text style={styles.flabel}>{t("labels.paperMargin")}</Text>
             <View style={styles.chipWrap}>
-              <TextInput style={styles.marginInput} value={marginTop} onChangeText={setMarginTop} placeholder="Top" placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="margin-top" />
-              <TextInput style={styles.marginInput} value={marginLeft} onChangeText={setMarginLeft} placeholder="Left" placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="margin-left" />
+              <TextInput style={styles.marginInput} value={marginTop} onChangeText={setMarginTop} placeholder={t("labels.top")} placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="margin-top" />
+              <TextInput style={styles.marginInput} value={marginLeft} onChangeText={setMarginLeft} placeholder={t("labels.left")} placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="margin-left" />
               <Pressable style={styles.logoAdd} onPress={() => { setMarginTop("0"); setMarginLeft("0"); }} testID="margin-zero">
                 <Text style={styles.saveText}>0 / 0</Text>
               </Pressable>
             </View>
 
-            <Text style={styles.flabel}>PAGE MARGIN (mm) — 0 = edge-to-edge</Text>
+            <Text style={styles.flabel}>{t("scanSticker.pageMarginEdgeToEdge")}</Text>
             <View style={styles.chipWrap}>
               <TextInput style={styles.marginInput} value={pageMargin} onChangeText={setPageMargin} placeholder="0" placeholderTextColor={colors.info} keyboardType="decimal-pad" testID="page-margin" />
               <Pressable style={styles.logoAdd} onPress={() => setPageMargin("0")} testID="page-margin-zero">
-                <Text style={styles.saveText}>Set 0</Text>
+                <Text style={styles.saveText}>{t("labels.setZero")}</Text>
               </Pressable>
             </View>
-            <Text style={styles.hint}>In the print dialog also choose Margins = None &amp; Scale = 100% for exact edge-to-edge.</Text>
+            <Text style={styles.hint}>{t("labels.printDialogTip")}</Text>
 
             <Pressable style={styles.printBtn} onPress={onPrint} testID="scan-print">
-              <Ionicons name="print" size={20} color={colors.onBrand} /><Text style={styles.printText}>Print Sheet ({Object.keys(cellMap).length})</Text>
+              <Ionicons name="print" size={20} color={colors.onBrand} /><Text style={styles.printText}>{t("scanSticker.printSheetLabel")} ({Object.keys(cellMap).length})</Text>
             </Pressable>
           </>
         ) : !busy ? (
           <View style={styles.empty}>
             <Ionicons name="scan-outline" size={48} color={colors.info} />
-            <Text style={styles.dim}>Pick a sticker photo. The app reads it and generates a clean, straight sticker (always upright). Edit the part number / any line, then print.</Text>
+            <Text style={styles.dim}>{t("scanSticker.emptyStateHint")}</Text>
           </View>
         ) : null}
       </ScrollView>
