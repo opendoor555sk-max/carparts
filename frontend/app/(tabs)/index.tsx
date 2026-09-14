@@ -20,7 +20,7 @@ import { FilterChip, SignOutButton } from "@/src/components/ui";
 import { storage } from "@/src/utils/storage";
 import { useLowStockCount } from "@/src/hooks/use-low-stock-count";
 import { brandingFromUser, shareDailySalesOnWhatsApp, shareLowStockOnWhatsApp, type LowStockRow } from "@/src/utils/print";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 import type { TranslationKey } from "@/src/i18n/translations";
 
 const COMPANIES = ["All", "Maruti Suzuki", "Hyundai", "Tata", "Mahindra", "Kia", "Toyota", "Honda", "Nissan", "Renault", "Ford", "Volkswagen", "Skoda", "MG", "Datsun", "Chevrolet"];
@@ -343,6 +343,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     justifyContent: "space-between",
     gap: spacing.md,
+    ...shadow.sm,
   },
   tileWide: { width: "100%", flexDirection: "row", alignItems: "center", minHeight: 88 },
   tileIcon: {
@@ -360,14 +361,12 @@ const styles = StyleSheet.create({
   hintBox: {
     flexDirection: "row",
     gap: spacing.sm,
-    backgroundColor: colors.surface2,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.brandFaint,
     borderRadius: radius.md,
     padding: spacing.md,
     marginTop: spacing.xl,
   },
-  hintText: { color: colors.onSurface3, fontSize: font.sm, flex: 1, lineHeight: 18 },
+  hintText: { color: colors.onBrandFaint, fontSize: font.sm, flex: 1, lineHeight: 18 },
   report: {
     flexDirection: "row",
     alignItems: "center",
@@ -377,6 +376,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.lg,
+    ...shadow.sm,
   },
   reportIcon: {
     width: 44,

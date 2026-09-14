@@ -16,7 +16,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { useAuth } from "@/src/context/AuthContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Field } from "@/src/components/ui";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 export default function Login() {
   const { login, biometricUnlock, hasStoredToken, user } = useAuth();
@@ -171,6 +171,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.lg,
+    ...shadow.sm,
   },
   title: { color: colors.onSurface, fontSize: font.xxl, fontWeight: "800", textAlign: "center" },
   subtitle: { color: colors.brand, fontSize: font.sm, fontWeight: "700", marginTop: spacing.xs, letterSpacing: 0.5 },
@@ -180,6 +181,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.lg,
     padding: spacing.xl,
+    ...shadow.md,
   },
   eye: { position: "absolute", right: spacing.md, top: 34 },
   errBanner: {
