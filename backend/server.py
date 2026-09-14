@@ -2052,6 +2052,7 @@ class StockAdjustIn(BaseModel):
     condition: Optional[str] = None
     location: Optional[Dict[str, Any]] = None
     assigned_location: Optional[AssignedLocationIn] = None
+    override: bool = False
 
 
 @api.post("/stock/adjust")
@@ -2063,16 +2064,45 @@ async def stock_adjust(body: StockAdjustIn, store_id: Optional[str] = None, user
         raise HTTPException(404, "Part મળ્યો નથી")
     delta = int(body.delta)
     added, removed = 0, 0
+    limit_reached = False
+    latest_limit: Optional[dict] = None
     if delta > 0:
+        # A "+1" here (Part Detail / Inventory quick-adjust steppers) reads to
+        # a shop owner exactly like buying another unit — it was previously
+        # inserting units straight into db.stock with NO purchase-limit check
+        # at all, a second, unguarded door onto the same shelf /buy locks
+        # down. That let total stock end up over a configured limit with no
+        # warning whenever this path (rather than /buy) was used to add
+        # units — reported as "purchase limit allows buying more than
+        # intended" even though /buy itself enforces it correctly. Fixed by
+        # running the exact same per-unit compute_limit() check under the
+        # same per-part mutex /buy uses, so a concurrent /buy and
+        # /stock/adjust on the same part can't both slip through either.
+        # Stops as soon as the limit is hit and reports what actually got
+        # added, rather than raising mid-way through an already-partially-
+        # applied delta>1 call (the UI only ever sends delta=1, but the field
+        # itself doesn't promise that).
         for _ in range(delta):
-            unit = {"id": new_id(), "store_id": sid, "part_number": pn, "condition": body.condition or "Unknown",
-                    "location": body.location or {}, "assigned_location": _location_from_model(body.assigned_location),
-                    "photos": [], "barcode": "",
-                    "sold": False, "created_at": now_iso(), "added_by": user["username"], "adjusted": True}
-            await db.stock.insert_one(dict(unit))
-            added += 1
-        await db.transactions.insert_one({"id": new_id(), "store_id": sid, "type": "adjust_add", "part_number": pn,
-                                          "quantity": added, "by": user["username"], "at": now_iso()})
+            if not await _acquire_part_buy_lock(sid, pn):
+                raise HTTPException(503, "Server busy processing this part — try again")
+            try:
+                latest_limit = await compute_limit(sid, pn)
+                if (latest_limit["limit_enabled"] and latest_limit["remaining"] is not None
+                        and latest_limit["remaining"] <= 0 and not body.override):
+                    limit_reached = True
+                    break
+                unit = {"id": new_id(), "store_id": sid, "part_number": pn, "condition": body.condition or "Unknown",
+                        "location": body.location or {}, "assigned_location": _location_from_model(body.assigned_location),
+                        "photos": [], "barcode": "",
+                        "sold": False, "created_at": now_iso(), "added_by": user["username"], "adjusted": True,
+                        "overridden": bool(body.override and latest_limit.get("status") == "STOP")}
+                await db.stock.insert_one(dict(unit))
+                added += 1
+            finally:
+                await _release_part_buy_lock(sid, pn)
+        if added:
+            await db.transactions.insert_one({"id": new_id(), "store_id": sid, "type": "adjust_add", "part_number": pn,
+                                              "quantity": added, "by": user["username"], "at": now_iso()})
     elif delta < 0:
         units = await db.stock.find({"store_id": sid, "part_number": pn, "sold": {"$ne": True}}).sort("created_at", -1).to_list(-delta)
         for u in units:
@@ -2082,7 +2112,8 @@ async def stock_adjust(body: StockAdjustIn, store_id: Optional[str] = None, user
         await db.transactions.insert_one({"id": new_id(), "store_id": sid, "type": "adjust_remove", "part_number": pn,
                                           "quantity": removed, "by": user["username"], "at": now_iso()})
     remaining = await db.stock.count_documents({"store_id": sid, "part_number": pn, "sold": {"$ne": True}})
-    return {"ok": True, "added": added, "removed": removed, "remaining_stock": remaining}
+    return {"ok": True, "added": added, "removed": removed, "remaining_stock": remaining,
+            "limit_reached": limit_reached, "limit": latest_limit}
 
 
 class StockUnitEditIn(BaseModel):

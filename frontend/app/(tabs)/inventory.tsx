@@ -189,8 +189,13 @@ export default function Inventory() {
     if (busy) return;
     setBusy(true);
     try {
-      await api.post("/stock/adjust", { part_number: pn, delta });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const res = await api.post("/stock/adjust", { part_number: pn, delta });
+      if (res?.limit_reached) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        show(`${t("buy.stopBuying")} ${pn} — ${t("buy.limitReached")}`, "error");
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
       await load();
     } catch (e: any) {
       show(e?.message || t("common.failed"), "error");

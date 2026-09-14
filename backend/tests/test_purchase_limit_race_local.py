@@ -24,6 +24,16 @@ buy_lock_until field), guarded by the (store_id, part_number) unique index
 on db.parts that predates this feature by a long way — see server.py's
 _acquire_part_buy_lock for the full writeup.
 
+Round 3: after the above, the limit still appeared to allow more than
+configured in real usage. compute_limit()/`/buy` were re-verified end-to-end
+and are correct (see the tests below) — the actual gap was a SECOND entry
+point that adds stock with no limit check at all: `/stock/adjust`'s
+delta>0 branch, which backs the "+1" quick-adjust stepper on the Part
+Detail and Inventory screens. To a shop owner that button looks and
+behaves exactly like buying another unit, so using it instead of /buy let
+total stock silently exceed the limit. Fixed by running the same
+compute_limit() check, under the same per-part mutex, in that path too.
+
 Like test_admin_bypass_local.py, this runs fully offline: the actual
 FastAPI `app` in-process against an in-memory Mongo mock (mongomock-motor),
 so it needs no network access and no real database — unlike tests/ which
@@ -304,3 +314,98 @@ async def test_concurrent_buys_race_closed_across_punctuation_variants(monkeypat
 
         inv = await client.get("/api/inventory", headers=headers)
         assert len(inv.json()) == 4
+
+
+@pytest.mark.asyncio
+async def test_stock_adjust_quick_plus_one_respects_purchase_limit():
+    """Round 3: a shop owner reported "buying" more than the configured
+    limit even though /buy itself was verified (in the tests above) to
+    enforce it correctly. The actual gap wasn't in compute_limit() at all —
+    it was a SECOND, unguarded door onto the same shelf: the "+1" quick-
+    adjust stepper on the Part Detail and Inventory screens posts straight to
+    /stock/adjust, which inserted stock units directly with NO limit check
+    whatsoever (unlike /buy, which always ran compute_limit() first). An
+    admin using that stepper — which looks and behaves exactly like buying
+    another unit — could push total stock past the limit with zero warning.
+
+    Reproduced end-to-end against the live code before this fix: 5 pre-
+    existing units + limit=7 set, then 5 "+1" adjusts all returned 200 and
+    inserted, landing at 10 units against a limit of 7. Fixed by running the
+    same compute_limit() check under the same per-part mutex /buy uses.
+    """
+    transport = httpx.ASGITransport(app=srv.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        suffix = uuid.uuid4().hex[:8]
+        reg = await client.post("/api/auth/register", json={
+            "store_name": f"ADJ_{suffix}", "name": "Adjust Owner",
+            "username": f"adj_{suffix}", "password": "Test@1234", "contact": "9999999999",
+        })
+        assert reg.status_code == 200, reg.text
+        headers = {"Authorization": f"Bearer {reg.json()['access_token']}"}
+        pn = f"ADJPN{suffix.upper()}"
+
+        # 5 pre-existing units via the normal /buy path, THEN a limit of 7 is
+        # set — mirroring the exact scenario reported.
+        for _ in range(5):
+            r = await client.post("/api/buy", json={"part_number": pn, "condition": "Working"}, headers=headers)
+            assert r.status_code == 200, r.text
+        r = await client.post("/api/limits/part", json={"part_number": pn, "limit": 7, "enabled": True},
+                              headers=headers)
+        assert r.status_code == 200 and r.json()["remaining"] == 2, r.text
+
+        # Now use the quick "+1" adjust (NOT /buy) for the next 5 attempts —
+        # exactly 2 must be allowed (to reach 7), the rest blocked.
+        added_flags = []
+        for _ in range(5):
+            r = await client.post("/api/stock/adjust", json={"part_number": pn, "delta": 1}, headers=headers)
+            assert r.status_code == 200, r.text
+            d = r.json()
+            added_flags.append((d["added"], d["limit_reached"]))
+        assert added_flags == [(1, False), (1, False), (0, True), (0, True), (0, True)]
+
+        inv = await client.get("/api/inventory", headers=headers)
+        assert len(inv.json()) == 7, "total stock must never exceed the configured limit via /stock/adjust either"
+
+        # An explicit override still allows a deliberate correction past the limit.
+        r = await client.post("/api/stock/adjust", json={"part_number": pn, "delta": 1, "override": True},
+                              headers=headers)
+        assert r.status_code == 200
+        d = r.json()
+        assert d["added"] == 1 and d["limit_reached"] is False
+        inv = await client.get("/api/inventory", headers=headers)
+        assert len(inv.json()) == 8
+
+
+@pytest.mark.asyncio
+async def test_stock_adjust_and_buy_share_the_same_lock():
+    """A concurrent /buy and /stock/adjust (+1) on the SAME part must not
+    both slip through the same limit — they share the per-part mutex, so
+    this closes the race for this second entry point too, not just for two
+    concurrent /buy calls."""
+    orig_compute_limit = srv.compute_limit
+
+    async def delayed_compute_limit(*a, **kw):
+        result = await orig_compute_limit(*a, **kw)
+        await asyncio.sleep(0.05)
+        return result
+
+    transport = httpx.ASGITransport(app=srv.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        headers, pn = await _register_and_set_limit(client, limit=5)
+
+        srv.compute_limit = delayed_compute_limit
+        try:
+            calls = [client.post("/api/buy", json={"part_number": pn, "condition": "Working"}, headers=headers)
+                     for _ in range(4)]
+            calls += [client.post("/api/stock/adjust", json={"part_number": pn, "delta": 1}, headers=headers)
+                      for _ in range(4)]
+            results = await asyncio.gather(*calls)
+        finally:
+            srv.compute_limit = orig_compute_limit
+
+        buy_oks = sum(1 for r in results[:4] if r.status_code == 200)
+        adjust_added = sum(r.json().get("added", 0) for r in results[4:] if r.status_code == 200)
+        assert buy_oks + adjust_added == 5, f"expected exactly 5 units total, got {buy_oks + adjust_added}"
+
+        inv = await client.get("/api/inventory", headers=headers)
+        assert len(inv.json()) == 5

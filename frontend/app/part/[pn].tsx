@@ -77,8 +77,13 @@ export default function PartDetail() {
 
   const adjustStock = async (delta: number) => {
     try {
-      await api.post("/stock/adjust", { part_number: partNumber, delta });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const res = await api.post("/stock/adjust", { part_number: partNumber, delta });
+      if (res?.limit_reached) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        show(`${tr("buy.stopBuying")} ${partNumber} — ${tr("buy.limitReached")}`, "error");
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
       load();
     } catch (e: any) {
       show(e?.message || tr("common.failed"), "error");
