@@ -9,6 +9,7 @@ import * as DocumentPicker from "expo-document-picker";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, ConfirmModal, Header } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -26,6 +27,7 @@ export default function Backup() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { show } = useToast();
+  const { t } = useLanguage();
   const [busy, setBusy] = useState<string | null>(null);
   const [pendingImport, setPendingImport] = useState<any | null>(null);
 
@@ -44,9 +46,9 @@ export default function Backup() {
         await FileSystem.writeAsStringAsync(uri, str);
         if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: "application/json" });
       }
-      show("Backup (JSON) ready ✓", "success");
+      show(t("backup.jsonReady"), "success");
     } catch (e: any) {
-      show(e?.message || "Export failed", "error");
+      show(e?.message || t("common.exportFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -67,9 +69,9 @@ export default function Backup() {
         const dl = await FileSystem.downloadAsync(url, uri, { headers: { Authorization: `Bearer ${token}` } });
         if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(dl.uri);
       }
-      show("Excel export ready ✓", "success");
+      show(t("backup.excelReady"), "success");
     } catch (e: any) {
-      show(e?.message || "Excel export failed", "error");
+      show(e?.message || t("backup.excelExportFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -90,7 +92,7 @@ export default function Backup() {
       const collections = parsed.collections || parsed;
       setPendingImport(collections);
     } catch {
-      show("Error reading file — pick a valid backup file", "error");
+      show(t("backup.errorReadingFile"), "error");
     }
   };
 
@@ -100,10 +102,10 @@ export default function Backup() {
     try {
       const res = await api.post("/backup/import", { collections: pendingImport });
       const total = Object.values(res.imported || {}).reduce((a: number, b: any) => a + b, 0);
-      show(`${total} records restored ✓`, "success");
+      show(`${total} ${t("backup.recordsRestored")}`, "success");
       setPendingImport(null);
     } catch (e: any) {
-      show(e?.message || "Import failed", "error");
+      show(e?.message || t("backup.importFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -111,21 +113,21 @@ export default function Backup() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Backup & Restore" subtitle="Data export / import" onBack={() => router.back()} />
+      <Header title={t("backup.title")} subtitle={t("backup.subtitle")} onBack={() => router.back()} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: insets.bottom + 40 }}>
         <View style={styles.info}>
           <Ionicons name="shield-checkmark" size={20} color={colors.success} />
           <Text style={styles.infoText}>
-            All your data is saved on a <Text style={{ fontWeight: "800", color: colors.onSurface }}>secure cloud database</Text>.
-            Even if your mobile is lost/crashes, the data stays safe. Still, download a backup file below to be sure.
+            {t("backup.infoText1")} <Text style={{ fontWeight: "800", color: colors.onSurface }}>{t("backup.secureCloud")}</Text>.
+            {" "}{t("backup.infoText2")}
           </Text>
         </View>
 
         <Card>
-          <Text style={styles.cardTitle}>EXPORT (BACKUP)</Text>
-          <Text style={styles.sub}>Download/share all data in one file.</Text>
+          <Text style={styles.cardTitle}>{t("backup.exportBackup").toUpperCase()}</Text>
+          <Text style={styles.sub}>{t("backup.exportSub")}</Text>
           <Button
-            title="Excel Backup (easy to read)"
+            title={t("backup.excelBackup")}
             icon="grid"
             onPress={exportExcel}
             loading={busy === "excel"}
@@ -133,7 +135,7 @@ export default function Backup() {
             style={{ marginTop: spacing.md }}
           />
           <Button
-            title="Full Backup (JSON — for restore)"
+            title={t("backup.fullBackup")}
             icon="download"
             variant="secondary"
             onPress={exportJson}
@@ -144,10 +146,10 @@ export default function Backup() {
         </Card>
 
         <Card>
-          <Text style={styles.cardTitle}>IMPORT (RESTORE)</Text>
-          <Text style={styles.sub}>Restore data from a previous JSON backup.</Text>
+          <Text style={styles.cardTitle}>{t("backup.importRestore").toUpperCase()}</Text>
+          <Text style={styles.sub}>{t("backup.importSub")}</Text>
           <Button
-            title="Pick Backup File & Restore"
+            title={t("backup.pickAndRestore")}
             icon="cloud-upload"
             variant="secondary"
             onPress={runImport}
@@ -160,9 +162,9 @@ export default function Backup() {
 
       <ConfirmModal
         visible={!!pendingImport}
-        title="Restore?"
-        message="This backup data will be added back into the app (merge/restore). Continue?"
-        confirmText="Restore"
+        title={t("backup.restoreTitle")}
+        message={t("backup.restoreMsg")}
+        confirmText={t("backup.restore")}
         loading={busy === "import"}
         onConfirm={confirmImport}
         onCancel={() => setPendingImport(null)}

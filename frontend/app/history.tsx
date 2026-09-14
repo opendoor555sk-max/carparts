@@ -8,6 +8,7 @@ import * as Haptics from "expo-haptics";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { ConfirmModal, EmptyState, FilterChip, Header, Loading } from "@/src/components/ui";
 import { printReport, brandingFromUser } from "@/src/utils/print";
 import { colors, font, radius, spacing } from "@/src/theme";
@@ -28,6 +29,7 @@ export default function History() {
   const insets = useSafeAreaInsets();
   const { show } = useToast();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [tab, setTab] = useState<"buy" | "sell">("buy");
   const [txns, setTxns] = useState<Txn[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,11 +44,11 @@ export default function History() {
       const data = await api.get<Txn[]>(`/transactions?type=${tab}`);
       setTxns(data);
     } catch (e: any) {
-      show(e?.message || "Load failed", "error");
+      show(e?.message || t("common.loadFailed"), "error");
     } finally {
       setLoading(false);
     }
-  }, [tab, show]);
+  }, [tab, show, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,11 +68,11 @@ export default function History() {
     try {
       const res = await api.post("/transactions/delete", { ids: selectedIds, remove_stock: true });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      show(`${res.deleted} entries + ${res.removed_units} stock deleted`, "success");
+      show(`${res.deleted} ${t("history.entriesPlusStock")} ${res.removed_units} ${t("history.stockDeleted")}`, "success");
       setConfirmOpen(false);
       load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     } finally {
       setDeleting(false);
     }
@@ -79,31 +81,31 @@ export default function History() {
   return (
     <View style={styles.flex}>
       <Header
-        title="Purchase / Sale History"
-        subtitle="Delete entries (Admin)"
+        title={t("history.title")}
+        subtitle={t("history.subtitle")}
         onBack={() => router.back()}
         right={
           txns.length > 0 ? (
             <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.lg }}>
-              <Pressable onPress={async () => printReport(await brandingFromUser(user), tab === "buy" ? "Purchase History" : "Sale History", txns, true)} testID="print-history">
+              <Pressable onPress={async () => printReport(await brandingFromUser(user), tab === "buy" ? t("history.purchaseHistory") : t("history.saleHistory"), txns, true)} testID="print-history">
                 <Ionicons name="print" size={22} color={colors.brand} />
               </Pressable>
               <Pressable onPress={toggleAll} testID="select-all">
-                <Text style={styles.selAll}>{allSelected ? "Clear" : "All"}</Text>
+                <Text style={styles.selAll}>{allSelected ? t("history.clear") : t("common.all")}</Text>
               </Pressable>
             </View>
           ) : undefined
         }
       />
       <View style={styles.tabs}>
-        <FilterChip label="Buy" active={tab === "buy"} onPress={() => setTab("buy")} testID="tab-buy" />
-        <FilterChip label="Sell" active={tab === "sell"} onPress={() => setTab("sell")} testID="tab-sell" />
+        <FilterChip label={t("buy.title")} active={tab === "buy"} onPress={() => setTab("buy")} testID="tab-buy" />
+        <FilterChip label={t("sell.title")} active={tab === "sell"} onPress={() => setTab("sell")} testID="tab-sell" />
       </View>
 
       {loading ? (
         <Loading />
       ) : txns.length === 0 ? (
-        <EmptyState icon="receipt-outline" title="No entries" subtitle={tab === "buy" ? "No purchases" : "No sales"} />
+        <EmptyState icon="receipt-outline" title={t("history.noEntries")} subtitle={tab === "buy" ? t("history.noPurchases") : t("history.noSales")} />
       ) : (
         <FlatList
           data={txns}
@@ -126,7 +128,7 @@ export default function History() {
                   <Text style={styles.pn}>{item.part_number}</Text>
                   {item.part_name ? <Text style={styles.name}>{item.part_name}</Text> : null}
                   <Text style={styles.meta}>
-                    {item.by ? `by ${item.by}` : ""}
+                    {item.by ? `${t("unlinkedStock.by")} ${item.by}` : ""}
                     {item.at ? `  •  ${new Date(item.at).toLocaleDateString()}` : ""}
                     {item.buyer ? `  •  ${item.buyer}` : ""}
                   </Text>
@@ -143,7 +145,7 @@ export default function History() {
           <Pressable style={styles.delBtn} onPress={() => setConfirmOpen(true)} disabled={deleting} testID="bulk-delete">
             <Ionicons name="trash" size={20} color={colors.onError} />
             <Text style={styles.delText}>
-              {deleting ? "Deleting…" : `Delete ${selectedIds.length} entries`}
+              {deleting ? t("history.deletingEllipsis") : `${t("common.delete")} ${selectedIds.length} ${t("history.entries")}`}
             </Text>
           </Pressable>
         </View>
@@ -151,9 +153,9 @@ export default function History() {
 
       <ConfirmModal
         visible={confirmOpen}
-        title={`Delete ${selectedIds.length} entries?`}
-        message={`These ${tab === "buy" ? "purchase" : "sale"} entries and their stock will be permanently deleted.`}
-        confirmText="Delete"
+        title={`${t("common.delete")} ${selectedIds.length} ${t("history.entries")}?`}
+        message={tab === "buy" ? t("history.deleteConfirmMsgBuy") : t("history.deleteConfirmMsgSell")}
+        confirmText={t("common.delete")}
         danger
         loading={deleting}
         onConfirm={doDelete}
