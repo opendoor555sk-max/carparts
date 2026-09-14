@@ -49,23 +49,23 @@ export default function Admin() {
   const isAdmin = user?.role === "admin";
   const isSuperAdmin = user?.role === "super_admin";
 
-  const statCards: { label: string; value: number; color: string; icon: keyof typeof Ionicons.glyphMap; route: string }[] = stats
+  const statCards: { key: string; label: string; value: number; color: string; icon: keyof typeof Ionicons.glyphMap; route: string }[] = stats
     ? [
-        { label: t("admin.statParts"), value: stats.total_parts, color: colors.brand, icon: "documents", route: "/report?mode=stock" },
-        { label: t("admin.statInStock"), value: stats.in_stock_units, color: colors.success, icon: "cube", route: "/report?mode=stock" },
-        { label: t("admin.statSold"), value: stats.sold_units, color: colors.info, icon: "cash", route: "/report?mode=sell" },
-        { label: t("admin.statPendingNeeds"), value: stats.pending_requirements, color: colors.warning, icon: "list", route: "/(tabs)/requirements" },
-        { label: t("admin.statAiPending"), value: stats.pending_ai, color: colors.warning, icon: "sparkles", route: "/ai-approvals" },
-        { label: t("admin.statVerified"), value: stats.verified_parts, color: colors.success, icon: "shield-checkmark", route: "/report?mode=stock" },
+        { key: "parts", label: t("admin.statParts"), value: stats.total_parts, color: colors.brand, icon: "documents", route: "/report?mode=stock" },
+        { key: "inStock", label: t("admin.statInStock"), value: stats.in_stock_units, color: colors.success, icon: "cube", route: "/report?mode=stock" },
+        { key: "sold", label: t("admin.statSold"), value: stats.sold_units, color: colors.info, icon: "cash", route: "/report?mode=sell" },
+        { key: "pendingNeeds", label: t("admin.statPendingNeeds"), value: stats.pending_requirements, color: colors.warning, icon: "list", route: "/(tabs)/requirements" },
+        { key: "aiPending", label: t("admin.statAiPending"), value: stats.pending_ai, color: colors.warning, icon: "sparkles", route: "/ai-approvals" },
+        { key: "verified", label: t("admin.statVerified"), value: stats.verified_parts, color: colors.success, icon: "shield-checkmark", route: "/report?mode=stock" },
       ]
     : [];
 
-  const links: { title: string; sub: string; icon: keyof typeof Ionicons.glyphMap; route: string; perm: string }[] = [
-    { title: t("aiApprovals.title"), sub: t("admin.linkAiApprovalsSub"), icon: "sparkles", route: "/ai-approvals", perm: "ai_approve" },
-    { title: t("settings.title"), sub: t("admin.linkGoogleSearchSub"), icon: "key", route: "/settings", perm: "search" },
-    { title: t("limits.title"), sub: t("admin.linkPurchaseLimitsSub"), icon: "speedometer", route: "/limits", perm: "manage_limits" },
-    { title: t("users.title"), sub: t("admin.linkManageUsersSub"), icon: "people", route: "/users", perm: "manage_users" },
-    { title: t("demand.title"), sub: t("admin.linkDemandSearchSub"), icon: "trending-up", route: "/demand", perm: "view_stats" },
+  const links: { key: string; title: string; sub: string; icon: keyof typeof Ionicons.glyphMap; route: string; perm: string }[] = [
+    { key: "aiApprovals", title: t("aiApprovals.title"), sub: t("admin.linkAiApprovalsSub"), icon: "sparkles", route: "/ai-approvals", perm: "ai_approve" },
+    { key: "googleSearch", title: t("settings.title"), sub: t("admin.linkGoogleSearchSub"), icon: "key", route: "/settings", perm: "search" },
+    { key: "purchaseLimits", title: t("limits.title"), sub: t("admin.linkPurchaseLimitsSub"), icon: "speedometer", route: "/limits", perm: "manage_limits" },
+    { key: "manageUsers", title: t("users.title"), sub: t("admin.linkManageUsersSub"), icon: "people", route: "/users", perm: "manage_users" },
+    { key: "demandSearch", title: t("demand.title"), sub: t("admin.linkDemandSearchSub"), icon: "trending-up", route: "/demand", perm: "view_stats" },
   ];
 
   return (
@@ -89,7 +89,7 @@ export default function Admin() {
                 <Text style={styles.section}>{t("admin.statistics").toUpperCase()}</Text>
                 <View style={styles.statGrid}>
                   {statCards.map((s) => (
-                    <Pressable key={s.label} style={styles.statCard} onPress={() => router.push(s.route as any)} testID={`stat-${s.label}`}>
+                    <Pressable key={s.key} style={styles.statCard} onPress={() => router.push(s.route as any)} testID={`stat-${s.key}`}>
                       <Ionicons name={s.icon} size={20} color={s.color} />
                       <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
                       <Text style={styles.statLabel}>{s.label}</Text>
@@ -137,10 +137,10 @@ export default function Admin() {
                 const allowed = can(l.perm);
                 return (
                   <Pressable
-                    key={l.title}
+                    key={l.key}
                     style={[styles.link, !allowed && { opacity: 0.45 }]}
                     onPress={() => (allowed ? router.push(l.route as any) : null)}
-                    testID={`admin-link-${l.title}`}
+                    testID={`admin-link-${l.key}`}
                   >
                     <View style={styles.linkIcon}>
                       <Ionicons name={l.icon} size={22} color={colors.brand} />

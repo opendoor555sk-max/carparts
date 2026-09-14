@@ -521,6 +521,7 @@ const dict = {
     "common.thisMonth": "આ મહિનો",
     "common.custom": "કસ્ટમ",
     "common.apply": "લાગુ કરો",
+    "common.to": "સુધી",
 
     "adminGps.title": "GPS લોકેશન્સ",
     "adminGps.subtitle": "બધા સ્ટોર્સ — Maps માં ખોલવા ટેપ કરો",
@@ -1355,6 +1356,7 @@ const dict = {
     "common.thisMonth": "इस महीने",
     "common.custom": "कस्टम",
     "common.apply": "लागू करें",
+    "common.to": "तक",
 
     "adminGps.title": "GPS लोकेशन",
     "adminGps.subtitle": "सभी स्टोर — Maps में खोलने के लिए टैप करें",
@@ -2189,6 +2191,7 @@ const dict = {
     "common.thisMonth": "This Month",
     "common.custom": "Custom",
     "common.apply": "Apply",
+    "common.to": "to",
 
     "adminGps.title": "GPS Locations",
     "adminGps.subtitle": "All stores — tap to open in Maps",

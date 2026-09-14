@@ -175,7 +175,7 @@ export default function Report() {
             {Platform.OS === "web" ? (
               <>
                 <TextInput style={styles.dateInput} value={customFrom} onChangeText={setCustomFrom} placeholder="YYYY-MM-DD" placeholderTextColor={colors.info} testID="date-from" />
-                <Text style={styles.toSep}>to</Text>
+                <Text style={styles.toSep}>{t("common.to")}</Text>
                 <TextInput style={styles.dateInput} value={customTo} onChangeText={setCustomTo} placeholder="YYYY-MM-DD" placeholderTextColor={colors.info} testID="date-to" />
                 <Pressable style={styles.applyBtn} onPress={load} testID="apply-custom">
                   <Text style={styles.applyText}>{t("common.apply")}</Text>
@@ -187,7 +187,7 @@ export default function Report() {
                   <Ionicons name="calendar" size={15} color={colors.brand} />
                   <Text style={styles.dateBtnText}>{customFrom}</Text>
                 </Pressable>
-                <Text style={styles.toSep}>to</Text>
+                <Text style={styles.toSep}>{t("common.to")}</Text>
                 <Pressable style={styles.dateBtn} onPress={() => setPicker("to")} testID="date-to">
                   <Ionicons name="calendar" size={15} color={colors.brand} />
                   <Text style={styles.dateBtnText}>{customTo}</Text>

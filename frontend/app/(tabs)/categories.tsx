@@ -69,7 +69,7 @@ export default function Categories() {
 
   return (
     <View style={styles.flex}>
-      <Header title={t("categories.title")} subtitle={`${total} ${t("categories.items")} • 5 ${t("categories.groups")}`} right={<SignOutButton />} />
+      <Header title={t("categories.title")} subtitle={`${total} ${t("categories.items")} • ${groups.length} ${t("categories.groups")}`} right={<SignOutButton />} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.md }}>
         {groups.map((g) => {
           const isOpen = open[g.group];
