@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, Field, Header, LimitBar } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -13,6 +14,7 @@ export default function Limits() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { show } = useToast();
+  const { t } = useLanguage();
 
   const [globalEnabled, setGlobalEnabled] = useState(false);
   const [globalDefault, setGlobalDefault] = useState("");
@@ -47,9 +49,9 @@ export default function Limits() {
         global_enabled: globalEnabled,
         global_default: globalDefault ? parseInt(globalDefault, 10) : null,
       });
-      show("Global limit saved", "success");
+      show(t("limits.globalSaved"), "success");
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     } finally {
       setSavingGlobal(false);
     }
@@ -57,7 +59,7 @@ export default function Limits() {
 
   const savePart = async () => {
     if (!partNumber.trim()) {
-      show("Part number required", "error");
+      show(t("common.errPartNumberRequired"), "error");
       return;
     }
     setSavingPart(true);
@@ -68,9 +70,9 @@ export default function Limits() {
         enabled: partEnabled,
       });
       setComputed(res);
-      show("Part limit saved — applies even to this part's first purchase", "success");
+      show(t("limits.partSaved"), "success");
     } catch (e: any) {
-      show(e?.message || "Save failed", "error");
+      show(e?.message || t("common.saveFailed"), "error");
     } finally {
       setSavingPart(false);
     }
@@ -78,7 +80,7 @@ export default function Limits() {
 
   const saveLowStock = async () => {
     if (!lowStockPn.trim()) {
-      show("Part number required", "error");
+      show(t("common.errPartNumberRequired"), "error");
       return;
     }
     setSavingLowStock(true);
@@ -89,9 +91,9 @@ export default function Limits() {
         enabled: lowStockEnabled,
       });
       setLowStockComputed(res);
-      show("Low stock threshold saved", "success");
+      show(t("limits.lowStockSaved"), "success");
     } catch (e: any) {
-      show(e?.message || "Save failed", "error");
+      show(e?.message || t("common.saveFailed"), "error");
     } finally {
       setSavingLowStock(false);
     }
@@ -99,56 +101,56 @@ export default function Limits() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Purchase Limits" subtitle="100% Admin configurable" onBack={() => router.back()} />
+      <Header title={t("limits.title")} subtitle={t("limits.subtitle")} onBack={() => router.back()} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 40, gap: spacing.md }} keyboardShouldPersistTaps="handled">
           <View style={styles.info}>
             <Ionicons name="information-circle" size={18} color={colors.brand} />
-            <Text style={styles.infoText}>No number is hard-coded. Only Admin can set/change/disable/override.</Text>
+            <Text style={styles.infoText}>{t("limits.infoText")}</Text>
           </View>
 
           <Card>
-            <Text style={styles.title}>GLOBAL DEFAULT LIMIT</Text>
+            <Text style={styles.title}>{t("limits.globalDefault").toUpperCase()}</Text>
             <View style={styles.rowBetween}>
-              <Text style={styles.label}>Enable global limit</Text>
+              <Text style={styles.label}>{t("limits.enableGlobal")}</Text>
               <Switch value={globalEnabled} onValueChange={setGlobalEnabled} trackColor={{ true: colors.brand, false: colors.surface3 }} thumbColor={colors.onSurface} testID="global-enable" />
             </View>
-            <Field label="Default max stock per part" value={globalDefault} onChangeText={setGlobalDefault} keyboardType="numeric" placeholder="e.g. 5" testID="global-default" />
-            <Button title="Save Global" onPress={saveGlobal} loading={savingGlobal} icon="save" testID="save-global" />
+            <Field label={t("limits.defaultMax")} value={globalDefault} onChangeText={setGlobalDefault} keyboardType="numeric" placeholder="e.g. 5" testID="global-default" />
+            <Button title={t("limits.saveGlobal")} onPress={saveGlobal} loading={savingGlobal} icon="save" testID="save-global" />
           </Card>
 
           <Card>
-            <Text style={styles.title}>PER-PART LIMIT (override)</Text>
-            <Field label="Part number" value={partNumber} onChangeText={setPartNumber} autoCapitalize="characters" placeholder="e.g. 39100-2B000" testID="part-limit-pn" />
-            <Field label="Limit (blank = unlimited)" value={partLimit} onChangeText={setPartLimit} keyboardType="numeric" placeholder="e.g. 3" testID="part-limit-value" />
+            <Text style={styles.title}>{t("limits.perPartLimit").toUpperCase()}</Text>
+            <Field label={t("common.partNumber")} value={partNumber} onChangeText={setPartNumber} autoCapitalize="characters" placeholder="e.g. 39100-2B000" testID="part-limit-pn" />
+            <Field label={t("limits.limitBlank")} value={partLimit} onChangeText={setPartLimit} keyboardType="numeric" placeholder="e.g. 3" testID="part-limit-value" />
             <View style={styles.rowBetween}>
-              <Text style={styles.label}>Enable this limit</Text>
+              <Text style={styles.label}>{t("limits.enableThisLimit")}</Text>
               <Switch value={partEnabled} onValueChange={setPartEnabled} trackColor={{ true: colors.brand, false: colors.surface3 }} thumbColor={colors.onSurface} testID="part-limit-enable" />
             </View>
-            <Button title="Save Part Limit" onPress={savePart} loading={savingPart} icon="save" variant="secondary" testID="save-part-limit" />
+            <Button title={t("limits.savePartLimit")} onPress={savePart} loading={savingPart} icon="save" variant="secondary" testID="save-part-limit" />
             {computed ? (
               <View style={{ marginTop: spacing.md }}>
                 <LimitBar existing={computed.existing_stock ?? 0} allowed={computed.allowed_limit ?? null} />
-                <Text style={styles.status}>Status: {computed.status}</Text>
+                <Text style={styles.status}>{t("limits.status")}: {computed.status}</Text>
               </View>
             ) : null}
           </Card>
 
           <Card>
-            <Text style={styles.title}>LOW STOCK ALERT (per part)</Text>
-            <Field label="Part number" value={lowStockPn} onChangeText={setLowStockPn} autoCapitalize="characters" placeholder="e.g. 39100-2B000" testID="lowstock-pn" />
-            <Field label="Alert when stock at or below (blank = off)" value={lowStockThreshold} onChangeText={setLowStockThreshold} keyboardType="numeric" placeholder="e.g. 2" testID="lowstock-value" />
+            <Text style={styles.title}>{t("limits.lowStockAlert").toUpperCase()}</Text>
+            <Field label={t("common.partNumber")} value={lowStockPn} onChangeText={setLowStockPn} autoCapitalize="characters" placeholder="e.g. 39100-2B000" testID="lowstock-pn" />
+            <Field label={t("limits.alertWhen")} value={lowStockThreshold} onChangeText={setLowStockThreshold} keyboardType="numeric" placeholder="e.g. 2" testID="lowstock-value" />
             <View style={styles.rowBetween}>
-              <Text style={styles.label}>Enable this alert</Text>
+              <Text style={styles.label}>{t("limits.enableThisAlert")}</Text>
               <Switch value={lowStockEnabled} onValueChange={setLowStockEnabled} trackColor={{ true: colors.brand, false: colors.surface3 }} thumbColor={colors.onSurface} testID="lowstock-enable" />
             </View>
-            <Button title="Save Low Stock Alert" onPress={saveLowStock} loading={savingLowStock} icon="alert-circle" variant="secondary" testID="save-lowstock" />
+            <Button title={t("limits.saveLowStockAlert")} onPress={saveLowStock} loading={savingLowStock} icon="alert-circle" variant="secondary" testID="save-lowstock" />
             {lowStockComputed ? (
               <View style={{ marginTop: spacing.md }}>
                 <Text style={[styles.status, lowStockComputed.low && styles.statusLow]}>
-                  {lowStockComputed.stock_count} in stock
-                  {lowStockComputed.low_stock_threshold != null ? ` • alert at ≤ ${lowStockComputed.low_stock_threshold}` : ""}
-                  {lowStockComputed.low ? " • LOW STOCK NOW" : ""}
+                  {lowStockComputed.stock_count} {t("storeDetail.inStock").toLowerCase()}
+                  {lowStockComputed.low_stock_threshold != null ? ` • ${t("limits.alertAt")} ≤ ${lowStockComputed.low_stock_threshold}` : ""}
+                  {lowStockComputed.low ? ` • ${t("limits.lowStockNow")}` : ""}
                 </Text>
               </View>
             ) : null}

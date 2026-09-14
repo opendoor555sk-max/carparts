@@ -9,6 +9,7 @@ import * as ImagePicker from "expo-image-picker";
 import { api, fileUrl, uploadImage } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, Field, Header, Loading } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -17,6 +18,7 @@ export default function StoreProfile() {
   const insets = useSafeAreaInsets();
   const { refresh } = useAuth();
   const { show } = useToast();
+  const { t } = useLanguage();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,11 +43,11 @@ export default function StoreProfile() {
         setLogoDisplay(await fileUrl(s.logo_path));
       }
     } catch (e: any) {
-      show(e?.message || "Load failed", "error");
+      show(e?.message || t("common.loadFailed"), "error");
     } finally {
       setLoading(false);
     }
-  }, [show]);
+  }, [show, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -57,9 +59,9 @@ export default function StoreProfile() {
     let perm = await ImagePicker.getMediaLibraryPermissionsAsync();
     if (!perm.granted && perm.canAskAgain) perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert("Gallery access needed", "Allow gallery to pick your store logo.", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Open Settings", onPress: () => Linking.openSettings() },
+      Alert.alert(t("storeProfile.galleryNeeded"), t("storeProfile.galleryNeededMsg"), [
+        { text: t("ui.cancel"), style: "cancel" },
+        { text: t("scan.openSettings"), onPress: () => Linking.openSettings() },
       ]);
       return;
     }
@@ -69,9 +71,9 @@ export default function StoreProfile() {
         const { path } = await uploadImage(res.assets[0].uri, "logo.jpg");
         setLogoPath(path);
         setLogoDisplay(await fileUrl(path));
-        show("Logo uploaded", "success");
+        show(t("storeProfile.logoUploaded"), "success");
       } catch {
-        show("Logo upload failed", "error");
+        show(t("storeProfile.logoUploadFailed"), "error");
       }
     }
   };
@@ -88,10 +90,10 @@ export default function StoreProfile() {
         logo_path: logoPath,
       });
       await refresh();
-      show("Store profile saved", "success");
+      show(t("storeProfile.saved"), "success");
       router.back();
     } catch (e: any) {
-      show(e?.message || "Save failed", "error");
+      show(e?.message || t("common.saveFailed"), "error");
     } finally {
       setSaving(false);
     }
@@ -100,7 +102,7 @@ export default function StoreProfile() {
   if (loading) {
     return (
       <View style={styles.flex}>
-        <Header title="Store Profile" onBack={() => router.back()} />
+        <Header title={t("storeProfile.title")} onBack={() => router.back()} />
         <Loading />
       </View>
     );
@@ -108,10 +110,10 @@ export default function StoreProfile() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Store Profile / Branding" onBack={() => router.back()} />
+      <Header title={t("storeProfile.fullTitle")} onBack={() => router.back()} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 40, gap: spacing.md }}>
         <Card>
-          <Text style={styles.cardTitle}>STORE LOGO</Text>
+          <Text style={styles.cardTitle}>{t("storeProfile.storeLogo").toUpperCase()}</Text>
           <View style={styles.logoRow}>
             {logoDisplay ? (
               <Image source={{ uri: logoDisplay }} style={styles.logo} contentFit="contain" />
@@ -120,20 +122,20 @@ export default function StoreProfile() {
                 <Ionicons name="image" size={28} color={colors.info} />
               </View>
             )}
-            <Button title="Choose Logo" onPress={pickLogo} variant="secondary" icon="cloud-upload" testID="pick-logo" style={{ flex: 1 }} />
+            <Button title={t("storeProfile.chooseLogo")} onPress={pickLogo} variant="secondary" icon="cloud-upload" testID="pick-logo" style={{ flex: 1 }} />
           </View>
-          <Text style={styles.hint}>Shown on every printed receipt / report.</Text>
+          <Text style={styles.hint}>{t("storeProfile.logoHint")}</Text>
         </Card>
 
         <Card>
-          <Field label="Store Name" value={name} onChangeText={setName} placeholder="Store name" testID="sp-name" />
-          <Field label="GST Number" value={gst} onChangeText={setGst} placeholder="e.g. 24ABCDE1234F1Z5" autoCapitalize="characters" testID="sp-gst" />
-          <Field label="Phone" value={phone} onChangeText={setPhone} placeholder="e.g. +91 98xxxxxxxx" keyboardType={Platform.OS === "web" ? "default" : "phone-pad"} testID="sp-phone" />
-          <Field label="Address" value={address} onChangeText={setAddress} placeholder="Shop address" testID="sp-address" />
-          <Field label="Bank Details" value={bank} onChangeText={setBank} placeholder="Bank name, A/C no, IFSC" testID="sp-bank" />
+          <Field label={t("storeProfile.storeName")} value={name} onChangeText={setName} placeholder={t("storeProfile.storeName")} testID="sp-name" />
+          <Field label={t("storeProfile.gstNumber")} value={gst} onChangeText={setGst} placeholder="e.g. 24ABCDE1234F1Z5" autoCapitalize="characters" testID="sp-gst" />
+          <Field label={t("common.phone")} value={phone} onChangeText={setPhone} placeholder="e.g. +91 98xxxxxxxx" keyboardType={Platform.OS === "web" ? "default" : "phone-pad"} testID="sp-phone" />
+          <Field label={t("common.address")} value={address} onChangeText={setAddress} placeholder={t("storeProfile.shopAddress")} testID="sp-address" />
+          <Field label={t("storeProfile.bankDetails")} value={bank} onChangeText={setBank} placeholder={t("storeProfile.bankPlaceholder")} testID="sp-bank" />
         </Card>
 
-        <Button title="Save Profile" onPress={save} loading={saving} icon="save" testID="save-profile" />
+        <Button title={t("storeProfile.saveProfile")} onPress={save} loading={saving} icon="save" testID="save-profile" />
       </ScrollView>
     </View>
   );

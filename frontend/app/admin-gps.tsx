@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Header, Loading } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -25,6 +26,12 @@ const FILTERS = ["All", "Requirement", "Purchase"] as const;
 export default function AdminGps() {
   const router = useRouter();
   const { show } = useToast();
+  const { t } = useLanguage();
+  const filterLabel: Record<(typeof FILTERS)[number], string> = {
+    All: t("common.all"),
+    Requirement: t("module.requirement"),
+    Purchase: t("adminGps.purchase"),
+  };
   const [points, setPoints] = useState<GpsPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
@@ -33,11 +40,11 @@ export default function AdminGps() {
     try {
       setPoints(await api.get<GpsPoint[]>("/admin/gps-locations"));
     } catch (e: any) {
-      show(e?.message || "Load failed", "error");
+      show(e?.message || t("common.loadFailed"), "error");
     } finally {
       setLoading(false);
     }
-  }, [show]);
+  }, [show, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -58,7 +65,7 @@ export default function AdminGps() {
       android: `https://maps.google.com/?q=${p.lat},${p.lng}(${label})`,
       default: `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`,
     })!;
-    Linking.openURL(url).catch(() => show("Could not open Maps", "error"));
+    Linking.openURL(url).catch(() => show(t("adminGps.couldNotOpenMaps"), "error"));
   };
 
   const fmt = (iso: string) => {
@@ -72,7 +79,7 @@ export default function AdminGps() {
 
   return (
     <View style={styles.flex}>
-      <Header title="GPS Locations" subtitle="All stores — tap to open in Maps" onBack={() => router.back()} />
+      <Header title={t("adminGps.title")} subtitle={t("adminGps.subtitle")} onBack={() => router.back()} />
       <View style={styles.filterRow}>
         {FILTERS.map((f) => (
           <Pressable
@@ -81,12 +88,12 @@ export default function AdminGps() {
             onPress={() => setFilter(f)}
             testID={`gps-filter-${f}`}
           >
-            <Text style={[styles.chipText, filter === f && styles.chipTextActive]}>{f}</Text>
+            <Text style={[styles.chipText, filter === f && styles.chipTextActive]}>{filterLabel[f]}</Text>
           </Pressable>
         ))}
       </View>
       {loading ? (
-        <Loading text="Loading GPS points…" />
+        <Loading text={t("adminGps.loadingPoints")} />
       ) : (
         <FlatList
           data={data}
@@ -95,7 +102,7 @@ export default function AdminGps() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="location-outline" size={40} color={colors.info} />
-              <Text style={styles.emptyText}>No GPS points captured yet</Text>
+              <Text style={styles.emptyText}>{t("adminGps.empty")}</Text>
             </View>
           }
           renderItem={({ item }) => (
@@ -106,7 +113,7 @@ export default function AdminGps() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.pn} numberOfLines={1}>{item.part_number || "—"}</Text>
                 <Text style={styles.meta}>
-                  {item.type} · {item.store_name} · {item.by || "—"}
+                  {item.type === "Requirement" ? t("module.requirement") : t("adminGps.purchase")} · {item.store_name} · {item.by || "—"}
                 </Text>
                 <View style={styles.gpsRow}>
                   <Ionicons name="location" size={12} color={colors.success} />

@@ -7,6 +7,7 @@ import * as Haptics from "expo-haptics";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, EmptyState, Header, Loading, StatusChip } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
 
@@ -16,6 +17,7 @@ export default function StockVerify() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { show } = useToast();
+  const { t } = useLanguage();
   const [items, setItems] = useState<Item[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -28,11 +30,11 @@ export default function StockVerify() {
       setItems(res.items);
       setCounts(Object.fromEntries(res.items.map((i) => [i.part_number, 0])));
     } catch (e: any) {
-      show(e?.message || "Load failed", "error");
+      show(e?.message || t("common.loadFailed"), "error");
     } finally {
       setLoading(false);
     }
-  }, [show]);
+  }, [show, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -52,7 +54,7 @@ export default function StockVerify() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setReport(res);
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || t("common.failed"), "error");
     } finally {
       setSubmitting(false);
     }
@@ -60,39 +62,37 @@ export default function StockVerify() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Stock Verification" subtitle="Count physical stock" onBack={() => router.back()} />
+      <Header title={t("stockVerify.title")} subtitle={t("stockVerify.subtitle")} onBack={() => router.back()} />
       {loading ? (
         <Loading />
       ) : items.length === 0 ? (
-        <EmptyState icon="cube-outline" title="No stock" subtitle="Add stock from the Buy module" />
+        <EmptyState icon="cube-outline" title={t("sell.noStock")} subtitle={t("stockVerify.addFromBuy")} />
       ) : (
         <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: insets.bottom + 120 }}>
           <View style={styles.info}>
             <Ionicons name="clipboard" size={18} color={colors.brand} />
-            <Text style={styles.infoText}>
-              Enter the physically counted (in-hand) units for each part. It compares with system stock and shows which part is missing.
-            </Text>
+            <Text style={styles.infoText}>{t("stockVerify.infoText")}</Text>
           </View>
 
           {report ? (
             <Card testID="verify-report">
-              <Text style={styles.cardTitle}>REPORT</Text>
+              <Text style={styles.cardTitle}>{t("stockVerify.report").toUpperCase()}</Text>
               <View style={styles.summaryRow}>
                 <View style={styles.summaryBox}>
                   <Text style={styles.summaryNum}>{report.total_parts}</Text>
-                  <Text style={styles.summaryLbl}>Total parts</Text>
+                  <Text style={styles.summaryLbl}>{t("stockVerify.totalParts")}</Text>
                 </View>
                 <View style={styles.summaryBox}>
                   <Text style={[styles.summaryNum, { color: colors.success }]}>{report.ok_count}</Text>
-                  <Text style={styles.summaryLbl}>OK</Text>
+                  <Text style={styles.summaryLbl}>{t("stockVerify.ok")}</Text>
                 </View>
                 <View style={styles.summaryBox}>
                   <Text style={[styles.summaryNum, { color: colors.error }]}>{report.discrepancies.length}</Text>
-                  <Text style={styles.summaryLbl}>Difference</Text>
+                  <Text style={styles.summaryLbl}>{t("stockVerify.difference")}</Text>
                 </View>
               </View>
               {report.discrepancies.length === 0 ? (
-                <Text style={styles.allGood}>✅ All stock matched correctly!</Text>
+                <Text style={styles.allGood}>✅ {t("stockVerify.allMatched")}</Text>
               ) : (
                 report.discrepancies.map((d: any) => (
                   <View key={d.part_number} style={styles.discRow}>
@@ -100,14 +100,14 @@ export default function StockVerify() {
                       <Text style={styles.discPn}>{d.part_number}</Text>
                       {d.part_name ? <Text style={styles.discName}>{d.part_name}</Text> : null}
                       <Text style={styles.discDetail}>
-                        System: {d.expected}  •  Counted: {d.counted}  •  {d.diff > 0 ? `+${d.diff}` : d.diff}
+                        {t("stockVerify.system")}: {d.expected}  •  {t("stockVerify.counted")}: {d.counted}  •  {d.diff > 0 ? `+${d.diff}` : d.diff}
                       </Text>
                     </View>
                     <StatusChip status={d.status === "MISSING" ? "Cancelled" : "Pending"} />
                   </View>
                 ))
               )}
-              <Button title="Count Again" variant="secondary" onPress={() => setReport(null)} style={{ marginTop: spacing.md }} testID="verify-again" />
+              <Button title={t("stockVerify.countAgain")} variant="secondary" onPress={() => setReport(null)} style={{ marginTop: spacing.md }} testID="verify-again" />
             </Card>
           ) : (
             <>
@@ -117,7 +117,7 @@ export default function StockVerify() {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.pn}>{i.part_number}</Text>
                       {i.part_name ? <Text style={styles.name}>{i.part_name}</Text> : null}
-                      <Text style={styles.expected}>System stock: {i.expected}</Text>
+                      <Text style={styles.expected}>{t("stockVerify.systemStock")}: {i.expected}</Text>
                     </View>
                   </View>
                   <View style={styles.counterRow}>
@@ -141,7 +141,7 @@ export default function StockVerify() {
 
       {!loading && !report && items.length > 0 ? (
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + spacing.md }]}>
-          <Button title="Verify & View Report" onPress={submit} loading={submitting} icon="checkmark-done" testID="verify-submit" />
+          <Button title={t("stockVerify.verifyView")} onPress={submit} loading={submitting} icon="checkmark-done" testID="verify-submit" />
         </View>
       ) : null}
     </View>
