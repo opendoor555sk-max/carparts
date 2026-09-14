@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, fileUrl } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Barcode } from "@/src/components/Barcode";
 import { SvgXml } from "react-native-svg";
 import { codeSvg } from "@/src/utils/codegen";
@@ -57,6 +58,7 @@ export default function PartDetail() {
   const insets = useSafeAreaInsets();
   const { can, user } = useAuth();
   const { show } = useToast();
+  const { t: tr } = useLanguage();
 
   const [data, setData] = useState<any>(null);
   const [part, setPart] = useState<any>(null);
@@ -79,7 +81,7 @@ export default function PartDetail() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || tr("common.failed"), "error");
     }
   };
 
@@ -91,11 +93,11 @@ export default function PartDetail() {
     try {
       await api.del(`/stock/unit/${pendingUnit}`);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      show("Unit deleted", "success");
+      show(tr("partDetail.unitDeleted"), "success");
       setPendingUnit(null);
       load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || tr("common.failed"), "error");
     } finally {
       setDeletingUnit(false);
     }
@@ -124,11 +126,11 @@ export default function PartDetail() {
         if (ai && ai.length) setAiResult(ai[0]);
       } catch {}
     } catch (e: any) {
-      show(e?.message || "Load failed", "error");
+      show(e?.message || tr("common.loadFailed"), "error");
     } finally {
       setLoading(false);
     }
-  }, [partNumber]);
+  }, [partNumber, show, tr]);
 
   useEffect(() => {
     load();
@@ -140,9 +142,9 @@ export default function PartDetail() {
       const company = data?.part?.company || "All";
       const res = await api.post("/ai/research", { part_number: partNumber, company });
       setAiResult(res);
-      show("AI research complete", "success");
+      show(tr("partDetail.aiComplete"), "success");
     } catch (e: any) {
-      show(e?.message || "AI research failed", "error");
+      show(e?.message || tr("partDetail.aiFailed"), "error");
     } finally {
       setAiLoading(false);
     }
@@ -203,18 +205,18 @@ export default function PartDetail() {
     try {
       if (editMode === "ai-approve") {
         await api.post(`/ai/research/${aiResult.id}/approve`, payload);
-        show("Edited & saved as Verified", "success");
+        show(tr("partDetail.editedSavedVerified"), "success");
       } else if (editMode === "edit-part") {
         await api.patch(`/parts/${encodeURIComponent(partNumber)}`, payload);
-        show("Part details updated", "success");
+        show(tr("partDetail.detailsUpdated"), "success");
       } else {
         await api.post("/parts", { part_number: partNumber, source: "Manual", ...payload });
-        show("NEW PART saved (Unverified)", "success");
+        show(tr("partDetail.newPartSaved"), "success");
       }
       setEditModal(false);
       load();
     } catch (e: any) {
-      show(e?.message || "Save failed", "error");
+      show(e?.message || tr("common.saveFailed"), "error");
     } finally {
       setSavingEdit(false);
     }
@@ -223,28 +225,28 @@ export default function PartDetail() {
   const rejectAI = async () => {
     try {
       await api.post(`/ai/research/${aiResult.id}/reject`);
-      show("Rejected", "info");
+      show(tr("partDetail.rejected"), "info");
       load();
     } catch (e: any) {
-      show(e?.message || "Reject failed", "error");
+      show(e?.message || tr("partDetail.rejectFailed"), "error");
     }
   };
 
   const saveKnown = async () => {
     try {
       await api.post("/known-parts", { part_number: partNumber, company: data?.part?.company || "All" });
-      show("Saved as Known Part", "success");
+      show(tr("partDetail.savedKnown"), "success");
       load();
     } catch (e: any) {
-      show(e?.message || "Failed", "error");
+      show(e?.message || tr("common.failed"), "error");
     }
   };
 
   if (loading) {
     return (
       <View style={styles.flex}>
-        <Header title="Part" onBack={() => router.back()} />
-        <Loading text="Loading part…" />
+        <Header title={tr("partDetail.part")} onBack={() => router.back()} />
+        <Loading text={tr("partDetail.loadingPart")} />
       </View>
     );
   }
@@ -255,13 +257,13 @@ export default function PartDetail() {
 
   return (
     <View style={styles.flex}>
-      <Header title={status || "Part"} subtitle="Part Master" onBack={() => router.back()} />
+      <Header title={status || tr("partDetail.part")} subtitle={tr("partDetail.partMaster")} onBack={() => router.back()} />
       <ScrollView
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 180, gap: spacing.md }}
       >
         {/* Part number hero */}
         <Card testID="part-hero">
-          <Text style={styles.pnLabel}>PART NUMBER</Text>
+          <Text style={styles.pnLabel}>{tr("common.partNumber").toUpperCase()}</Text>
           <Text style={styles.pn} selectable testID="part-number">
             {partNumber}
           </Text>
@@ -270,20 +272,20 @@ export default function PartDetail() {
             {p ? <VerificationBadge status={p.verification_status} /> : null}
           </View>
           <Text style={styles.stockLine}>
-            In stock: <Text style={{ color: colors.brand, fontWeight: "800" }}>{data?.stock_count ?? 0}</Text> units
+            {tr("partDetail.inStock")}: <Text style={{ color: colors.brand, fontWeight: "800" }}>{data?.stock_count ?? 0}</Text> {tr("common.units")}
           </Text>
         </Card>
 
         {/* Barcode + QR Code */}
         <Card testID="part-barcode">
-          <Text style={styles.cardTitle}>BARCODE & QR CODE</Text>
+          <Text style={styles.cardTitle}>{tr("partDetail.barcodeQr").toUpperCase()}</Text>
           <Barcode value={partNumber} height={64} />
           <View style={styles.qrWrap}>
             <SvgXml xml={codeSvg("qr", partNumber)} width={qrMm * 4} height={qrMm * 4} />
             <Text style={styles.qrCaption}>{partNumber}</Text>
           </View>
           <View style={styles.qrSizeRow}>
-            <Text style={styles.qrSizeLabel}>QR SIZE</Text>
+            <Text style={styles.qrSizeLabel}>{tr("partDetail.qrSize").toUpperCase()}</Text>
             <Pressable style={styles.qrSizeBtn} onPress={() => setQrMm((s) => Math.max(12, s - 2))} testID="qr-dec">
               <Ionicons name="remove" size={18} color={colors.warning} />
             </Pressable>
@@ -293,7 +295,7 @@ export default function PartDetail() {
             </Pressable>
           </View>
           <Button
-            title="Print Barcode Label"
+            title={tr("partDetail.printBarcodeLabel")}
             onPress={async () => printBarcodeLabel(await brandingFromUser(user), partNumber, p?.company, qrMm)}
             variant="secondary"
             icon="print"
@@ -305,32 +307,32 @@ export default function PartDetail() {
         {/* Part master details */}
         {p ? (
           <Card>
-            <Text style={styles.cardTitle}>DETAILS</Text>
-            <Row label="Name" value={p.name} />
-            <Row label="Company" value={p.company} />
-            <Row label="Category" value={p.category} />
-            <Row label="Variant" value={p.variant} />
-            <Row label="Year" value={p.year} />
-            <Row label="Old No." value={p.old_number} />
-            <Row label="New No." value={p.new_number} />
-            <Row label="Sticker Color" value={p.sticker_color} />
+            <Text style={styles.cardTitle}>{tr("partDetail.details").toUpperCase()}</Text>
+            <Row label={tr("common.name")} value={p.name} />
+            <Row label={tr("common.company")} value={p.company} />
+            <Row label={tr("common.category")} value={p.category} />
+            <Row label={tr("buy.variant")} value={p.variant} />
+            <Row label={tr("partDetail.year")} value={p.year} />
+            <Row label={tr("partDetail.oldNo")} value={p.old_number} />
+            <Row label={tr("partDetail.newNo")} value={p.new_number} />
+            <Row label={tr("partDetail.stickerColor")} value={p.sticker_color} />
             <Row
-              label="Compatible"
+              label={tr("partDetail.compatible")}
               value={(p.compatible_vehicles || []).join(", ")}
             />
             {p.technical_info ? (
               <View style={{ marginTop: spacing.sm }}>
-                <Text style={styles.rowLabel}>Technical Info</Text>
+                <Text style={styles.rowLabel}>{tr("partDetail.technicalInfo")}</Text>
                 <Text style={styles.tech}>{p.technical_info}</Text>
               </View>
             ) : null}
             <View style={styles.sourceRow}>
               <Ionicons name="git-branch" size={13} color={colors.info} />
-              <Text style={styles.source}>Source: {p.source || "Manual"}</Text>
+              <Text style={styles.source}>{tr("partDetail.source")}: {p.source || tr("partDetail.manual")}</Text>
             </View>
             {can("manage_parts") ? (
               <Button
-                title="Edit Details"
+                title={tr("partDetail.editDetails")}
                 onPress={() => openEdit("edit-part")}
                 icon="create"
                 variant="secondary"
@@ -341,27 +343,25 @@ export default function PartDetail() {
           </Card>
         ) : (
           <Card testID="new-part-card">
-            <Text style={styles.cardTitle}>{data?.catalog ? "NEW TO YOUR STORE" : "NEW PART"}</Text>
+            <Text style={styles.cardTitle}>{data?.catalog ? tr("partDetail.newToStore") : tr("partDetail.newPart")}</Text>
             {data?.catalog ? (
               <>
                 <View style={styles.catalogBanner}>
                   <Ionicons name="globe" size={14} color={colors.brand} />
-                  <Text style={styles.catalogBannerText}>Found in Common Catalog — details shared across stores</Text>
+                  <Text style={styles.catalogBannerText}>{tr("partDetail.foundInCatalog")}</Text>
                 </View>
-                <Row label="Name" value={data.catalog.name} />
-                <Row label="Company" value={data.catalog.company} />
-                <Row label="Category" value={data.catalog.category} />
-                <Row label="Variant" value={data.catalog.variant} />
-                <Row label="Compatible" value={(data.catalog.compatible_vehicles || []).join(", ")} />
-                <Text style={styles.dim}>Add it to your store — the catalog details are pre-filled.</Text>
+                <Row label={tr("common.name")} value={data.catalog.name} />
+                <Row label={tr("common.company")} value={data.catalog.company} />
+                <Row label={tr("common.category")} value={data.catalog.category} />
+                <Row label={tr("buy.variant")} value={data.catalog.variant} />
+                <Row label={tr("partDetail.compatible")} value={(data.catalog.compatible_vehicles || []).join(", ")} />
+                <Text style={styles.dim}>{tr("partDetail.addToStoreHint")}</Text>
               </>
             ) : (
-              <Text style={styles.dim}>
-                This part number is not in the library. Save it — after AI research and Admin approval it becomes Verified.
-              </Text>
+              <Text style={styles.dim}>{tr("partDetail.notInLibrary")}</Text>
             )}
             {can("manage_parts") ? (
-              <Button title={data?.catalog ? "Add to My Store" : "Add Details & Save NEW PART"} onPress={() => openEdit("new-part")} icon="add" testID="add-new-part" style={{ marginTop: spacing.md }} />
+              <Button title={data?.catalog ? tr("partDetail.addToMyStore") : tr("partDetail.addSaveNewPart")} onPress={() => openEdit("new-part")} icon="add" testID="add-new-part" style={{ marginTop: spacing.md }} />
             ) : null}
           </Card>
         )}
@@ -369,12 +369,12 @@ export default function PartDetail() {
         {/* Purchase limit */}
         {limit ? (
           <Card>
-            <Text style={styles.cardTitle}>PURCHASE LIMIT</Text>
+            <Text style={styles.cardTitle}>{tr("buy.purchaseLimit").toUpperCase()}</Text>
             <LimitBar existing={limit.existing_stock ?? 0} allowed={limit.allowed_limit ?? null} />
             {limit.status === "STOP" ? (
               <View style={styles.stopBanner}>
                 <Ionicons name="hand-left" size={16} color={colors.onError} />
-                <Text style={styles.stopText}>LIMIT REACHED — DO NOT BUY</Text>
+                <Text style={styles.stopText}>{tr("partDetail.limitReachedDoNotBuy")}</Text>
               </View>
             ) : null}
           </Card>
@@ -384,15 +384,13 @@ export default function PartDetail() {
         <Card testID="ai-card">
           <View style={styles.aiHead}>
             <Ionicons name="sparkles" size={18} color={colors.brand} />
-            <Text style={styles.cardTitle}>AI RESEARCH (Gemini)</Text>
+            <Text style={styles.cardTitle}>{tr("partDetail.aiResearch")}</Text>
           </View>
           {!aiResult ? (
             <>
-              <Text style={styles.dim}>
-                Gemini identifies the part → sources → confidence → Admin approval → saved as Verified.
-              </Text>
+              <Text style={styles.dim}>{tr("partDetail.aiResearchHint")}</Text>
               <Button
-                title="Run AI Research"
+                title={tr("partDetail.runAiResearch")}
                 onPress={runAI}
                 loading={aiLoading}
                 icon="search"
@@ -409,13 +407,13 @@ export default function PartDetail() {
                 {aiResult.conflict ? (
                   <View style={styles.conflict}>
                     <Ionicons name="warning" size={13} color={colors.onWarning} />
-                    <Text style={styles.conflictText}>Information Conflict</Text>
+                    <Text style={styles.conflictText}>{tr("partDetail.infoConflict")}</Text>
                   </View>
                 ) : null}
                 {aiResult.grounded ? (
                   <View style={styles.grounded}>
                     <Ionicons name="globe" size={13} color={colors.onSuccess} />
-                    <Text style={styles.groundedText}>Live web sources</Text>
+                    <Text style={styles.groundedText}>{tr("partDetail.liveWebSources")}</Text>
                   </View>
                 ) : null}
               </View>
@@ -424,24 +422,24 @@ export default function PartDetail() {
                 color={
                   aiResult.confidence >= 70 ? colors.success : aiResult.confidence >= 40 ? colors.warning : colors.error
                 }
-                label="Confidence"
+                label={tr("partDetail.confidence")}
               />
-              <Row label="Name" value={aiResult.result?.name} />
-              <Row label="Category" value={aiResult.result?.category} />
-              <Row label="Vehicles" value={(aiResult.result?.compatible_vehicles || []).join(", ")} />
-              <Row label="Variant" value={aiResult.result?.variant} />
-              <Row label="Year" value={aiResult.result?.year || aiResult.result?.model_years} />
-              <Row label="Cross-ref" value={(aiResult.result?.cross_reference || []).join(", ")} />
+              <Row label={tr("common.name")} value={aiResult.result?.name} />
+              <Row label={tr("common.category")} value={aiResult.result?.category} />
+              <Row label={tr("partDetail.vehicles")} value={(aiResult.result?.compatible_vehicles || []).join(", ")} />
+              <Row label={tr("buy.variant")} value={aiResult.result?.variant} />
+              <Row label={tr("partDetail.year")} value={aiResult.result?.year || aiResult.result?.model_years} />
+              <Row label={tr("partDetail.crossRef")} value={(aiResult.result?.cross_reference || []).join(", ")} />
               {aiResult.result?.status === "NOT_FOUND" ? (
                 <View style={styles.notFound}>
                   <Ionicons name="help-circle" size={14} color={colors.warning} />
-                  <Text style={styles.notFoundText}>AI could not identify this part number — add details manually</Text>
+                  <Text style={styles.notFoundText}>{tr("partDetail.aiNotFound")}</Text>
                 </View>
               ) : null}
               {aiResult.from_database ? (
                 <View style={styles.dbTag}>
                   <Ionicons name="shield-checkmark" size={13} color={colors.success} />
-                  <Text style={styles.dbTagText}>From your Verified Library (100%)</Text>
+                  <Text style={styles.dbTagText}>{tr("partDetail.fromVerifiedLibrary")}</Text>
                 </View>
               ) : null}
               {aiResult.result?.technical_info ? (
@@ -449,7 +447,7 @@ export default function PartDetail() {
               ) : null}
               {(aiResult.sources || []).length ? (
                 <View>
-                  <Text style={styles.rowLabel}>Sources</Text>
+                  <Text style={styles.rowLabel}>{tr("partDetail.sources")}</Text>
                   {aiResult.sources.map((s: string, i: number) => (
                     <Text key={i} style={styles.sourceItem}>
                       • {s}
@@ -461,16 +459,16 @@ export default function PartDetail() {
 
               {aiResult.approval_status === "Pending" && can("ai_approve") ? (
                 <View style={{ gap: spacing.sm }}>
-                  <Button title="Review, Edit & Approve" onPress={() => openEdit("ai-approve")} icon="create" testID="ai-edit-approve" />
-                  <Button title="Reject" onPress={rejectAI} variant="danger" icon="close" testID="ai-reject" />
+                  <Button title={tr("partDetail.reviewEditApprove")} onPress={() => openEdit("ai-approve")} icon="create" testID="ai-edit-approve" />
+                  <Button title={tr("common.reject")} onPress={rejectAI} variant="danger" icon="close" testID="ai-reject" />
                 </View>
               ) : aiResult.approval_status === "Pending" ? (
                 <View style={styles.pendingNote}>
                   <Ionicons name="time" size={14} color={colors.warning} />
-                  <Text style={styles.pendingText}>Awaiting Admin approval — not shown as verified</Text>
+                  <Text style={styles.pendingText}>{tr("partDetail.awaitingApproval")}</Text>
                 </View>
               ) : null}
-              <Button title="Re-run AI" onPress={runAI} loading={aiLoading} variant="ghost" testID="rerun-ai" />
+              <Button title={tr("partDetail.rerunAi")} onPress={runAI} loading={aiLoading} variant="ghost" testID="rerun-ai" />
             </View>
           )}
         </Card>
@@ -479,7 +477,7 @@ export default function PartDetail() {
         {part?.units?.length ? (
           <Card>
             <View style={styles.stockHead}>
-              <Text style={styles.cardTitle}>STOCK UNITS ({part.units.length})</Text>
+              <Text style={styles.cardTitle}>{tr("partDetail.stockUnits").toUpperCase()} ({part.units.length})</Text>
               {isAdmin ? (
                 <View style={styles.qtyCtrl}>
                   <Pressable style={styles.qtyBtn} onPress={() => adjustStock(-1)} testID="pd-dec">
@@ -499,7 +497,7 @@ export default function PartDetail() {
                   <Text style={styles.unitLoc}>
                     {[u.location?.rack, u.location?.shelf, u.location?.box, u.location?.position]
                       .filter(Boolean)
-                      .join(" → ") || "No location"}
+                      .join(" → ") || tr("common.noLocation")}
                   </Text>
                   {u.location?.gps ? (
                     <View style={styles.unitGps}>
@@ -533,7 +531,7 @@ export default function PartDetail() {
         <View style={styles.actionRow}>
           {can("buy") ? (
             <Button
-              title="Buy"
+              title={tr("buy.title")}
               onPress={() => router.push(`/buy?pn=${encodeURIComponent(partNumber)}&company=${p?.company || "All"}` as any)}
               icon="download"
               variant="secondary"
@@ -543,7 +541,7 @@ export default function PartDetail() {
           ) : null}
           {can("sell") ? (
             <Button
-              title="Sell"
+              title={tr("sell.title")}
               onPress={() => router.push(`/sell?pn=${encodeURIComponent(partNumber)}` as any)}
               icon="cash"
               style={{ flex: 1 }}
@@ -554,7 +552,7 @@ export default function PartDetail() {
         <View style={styles.actionRow}>
           {can("requirement") ? (
             <Button
-              title="Requirement"
+              title={tr("module.requirement")}
               onPress={() => router.push(`/requirement-new?pn=${encodeURIComponent(partNumber)}&company=${p?.company || "All"}` as any)}
               icon="add-circle"
               variant="ghost"
@@ -563,16 +561,16 @@ export default function PartDetail() {
             />
           ) : null}
           {p ? (
-            <Button title="Save Known" onPress={saveKnown} icon="bookmark" variant="ghost" style={{ flex: 1 }} testID="save-known" />
+            <Button title={tr("partDetail.saveKnown")} onPress={saveKnown} icon="bookmark" variant="ghost" style={{ flex: 1 }} testID="save-known" />
           ) : null}
         </View>
       </View>
 
       <ConfirmModal
         visible={!!pendingUnit}
-        title="Delete this unit?"
-        message="This one physical unit will be permanently deleted."
-        confirmText="Delete"
+        title={tr("partDetail.deleteUnitTitle")}
+        message={tr("partDetail.deleteUnitMsg")}
+        confirmText={tr("common.delete")}
         danger
         loading={deletingUnit}
         onConfirm={performDeleteUnit}
@@ -586,7 +584,7 @@ export default function PartDetail() {
             <View style={styles.modal}>
               <View style={styles.modalHead}>
                 <Text style={styles.modalTitle}>
-                  {editMode === "ai-approve" ? "Review & Approve" : editMode === "edit-part" ? "Edit Details" : "Add Part Details"}
+                  {editMode === "ai-approve" ? tr("partDetail.reviewApprove") : editMode === "edit-part" ? tr("partDetail.editDetails") : tr("partDetail.addPartDetails")}
                 </Text>
                 <Pressable onPress={() => setEditModal(false)} testID="close-edit-modal">
                   <Ionicons name="close" size={24} color={colors.onSurface} />
@@ -596,33 +594,31 @@ export default function PartDetail() {
               {editMode === "ai-approve" ? (
                 <View style={styles.aiNote}>
                   <Ionicons name="information-circle" size={14} color={colors.brand} />
-                  <Text style={styles.aiNoteText}>
-                    This is an AI suggestion — if wrong, correct it, then it saves as Verified.
-                  </Text>
+                  <Text style={styles.aiNoteText}>{tr("partDetail.aiSuggestionHint")}</Text>
                 </View>
               ) : null}
               <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 460 }}>
-                <Field label="NAME" value={editData.name} onChangeText={(t) => setEditData((d) => ({ ...d, name: t }))} testID="edit-name" />
-                <Field label="CATEGORY" value={editData.category} onChangeText={(t) => setEditData((d) => ({ ...d, category: t }))} testID="edit-category" />
-                <Field label="COMPANY" value={editData.company} onChangeText={(t) => setEditData((d) => ({ ...d, company: t }))} testID="edit-company" />
+                <Field label={tr("common.name").toUpperCase()} value={editData.name} onChangeText={(t) => setEditData((d) => ({ ...d, name: t }))} testID="edit-name" />
+                <Field label={tr("common.category").toUpperCase()} value={editData.category} onChangeText={(t) => setEditData((d) => ({ ...d, category: t }))} testID="edit-category" />
+                <Field label={tr("common.company").toUpperCase()} value={editData.company} onChangeText={(t) => setEditData((d) => ({ ...d, company: t }))} testID="edit-company" />
                 <Field
-                  label="COMPATIBLE VEHICLES (comma separated)"
+                  label={tr("buy.compatibleVehicles").toUpperCase()}
                   value={editData.compatible_vehicles}
                   onChangeText={(t) => setEditData((d) => ({ ...d, compatible_vehicles: t }))}
                   placeholder="Hyundai Creta, Kia Seltos"
                   testID="edit-vehicles"
                 />
-                <Field label="VARIANT" value={editData.variant} onChangeText={(t) => setEditData((d) => ({ ...d, variant: t }))} testID="edit-variant" />
-                <Field label="YEAR" value={editData.year} onChangeText={(t) => setEditData((d) => ({ ...d, year: t }))} testID="edit-year" />
+                <Field label={tr("buy.variant").toUpperCase()} value={editData.variant} onChangeText={(t) => setEditData((d) => ({ ...d, variant: t }))} testID="edit-variant" />
+                <Field label={tr("partDetail.year").toUpperCase()} value={editData.year} onChangeText={(t) => setEditData((d) => ({ ...d, year: t }))} testID="edit-year" />
                 <Field
-                  label="TECHNICAL INFO"
+                  label={tr("partDetail.technicalInfo").toUpperCase()}
                   value={editData.technical_info}
                   onChangeText={(t) => setEditData((d) => ({ ...d, technical_info: t }))}
                   multiline
                   testID="edit-technical"
                 />
                 <Button
-                  title={editMode === "ai-approve" ? "Approve & Save Verified" : editMode === "edit-part" ? "Save Changes" : "Save Part"}
+                  title={editMode === "ai-approve" ? tr("partDetail.approveSaveVerified") : editMode === "edit-part" ? tr("common.saveChanges") : tr("partDetail.savePart")}
                   onPress={saveEdit}
                   loading={savingEdit}
                   icon="checkmark"

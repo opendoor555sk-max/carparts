@@ -5,6 +5,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, EmptyState, Header, Loading } from "@/src/components/ui";
 import { brandingFromUser, shareInvoicePdf } from "@/src/utils/print";
 import { colors, font, spacing } from "@/src/theme";
@@ -19,6 +20,7 @@ export default function InvoiceDetail() {
   const router = useRouter();
   const { user } = useAuth();
   const { show } = useToast();
+  const { t } = useLanguage();
 
   const [invoice, setInvoice] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -28,12 +30,12 @@ export default function InvoiceDetail() {
     try {
       setInvoice(await api.get(`/invoices/${encodeURIComponent(invoiceId)}`));
     } catch (e: any) {
-      show(e?.message || "Failed to load invoice", "error");
+      show(e?.message || t("invoice.loadFailed"), "error");
       setInvoice(null);
     } finally {
       setLoading(false);
     }
-  }, [invoiceId, show]);
+  }, [invoiceId, show, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -48,7 +50,7 @@ export default function InvoiceDetail() {
     try {
       await shareInvoicePdf(await brandingFromUser(user), invoice);
     } catch (e: any) {
-      show(e?.message || "Could not share invoice", "error");
+      show(e?.message || t("invoice.shareFailed"), "error");
     } finally {
       setSharing(false);
     }
@@ -57,7 +59,7 @@ export default function InvoiceDetail() {
   if (loading) {
     return (
       <View style={styles.flex}>
-        <Header title="Invoice" onBack={() => router.back()} />
+        <Header title={t("invoice.title")} onBack={() => router.back()} />
         <Loading />
       </View>
     );
@@ -66,8 +68,8 @@ export default function InvoiceDetail() {
   if (!invoice) {
     return (
       <View style={styles.flex}>
-        <Header title="Invoice" onBack={() => router.back()} />
-        <EmptyState icon="receipt-outline" title="Invoice not found" />
+        <Header title={t("invoice.title")} onBack={() => router.back()} />
+        <EmptyState icon="receipt-outline" title={t("invoice.notFound")} />
       </View>
     );
   }
@@ -78,13 +80,13 @@ export default function InvoiceDetail() {
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
         {invoice.customer_name ? (
           <Card>
-            <Text style={styles.cardTitle}>CUSTOMER</Text>
+            <Text style={styles.cardTitle}>{t("customers.detailTitle").toUpperCase()}</Text>
             <Text style={styles.value}>{invoice.customer_name}</Text>
           </Card>
         ) : null}
 
         <Card>
-          <Text style={styles.cardTitle}>ITEM</Text>
+          <Text style={styles.cardTitle}>{t("invoice.item").toUpperCase()}</Text>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
               <Text style={styles.value}>{invoice.part_number}</Text>
@@ -96,24 +98,24 @@ export default function InvoiceDetail() {
 
         <Card>
           <View style={styles.row}>
-            <Text style={styles.label}>Taxable Amount</Text>
+            <Text style={styles.label}>{t("invoice.taxableAmount")}</Text>
             <Text style={styles.value}>{money(invoice.price)}</Text>
           </View>
           <View style={styles.row}>
-            <Text style={styles.label}>GST ({(invoice.gst_rate * 100).toFixed(0)}%)</Text>
+            <Text style={styles.label}>{t("invoice.gst")} ({(invoice.gst_rate * 100).toFixed(0)}%)</Text>
             <Text style={styles.value}>{money(invoice.gst_amount)}</Text>
           </View>
           <View style={[styles.row, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalLabel}>{t("invoice.total")}</Text>
             <Text style={styles.totalValue}>{money(invoice.total)}</Text>
           </View>
         </Card>
 
         {invoice.price == null ? (
-          <Text style={styles.hint}>No price was recorded for this sale, so GST could not be calculated.</Text>
+          <Text style={styles.hint}>{t("invoice.noPriceHint")}</Text>
         ) : null}
 
-        <Button title="Share as PDF" onPress={doShare} loading={sharing} icon="share-social" testID="invoice-share" />
+        <Button title={t("invoice.shareAsPdf")} onPress={doShare} loading={sharing} icon="share-social" testID="invoice-share" />
       </ScrollView>
     </View>
   );

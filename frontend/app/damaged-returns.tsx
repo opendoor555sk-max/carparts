@@ -5,8 +5,10 @@ import { useFocusEffect, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
+import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, EmptyState, Field, FilterChip, Header, Loading } from "@/src/components/ui";
 import { colors, font, radius, spacing } from "@/src/theme";
+import type { TranslationKey } from "@/src/i18n/translations";
 
 type RecordType = "customer_return" | "damaged_stock" | "vendor_return";
 
@@ -25,10 +27,13 @@ type ReturnRecord = {
 
 type PickItem = { id: string; name: string; phone: string };
 
-const TYPE_META: Record<RecordType, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
-  customer_return: { label: "Customer Return", icon: "arrow-undo", color: colors.brand },
-  damaged_stock: { label: "Damaged Stock", icon: "warning", color: colors.error },
-  vendor_return: { label: "Vendor Return", icon: "return-up-back", color: colors.info },
+// Icon/color only — the display label is translated at render time via
+// t(`damagedReturns.type.${type}`) since this map is module-level (built
+// once, not per-render) and can't itself react to a language change.
+const TYPE_META: Record<RecordType, { icon: keyof typeof Ionicons.glyphMap; color: string }> = {
+  customer_return: { icon: "arrow-undo", color: colors.brand },
+  damaged_stock: { icon: "warning", color: colors.error },
+  vendor_return: { icon: "return-up-back", color: colors.info },
 };
 
 // Lightweight debounced name/phone search shared by the customer and vendor
@@ -75,6 +80,8 @@ function usePicker(endpoint: "/customers" | "/vendors") {
 export default function DamagedReturns() {
   const router = useRouter();
   const { show } = useToast();
+  const { t, tStatus } = useLanguage();
+  const typeLabel = (type: RecordType) => t(`damagedReturns.type.${type}` as TranslationKey);
 
   const [records, setRecords] = useState<ReturnRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,7 +124,7 @@ export default function DamagedReturns() {
 
   const submit = async () => {
     if (!partNumber.trim()) {
-      show("Part number required", "error");
+      show(t("common.errPartNumberRequired"), "error");
       return;
     }
     setSaving(true);
@@ -129,22 +136,22 @@ export default function DamagedReturns() {
           customer_id: customerPicker.selected?.id || null,
           note: note.trim(),
         });
-        show(condition === "good" ? "Return recorded — back in sellable stock" : "Return recorded — marked damaged", "success");
+        show(condition === "good" ? t("damagedReturns.returnGood") : t("damagedReturns.returnDamaged"), "success");
       } else if (modal === "damaged_stock") {
         await api.post("/returns/damaged", { part_number: partNumber.trim(), note: note.trim() });
-        show("Unit marked damaged — removed from sellable stock", "success");
+        show(t("damagedReturns.markedDamaged"), "success");
       } else if (modal === "vendor_return") {
         await api.post("/returns/vendor", {
           part_number: partNumber.trim(),
           vendor_id: vendorPicker.selected?.id || null,
           reason: note.trim(),
         });
-        show("Vendor return recorded — unit removed from stock", "success");
+        show(t("damagedReturns.vendorReturnRecorded"), "success");
       }
       setModal(null);
       load();
     } catch (e: any) {
-      show(e?.detail?.message || e?.message || "Save failed", "error");
+      show(e?.detail?.message || e?.message || t("common.saveFailed"), "error");
     } finally {
       setSaving(false);
     }
@@ -152,27 +159,27 @@ export default function DamagedReturns() {
 
   return (
     <View style={styles.flex}>
-      <Header title="Damaged / Returns" subtitle="Customer returns, damaged stock, vendor returns" onBack={() => router.back()} />
+      <Header title={t("damagedReturns.title")} subtitle={t("damagedReturns.subtitle")} onBack={() => router.back()} />
 
       <View style={styles.actionRow}>
         <Pressable style={styles.actionBtn} onPress={() => openModal("customer_return")} testID="action-customer-return">
           <Ionicons name={TYPE_META.customer_return.icon} size={22} color={TYPE_META.customer_return.color} />
-          <Text style={styles.actionText}>Customer{"\n"}Return</Text>
+          <Text style={styles.actionText}>{t("damagedReturns.customerReturnShort")}</Text>
         </Pressable>
         <Pressable style={styles.actionBtn} onPress={() => openModal("damaged_stock")} testID="action-mark-damaged">
           <Ionicons name={TYPE_META.damaged_stock.icon} size={22} color={TYPE_META.damaged_stock.color} />
-          <Text style={styles.actionText}>Mark{"\n"}Damaged</Text>
+          <Text style={styles.actionText}>{t("damagedReturns.markDamagedShort")}</Text>
         </Pressable>
         <Pressable style={styles.actionBtn} onPress={() => openModal("vendor_return")} testID="action-vendor-return">
           <Ionicons name={TYPE_META.vendor_return.icon} size={22} color={TYPE_META.vendor_return.color} />
-          <Text style={styles.actionText}>Vendor{"\n"}Return</Text>
+          <Text style={styles.actionText}>{t("damagedReturns.vendorReturnShort")}</Text>
         </Pressable>
       </View>
 
       {loading ? (
         <Loading />
       ) : records.length === 0 ? (
-        <EmptyState icon="return-down-back-outline" title="No records yet" subtitle="Customer returns, damaged stock and vendor returns will show here" />
+        <EmptyState icon="return-down-back-outline" title={t("damagedReturns.noRecords")} subtitle={t("damagedReturns.noRecordsSub")} />
       ) : (
         <FlatList
           data={records}
@@ -188,7 +195,7 @@ export default function DamagedReturns() {
                 <View style={{ flex: 1 }}>
                   <View style={styles.rowTop}>
                     <Text style={styles.pn}>{item.part_number}</Text>
-                    <Text style={[styles.typeLabel, { color: meta.color }]}>{meta.label}</Text>
+                    <Text style={[styles.typeLabel, { color: meta.color }]}>{typeLabel(item.type)}</Text>
                   </View>
                   <Text style={styles.meta}>
                     {new Date(item.at).toLocaleString()}
@@ -206,22 +213,22 @@ export default function DamagedReturns() {
         <View style={mstyles.wrap}>
           <View style={mstyles.box}>
             <ScrollView keyboardShouldPersistTaps="handled">
-              <Text style={mstyles.title}>{modal ? TYPE_META[modal].label : ""}</Text>
+              <Text style={mstyles.title}>{modal ? typeLabel(modal) : ""}</Text>
 
-              <Field label="Part number" value={partNumber} onChangeText={setPartNumber} autoCapitalize="characters" placeholder="e.g. 39100-2B000" testID="return-pn" />
+              <Field label={t("common.partNumber")} value={partNumber} onChangeText={setPartNumber} autoCapitalize="characters" placeholder="e.g. 39100-2B000" testID="return-pn" />
 
               {modal === "customer_return" ? (
                 <>
-                  <Text style={mstyles.label}>Condition</Text>
+                  <Text style={mstyles.label}>{t("buy.condition")}</Text>
                   <View style={mstyles.chipRow}>
-                    <FilterChip label="Good (reusable)" active={condition === "good"} onPress={() => setCondition("good")} testID="return-condition-good" />
-                    <FilterChip label="Damaged" active={condition === "damaged"} onPress={() => setCondition("damaged")} testID="return-condition-damaged" />
+                    <FilterChip label={t("damagedReturns.goodReusable")} active={condition === "good"} onPress={() => setCondition("good")} testID="return-condition-good" />
+                    <FilterChip label={tStatus("Damaged")} active={condition === "damaged"} onPress={() => setCondition("damaged")} testID="return-condition-damaged" />
                   </View>
                   <Field
-                    label="Customer (optional)"
+                    label={t("damagedReturns.customerOptional")}
                     value={customerPicker.query}
                     onChangeText={customerPicker.search}
-                    placeholder="Search name or phone"
+                    placeholder={t("customers.searchPlaceholder")}
                     testID="return-customer-search"
                   />
                   {customerPicker.results.length ? (
@@ -233,17 +240,17 @@ export default function DamagedReturns() {
                       ))}
                     </View>
                   ) : null}
-                  <Field label="Note (optional)" value={note} onChangeText={setNote} placeholder="Condition note" multiline testID="return-note" />
+                  <Field label={t("common.noteOptional")} value={note} onChangeText={setNote} placeholder={t("damagedReturns.conditionNote")} multiline testID="return-note" />
                 </>
               ) : modal === "damaged_stock" ? (
-                <Field label="Note (optional)" value={note} onChangeText={setNote} placeholder="What happened to it" multiline testID="return-note" />
+                <Field label={t("common.noteOptional")} value={note} onChangeText={setNote} placeholder={t("damagedReturns.whatHappened")} multiline testID="return-note" />
               ) : modal === "vendor_return" ? (
                 <>
                   <Field
-                    label="Vendor (optional)"
+                    label={t("damagedReturns.vendorOptional")}
                     value={vendorPicker.query}
                     onChangeText={vendorPicker.search}
-                    placeholder="Search name or phone"
+                    placeholder={t("customers.searchPlaceholder")}
                     testID="return-vendor-search"
                   />
                   {vendorPicker.results.length ? (
@@ -255,13 +262,13 @@ export default function DamagedReturns() {
                       ))}
                     </View>
                   ) : null}
-                  <Field label="Reason (optional)" value={note} onChangeText={setNote} placeholder="Why it's going back" multiline testID="return-note" />
+                  <Field label={t("damagedReturns.reasonOptional")} value={note} onChangeText={setNote} placeholder={t("damagedReturns.whyGoingBack")} multiline testID="return-note" />
                 </>
               ) : null}
 
               <View style={mstyles.row}>
-                <Button title="Cancel" onPress={() => setModal(null)} variant="secondary" style={{ flex: 1 }} testID="return-cancel" />
-                <Button title="Save" onPress={submit} loading={saving} style={{ flex: 1 }} testID="return-save" />
+                <Button title={t("ui.cancel")} onPress={() => setModal(null)} variant="secondary" style={{ flex: 1 }} testID="return-cancel" />
+                <Button title={t("damagedReturns.save")} onPress={submit} loading={saving} style={{ flex: 1 }} testID="return-save" />
               </View>
             </ScrollView>
           </View>
