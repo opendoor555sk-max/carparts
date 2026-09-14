@@ -18,7 +18,7 @@ import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, Field, Header, Loading, StatusChip } from "@/src/components/ui";
-import { colors, font, radius, spacing } from "@/src/theme";
+import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 export default function Users() {
   const router = useRouter();
@@ -355,7 +355,7 @@ export default function Users() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
-  addBtn: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" },
+  addBtn: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center", ...shadow.sm },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   name: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
   username: { color: colors.info, fontSize: font.sm },
