@@ -99,9 +99,9 @@ export default function Requirements() {
             >
               <Ionicons name="add" size={22} color={colors.onBrand} />
             </Pressable>
+            <SignOutButton />
           </View>
         }
-        center={<SignOutButton />}
       />
       <ScrollView
         horizontal

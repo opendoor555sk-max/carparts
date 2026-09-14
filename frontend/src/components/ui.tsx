@@ -56,7 +56,7 @@ export function Header({
   );
 }
 
-// ---------- Quick Sign Out (top-center of a screen header) ----------
+// ---------- Quick Sign Out (top-right of a screen header) ----------
 // Confirms before signing out since this is now a prominent, easy-to-tap
 // button rather than buried in a menu — an accidental sign-out here would
 // be more disruptive than the old, harder-to-reach entry point.

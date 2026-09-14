@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  signOutRow: { alignItems: "center", marginTop: spacing.sm },
+  signOutRow: { alignItems: "flex-end", marginTop: spacing.sm },
   hello: { color: colors.info, fontSize: font.sm },
   name: { color: colors.onSurface, fontSize: font.xl, fontWeight: "800" },
   syncPill: {

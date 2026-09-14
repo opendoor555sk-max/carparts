@@ -228,26 +228,28 @@ export default function Inventory() {
         title={t("inventory.title")}
         subtitle={t("inventory.subtitle")}
         right={
-          units.length ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-              {exporting ? (
-                <ActivityIndicator color={colors.brand} />
-              ) : (
-                <Pressable onPress={exportToExcel} hitSlop={12} testID="export-inventory-excel">
-                  <Ionicons name="download" size={22} color={colors.brand} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+            {units.length ? (
+              <>
+                {exporting ? (
+                  <ActivityIndicator color={colors.brand} />
+                ) : (
+                  <Pressable onPress={exportToExcel} hitSlop={12} testID="export-inventory-excel">
+                    <Ionicons name="download" size={22} color={colors.brand} />
+                  </Pressable>
+                )}
+                <Pressable
+                  onPress={async () => printInventory(await brandingFromUser(user), units)}
+                  hitSlop={12}
+                  testID="print-inventory"
+                >
+                  <Ionicons name="print" size={22} color={colors.brand} />
                 </Pressable>
-              )}
-              <Pressable
-                onPress={async () => printInventory(await brandingFromUser(user), units)}
-                hitSlop={12}
-                testID="print-inventory"
-              >
-                <Ionicons name="print" size={22} color={colors.brand} />
-              </Pressable>
-            </View>
-          ) : undefined
+              </>
+            ) : null}
+            <SignOutButton />
+          </View>
         }
-        center={<SignOutButton />}
       />
       <View style={styles.pnRow}>
         <TextInput
