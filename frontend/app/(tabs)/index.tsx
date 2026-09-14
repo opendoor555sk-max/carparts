@@ -251,6 +251,34 @@ export default function Home() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.info} />
           </Pressable>
+          <Pressable
+            style={styles.report}
+            onPress={() => router.push("/(tabs)/inventory" as any)}
+            testID="report-inventory"
+          >
+            <View style={[styles.reportIcon, { borderColor: colors.brand }]}>
+              <Ionicons name="cube" size={22} color={colors.brand} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reportTitle}>{t("tabs.inventory")}</Text>
+              <Text style={styles.reportSub}>{t("home.reportInventorySub")}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.info} />
+          </Pressable>
+          <Pressable
+            style={styles.report}
+            onPress={() => router.push("/(tabs)/requirements" as any)}
+            testID="report-requirements"
+          >
+            <View style={[styles.reportIcon, { borderColor: colors.warning }]}>
+              <Ionicons name="list-circle" size={22} color={colors.warning} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reportTitle}>{t("tabs.needs")}</Text>
+              <Text style={styles.reportSub}>{t("home.reportRequirementsSub")}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.info} />
+          </Pressable>
           {isAdmin ? (
             <Pressable style={styles.report} onPress={shareDailySales} disabled={sharingSales} testID="home-share-daily-sales">
               <View style={[styles.reportIcon, { borderColor: "#25D366" }]}>
@@ -286,6 +314,29 @@ export default function Home() {
             </View>
           </>
         ) : null}
+
+        {/* Standalone entry point at the very bottom of the screen — a
+            single, always-visible way back into Reports regardless of how
+            far a user has scrolled or which admin-only sections they can
+            see above. There's no separate "reports overview" screen, so
+            per the fallback this just re-links into the same reports
+            already listed higher up (defaulting to Purchases, same as
+            that tile does). */}
+        <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>{t("home.reports").toUpperCase()}</Text>
+        <Pressable
+          style={styles.report}
+          onPress={() => router.push("/report?mode=buy" as any)}
+          testID="home-view-all-reports"
+        >
+          <View style={[styles.reportIcon, { borderColor: colors.brand }]}>
+            <Ionicons name="bar-chart" size={22} color={colors.brand} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.reportTitle}>{t("home.viewAllReports")}</Text>
+            <Text style={styles.reportSub}>{t("home.viewAllReportsSub")}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.info} />
+        </Pressable>
       </ScrollView>
     </View>
   );
