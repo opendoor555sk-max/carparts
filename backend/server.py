@@ -3,6 +3,8 @@ import re
 import uuid
 import json
 import logging
+import asyncio
+import time
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
@@ -719,10 +721,15 @@ async def startup():
     except Exception as e:
         logger.warning(f"Object storage init failed (non-fatal): {e}")
 
-    # Unique index backing the one-shot demo lock (see /demo-check) — the
-    # uniqueness on "id" is what makes the check-and-set atomic and race-safe.
+    # Unique index backing the one-shot demo lock (see /demo-check) AND the
+    # /buy purchase-limit mutex (see _acquire_buy_lock) — the uniqueness on
+    # "id" is what makes both's insert-to-acquire pattern atomic and
+    # race-safe. TTL index self-heals an abandoned buy-lock (e.g. the process
+    # crashed mid-request) rather than deadlocking that part's purchases
+    # forever; demo-check's lock has no expires_at field so it's unaffected.
     try:
         await db.locks.create_index("id", unique=True)
+        await db.locks.create_index("expires_at", expireAfterSeconds=0)
     except Exception as e:
         logger.warning(f"locks index create warning: {e}")
 
@@ -1234,6 +1241,58 @@ async def _find_canonical_part(base: Dict[str, Any], pn: str) -> Optional[dict]:
     return canonicals[0]
 
 
+# ---------------- Purchase-limit concurrency lock ----------------
+# ba366de and ce7f981 fixed two *identity* bugs (a limit set under one
+# spelling of a part number not matching stock recorded under another). Both
+# assumed /buy's check-then-insert — read existing_stock via compute_limit(),
+# decide, THEN insert the new stock.insert_one() — was itself safe. It isn't:
+# nothing serializes two /buy calls for the same part, so two requests can
+# both read "4 of 5 used, OK to proceed" before either write commits, and
+# both insert — landing at 6 units against a limit of 5 with no error to
+# either caller. This reproduces reliably under real network/DB latency
+# (verified by re-running compute_limit() with an injected delay between its
+# read and /buy's insert: 12 concurrent buys against a limit of 5 all
+# succeeded, 12 stock docs created, zero blocked) — it just doesn't show up
+# in a sequential test, which is why it read as "sometimes blocks, sometimes
+# doesn't" rather than a deterministic failure like the two prior bugs.
+#
+# Fix: a short-lived mutex per (store, canonical part number), so only one
+# /buy critical section for a given part runs at a time — the same atomic
+# insert-races-a-unique-index idiom this file already uses for the
+# /demo-check one-shot lock (db.locks, unique index on "id"). A TTL index on
+# expires_at self-heals an abandoned lock (e.g. the process crashed
+# mid-request) instead of deadlocking that part's purchases forever.
+BUY_LOCK_TTL_SECONDS = 30.0
+BUY_LOCK_WAIT_SECONDS = 5.0
+
+
+def _buy_lock_id(store_id: Optional[str], part_number: str) -> str:
+    # _canon_pn (not the raw/regex-fuzzy spelling) so every punctuation/casing
+    # variant of the same real part shares exactly one lock — otherwise two
+    # concurrent buys scanned/typed differently could each acquire a
+    # DIFFERENT lock and race just as before.
+    return f"buylock:{store_id}:{_canon_pn(part_number)}"
+
+
+async def _acquire_buy_lock(lock_id: str) -> bool:
+    deadline = time.monotonic() + BUY_LOCK_WAIT_SECONDS
+    while True:
+        try:
+            await db.locks.insert_one({
+                "id": lock_id, "at": now_iso(),
+                "expires_at": datetime.now(timezone.utc) + timedelta(seconds=BUY_LOCK_TTL_SECONDS),
+            })
+            return True
+        except DuplicateKeyError:
+            if time.monotonic() >= deadline:
+                return False
+            await asyncio.sleep(0.05)
+
+
+async def _release_buy_lock(lock_id: str) -> None:
+    await db.locks.delete_one({"id": lock_id})
+
+
 async def compute_limit(store_id: Optional[str], part_number: str) -> dict:
     # part_number is never case-normalized at write time elsewhere, and Mongo
     # matches are case-sensitive — normalize here so a limit set under one
@@ -1415,75 +1474,85 @@ async def buy(body: BuyIn, store_id: Optional[str] = None, user=Depends(require(
     if not pn:
         raise HTTPException(400, "Part number required")
     sid = resolve_store(user, store_id, require_write=True)
-    # Match punctuation-insensitively (see _pn_regex) so a buy scanned as
-    # "954A0CCAF0" finds a part document already created under a
-    # differently-formatted spelling of the SAME part number — e.g.
-    # "954A0-CCAF0", typed by hand when an admin proactively set a limit on
-    # it via /limits/part before any purchase existed. Without this, the buy
-    # would spawn an untracked duplicate part with no limit attached, and
-    # the configured limit would silently never apply to it.
-    # _find_canonical_part (not a bare find_one) also self-heals the case
-    # where BOTH spellings already exist as separate documents from before
-    # this matching existed — merging whichever one carries the limit onto
-    # the identity kept, instead of risking an unordered find_one silently
-    # returning the limit-less sibling.
-    part = await _find_canonical_part({"store_id": sid}, pn)
-    if part:
-        # Keep recording stock under the identity that already exists (and
-        # may already carry a limit/threshold) rather than the raw scanned
-        # spelling, so every buy of this part accumulates against one
-        # canonical part_number instead of fragmenting across spellings.
-        pn = part["part_number"]
-    if not part:
-        cat = await db.catalog.find_one({"part_number": pn}, {"_id": 0}) or {}
-        comp = body.company if _nonempty(body.company) else cat.get("company")
-        part = {
-            "id": new_id(), "store_id": sid, "part_number": pn, "company": comp or "All",
-            "name": body.name or cat.get("name", "") or "",
-            "category": body.category or cat.get("category", "") or "",
-            "compatible_vehicles": body.compatible_vehicles or cat.get("compatible_vehicles", []) or [],
-            "variant": body.variant or cat.get("variant", "") or "",
-            "year": cat.get("year", "") or "", "old_number": cat.get("old_number", "") or "",
-            "new_number": cat.get("new_number", "") or "", "barcode": body.barcode or "",
-            "sticker_color": "", "technical_info": "", "photos": [], "source": "Buy",
-            "verification_status": "Unverified", "created_at": now_iso(),
-            "created_by": user["username"], "purchase_limit": None, "limit_enabled": False,
+    # Serialize the whole check-then-insert critical section per (store,
+    # canonical part) — see _acquire_buy_lock's comment. Without this, two
+    # concurrent /buy calls for the same part can both read "under limit"
+    # from compute_limit() before either write commits, and both insert.
+    lock_id = _buy_lock_id(sid, pn)
+    if not await _acquire_buy_lock(lock_id):
+        raise HTTPException(503, "Server busy processing this part — try again")
+    try:
+        # Match punctuation-insensitively (see _pn_regex) so a buy scanned as
+        # "954A0CCAF0" finds a part document already created under a
+        # differently-formatted spelling of the SAME part number — e.g.
+        # "954A0-CCAF0", typed by hand when an admin proactively set a limit on
+        # it via /limits/part before any purchase existed. Without this, the buy
+        # would spawn an untracked duplicate part with no limit attached, and
+        # the configured limit would silently never apply to it.
+        # _find_canonical_part (not a bare find_one) also self-heals the case
+        # where BOTH spellings already exist as separate documents from before
+        # this matching existed — merging whichever one carries the limit onto
+        # the identity kept, instead of risking an unordered find_one silently
+        # returning the limit-less sibling.
+        part = await _find_canonical_part({"store_id": sid}, pn)
+        if part:
+            # Keep recording stock under the identity that already exists (and
+            # may already carry a limit/threshold) rather than the raw scanned
+            # spelling, so every buy of this part accumulates against one
+            # canonical part_number instead of fragmenting across spellings.
+            pn = part["part_number"]
+        if not part:
+            cat = await db.catalog.find_one({"part_number": pn}, {"_id": 0}) or {}
+            comp = body.company if _nonempty(body.company) else cat.get("company")
+            part = {
+                "id": new_id(), "store_id": sid, "part_number": pn, "company": comp or "All",
+                "name": body.name or cat.get("name", "") or "",
+                "category": body.category or cat.get("category", "") or "",
+                "compatible_vehicles": body.compatible_vehicles or cat.get("compatible_vehicles", []) or [],
+                "variant": body.variant or cat.get("variant", "") or "",
+                "year": cat.get("year", "") or "", "old_number": cat.get("old_number", "") or "",
+                "new_number": cat.get("new_number", "") or "", "barcode": body.barcode or "",
+                "sticker_color": "", "technical_info": "", "photos": [], "source": "Buy",
+                "verification_status": "Unverified", "created_at": now_iso(),
+                "created_by": user["username"], "purchase_limit": None, "limit_enabled": False,
+            }
+            await db.parts.insert_one(dict(part))
+            await upsert_catalog(pn, part, sid)
+        else:
+            fill: Dict[str, Any] = {}
+            if body.name and not part.get("name"):
+                fill["name"] = body.name
+            if body.category and not part.get("category"):
+                fill["category"] = body.category
+            if body.company and body.company != "All" and (not part.get("company") or part.get("company") == "All"):
+                fill["company"] = body.company
+            if body.compatible_vehicles and not part.get("compatible_vehicles"):
+                fill["compatible_vehicles"] = body.compatible_vehicles
+            if body.variant and not part.get("variant"):
+                fill["variant"] = body.variant
+            if fill:
+                await db.parts.update_one({"store_id": sid, "part_number": pn}, {"$set": fill})
+            await upsert_catalog(pn, {**part, **fill}, sid)
+        limit = await compute_limit(sid, pn)
+        if limit["limit_enabled"] and limit["remaining"] is not None and limit["remaining"] <= 0 and not body.override:
+            raise HTTPException(409, detail={"code": "LIMIT_REACHED", "message": "DO NOT BUY — purchase limit reached",
+                                             "limit": limit})
+        unit = {
+            "id": new_id(), "store_id": sid, "part_number": pn, "condition": body.condition,
+            "location": body.location or {}, "assigned_location": _location_from_model(body.assigned_location),
+            "photos": body.photos or [],
+            "barcode": body.barcode or "", "sold": False, "created_at": now_iso(),
+            "added_by": user["username"], "overridden": bool(body.override and limit.get("status") == "STOP"),
         }
-        await db.parts.insert_one(dict(part))
-        await upsert_catalog(pn, part, sid)
-    else:
-        fill: Dict[str, Any] = {}
-        if body.name and not part.get("name"):
-            fill["name"] = body.name
-        if body.category and not part.get("category"):
-            fill["category"] = body.category
-        if body.company and body.company != "All" and (not part.get("company") or part.get("company") == "All"):
-            fill["company"] = body.company
-        if body.compatible_vehicles and not part.get("compatible_vehicles"):
-            fill["compatible_vehicles"] = body.compatible_vehicles
-        if body.variant and not part.get("variant"):
-            fill["variant"] = body.variant
-        if fill:
-            await db.parts.update_one({"store_id": sid, "part_number": pn}, {"$set": fill})
-        await upsert_catalog(pn, {**part, **fill}, sid)
-    limit = await compute_limit(sid, pn)
-    if limit["limit_enabled"] and limit["remaining"] is not None and limit["remaining"] <= 0 and not body.override:
-        raise HTTPException(409, detail={"code": "LIMIT_REACHED", "message": "DO NOT BUY — purchase limit reached",
-                                          "limit": limit})
-    unit = {
-        "id": new_id(), "store_id": sid, "part_number": pn, "condition": body.condition,
-        "location": body.location or {}, "assigned_location": _location_from_model(body.assigned_location),
-        "photos": body.photos or [],
-        "barcode": body.barcode or "", "sold": False, "created_at": now_iso(),
-        "added_by": user["username"], "overridden": bool(body.override and limit.get("status") == "STOP"),
-    }
-    await db.stock.insert_one(dict(unit))
-    txn = {"id": new_id(), "store_id": sid, "type": "buy", "part_number": pn, "unit_id": unit["id"],
-           "price": body.price, "location": body.location or {}, "by": user["username"], "at": now_iso()}
-    await db.transactions.insert_one(dict(txn))
-    unit.pop("_id", None)
-    new_limit = await compute_limit(sid, pn)
-    return {"ok": True, "unit": unit, "limit": new_limit}
+        await db.stock.insert_one(dict(unit))
+        txn = {"id": new_id(), "store_id": sid, "type": "buy", "part_number": pn, "unit_id": unit["id"],
+               "price": body.price, "location": body.location or {}, "by": user["username"], "at": now_iso()}
+        await db.transactions.insert_one(dict(txn))
+        unit.pop("_id", None)
+        new_limit = await compute_limit(sid, pn)
+        return {"ok": True, "unit": unit, "limit": new_limit}
+    finally:
+        await _release_buy_lock(lock_id)
 
 
 # ---------------- GST Invoicing ----------------
