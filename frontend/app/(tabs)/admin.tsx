@@ -74,8 +74,12 @@ export default function Admin() {
         title={t("admin.title")}
         subtitle={user?.store_name ? `${user?.name} · ${user?.store_name}` : user?.name}
         right={
-          <Pressable onPress={logout} hitSlop={12} testID="logout-btn">
-            <Ionicons name="log-out-outline" size={24} color={colors.error} />
+          // TEMP: icon + "(TEST)" label swapped for visual OTA-delivery
+          // verification — see the OTA debug panel on the login screen.
+          // Revert to the plain log-out-outline icon once confirmed.
+          <Pressable onPress={logout} hitSlop={12} testID="logout-btn" style={styles.logoutBtn}>
+            <Ionicons name="flask" size={24} color={colors.error} />
+            <Text style={styles.logoutTestLabel}>(TEST)</Text>
           </Pressable>
         }
       />
@@ -292,6 +296,8 @@ export default function Admin() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
+  logoutBtn: { flexDirection: "row", alignItems: "center", gap: 2 },
+  logoutTestLabel: { color: colors.error, fontSize: font.sm - 2, fontWeight: "800" },
   section: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1, marginBottom: spacing.md },
   statGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   statCard: {
