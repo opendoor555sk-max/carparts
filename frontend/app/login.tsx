@@ -16,6 +16,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { useAuth } from "@/src/context/AuthContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Field } from "@/src/components/ui";
+import { UpdateDebugPanel } from "@/src/components/UpdateDebugPanel";
 import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 export default function Login() {
@@ -152,6 +153,7 @@ export default function Login() {
         </View>
 
         <Text style={styles.footer}>{t("login.footer")}</Text>
+        <UpdateDebugPanel />
       </ScrollView>
     </KeyboardAvoidingView>
   );
