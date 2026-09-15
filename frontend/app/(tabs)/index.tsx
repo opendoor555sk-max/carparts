@@ -19,7 +19,7 @@ import { useLanguage } from "@/src/context/LanguageContext";
 import { FilterChip, SignOutButton } from "@/src/components/ui";
 import { storage } from "@/src/utils/storage";
 import { useLowStockCount } from "@/src/hooks/use-low-stock-count";
-import { brandingFromUser, shareDailySalesOnWhatsApp, shareLowStockOnWhatsApp, type LowStockRow } from "@/src/utils/print";
+import { brandingFromUser, shareLowStockOnWhatsApp, type LowStockRow } from "@/src/utils/print";
 import { colors, font, radius, shadow, spacing } from "@/src/theme";
 import type { TranslationKey } from "@/src/i18n/translations";
 
@@ -61,7 +61,6 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const [company, setCompany] = useState("All");
   const [sharingLowStock, setSharingLowStock] = useState(false);
-  const [sharingSales, setSharingSales] = useState(false);
   const lowStockCount = useLowStockCount();
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
@@ -101,19 +100,6 @@ export default function Home() {
       show(e?.message || t("common.failed"), "error");
     } finally {
       setSharingLowStock(false);
-    }
-  };
-
-  const shareDailySales = async () => {
-    setSharingSales(true);
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      const report = await api.get<{ summary: any }>(`/reports/profit?date_from=${today}&date_to=${today}`);
-      await shareDailySalesOnWhatsApp(await brandingFromUser(user), report.summary, new Date().toLocaleDateString());
-    } catch (e: any) {
-      show(e?.message || t("common.failed"), "error");
-    } finally {
-      setSharingSales(false);
     }
   };
 
@@ -214,85 +200,6 @@ export default function Home() {
           <Text style={styles.hintText}>{t("home.hint")}</Text>
         </View>
 
-        <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>{t("home.reports").toUpperCase()}</Text>
-        <View style={{ gap: spacing.md }}>
-          {[
-            { key: "buy", titleKey: "report.purchases", subKey: "home.reportBuySub", icon: "download" as const, color: colors.success },
-            { key: "sell", titleKey: "report.sales", subKey: "home.reportSellSub", icon: "cash" as const, color: colors.brand },
-            { key: "stock", titleKey: "report.stockReport", subKey: "home.reportStockSub", icon: "cube" as const, color: colors.info },
-          ].map((r) => (
-            <Pressable
-              key={r.key}
-              style={styles.report}
-              onPress={() => router.push(`/report?mode=${r.key}` as any)}
-              testID={`report-${r.key}`}
-            >
-              <View style={[styles.reportIcon, { borderColor: r.color }]}>
-                <Ionicons name={r.icon} size={22} color={r.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.reportTitle}>{t(r.titleKey as TranslationKey)}</Text>
-                <Text style={styles.reportSub}>{t(r.subKey as TranslationKey)}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.info} />
-            </Pressable>
-          ))}
-          <Pressable
-            style={styles.report}
-            onPress={() => router.push("/profit-report" as any)}
-            testID="report-profit"
-          >
-            <View style={[styles.reportIcon, { borderColor: colors.warning }]}>
-              <Ionicons name="trending-up" size={22} color={colors.warning} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.reportTitle}>{t("profitReport.title")}</Text>
-              <Text style={styles.reportSub}>{t("home.reportProfitSub")}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.info} />
-          </Pressable>
-          <Pressable
-            style={styles.report}
-            onPress={() => router.push("/(tabs)/inventory" as any)}
-            testID="report-inventory"
-          >
-            <View style={[styles.reportIcon, { borderColor: colors.brand }]}>
-              <Ionicons name="cube" size={22} color={colors.brand} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.reportTitle}>{t("tabs.inventory")}</Text>
-              <Text style={styles.reportSub}>{t("home.reportInventorySub")}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.info} />
-          </Pressable>
-          <Pressable
-            style={styles.report}
-            onPress={() => router.push("/(tabs)/requirements" as any)}
-            testID="report-requirements"
-          >
-            <View style={[styles.reportIcon, { borderColor: colors.warning }]}>
-              <Ionicons name="list-circle" size={22} color={colors.warning} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.reportTitle}>{t("tabs.needs")}</Text>
-              <Text style={styles.reportSub}>{t("home.reportRequirementsSub")}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.info} />
-          </Pressable>
-          {isAdmin ? (
-            <Pressable style={styles.report} onPress={shareDailySales} disabled={sharingSales} testID="home-share-daily-sales">
-              <View style={[styles.reportIcon, { borderColor: "#25D366" }]}>
-                <Ionicons name="logo-whatsapp" size={22} color="#25D366" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.reportTitle}>{t("home.shareDailySales")}</Text>
-                <Text style={styles.reportSub}>{t("home.shareDailySalesSub")}</Text>
-              </View>
-              {sharingSales ? <ActivityIndicator color={colors.brand} /> : <Ionicons name="chevron-forward" size={18} color={colors.info} />}
-            </Pressable>
-          ) : null}
-        </View>
-
         {isAdmin ? (
           <>
             <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>STICKER PRINTING</Text>
@@ -314,27 +221,6 @@ export default function Home() {
             </View>
           </>
         ) : null}
-
-        {/* Standalone entry point at the very bottom of the screen — a
-            single, always-visible way back into Reports regardless of how
-            far a user has scrolled or which admin-only sections they can
-            see above. Now routes to the dedicated Reports tab (see
-            (tabs)/reports.tsx) rather than a single fixed report mode. */}
-        <Text style={[styles.sectionLabel, { marginTop: spacing.xl }]}>{t("home.reports").toUpperCase()}</Text>
-        <Pressable
-          style={styles.report}
-          onPress={() => router.push("/(tabs)/reports" as any)}
-          testID="home-view-all-reports"
-        >
-          <View style={[styles.reportIcon, { borderColor: colors.brand }]}>
-            <Ionicons name="bar-chart" size={22} color={colors.brand} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.reportTitle}>{t("home.viewAllReports")}</Text>
-            <Text style={styles.reportSub}>{t("home.viewAllReportsSub")}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.info} />
-        </Pressable>
       </ScrollView>
     </View>
   );

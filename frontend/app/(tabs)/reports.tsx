@@ -1,9 +1,14 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
+import { api } from "@/src/api/client";
+import { useAuth } from "@/src/context/AuthContext";
+import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Header, SignOutButton } from "@/src/components/ui";
+import { brandingFromUser, shareDailySalesOnWhatsApp } from "@/src/utils/print";
 import { colors, font, radius, shadow, spacing } from "@/src/theme";
 import type { TranslationKey } from "@/src/i18n/translations";
 
@@ -33,7 +38,27 @@ const LINKS: LinkItem[] = [
 
 export default function Reports() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { show } = useToast();
   const { t } = useLanguage();
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+  const [sharingSales, setSharingSales] = useState(false);
+
+  // Not a navigation link like the rest of LINKS — it's an action (fetch
+  // today's totals, then hand off to WhatsApp), so it's rendered separately
+  // below rather than folded into LINKS.map's uniform router.push handler.
+  const shareDailySales = async () => {
+    setSharingSales(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const report = await api.get<{ summary: any }>(`/reports/profit?date_from=${today}&date_to=${today}`);
+      await shareDailySalesOnWhatsApp(await brandingFromUser(user), report.summary, new Date().toLocaleDateString());
+    } catch (e: any) {
+      show(e?.message || t("common.failed"), "error");
+    } finally {
+      setSharingSales(false);
+    }
+  };
 
   return (
     <View style={styles.flex}>
@@ -60,6 +85,18 @@ export default function Reports() {
             <Ionicons name="chevron-forward" size={18} color={colors.info} />
           </Pressable>
         ))}
+        {isAdmin ? (
+          <Pressable style={styles.row} onPress={shareDailySales} disabled={sharingSales} testID="reports-share-daily-sales">
+            <View style={[styles.icon, { borderColor: "#25D366" }]}>
+              <Ionicons name="logo-whatsapp" size={22} color="#25D366" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>{t("home.shareDailySales")}</Text>
+              <Text style={styles.sub}>{t("home.shareDailySalesSub")}</Text>
+            </View>
+            {sharingSales ? <ActivityIndicator color={colors.brand} /> : <Ionicons name="chevron-forward" size={18} color={colors.info} />}
+          </Pressable>
+        ) : null}
       </ScrollView>
     </View>
   );
