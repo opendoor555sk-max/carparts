@@ -108,7 +108,13 @@ export default function Home() {
       <View style={[styles.topBarWrap, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.topBar}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.hello}>Welcome,</Text>
+            {/* TEMP: small, easy-to-spot marker for re-verifying OTA delivery
+                — bump the label (OTA v2 -> v3 -> ...) each time we need fresh
+                proof an update actually reached a device. Remove once OTA
+                delivery is confirmed working reliably. */}
+            <Text style={styles.hello}>
+              Welcome, <Text style={styles.otaMarker}>[OTA v2]</Text>
+            </Text>
             <Text style={styles.name}>{user?.name}</Text>
           </View>
           <View style={styles.syncPill} testID="sync-pill">
@@ -240,6 +246,7 @@ const styles = StyleSheet.create({
   },
   signOutRow: { alignItems: "flex-end", marginTop: spacing.sm },
   hello: { color: colors.info, fontSize: font.sm },
+  otaMarker: { color: colors.brand, fontWeight: "800" },
   name: { color: colors.onSurface, fontSize: font.xl, fontWeight: "800" },
   syncPill: {
     flexDirection: "row",
