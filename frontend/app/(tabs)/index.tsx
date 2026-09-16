@@ -113,7 +113,7 @@ export default function Home() {
                 proof an update actually reached a device. Remove once OTA
                 delivery is confirmed working reliably. */}
             <Text style={styles.hello}>
-              Welcome, <Text style={styles.otaMarker}>[OTA v2]</Text>
+              Welcome, <Text style={styles.otaMarker}>[OTA v3]</Text>
             </Text>
             <Text style={styles.name}>{user?.name}</Text>
           </View>
