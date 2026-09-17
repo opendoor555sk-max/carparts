@@ -33,6 +33,11 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="grid" size={size} color={color} />,
         }}
       />
+      {/* Inventory kept as a real, navigable route (still linked from Home,
+          the low-stock banner, and the Reports tab overview screen) but no
+          longer its own bottom-tab button — same href: null pattern used
+          for Requirements/Needs below, now redundant here too since
+          Inventory is already one tap away from the Reports tab. */}
       <Tabs.Screen
         name="inventory"
         options={{
@@ -40,6 +45,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="cube" size={size} color={color} />,
           tabBarBadge: lowStockCount > 0 ? lowStockCount : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.error },
+          href: null,
         }}
       />
       <Tabs.Screen
