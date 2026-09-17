@@ -1,9 +1,17 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Platform } from "react-native";
-import { colors, font } from "@/src/theme";
+import { colors, font, spacing } from "@/src/theme";
 import { useLowStockCount } from "@/src/hooks/use-low-stock-count";
 import { useLanguage } from "@/src/context/LanguageContext";
+
+// ~10mm of extra clearance so the tab bar's icons/labels sit further up from
+// the bottom edge, composed from the existing spacing scale (xxl + xs =
+// 32 + 4 = 36px) rather than a new magic number — lands in the ~35-40px
+// range 10mm works out to at typical phone pixel densities. Added to both
+// height and paddingBottom so the bar grows a taller "floor" underneath the
+// icons instead of shrinking their existing tap-target area.
+const TAB_BAR_LIFT = spacing.xxl + spacing.xs; // 36
 
 export default function TabsLayout() {
   const lowStockCount = useLowStockCount();
@@ -19,8 +27,8 @@ export default function TabsLayout() {
           backgroundColor: colors.surface2,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: Platform.OS === "ios" ? 88 : 64,
-          paddingBottom: Platform.OS === "ios" ? 28 : 8,
+          height: (Platform.OS === "ios" ? 88 : 64) + TAB_BAR_LIFT,
+          paddingBottom: (Platform.OS === "ios" ? 28 : 8) + TAB_BAR_LIFT,
           paddingTop: 8,
         },
         tabBarLabelStyle: { fontSize: font.sm - 1, fontWeight: "700" },
