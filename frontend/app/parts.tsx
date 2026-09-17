@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
-import { EmptyState, Header, Loading, StatusChip } from "@/src/components/ui";
+import { Button, EmptyState, Header, Loading, StatusChip } from "@/src/components/ui";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
@@ -14,18 +14,25 @@ export default function PartsList() {
   const router = useRouter();
   const [parts, setParts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Previously a bare try/catch {} — a fetch failure (e.g. a cold-start
+  // network hiccup) silently left parts=[] and looked identical to "this
+  // category really has zero parts". Surface the failure instead, with a
+  // way to retry the same request rather than requiring a full app restart.
   const load = useCallback(async () => {
+    setError(null);
     try {
       const params = new URLSearchParams();
       if (category) params.append("category", category as string);
       if (company && company !== "All") params.append("company", company as string);
       setParts(await api.get(`/parts?${params.toString()}`));
-    } catch {
+    } catch (e: any) {
+      setError(e?.message || t("common.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [category, company]);
+  }, [category, company, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -39,6 +46,13 @@ export default function PartsList() {
       <Header title={(title as string) || t("parts.title")} subtitle={t("parts.subtitle")} onBack={() => router.back()} />
       {loading ? (
         <Loading />
+      ) : error ? (
+        <EmptyState
+          icon="cloud-offline-outline"
+          title={t("common.loadFailed")}
+          subtitle={error}
+          action={<Button title={t("common.retry")} onPress={load} icon="refresh" testID="parts-retry" />}
+        />
       ) : parts.length === 0 ? (
         <EmptyState icon="documents-outline" title={t("parts.empty")} subtitle={t("parts.emptySub")} />
       ) : (

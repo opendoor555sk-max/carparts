@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
 import { useLanguage } from "@/src/context/LanguageContext";
-import { Header, Loading, SignOutButton } from "@/src/components/ui";
+import { Button, EmptyState, Header, Loading, SignOutButton } from "@/src/components/ui";
 import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -37,21 +37,30 @@ export default function Categories() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
 
+  // Previously a bare try/catch {} — a fetch failure (e.g. a cold-start
+  // network hiccup) silently left groups=[] and looked identical to "this
+  // store really has zero categories". Surface the failure instead, with a
+  // way to retry the same request rather than requiring a full app restart.
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      const data = await api.get<{ groups: Group[]; total: number }>("/categories");
+      setGroups(data.groups);
+      setTotal(data.total);
+      setOpen({ [data.groups[0]?.group]: true });
+    } catch (e: any) {
+      setError(e?.message || t("common.loadFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
   useEffect(() => {
-    (async () => {
-      try {
-        const data = await api.get<{ groups: Group[]; total: number }>("/categories");
-        setGroups(data.groups);
-        setTotal(data.total);
-        setOpen({ [data.groups[0]?.group]: true });
-      } catch {
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    load();
+  }, [load]);
 
   const toggle = (g: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -63,6 +72,20 @@ export default function Categories() {
       <View style={styles.flex}>
         <Header title={t("categories.title")} right={<SignOutButton />} />
         <Loading />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.flex}>
+        <Header title={t("categories.title")} right={<SignOutButton />} />
+        <EmptyState
+          icon="cloud-offline-outline"
+          title={t("common.loadFailed")}
+          subtitle={error}
+          action={<Button title={t("common.retry")} onPress={load} icon="refresh" testID="categories-retry" />}
+        />
       </View>
     );
   }

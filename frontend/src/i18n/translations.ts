@@ -367,6 +367,7 @@ const dict = {
     "vendors.deleteConfirmMsg": "ડિરેક્ટરીમાંથી કાયમ માટે દૂર થઈ જશે.",
 
     "common.loadFailed": "લોડ કરવામાં નિષ્ફળ",
+    "common.retry": "ફરી પ્રયાસ કરો",
     "common.reject": "નકારો",
 
     "partDetail.unitDeleted": "યુનિટ ડિલીટ થયું",
@@ -1207,6 +1208,7 @@ const dict = {
     "vendors.deleteConfirmMsg": "डायरेक्टरी से हमेशा के लिए हट जाएगा।",
 
     "common.loadFailed": "लोड करने में विफल",
+    "common.retry": "फिर कोशिश करें",
     "common.reject": "अस्वीकार करें",
 
     "partDetail.unitDeleted": "यूनिट डिलीट हुई",
@@ -2047,6 +2049,7 @@ const dict = {
     "vendors.deleteConfirmMsg": "will be permanently removed from the directory.",
 
     "common.loadFailed": "Load failed",
+    "common.retry": "Retry",
     "common.reject": "Reject",
 
     "partDetail.unitDeleted": "Unit deleted",
