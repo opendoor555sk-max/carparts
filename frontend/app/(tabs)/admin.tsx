@@ -60,12 +60,14 @@ export default function Admin() {
       ]
     : [];
 
+  // AI Approvals / Google Search Setup / Purchase Limits / Demand & Search /
+  // Stock Verification / Unlinked Stock / Purchase-Sale History (+ its bulk
+  // delete) used to be 7 separate rows here — consolidated into the single
+  // "Tools" row below (tools.tsx), which reproduces the same per-item
+  // permission/admin gating. Manage Users stays a standalone row; it wasn't
+  // part of that consolidation.
   const links: { key: string; title: string; sub: string; icon: keyof typeof Ionicons.glyphMap; route: string; perm: string }[] = [
-    { key: "aiApprovals", title: t("aiApprovals.title"), sub: t("admin.linkAiApprovalsSub"), icon: "sparkles", route: "/ai-approvals", perm: "ai_approve" },
-    { key: "googleSearch", title: t("settings.title"), sub: t("admin.linkGoogleSearchSub"), icon: "key", route: "/settings", perm: "search" },
-    { key: "purchaseLimits", title: t("limits.title"), sub: t("admin.linkPurchaseLimitsSub"), icon: "speedometer", route: "/limits", perm: "manage_limits" },
     { key: "manageUsers", title: t("users.title"), sub: t("admin.linkManageUsersSub"), icon: "people", route: "/users", perm: "manage_users" },
-    { key: "demandSearch", title: t("demand.title"), sub: t("admin.linkDemandSearchSub"), icon: "trending-up", route: "/demand", perm: "view_stats" },
   ];
 
   return (
@@ -136,6 +138,20 @@ export default function Admin() {
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
             ) : null}
+            <Pressable
+              style={[styles.link, { marginBottom: spacing.md }]}
+              onPress={() => router.push("/tools" as any)}
+              testID="admin-link-tools"
+            >
+              <View style={styles.linkIcon}>
+                <Ionicons name="construct" size={22} color={colors.brand} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.linkTitle}>{t("admin.toolsTitle")}</Text>
+                <Text style={styles.linkSub}>{t("admin.linkToolsSub")}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.info} />
+            </Pressable>
             <View style={{ gap: spacing.md }}>
               {links.map((l) => {
                 const allowed = can(l.perm);
@@ -158,57 +174,6 @@ export default function Admin() {
                 );
               })}
             </View>
-
-            {isAdmin ? (
-              <Pressable
-                style={[styles.link, { marginTop: spacing.md }]}
-                onPress={() => router.push("/stock-verify" as any)}
-                testID="admin-link-stock-verify"
-              >
-                <View style={styles.linkIcon}>
-                  <Ionicons name="clipboard" size={22} color={colors.brand} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.linkTitle}>{t("stockVerify.title")}</Text>
-                  <Text style={styles.linkSub}>{t("admin.linkStockVerifySub")}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.info} />
-              </Pressable>
-            ) : null}
-
-            {isAdmin ? (
-              <Pressable
-                style={[styles.link, { marginTop: spacing.md, borderColor: colors.warning }]}
-                onPress={() => router.push("/unlinked-stock" as any)}
-                testID="admin-link-unlinked-stock"
-              >
-                <View style={styles.linkIcon}>
-                  <Ionicons name="warning" size={22} color={colors.warning} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.linkTitle}>{t("unlinkedStock.title")}</Text>
-                  <Text style={styles.linkSub}>{t("admin.linkUnlinkedStockSub")}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.info} />
-              </Pressable>
-            ) : null}
-
-            {isAdmin ? (
-              <Pressable
-                style={[styles.link, { marginTop: spacing.md }]}
-                onPress={() => router.push("/history" as any)}
-                testID="admin-link-history"
-              >
-                <View style={styles.linkIcon}>
-                  <Ionicons name="receipt" size={22} color={colors.brand} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.linkTitle}>{t("history.title")}</Text>
-                  <Text style={styles.linkSub}>{t("admin.linkHistorySub")}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.info} />
-              </Pressable>
-            ) : null}
 
             {isAdmin ? (
               <Pressable
