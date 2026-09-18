@@ -30,7 +30,10 @@ type Module = {
   title: string;
   gujarati: string;
   icon: keyof typeof Ionicons.glyphMap;
-  perm: string;
+  // Omit for a tile with no permission requirement of its own (e.g. Tools,
+  // which had none as an Admin Panel row either — access there depended only
+  // on reaching the Admin tab, which every logged-in user can).
+  perm?: string;
   route: string;
   wide?: boolean;
   color: string;
@@ -50,6 +53,11 @@ const MODULES: Module[] = [
   { key: "customers", title: "CUSTOMERS", gujarati: "Grahak Khata", icon: "people", perm: "sell", route: "/customers", color: colors.brand },
   { key: "vendors", title: "VENDORS", gujarati: "Supplier records", icon: "briefcase", perm: "buy", route: "/vendors", color: colors.success },
   { key: "damaged-returns", title: "DAMAGED / RETURNS", gujarati: "Returns & spoilage", icon: "return-up-back", perm: "sell", route: "/damaged-returns", color: colors.error },
+  // Moved from Admin Panel's Management section (was a single unconditional
+  // row there, gated only by reaching the Admin tab at all) — no perm here
+  // either, for the same reason. The 7 items inside /tools keep their own
+  // per-item permission/admin gating unchanged.
+  { key: "tools", title: "TOOLS", gujarati: "Admin utilities", icon: "construct", route: "/tools", color: colors.brand },
   { key: "arrange", title: "STORE ARRANGEMENT", gujarati: "Place bought stock", icon: "location", perm: "buy", route: "/store-arrangement", wide: true, color: colors.info },
 ];
 
@@ -78,7 +86,7 @@ export default function Home() {
   };
 
   const openModule = (m: Module) => {
-    if (!can(m.perm)) {
+    if (m.perm && !can(m.perm)) {
       show("No permission for this module", "error");
       return;
     }
@@ -178,7 +186,7 @@ export default function Home() {
         <Text style={styles.sectionLabel}>{t("home.modules").toUpperCase()}</Text>
         <View style={styles.grid}>
           {MODULES.map((m) => {
-            const allowed = can(m.perm);
+            const allowed = !m.perm || can(m.perm);
             return (
               <Pressable
                 key={m.key}

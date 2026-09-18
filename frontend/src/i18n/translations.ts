@@ -53,6 +53,7 @@ const dict = {
     "module.vendors": "વિક્રેતાઓ",
     "module.damaged-returns": "ડેમેજ / રિટર્ન",
     "module.arrange": "સ્ટોર ગોઠવણ",
+    "module.tools": "ટૂલ્સ",
 
     "admin.title": "એડમિન પેનલ",
     "admin.statistics": "આંકડા",
@@ -904,6 +905,7 @@ const dict = {
     "module.vendors": "विक्रेता",
     "module.damaged-returns": "डैमेज / रिटर्न",
     "module.arrange": "स्टोर व्यवस्था",
+    "module.tools": "टूल्स",
 
     "admin.title": "एडमिन पैनल",
     "admin.statistics": "आंकड़े",
@@ -1755,6 +1757,7 @@ const dict = {
     "module.vendors": "Vendors",
     "module.damaged-returns": "Damaged / Returns",
     "module.arrange": "Store Arrangement",
+    "module.tools": "Tools",
 
     "admin.title": "Admin Panel",
     "admin.statistics": "Statistics",

@@ -62,10 +62,11 @@ export default function Admin() {
 
   // AI Approvals / Google Search Setup / Purchase Limits / Demand & Search /
   // Stock Verification / Unlinked Stock / Purchase-Sale History (+ its bulk
-  // delete) used to be 7 separate rows here — consolidated into the single
-  // "Tools" row below (tools.tsx), which reproduces the same per-item
-  // permission/admin gating. Manage Users stays a standalone row; it wasn't
-  // part of that consolidation.
+  // delete) used to be 7 separate rows here, then a single consolidated
+  // "Tools" row (tools.tsx). That Tools row has since moved to Home's
+  // MODULES grid instead — see (tabs)/index.tsx — so it's gone from here
+  // entirely now. Manage Users stays a standalone row; it was never part of
+  // that consolidation.
   const links: { key: string; title: string; sub: string; icon: keyof typeof Ionicons.glyphMap; route: string; perm: string }[] = [
     { key: "manageUsers", title: t("users.title"), sub: t("admin.linkManageUsersSub"), icon: "people", route: "/users", perm: "manage_users" },
   ];
@@ -138,20 +139,6 @@ export default function Admin() {
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
             ) : null}
-            <Pressable
-              style={[styles.link, { marginBottom: spacing.md }]}
-              onPress={() => router.push("/tools" as any)}
-              testID="admin-link-tools"
-            >
-              <View style={styles.linkIcon}>
-                <Ionicons name="construct" size={22} color={colors.brand} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.linkTitle}>{t("admin.toolsTitle")}</Text>
-                <Text style={styles.linkSub}>{t("admin.linkToolsSub")}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.info} />
-            </Pressable>
             <View style={{ gap: spacing.md }}>
               {links.map((l) => {
                 const allowed = can(l.perm);
