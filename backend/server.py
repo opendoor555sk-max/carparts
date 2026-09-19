@@ -38,6 +38,10 @@ db = client[os.environ['DB_NAME']]
 JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ISSUER = os.environ.get('JWT_ISSUER', 'kabadi-api')
 ACCESS_MINUTES = int(os.environ.get('ACCESS_MINUTES', '720'))
+# Platform-level Owner: a single hardcoded contact number, not a role. Whichever
+# user account's own `contact` field (server-side, from their DB record) matches
+# this is treated as the Owner everywhere in this file — see is_owner() below.
+OWNER_CONTACT = os.environ.get('OWNER_CONTACT', '+919773041676')
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.7-flash')
@@ -321,11 +325,16 @@ def public_user(u: dict) -> dict:
             "store_gst": u.get("store_gst", ""), "store_phone": u.get("store_phone", ""),
             "store_address": u.get("store_address", ""), "store_logo": u.get("store_logo", ""),
             "store_bank": u.get("store_bank", ""),
+            # Own contact, for client-side UI only (e.g. showing the Owner
+            # Panel entry point) — never trusted for the actual owner-only
+            # authorization check, which is always is_owner() against the
+            # user's server-side DB record, done fresh on every call.
+            "contact": u.get("contact", ""),
             "permissions": perms, "disabled": u.get("disabled", False),
             "has_google_key": bool(u.get("google_api_key") and u.get("google_cx"))}
 
 
-async def _attach_store(user: dict) -> None:
+async def _attach_store(user: dict) -> Optional[dict]:
     if user.get("store_id"):
         store = await db.stores.find_one({"id": user["store_id"]}, {"_id": 0})
         if store:
@@ -335,6 +344,26 @@ async def _attach_store(user: dict) -> None:
             user["store_address"] = store.get("address", "")
             user["store_logo"] = store.get("logo_path", "")
             user["store_bank"] = store.get("bank", "")
+            return store
+    return None
+
+
+def is_owner(user: dict) -> bool:
+    """True only for the specific account whose OWN stored `contact` field —
+    from the authenticated user's DB record, never a client-supplied value —
+    equals OWNER_CONTACT. Independent of role/permissions entirely; re-derived
+    fresh from `user` (itself always freshly loaded by get_current_user) on
+    every call, never cached or trusted from a token claim."""
+    contact = user.get("contact")
+    return bool(contact) and contact == OWNER_CONTACT
+
+
+def _store_locked_error() -> HTTPException:
+    return HTTPException(403, detail={
+        "code": "store_locked",
+        "message": f"This store has been locked by the platform owner. Contact {OWNER_CONTACT} for help.",
+        "contact": OWNER_CONTACT,
+    })
 
 
 async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
@@ -349,7 +378,12 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
     if not user or user.get("disabled"):
         raise HTTPException(401, "User not found or disabled")
-    await _attach_store(user)
+    store = await _attach_store(user)
+    # Central choke point: every authenticated request resolves current_user
+    # (and its store) here, so this is the one place needed to reject a
+    # locked store's users on every subsequent call, not just at login.
+    if store and store.get("status") == "locked" and not is_owner(user):
+        raise _store_locked_error()
     return user
 
 
@@ -697,6 +731,12 @@ async def startup():
         logger.warning(f"catalog backfill warning: {e}")
 
     # Super Admin (app developer / god-view). Existing 'abdul' is upgraded to super_admin.
+    # Also the account this deployment's Owner mechanism is concretely tied to:
+    # OWNER_CONTACT (see is_owner()) has to actually live on SOME user's
+    # `contact` field for platform-owner access to work at all, and no other
+    # endpoint ever lets a `contact` be set post-creation — so it's seeded
+    # here, on this account specifically, every startup (idempotent, same
+    # unconditional-set pattern already used for `role` below).
     sa_username = os.environ.get("ADMIN_USERNAME", "abdul").lower()
     existing = await db.users.find_one({"username": sa_username})
     if not existing:
@@ -707,14 +747,25 @@ async def startup():
             "password_hash": hash_pw(os.environ.get("ADMIN_PASSWORD", "Salam@123")),
             "password_enc": encrypt_pw(os.environ.get("ADMIN_PASSWORD", "Salam@123")),
             "role": "super_admin", "store_id": None, "permissions": ALL_PERMISSIONS,
-            "disabled": False, "created_at": now_iso(),
+            "contact": OWNER_CONTACT, "disabled": False, "created_at": now_iso(),
         })
         logger.info("Seeded super admin user")
     else:
-        upd = {"role": "super_admin"}
+        upd = {"role": "super_admin", "contact": OWNER_CONTACT}
         if not existing.get("password_enc"):
             upd["password_enc"] = encrypt_pw(os.environ.get("ADMIN_PASSWORD", "Salam@123"))
         await db.users.update_one({"id": existing["id"]}, {"$set": upd})
+
+    # Store status backfill: only sets it where missing (never overwrites an
+    # existing value), same "idempotent enrich-only" shape as the catalog
+    # backfill above. New stores get "active" set directly at creation
+    # (/auth/register) — this only covers stores that existed before this field did.
+    try:
+        r = await db.stores.update_many({"status": {"$exists": False}}, {"$set": {"status": "active"}})
+        if r.modified_count:
+            logger.info(f"Backfilled status=active on {r.modified_count} store(s)")
+    except Exception as e:
+        logger.warning(f"store status backfill warning: {e}")
 
     try:
         await run_in_threadpool(init_storage)
@@ -780,7 +831,7 @@ async def register(body: RegisterIn):
         raise HTTPException(400, "આ username પહેલેથી વપરાયેલ છે — બીજું પસંદ કરો")
     store_id = new_id()
     store = {"id": store_id, "name": body.store_name.strip(), "owner_username": username,
-             "contact": body.contact.strip(), "created_at": now_iso()}
+             "contact": body.contact.strip(), "created_at": now_iso(), "status": "active"}
     await db.stores.insert_one(dict(store))
     user = {
         "id": new_id(), "name": body.name.strip() or body.store_name.strip(), "username": username,
@@ -803,7 +854,12 @@ async def login(body: LoginIn):
         raise HTTPException(401, "ખોટું username અથવા password")
     if user.get("disabled"):
         raise HTTPException(403, "User disabled")
-    await _attach_store(user)
+    store = await _attach_store(user)
+    # Checked right after credentials verify, before a token is issued — a
+    # locked store's users (owner excepted) can't log in at all, matching
+    # the same check get_current_user() applies to every call afterward.
+    if store and store.get("status") == "locked" and not is_owner(user):
+        raise _store_locked_error()
     return {"access_token": make_token(user), "token_type": "bearer", "user": public_user(user)}
 
 
@@ -970,6 +1026,95 @@ async def list_stores(user=Depends(require_super_admin)):
             "owner": (await db.users.find_one({"store_id": sid, "role": "admin"}, {"_id": 0, "name": 1, "username": 1})) or {},
         })
     return out
+
+
+# ---------------- Owner (platform-level, single hardcoded contact) ----------------
+# Entirely separate from the per-store "admin" role and from super_admin's
+# existing cross-store read access above — this is additive only, nothing
+# here changes what those roles can already do. Gated by is_owner() alone,
+# never by role/permissions, so it works regardless of which account (or
+# which store, if any) OWNER_CONTACT happens to be seeded onto.
+class OwnerDeleteStoreIn(BaseModel):
+    confirm_name: str
+
+
+# Every collection that carries a per-store store_id field (audited against
+# every db.<x>.insert_one/insert_many call site in this file). db.catalog is
+# deliberately excluded — it's the GLOBAL shared part-identity table, not
+# store data. db.locks is excluded too — internal mutex bookkeeping, not
+# business data. Deleting a store's db.files rows removes their metadata
+# only; the underlying uploaded objects in blob storage are not touched.
+OWNER_STORE_SCOPED_COLLECTIONS = [
+    "parts", "stock", "transactions", "requirements", "customers", "customer_ledger",
+    "vendors", "invoices", "settings", "users", "ai_research", "files", "logos",
+    "sticker_templates", "verifications", "stock_adjustments",
+]
+
+
+async def require_owner(user=Depends(get_current_user)):
+    # Same generic 403 a permission-denied call gets anywhere else in this
+    # app — never a distinct message/code that would confirm to a non-owner
+    # that owner-only routes exist at all.
+    if not is_owner(user):
+        raise HTTPException(403, "Not authorized")
+    return user
+
+
+@api.get("/owner/stores")
+async def owner_list_stores(user=Depends(require_owner)):
+    stores = await db.stores.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    out = []
+    for s in stores:
+        sid = s["id"]
+        admin = await db.users.find_one({"store_id": sid, "role": "admin"}, {"_id": 0, "contact": 1})
+        out.append({
+            "id": sid,
+            "name": s.get("name", ""),
+            "admin_contact": (admin or {}).get("contact", ""),
+            "user_count": await db.users.count_documents({"store_id": sid, "deleted_at": {"$exists": False}}),
+            "part_count": await db.parts.count_documents({"store_id": sid}),
+            "status": s.get("status", "active"),
+            "created_at": s.get("created_at"),
+            "locked_at": s.get("locked_at"),
+            "locked_by": s.get("locked_by"),
+        })
+    return out
+
+
+@api.post("/owner/stores/{store_id}/lock")
+async def owner_lock_store(store_id: str, user=Depends(require_owner)):
+    store = await db.stores.find_one({"id": store_id}, {"_id": 0})
+    if not store:
+        raise HTTPException(404, "Store not found")
+    await db.stores.update_one({"id": store_id}, {"$set": {
+        "status": "locked", "locked_at": now_iso(), "locked_by": user.get("contact") or OWNER_CONTACT,
+    }})
+    return {"ok": True, "id": store_id, "status": "locked"}
+
+
+@api.post("/owner/stores/{store_id}/unlock")
+async def owner_unlock_store(store_id: str, user=Depends(require_owner)):
+    store = await db.stores.find_one({"id": store_id}, {"_id": 0})
+    if not store:
+        raise HTTPException(404, "Store not found")
+    await db.stores.update_one(
+        {"id": store_id},
+        {"$set": {"status": "active"}, "$unset": {"locked_at": "", "locked_by": ""}},
+    )
+    return {"ok": True, "id": store_id, "status": "active"}
+
+
+@api.delete("/owner/stores/{store_id}")
+async def owner_delete_store(store_id: str, body: OwnerDeleteStoreIn, user=Depends(require_owner)):
+    store = await db.stores.find_one({"id": store_id}, {"_id": 0})
+    if not store:
+        raise HTTPException(404, "Store not found")
+    if (body.confirm_name or "").strip() != store.get("name", ""):
+        raise HTTPException(400, "Confirmation name does not match this store — nothing was deleted")
+    for coll in OWNER_STORE_SCOPED_COLLECTIONS:
+        await db[coll].delete_many({"store_id": store_id})
+    await db.stores.delete_one({"id": store_id})
+    return {"ok": True, "deleted_store_id": store_id}
 
 
 @api.get("/admin/gps-locations")

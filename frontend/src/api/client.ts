@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { router } from "expo-router";
 
 import { storage } from "@/src/utils/storage";
 
@@ -68,6 +69,19 @@ async function request<T = any>(
         ? detail
         : detail?.message || `Request failed (${res.status})`;
     const err: ApiError = { status: res.status, message, detail };
+    // Every API call in the app funnels through this one function — including
+    // /auth/login itself (called with auth=false) — so this doubles as the
+    // one global place needed to catch a locked-store response from
+    // anywhere and immediately show the full-screen Store Locked view
+    // instead of whichever screen's own generic error toast would otherwise
+    // fire. The caller below still throws/unwinds normally (loading states,
+    // etc. still resolve correctly); this redirect just wins the race.
+    if (detail && typeof detail === "object" && detail.code === "store_locked") {
+      router.replace({
+        pathname: "/store-locked",
+        params: { message: detail.message || message, contact: detail.contact || "" },
+      } as any);
+    }
     throw err;
   }
   return data as T;
@@ -78,7 +92,7 @@ export const api = {
   post: <T = any>(path: string, body?: any, auth = true) =>
     request<T>("POST", path, body, auth),
   patch: <T = any>(path: string, body?: any) => request<T>("PATCH", path, body),
-  del: <T = any>(path: string) => request<T>("DELETE", path),
+  del: <T = any>(path: string, body?: any) => request<T>("DELETE", path, body),
   base: BASE,
   getToken,
 };

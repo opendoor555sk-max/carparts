@@ -18,6 +18,11 @@ export type User = {
   store_address?: string;
   store_logo?: string;
   store_bank?: string;
+  // Own contact number, sent by public_user() for UI purposes (e.g. the
+  // Owner Panel entry point's visibility check) — never authoritative;
+  // real owner-only authorization is always the server's own is_owner()
+  // check against this user's DB record, not this client-visible field.
+  contact?: string;
   permissions: string[];
   disabled?: boolean;
 };

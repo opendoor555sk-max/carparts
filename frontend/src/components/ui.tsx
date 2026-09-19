@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
@@ -353,6 +353,7 @@ export function ConfirmModal({
   loading = false,
   onConfirm,
   onCancel,
+  confirmInput,
 }: {
   visible: boolean;
   title: string;
@@ -363,8 +364,18 @@ export function ConfirmModal({
   loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  // Minimal "type to confirm" extension: when set, a text field is shown and
+  // Confirm stays disabled until the typed value matches `expectedValue`
+  // exactly — e.g. owner-panel.tsx's store-delete guard (type the store's
+  // exact name). Omitted entirely, ConfirmModal behaves exactly as before.
+  confirmInput?: { placeholder?: string; expectedValue: string };
 }) {
   const { t } = useLanguage();
+  const [typed, setTyped] = useState("");
+  useEffect(() => {
+    if (visible) setTyped("");
+  }, [visible]);
+  const confirmDisabled = !!confirmInput && typed.trim() !== confirmInput.expectedValue;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={cstyles.wrap}>
@@ -372,12 +383,23 @@ export function ConfirmModal({
           <Ionicons name={danger ? "warning" : "help-circle"} size={40} color={danger ? colors.error : colors.brand} />
           <Text style={cstyles.title}>{title}</Text>
           {message ? <Text style={cstyles.msg}>{message}</Text> : null}
+          {confirmInput ? (
+            <Field
+              value={typed}
+              onChangeText={setTyped}
+              placeholder={confirmInput.placeholder}
+              autoCapitalize="none"
+              autoCorrect={false}
+              testID="confirm-type-input"
+            />
+          ) : null}
           <View style={cstyles.row}>
             <Button title={cancelText ?? t("ui.cancel")} onPress={onCancel} variant="secondary" style={{ flex: 1 }} testID="confirm-cancel" />
             <Button
               title={confirmText ?? t("ui.confirm")}
               onPress={onConfirm}
               loading={loading}
+              disabled={confirmDisabled}
               variant={danger ? "danger" : "primary"}
               style={{ flex: 1 }}
               testID="confirm-ok"

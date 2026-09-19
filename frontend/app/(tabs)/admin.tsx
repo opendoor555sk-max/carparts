@@ -8,6 +8,7 @@ import { useAuth } from "@/src/context/AuthContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Header, Loading, FilterChip } from "@/src/components/ui";
 import { LANGUAGES } from "@/src/i18n/translations";
+import { OWNER_CONTACT } from "@/src/constants/owner";
 import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 type Stats = {
@@ -48,6 +49,10 @@ export default function Admin() {
 
   const isAdmin = user?.role === "admin";
   const isSuperAdmin = user?.role === "super_admin";
+  // Platform Owner is a single hardcoded contact, not a role — see
+  // is_owner() in server.py. This is UI visibility only; the real
+  // authorization for every /owner/* call is re-checked server-side.
+  const isOwner = !!user?.contact && user.contact === OWNER_CONTACT;
 
   const statCards: { key: string; label: string; value: number; color: string; icon: keyof typeof Ionicons.glyphMap; route: string }[] = stats
     ? [
@@ -135,6 +140,22 @@ export default function Admin() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.linkTitle}>{t("admin.linkGpsTitle")}</Text>
                   <Text style={styles.linkSub}>{t("admin.linkGpsSub")}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.info} />
+              </Pressable>
+            ) : null}
+            {isOwner ? (
+              <Pressable
+                style={[styles.link, { marginBottom: spacing.md, borderColor: colors.error }]}
+                onPress={() => router.push("/owner-panel" as any)}
+                testID="admin-link-owner-panel"
+              >
+                <View style={styles.linkIcon}>
+                  <Ionicons name="planet" size={22} color={colors.error} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.linkTitle}>{t("ownerPanel.title")}</Text>
+                  <Text style={styles.linkSub}>{t("admin.linkOwnerPanelSub")}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
               </Pressable>
