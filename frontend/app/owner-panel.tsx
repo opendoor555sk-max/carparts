@@ -2,7 +2,6 @@ import { useCallback, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import * as Clipboard from "expo-clipboard";
 
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
@@ -162,11 +161,6 @@ export default function OwnerPanel() {
     }
   };
 
-  const copyOtp = async (otp: string) => {
-    await Clipboard.setStringAsync(otp);
-    show(t("ownerPanel.copied"), "success");
-  };
-
   const toggleStaffActive = async (u: OwnerUser) => {
     setStaffBusyId(u.id);
     try {
@@ -298,12 +292,8 @@ export default function OwnerPanel() {
                   {live ? (
                     <View style={styles.otpBox}>
                       <Text style={styles.otpLabel}>{t("ownerPanel.otpLabel")}</Text>
-                      <View style={styles.otpRow}>
-                        <Text style={styles.otpValue} selectable testID={`owner-request-otp-${item.id}`}>{live.otp}</Text>
-                        <Pressable onPress={() => copyOtp(live.otp)} hitSlop={10} testID={`owner-request-otp-copy-${item.id}`}>
-                          <Ionicons name="copy-outline" size={20} color={colors.brand} />
-                        </Pressable>
-                      </View>
+                      <Text style={styles.otpValue} selectable testID={`owner-request-otp-${item.id}`}>{live.otp}</Text>
+                      <Text style={styles.otpHint}>{t("ownerPanel.otpCopyHint")}</Text>
                       <Text style={styles.otpExpiry}>{t("ownerPanel.otpExpiresLabel")}: {new Date(live.expires_at).toLocaleTimeString()}</Text>
                     </View>
                   ) : null}
@@ -405,9 +395,9 @@ const styles = StyleSheet.create({
   statText: { color: colors.info, fontSize: font.sm },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
   adminNote: { color: colors.success, fontSize: font.sm, fontWeight: "700" },
-  otpBox: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.sm, padding: spacing.md, gap: 4 },
+  otpBox: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.sm, padding: spacing.md, gap: 4, alignItems: "center" },
   otpLabel: { color: colors.info, fontSize: font.sm - 1, fontWeight: "700", letterSpacing: 1 },
-  otpRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  otpValue: { color: colors.brand, fontSize: font.xxl, fontWeight: "800", letterSpacing: 4 },
+  otpValue: { color: colors.brand, fontSize: font.huge, fontWeight: "800", letterSpacing: 6 },
+  otpHint: { color: colors.info, fontSize: font.sm - 1 },
   otpExpiry: { color: colors.info, fontSize: font.sm - 1 },
 });

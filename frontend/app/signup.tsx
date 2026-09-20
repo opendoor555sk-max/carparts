@@ -11,7 +11,6 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Clipboard from "expo-clipboard";
 
 import { useAuth } from "@/src/context/AuthContext";
 import { useLanguage } from "@/src/context/LanguageContext";
@@ -94,11 +93,6 @@ export default function SignUp() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const copyPassword = async () => {
-    await Clipboard.setStringAsync(tempPassword);
-    show(t("signup.copied"), "success");
   };
 
   return (
@@ -210,11 +204,9 @@ export default function SignUp() {
             </View>
             <View style={styles.credRow}>
               <Text style={styles.credLabel}>{t("login.password")}</Text>
-              <Text style={styles.credValue} selectable>{tempPassword}</Text>
-              <Pressable onPress={copyPassword} hitSlop={10} testID="signup-copy-password">
-                <Ionicons name="copy-outline" size={18} color={colors.brand} />
-              </Pressable>
+              <Text style={styles.credValue} selectable testID="signup-temp-password">{tempPassword}</Text>
             </View>
+            <Text style={styles.otpHint}>{t("signup.copyHint")}</Text>
 
             <Button
               title={t("signup.continueToApp")}
@@ -268,6 +260,7 @@ const styles = StyleSheet.create({
   credRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, marginBottom: spacing.sm },
   credLabel: { color: colors.info, fontSize: font.sm - 1, fontWeight: "700", width: 90 },
   credValue: { color: colors.onSurface, fontSize: font.base, fontWeight: "700", flex: 1 },
+  otpHint: { color: colors.info, fontSize: font.sm - 1, textAlign: "center", marginBottom: spacing.md },
   errBanner: {
     flexDirection: "row",
     alignItems: "center",
