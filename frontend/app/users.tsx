@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@/src/api/client";
 import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
-import { Button, Card, Field, Header, Loading, StatusChip } from "@/src/components/ui";
+import { Button, Card, Field, Header, Loading } from "@/src/components/ui";
 import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 export default function Users() {
@@ -207,7 +207,11 @@ export default function Users() {
                     {t("users.addedBy")}: {u.created_by?.name || t("users.addedByUnknown")}
                   </Text>
                 </View>
-                <StatusChip status={u.role === "admin" ? "Verified" : u.disabled ? "Cancelled" : "Pending"} />
+                <View style={[styles.badge, { backgroundColor: u.disabled ? colors.errorFaint : colors.successFaint }]}>
+                  <Text style={[styles.badgeText, { color: u.disabled ? colors.error : colors.success }]}>
+                    {u.disabled ? t("users.disabled") : t("users.active")}
+                  </Text>
+                </View>
               </View>
 
               {/* Password reveal + edit (Admin) */}
@@ -363,6 +367,8 @@ const styles = StyleSheet.create({
   name: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
   username: { color: colors.info, fontSize: font.sm },
   addedBy: { color: colors.info, fontSize: font.sm - 1, marginTop: 2 },
+  badge: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill },
+  badgeText: { fontSize: font.sm - 1, fontWeight: "800" },
   permLabel: { color: colors.info, fontSize: font.sm - 1, fontWeight: "800", letterSpacing: 1, marginTop: spacing.md, marginBottom: spacing.sm },
   permGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
   permChip: { paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.sm, borderWidth: 1 },
