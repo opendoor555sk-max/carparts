@@ -25,13 +25,20 @@ type LinkItem = {
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
   route: string;
+  // Profit/buy/sell reports read from /reports/profit and /transactions,
+  // both require_admin server-side (a role check, not a per-permission
+  // flag a staff account can be granted) -- so these are admin-only, same
+  // as the "Share Daily Sales" row below. Stock report reads /inventory
+  // and buy/sell modes' underlying data for inventory/requirements come
+  // from endpoints any authenticated user can call, so those stay visible.
+  adminOnly?: boolean;
 };
 
 const LINKS: LinkItem[] = [
-  { key: "profit", titleKey: "profitReport.title", subKey: "home.reportProfitSub", icon: "trending-up", color: colors.warning, route: "/profit-report" },
+  { key: "profit", titleKey: "profitReport.title", subKey: "home.reportProfitSub", icon: "trending-up", color: colors.warning, route: "/profit-report", adminOnly: true },
   { key: "stock", titleKey: "report.stockReport", subKey: "home.reportStockSub", icon: "cube", color: colors.info, route: "/report?mode=stock" },
-  { key: "buy", titleKey: "report.purchases", subKey: "home.reportBuySub", icon: "download", color: colors.success, route: "/report?mode=buy" },
-  { key: "sell", titleKey: "report.sales", subKey: "home.reportSellSub", icon: "cash", color: colors.brand, route: "/report?mode=sell" },
+  { key: "buy", titleKey: "report.purchases", subKey: "home.reportBuySub", icon: "download", color: colors.success, route: "/report?mode=buy", adminOnly: true },
+  { key: "sell", titleKey: "report.sales", subKey: "home.reportSellSub", icon: "cash", color: colors.brand, route: "/report?mode=sell", adminOnly: true },
   { key: "inventory", titleKey: "tabs.inventory", subKey: "home.reportInventorySub", icon: "cube-outline", color: colors.brand, route: "/(tabs)/inventory" },
   { key: "requirements", titleKey: "tabs.needs", subKey: "home.reportRequirementsSub", icon: "list-circle", color: colors.warning, route: "/(tabs)/requirements" },
 ];
@@ -43,6 +50,7 @@ export default function Reports() {
   const { t } = useLanguage();
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   const [sharingSales, setSharingSales] = useState(false);
+  const visibleLinks = LINKS.filter((l) => !l.adminOnly || isAdmin);
 
   // Not a navigation link like the rest of LINKS — it's an action (fetch
   // today's totals, then hand off to WhatsApp), so it's rendered separately
@@ -68,7 +76,7 @@ export default function Reports() {
         right={<SignOutButton />}
       />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl }}>
-        {LINKS.map((l) => (
+        {visibleLinks.map((l) => (
           <Pressable
             key={l.key}
             style={styles.row}

@@ -85,15 +85,16 @@ export default function Home() {
     Haptics.selectionAsync();
   };
 
+  // Tiles the caller has no permission for are filtered out entirely below
+  // (visibleModules) rather than rendered dimmed/locked — a staff account
+  // should only ever see the modules their assigned permissions cover.
   const openModule = (m: Module) => {
-    if (m.perm && !can(m.perm)) {
-      show("No permission for this module", "error");
-      return;
-    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const sep = m.route.includes("?") ? "&" : "?";
     router.push(`${m.route}${sep}company=${encodeURIComponent(company)}` as any);
   };
+
+  const visibleModules = MODULES.filter((m) => !m.perm || can(m.perm));
 
   const shareLowStock = async () => {
     setSharingLowStock(true);
@@ -185,28 +186,22 @@ export default function Home() {
 
         <Text style={styles.sectionLabel}>{t("home.modules").toUpperCase()}</Text>
         <View style={styles.grid}>
-          {MODULES.map((m) => {
-            const allowed = !m.perm || can(m.perm);
-            return (
-              <Pressable
-                key={m.key}
-                onPress={() => openModule(m)}
-                testID={`module-${m.key}`}
-                style={[styles.tile, m.wide && styles.tileWide, !allowed && { opacity: 0.45 }]}
-              >
-                <View style={[styles.tileIcon, { borderColor: m.color }]}>
-                  <Ionicons name={m.icon} size={26} color={m.color} />
-                </View>
-                <View>
-                  <Text style={styles.tileTitle}>{t(`module.${m.key}` as TranslationKey)}</Text>
-                  <Text style={styles.tileGuj}>{m.gujarati}</Text>
-                </View>
-                {!allowed ? (
-                  <Ionicons name="lock-closed" size={14} color={colors.info} style={styles.lock} />
-                ) : null}
-              </Pressable>
-            );
-          })}
+          {visibleModules.map((m) => (
+            <Pressable
+              key={m.key}
+              onPress={() => openModule(m)}
+              testID={`module-${m.key}`}
+              style={[styles.tile, m.wide && styles.tileWide]}
+            >
+              <View style={[styles.tileIcon, { borderColor: m.color }]}>
+                <Ionicons name={m.icon} size={26} color={m.color} />
+              </View>
+              <View>
+                <Text style={styles.tileTitle}>{t(`module.${m.key}` as TranslationKey)}</Text>
+                <Text style={styles.tileGuj}>{m.gujarati}</Text>
+              </View>
+            </Pressable>
+          ))}
         </View>
 
         <View style={styles.hintBox}>
@@ -307,7 +302,6 @@ const styles = StyleSheet.create({
   },
   tileTitle: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800", letterSpacing: 0.5 },
   tileGuj: { color: colors.info, fontSize: font.base, marginTop: 2 },
-  lock: { position: "absolute", top: spacing.md, right: spacing.md },
   hintBox: {
     flexDirection: "row",
     gap: spacing.sm,

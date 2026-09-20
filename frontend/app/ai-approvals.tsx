@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
+import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Button, Card, EmptyState, Header, Loading, Meter, StatusChip } from "@/src/components/ui";
@@ -11,6 +12,7 @@ import { colors, font, radius, spacing } from "@/src/theme";
 
 export default function AiApprovals() {
   const router = useRouter();
+  const { can } = useAuth();
   const { show } = useToast();
   const { t } = useLanguage();
   const [items, setItems] = useState<any[]>([]);
@@ -82,10 +84,12 @@ export default function AiApprovals() {
                   <Text style={styles.conflictText}>{t("aiApprovals.conflictNote")}</Text>
                 </View>
               ) : null}
-              <View style={styles.actions}>
-                <Button title={t("aiApprovals.approve")} onPress={() => approve(item.id)} icon="checkmark" style={{ flex: 1 }} testID={`approve-${item.part_number}`} />
-                <Button title={t("common.reject")} onPress={() => reject(item.id)} variant="danger" icon="close" style={{ flex: 1 }} testID={`reject-${item.part_number}`} />
-              </View>
+              {can("ai_approve") ? (
+                <View style={styles.actions}>
+                  <Button title={t("aiApprovals.approve")} onPress={() => approve(item.id)} icon="checkmark" style={{ flex: 1 }} testID={`approve-${item.part_number}`} />
+                  <Button title={t("common.reject")} onPress={() => reject(item.id)} variant="danger" icon="close" style={{ flex: 1 }} testID={`reject-${item.part_number}`} />
+                </View>
+              ) : null}
             </Card>
           )}
         />

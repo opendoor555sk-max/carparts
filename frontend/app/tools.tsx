@@ -20,10 +20,11 @@ type ToolItem = {
   subKey: TranslationKey;
   icon: keyof typeof Ionicons.glyphMap;
   route: string;
-  // Permission-gated items stay visible but dimmed+locked when missing the
-  // permission (matching links.map()'s old behavior in admin.tsx). Items
-  // with no perm are admin-only instead — fully hidden for non-admins, same
-  // as their old standalone `{isAdmin ? ... : null}` Pressables.
+  // Permission-gated items are fully hidden (not dimmed/locked) when the
+  // viewer lacks the permission -- a staff account should only ever see
+  // exactly what their assigned permissions cover. Items with no perm are
+  // admin-only instead, same as their old standalone `{isAdmin ? ... : null}`
+  // Pressables in admin.tsx before this list existed.
   perm?: string;
 };
 
@@ -43,32 +44,29 @@ export default function Tools() {
   const { t } = useLanguage();
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
-  const items = TOOLS.filter((it) => it.perm || isAdmin);
+  const items = TOOLS.filter((it) => (it.perm ? can(it.perm) : isAdmin));
 
   return (
     <View style={styles.flex}>
       <Header title={t("admin.toolsTitle")} subtitle={t("admin.linkToolsSub")} onBack={() => router.back()} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl }}>
-        {items.map((it) => {
-          const allowed = !it.perm || can(it.perm);
-          return (
-            <Pressable
-              key={it.key}
-              style={[styles.row, !allowed && { opacity: 0.45 }]}
-              onPress={() => (allowed ? router.push(it.route as any) : null)}
-              testID={`tools-${it.key}`}
-            >
-              <View style={styles.icon}>
-                <Ionicons name={it.icon} size={22} color={colors.brand} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.title}>{t(it.titleKey)}</Text>
-                <Text style={styles.sub}>{t(it.subKey)}</Text>
-              </View>
-              <Ionicons name={allowed ? "chevron-forward" : "lock-closed"} size={18} color={colors.info} />
-            </Pressable>
-          );
-        })}
+        {items.map((it) => (
+          <Pressable
+            key={it.key}
+            style={styles.row}
+            onPress={() => router.push(it.route as any)}
+            testID={`tools-${it.key}`}
+          >
+            <View style={styles.icon}>
+              <Ionicons name={it.icon} size={22} color={colors.brand} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>{t(it.titleKey)}</Text>
+              <Text style={styles.sub}>{t(it.subKey)}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.info} />
+          </Pressable>
+        ))}
       </ScrollView>
     </View>
   );

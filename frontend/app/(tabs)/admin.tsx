@@ -54,11 +54,22 @@ export default function Admin() {
   // authorization for every /owner/* call is re-checked server-side.
   const isOwner = !!user?.contact && user.contact === OWNER_CONTACT;
 
+  // "sold" links to /report?mode=sell, which reads /transactions --
+  // require_admin server-side (a role check, not a grantable permission
+  // flag), so it's excluded for non-admin staff even when they hold
+  // view_stats. The rest read from endpoints any authenticated user can
+  // call (/inventory, /requirements) or stay view-only for non-approvers
+  // (/ai-approvals -- its Approve/Reject actions are separately gated by
+  // ai_approve inside that screen), so they stay visible under view_stats
+  // alone.
+  const canViewSalesReport = isAdmin || isSuperAdmin;
   const statCards: { key: string; label: string; value: number; color: string; icon: keyof typeof Ionicons.glyphMap; route: string }[] = stats
     ? [
         { key: "parts", label: t("admin.statParts"), value: stats.total_parts, color: colors.brand, icon: "documents", route: "/report?mode=stock" },
         { key: "inStock", label: t("admin.statInStock"), value: stats.in_stock_units, color: colors.success, icon: "cube", route: "/report?mode=stock" },
-        { key: "sold", label: t("admin.statSold"), value: stats.sold_units, color: colors.info, icon: "cash", route: "/report?mode=sell" },
+        ...(canViewSalesReport
+          ? [{ key: "sold", label: t("admin.statSold"), value: stats.sold_units, color: colors.info, icon: "cash" as const, route: "/report?mode=sell" }]
+          : []),
         { key: "pendingNeeds", label: t("admin.statPendingNeeds"), value: stats.pending_requirements, color: colors.warning, icon: "list", route: "/(tabs)/requirements" },
         { key: "aiPending", label: t("admin.statAiPending"), value: stats.pending_ai, color: colors.warning, icon: "sparkles", route: "/ai-approvals" },
         { key: "verified", label: t("admin.statVerified"), value: stats.verified_parts, color: colors.success, icon: "shield-checkmark", route: "/report?mode=stock" },
@@ -161,26 +172,23 @@ export default function Admin() {
               </Pressable>
             ) : null}
             <View style={{ gap: spacing.md }}>
-              {links.map((l) => {
-                const allowed = can(l.perm);
-                return (
-                  <Pressable
-                    key={l.key}
-                    style={[styles.link, !allowed && { opacity: 0.45 }]}
-                    onPress={() => (allowed ? router.push(l.route as any) : null)}
-                    testID={`admin-link-${l.key}`}
-                  >
-                    <View style={styles.linkIcon}>
-                      <Ionicons name={l.icon} size={22} color={colors.brand} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.linkTitle}>{l.title}</Text>
-                      <Text style={styles.linkSub}>{l.sub}</Text>
-                    </View>
-                    <Ionicons name={allowed ? "chevron-forward" : "lock-closed"} size={18} color={colors.info} />
-                  </Pressable>
-                );
-              })}
+              {links.filter((l) => can(l.perm)).map((l) => (
+                <Pressable
+                  key={l.key}
+                  style={styles.link}
+                  onPress={() => router.push(l.route as any)}
+                  testID={`admin-link-${l.key}`}
+                >
+                  <View style={styles.linkIcon}>
+                    <Ionicons name={l.icon} size={22} color={colors.brand} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.linkTitle}>{l.title}</Text>
+                    <Text style={styles.linkSub}>{l.sub}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.info} />
+                </Pressable>
+              ))}
             </View>
 
             {isAdmin ? (
