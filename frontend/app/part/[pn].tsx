@@ -20,6 +20,7 @@ import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Barcode } from "@/src/components/Barcode";
+import { formatAssignedLocation } from "@/src/components/LocationPicker";
 import { SvgXml } from "react-native-svg";
 import { codeSvg } from "@/src/utils/codegen";
 import { brandingFromUser, printBarcodeLabel } from "@/src/utils/print";
@@ -59,9 +60,14 @@ export default function PartDetail() {
   const { can, user } = useAuth();
   const { show } = useToast();
   const { t: tr } = useLanguage();
+  // A staff account without this only ever sees whether the part is in
+  // stock and its shelf/rack location -- nothing else (price, cost,
+  // quantity, purchase history, vendor info, AI research, etc.).
+  const canViewDetails = can("view_part_details");
 
   const [data, setData] = useState<any>(null);
   const [part, setPart] = useState<any>(null);
+  const [restricted, setRestricted] = useState<{ exists: boolean; location: any } | null>(null);
   const [loading, setLoading] = useState(true);
   const [aiResult, setAiResult] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -110,6 +116,18 @@ export default function PartDetail() {
 
   const load = useCallback(async () => {
     try {
+      if (!canViewDetails) {
+        // Deliberately the ONLY call made for a restricted viewer -- never
+        // fetches /search, /parts/{pn}, or /ai/research, so price, cost,
+        // stock quantity, purchase history, vendor info, etc. never reach
+        // this client at all. /inventory/location-check exposes nothing
+        // beyond unit counts and shelf/rack location by design.
+        const loc = await api.get(
+          `/inventory/location-check?part_number=${encodeURIComponent(partNumber)}`,
+        );
+        setRestricted({ exists: (loc.units_total || 0) > 0, location: loc.assigned_location || null });
+        return;
+      }
       const res = await api.get(`/search?q=${encodeURIComponent(partNumber)}`);
       setData(res);
       if (res.part) {
@@ -135,7 +153,7 @@ export default function PartDetail() {
     } finally {
       setLoading(false);
     }
-  }, [partNumber, show, tr]);
+  }, [partNumber, show, tr, canViewDetails]);
 
   useEffect(() => {
     load();
@@ -252,6 +270,39 @@ export default function PartDetail() {
       <View style={styles.flex}>
         <Header title={tr("partDetail.part")} onBack={() => router.back()} />
         <Loading text={tr("partDetail.loadingPart")} />
+      </View>
+    );
+  }
+
+  if (!canViewDetails) {
+    const locationText = formatAssignedLocation(restricted?.location);
+    return (
+      <View style={styles.flex}>
+        <Header title={tr("partDetail.part")} onBack={() => router.back()} />
+        <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: insets.bottom + spacing.xl }}>
+          <Card testID="part-hero-restricted">
+            <Text style={styles.pnLabel}>{tr("common.partNumber").toUpperCase()}</Text>
+            <Text style={styles.pn} selectable testID="part-number">
+              {partNumber}
+            </Text>
+            <View
+              style={[
+                styles.existenceBadge,
+                { backgroundColor: restricted?.exists ? colors.successFaint : colors.errorFaint },
+              ]}
+            >
+              <Text style={[styles.existenceBadgeText, { color: restricted?.exists ? colors.success : colors.error }]}>
+                {restricted?.exists ? tr("partDetail.inStockYes") : tr("partDetail.notFoundInStore")}
+              </Text>
+            </View>
+          </Card>
+          <Card testID="part-location-restricted">
+            <Text style={styles.cardTitle}>{tr("partDetail.locationTitle").toUpperCase()}</Text>
+            <Text style={locationText ? styles.locationValue : styles.dim}>
+              {locationText || tr("common.noLocation")}
+            </Text>
+          </Card>
+        </ScrollView>
       </View>
     );
   }
@@ -654,6 +705,9 @@ const styles = StyleSheet.create({
   pnLabel: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1 },
   pn: { color: colors.onSurface, fontSize: font.huge, fontWeight: "800", letterSpacing: 1, marginVertical: spacing.sm },
   chipRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.sm },
+  existenceBadge: { alignSelf: "flex-start", paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.pill, marginTop: spacing.sm },
+  existenceBadgeText: { fontSize: font.sm, fontWeight: "800" },
+  locationValue: { color: colors.onSurface, fontSize: font.lg, fontWeight: "700" },
   stockLine: { color: colors.onSurface2, fontSize: font.base, marginTop: spacing.sm },
   cardTitle: { color: colors.info, fontSize: font.sm, fontWeight: "800", letterSpacing: 1, marginBottom: spacing.md },
   qrWrap: { alignItems: "center", backgroundColor: "#fff", borderRadius: radius.md, paddingVertical: spacing.md, marginTop: spacing.md },

@@ -161,7 +161,14 @@ def _location_key(loc: Optional[Dict[str, Any]]):
 # ---------------- Permissions ----------------
 ALL_PERMISSIONS = [
     "search", "buy", "sell", "requirement", "manage_parts",
-    "view_price", "manage_limits", "manage_users", "ai_approve", "view_stats"
+    "view_price", "manage_limits", "manage_users", "ai_approve", "view_stats",
+    # Gates full part detail (name/company/category/technical info, purchase
+    # history, stock units, AI research, purchase-limit status) on the
+    # search-result/part-detail screen. A staff account with "search" but
+    # without this can still search and see whether a part is in stock and
+    # its shelf/rack location -- nothing else. Deliberately NOT in
+    # STAFF_DEFAULT: opt-in only, a store admin grants it explicitly.
+    "view_part_details",
 ]
 STAFF_DEFAULT = ["search", "buy", "sell", "requirement", "manage_parts"]
 
@@ -397,6 +404,17 @@ def require(permission: str):
             raise HTTPException(403, f"Permission denied: {permission}")
         return user
     return dep
+
+
+def has_permission(user: dict, permission: str) -> bool:
+    """Soft check (never 403s) for endpoints that stay reachable regardless
+    of a permission but reduce what they return without it -- e.g. a part
+    listing that still resolves for a "search"-only caller, just with
+    sensitive fields stripped. Mirrors require()'s own role/permission
+    logic exactly."""
+    role = user.get("role")
+    perms = ALL_PERMISSIONS if role in ("admin", "super_admin") else user.get("permissions", [])
+    return permission in perms
 
 
 async def require_admin(user=Depends(get_current_user)):
@@ -1835,6 +1853,12 @@ async def list_parts(company: Optional[str] = None, category: Optional[str] = No
     for p in parts:
         p["stock_count"] = await db.stock.count_documents(
             {"store_id": p.get("store_id"), "part_number": p["part_number"], "sold": {"$ne": True}})
+    if not has_permission(user, "view_part_details"):
+        # This is the only caller of /parts in the app (the Catalog tab's
+        # category browse list) -- a staff account without view_part_details
+        # only ever learns a part number exists here, never its name,
+        # company, exact stock count, or verification status.
+        return [{"id": p["id"], "part_number": p["part_number"], "exists": p["stock_count"] > 0} for p in parts]
     return parts
 
 

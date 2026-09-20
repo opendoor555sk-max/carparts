@@ -5,12 +5,15 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
 import { api } from "@/src/api/client";
 import { Button, EmptyState, Header, Loading, StatusChip } from "@/src/components/ui";
+import { useAuth } from "@/src/context/AuthContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { colors, font, radius, shadow, spacing } from "@/src/theme";
 
 export default function PartsList() {
   const { category, company, title } = useLocalSearchParams<{ category: string; company: string; title: string }>();
   const { t } = useLanguage();
+  const { can } = useAuth();
+  const canViewDetails = can("view_part_details");
   const router = useRouter();
   const [parts, setParts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,21 +63,47 @@ export default function PartsList() {
           data={parts}
           keyExtractor={(p) => p.id}
           contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}
-          renderItem={({ item }) => (
-            <Pressable
-              style={styles.row}
-              onPress={() => router.push(`/part/${encodeURIComponent(item.part_number)}` as any)}
-              testID={`partlist-${item.part_number}`}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.pn}>{item.part_number}</Text>
-                {item.name ? <Text style={styles.name}>{item.name}</Text> : null}
-                <Text style={styles.meta}>{item.company} • {t("common.stock")}: {item.stock_count ?? 0}</Text>
-              </View>
-              <StatusChip status={item.verification_status} />
-              <Ionicons name="chevron-forward" size={18} color={colors.info} />
-            </Pressable>
-          )}
+          renderItem={({ item }) =>
+            canViewDetails ? (
+              <Pressable
+                style={styles.row}
+                onPress={() => router.push(`/part/${encodeURIComponent(item.part_number)}` as any)}
+                testID={`partlist-${item.part_number}`}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pn}>{item.part_number}</Text>
+                  {item.name ? <Text style={styles.name}>{item.name}</Text> : null}
+                  <Text style={styles.meta}>{item.company} • {t("common.stock")}: {item.stock_count ?? 0}</Text>
+                </View>
+                <StatusChip status={item.verification_status} />
+                <Ionicons name="chevron-forward" size={18} color={colors.info} />
+              </Pressable>
+            ) : (
+              // Reduced view: only part number + existence -- the backend
+              // itself doesn't send name/company/stock_count/verification
+              // status here without view_part_details.
+              <Pressable
+                style={styles.row}
+                onPress={() => router.push(`/part/${encodeURIComponent(item.part_number)}` as any)}
+                testID={`partlist-${item.part_number}`}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pn}>{item.part_number}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.existenceBadge,
+                    { backgroundColor: item.exists ? colors.successFaint : colors.errorFaint },
+                  ]}
+                >
+                  <Text style={[styles.existenceBadgeText, { color: item.exists ? colors.success : colors.error }]}>
+                    {item.exists ? t("partDetail.inStockYes") : t("partDetail.notFoundInStore")}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.info} />
+              </Pressable>
+            )
+          }
         />
       )}
     </View>
@@ -87,4 +116,6 @@ const styles = StyleSheet.create({
   pn: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
   name: { color: colors.onSurface3, fontSize: font.base, marginTop: 2 },
   meta: { color: colors.info, fontSize: font.sm, marginTop: spacing.xs },
+  existenceBadge: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.pill },
+  existenceBadgeText: { fontSize: font.sm - 1, fontWeight: "800" },
 });
