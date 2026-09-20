@@ -81,7 +81,6 @@ export default function Login() {
             <Ionicons name="hardware-chip" size={40} color={colors.brand} />
           </View>
           <Text style={styles.title}>Auto Parts Store</Text>
-          <Text style={styles.subtitle}>{t("login.tagline")}</Text>
         </View>
 
         <View style={styles.form}>
@@ -176,7 +175,6 @@ const styles = StyleSheet.create({
     ...shadow.sm,
   },
   title: { color: colors.onSurface, fontSize: font.xxl, fontWeight: "800", textAlign: "center" },
-  subtitle: { color: colors.brand, fontSize: font.sm, fontWeight: "700", marginTop: spacing.xs, letterSpacing: 0.5 },
   form: {
     backgroundColor: colors.surface2,
     borderWidth: 1,

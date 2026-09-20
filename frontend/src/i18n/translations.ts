@@ -148,7 +148,6 @@ const dict = {
     "ui.verified": "વેરિફાઇડ",
     "ui.unverified": "અનવેરિફાઇડ",
 
-    "login.tagline": "ઓટો ઇલેક્ટ્રિકલ સ્ક્રેપ પાર્ટ્સ ERP",
     "login.username": "યુઝરનેમ",
     "login.password": "પાસવર્ડ",
     "login.errRequired": "યુઝરનેમ અને પાસવર્ડ જરૂરી છે",
@@ -1062,7 +1061,6 @@ const dict = {
     "ui.verified": "वेरिफाइड",
     "ui.unverified": "अनवेरिफाइड",
 
-    "login.tagline": "ऑटो इलेक्ट्रिकल स्क्रैप पार्ट्स ERP",
     "login.username": "यूज़रनेम",
     "login.password": "पासवर्ड",
     "login.errRequired": "यूज़रनेम और पासवर्ड ज़रूरी हैं",
@@ -1976,7 +1974,6 @@ const dict = {
     "ui.verified": "Verified",
     "ui.unverified": "Unverified",
 
-    "login.tagline": "Auto Electrical Scrap Parts ERP",
     "login.username": "Username",
     "login.password": "Password",
     "login.errRequired": "Username and password are required",
