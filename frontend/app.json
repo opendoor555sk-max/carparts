@@ -4,7 +4,7 @@
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/auto-parts-logo.png",
     "scheme": "frontend",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -27,7 +27,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/auto-parts-logo.png",
         "backgroundColor": "#2563EB"
       },
       "edgeToEdgeEnabled": true,
@@ -70,7 +70,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-image.png",
+          "image": "./assets/images/auto-parts-logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#F4F6F9"

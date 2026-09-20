@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -77,9 +78,11 @@ export default function Login() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.logoWrap}>
-          <View style={styles.logoBox}>
-            <Ionicons name="hardware-chip" size={40} color={colors.brand} />
-          </View>
+          <Image
+            source={require("@/assets/images/auto-parts-logo.png")}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <Text style={styles.title}>Auto Parts Store</Text>
         </View>
 
@@ -162,15 +165,10 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
   container: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxxl, minHeight: "100%" },
   logoWrap: { alignItems: "center", marginBottom: spacing.xxxl },
-  logoBox: {
+  logoImage: {
     width: 84,
     height: 84,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface2,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    alignItems: "center",
-    justifyContent: "center",
+    borderRadius: 42,
     marginBottom: spacing.lg,
     ...shadow.sm,
   },
