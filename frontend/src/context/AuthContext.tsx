@@ -27,12 +27,12 @@ export type User = {
   disabled?: boolean;
 };
 
-export type RegisterPayload = {
-  store_name: string;
+export type StoreRequest = {
+  id: string;
   name: string;
-  username: string;
-  password: string;
-  contact: string;
+  mobile: string;
+  status: "pending" | "otp_generated" | "verified" | "expired";
+  created_at: string;
 };
 
 type AuthState = {
@@ -40,7 +40,8 @@ type AuthState = {
   loading: boolean;
   hasStoredToken: boolean;
   login: (username: string, password: string) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<void>;
+  createStoreRequest: (name: string, mobile: string) => Promise<StoreRequest>;
+  verifyStoreRequestOtp: (requestId: string, otp: string) => Promise<{ tempPassword: string; username: string }>;
   biometricUnlock: () => Promise<boolean>;
   logout: () => Promise<void>;
   can: (perm: string) => boolean;
@@ -89,16 +90,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(res.user);
   }, []);
 
-  const register = useCallback(async (payload: RegisterPayload) => {
-    const res = await api.post<{ access_token: string; user: User }>(
-      "/auth/register",
-      payload,
+  const createStoreRequest = useCallback(async (name: string, mobile: string) => {
+    return await api.post<StoreRequest>("/store-requests", { name, mobile }, false);
+  }, []);
+
+  const verifyStoreRequestOtp = useCallback(async (requestId: string, otp: string) => {
+    const res = await api.post<{ access_token: string; user: User; temp_password: string }>(
+      `/store-requests/${requestId}/verify-otp`,
+      { otp },
       false,
     );
     await storage.secureSet(TOKEN_KEY, res.access_token);
     await storage.setItem(USER_KEY, res.user as any);
     setHasStoredToken(true);
     setUser(res.user);
+    return { tempPassword: res.temp_password, username: res.user.username };
   }, []);
 
   const biometricUnlock = useCallback(async (): Promise<boolean> => {
@@ -170,7 +176,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, hasStoredToken, login, register, biometricUnlock, logout, can, refresh }}
+      value={{
+        user,
+        loading,
+        hasStoredToken,
+        login,
+        createStoreRequest,
+        verifyStoreRequestOtp,
+        biometricUnlock,
+        logout,
+        can,
+        refresh,
+      }}
     >
       {children}
     </AuthContext.Provider>

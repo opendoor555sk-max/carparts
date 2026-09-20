@@ -4,6 +4,8 @@ import uuid
 import json
 import logging
 import asyncio
+import secrets
+import string
 import time
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -483,12 +485,13 @@ class LoginIn(BaseModel):
     password: str
 
 
-class RegisterIn(BaseModel):
-    store_name: str
+class StoreRequestIn(BaseModel):
     name: str
-    username: str
-    password: str
-    contact: str
+    mobile: str
+
+
+class VerifyOtpIn(BaseModel):
+    otp: str
 
 
 class ApiSettingsIn(BaseModel):
@@ -730,16 +733,34 @@ async def startup():
     except Exception as e:
         logger.warning(f"catalog backfill warning: {e}")
 
-    # Super Admin (app developer / god-view). Existing 'abdul' is upgraded to super_admin.
-    # Also the account this deployment's Owner mechanism is concretely tied to:
-    # OWNER_CONTACT (see is_owner()) has to actually live on SOME user's
-    # `contact` field for platform-owner access to work at all, and no other
-    # endpoint ever lets a `contact` be set post-creation — so it's seeded
-    # here, on this account specifically, every startup (idempotent, same
-    # unconditional-set pattern already used for `role` below).
-    sa_username = os.environ.get("ADMIN_USERNAME", "abdul").lower()
-    existing = await db.users.find_one({"username": sa_username})
-    if not existing:
+    # Super Admin (app developer / god-view) — also the account this
+    # deployment's Owner mechanism is tied to (OWNER_CONTACT; see is_owner()).
+    #
+    # SECURITY FIX: this used to match by username alone (ADMIN_USERNAME,
+    # default "abdul") — `db.users.find_one({"username": sa_username})` —
+    # then unconditionally set role="super_admin" (+ contact=OWNER_CONTACT)
+    # on whatever document that found. usernames are ordinary, tenant-chosen
+    # values with no reservation; if any store's own admin had ALREADY
+    # created a staff/admin account named "abdul" (this app's own documented
+    # demo username, not an obviously reserved one) before this block's next
+    # run, that exact tenant account got silently promoted — instantly
+    # breaking its store scoping (a super_admin's resolve_store() is
+    # cross-store by design when no store_id is given), i.e. "a staff user
+    # can see data belonging to other stores too". Fixed by matching on a
+    # dedicated `platform_seed` marker instead, set only here and never
+    # reachable from any user-facing endpoint, so a tenant account can never
+    # collide with it regardless of what it's named.
+    seed = await db.users.find_one({"platform_seed": True})
+    if not seed:
+        sa_username = os.environ.get("ADMIN_USERNAME", "abdul").lower()
+        base_username = sa_username
+        n = 2
+        while await db.users.find_one({"username": sa_username}):
+            # ADMIN_USERNAME is already taken by a tenant account (or, on a
+            # fresh DB, this can't happen) — fall back rather than touching
+            # someone else's account.
+            sa_username = f"{base_username}_platform{'' if n == 2 else n}"
+            n += 1
         await db.users.insert_one({
             "id": new_id(),
             "name": os.environ.get("ADMIN_NAME", "Abdul Salam"),
@@ -748,24 +769,62 @@ async def startup():
             "password_enc": encrypt_pw(os.environ.get("ADMIN_PASSWORD", "Salam@123")),
             "role": "super_admin", "store_id": None, "permissions": ALL_PERMISSIONS,
             "contact": OWNER_CONTACT, "disabled": False, "created_at": now_iso(),
+            "platform_seed": True,
         })
-        logger.info("Seeded super admin user")
+        logger.info(f"Seeded platform super admin user (username={sa_username!r})")
     else:
         upd = {"role": "super_admin", "contact": OWNER_CONTACT}
-        if not existing.get("password_enc"):
+        if not seed.get("password_enc"):
             upd["password_enc"] = encrypt_pw(os.environ.get("ADMIN_PASSWORD", "Salam@123"))
-        await db.users.update_one({"id": existing["id"]}, {"$set": upd})
+        await db.users.update_one({"id": seed["id"]}, {"$set": upd})
+
+    # One-time repair for any account the OLD username-matching lookup above
+    # already mispromoted in the past: role=="super_admin" is never correct
+    # for an account that also has a real store_id (the platform account
+    # always has store_id=None) unless it's the platform_seed account
+    # itself. Can't know what the account's role was before the leak, so
+    # this deliberately does not guess "admin" back — "staff" is the
+    # never-over-privileged default — and strips OWNER_CONTACT if it was
+    # wrongly granted. Logged loudly so a human can manually re-grant
+    # whatever the account actually needed.
+    async for u in db.users.find({"role": "super_admin", "store_id": {"$ne": None}, "platform_seed": {"$ne": True}}):
+        logger.warning(
+            f"Reverting user {u.get('username')!r} (id={u['id']}) from super_admin back to staff — "
+            "it has a store_id, so it was never the platform account; almost certainly a tenant "
+            "account previously mismatched by the old username-based seed lookup. If it needed "
+            "admin rights in its own store, re-grant that by hand."
+        )
+        fix: Dict[str, Any] = {"$set": {"role": "staff"}}
+        if u.get("contact") == OWNER_CONTACT:
+            fix["$unset"] = {"contact": ""}
+        await db.users.update_one({"id": u["id"]}, fix)
 
     # Store status backfill: only sets it where missing (never overwrites an
     # existing value), same "idempotent enrich-only" shape as the catalog
     # backfill above. New stores get "active" set directly at creation
-    # (/auth/register) — this only covers stores that existed before this field did.
+    # (_create_store_and_admin) — this only covers stores that existed
+    # before this field did.
     try:
         r = await db.stores.update_many({"status": {"$exists": False}}, {"$set": {"status": "active"}})
         if r.modified_count:
             logger.info(f"Backfilled status=active on {r.modified_count} store(s)")
     except Exception as e:
         logger.warning(f"store status backfill warning: {e}")
+
+    # created_by backfill: existing accounts predate this field entirely, and
+    # there's no reliable way to reconstruct who actually added them, so this
+    # deliberately sets null ("Unknown" in the UI) rather than guessing.
+    try:
+        r = await db.users.update_many({"created_by": {"$exists": False}}, {"$set": {"created_by": None}})
+        if r.modified_count:
+            logger.info(f"Backfilled created_by=None on {r.modified_count} user(s)")
+    except Exception as e:
+        logger.warning(f"created_by backfill warning: {e}")
+
+    try:
+        await db.store_requests.create_index("id", unique=True)
+    except Exception as e:
+        logger.warning(f"store_requests index create warning: {e}")
 
     try:
         await run_in_threadpool(init_storage)
@@ -818,33 +877,124 @@ async def demo_check():
         return {"allowed": False}
 
 
-@api.post("/auth/register")
-async def register(body: RegisterIn):
-    username = body.username.lower().strip()
-    if not username or not body.password or not body.store_name.strip():
-        raise HTTPException(422, "Store name, username and password are required")
-    if not body.contact.strip():
-        raise HTTPException(422, "Contact number is required")
-    if len(body.password) < 6:
-        raise HTTPException(422, "Password must be at least 6 characters")
-    if await db.users.find_one({"username": username}):
-        raise HTTPException(400, "આ username પહેલેથી વપરાયેલ છે — બીજું પસંદ કરો")
+# ---------------- Store creation: owner-approved via in-app OTP ----------------
+# Replaces the old direct /auth/register (create a store immediately, no
+# gate) entirely — anyone reaching the app can no longer spin up a store on
+# their own; every store now needs the platform Owner to actually hand over
+# an OTP first. store_requests is the pending-approval queue that sits in
+# front of the same account-creation logic /auth/register used to run
+# inline (see _create_store_and_admin below).
+OTP_TTL_MINUTES = 10
+
+
+def _username_from_mobile(mobile: str) -> str:
+    digits = re.sub(r"[^0-9]", "", mobile or "")
+    return digits or uuid.uuid4().hex[:10]
+
+
+async def _unique_username(base: str) -> str:
+    username = base
+    n = 2
+    while await db.users.find_one({"username": username}):
+        username = f"{base}{n}"
+        n += 1
+    return username
+
+
+def _gen_temp_password() -> str:
+    # 8 random uppercase/digit chars -- short enough to read off a screen
+    # and retype, long enough to not be trivially guessable as a one-off
+    # initial credential (the admin is expected to change it afterward).
+    alphabet = string.ascii_uppercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(8))
+
+
+def _gen_otp() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+async def _create_store_and_admin(store_name: str, mobile: str) -> tuple:
+    """The exact account-creation logic /auth/register used to run inline,
+    now shared with verify_store_request_otp() below. Since the OTP flow
+    only ever collects a name + mobile (no chosen username/password), the
+    username is derived from the mobile number and a random temporary
+    password is generated — returned in plaintext ONLY to the immediate
+    caller (verify_store_request_otp's response, shown once), never stored
+    anywhere in plaintext or logged."""
+    mobile = mobile.strip()
+    username = await _unique_username(_username_from_mobile(mobile))
+    temp_password = _gen_temp_password()
     store_id = new_id()
-    store = {"id": store_id, "name": body.store_name.strip(), "owner_username": username,
-             "contact": body.contact.strip(), "created_at": now_iso(), "status": "active"}
+    store = {"id": store_id, "name": store_name.strip(), "owner_username": username,
+             "contact": mobile, "created_at": now_iso(), "status": "active"}
     await db.stores.insert_one(dict(store))
     user = {
-        "id": new_id(), "name": body.name.strip() or body.store_name.strip(), "username": username,
-        "password_hash": hash_pw(body.password), "password_enc": encrypt_pw(body.password),
+        "id": new_id(), "name": store_name.strip(), "username": username,
+        "password_hash": hash_pw(temp_password), "password_enc": encrypt_pw(temp_password),
         "role": "admin", "store_id": store_id, "permissions": ALL_PERMISSIONS,
-        "contact": body.contact.strip(), "disabled": False, "created_at": now_iso(),
+        "contact": mobile, "disabled": False, "created_at": now_iso(),
+        # The store's own first admin has no human creator.
+        "created_by": None,
     }
     await db.users.insert_one(dict(user))
-    # per-store purchase limit settings
     await db.settings.insert_one({"key": "purchase_limit", "store_id": store_id,
                                   "global_enabled": False, "global_default": None})
     user["store_name"] = store["name"]
-    return {"access_token": make_token(user), "token_type": "bearer", "user": public_user(user)}
+    return store, user, temp_password
+
+
+@api.post("/store-requests")
+async def create_store_request(body: StoreRequestIn):
+    name = body.name.strip()
+    mobile = body.mobile.strip()
+    if not name:
+        raise HTTPException(422, "Store name is required")
+    if not mobile:
+        raise HTTPException(422, "Mobile number is required")
+    # Dedup: one live (not yet verified/expired) request per mobile at a
+    # time — resend the same one instead of piling up duplicates.
+    existing = await db.store_requests.find_one(
+        {"mobile": mobile, "status": {"$in": ["pending", "otp_generated"]}}, {"_id": 0, "otp_hash": 0},
+    )
+    if existing:
+        return existing
+    doc = {
+        "id": new_id(), "name": name, "mobile": mobile, "status": "pending",
+        "otp_hash": None, "otp_expires_at": None, "created_at": now_iso(), "verified_at": None,
+    }
+    await db.store_requests.insert_one(dict(doc))
+    doc.pop("_id", None)
+    doc.pop("otp_hash", None)
+    return doc
+
+
+@api.post("/store-requests/{request_id}/verify-otp")
+async def verify_store_request_otp(request_id: str, body: VerifyOtpIn):
+    req = await db.store_requests.find_one({"id": request_id})
+    # Same generic error whether the request doesn't exist, has no OTP yet,
+    # is already verified, has expired, or the code is simply wrong — never
+    # reveal which case it is.
+    generic_error = HTTPException(400, "Invalid or expired code")
+    if not req or req.get("status") == "verified" or not req.get("otp_hash"):
+        raise generic_error
+    expires_at = req.get("otp_expires_at")
+    try:
+        expired = not expires_at or datetime.fromisoformat(expires_at) < datetime.now(timezone.utc)
+    except ValueError:
+        expired = True
+    if expired:
+        await db.store_requests.update_one({"id": request_id}, {"$set": {"status": "expired"}})
+        raise generic_error
+    if not verify_pw((body.otp or "").strip(), req["otp_hash"]):
+        raise generic_error
+    store, admin_user, temp_password = await _create_store_and_admin(req["name"], req["mobile"])
+    await db.store_requests.update_one(
+        {"id": request_id}, {"$set": {"status": "verified", "verified_at": now_iso()}},
+    )
+    return {
+        "access_token": make_token(admin_user), "token_type": "bearer",
+        "user": public_user(admin_user), "temp_password": temp_password,
+    }
 
 
 @api.post("/auth/login")
@@ -1117,6 +1267,78 @@ async def owner_delete_store(store_id: str, body: OwnerDeleteStoreIn, user=Depen
     return {"ok": True, "deleted_store_id": store_id}
 
 
+@api.get("/owner/store-requests")
+async def owner_list_store_requests(user=Depends(require_owner)):
+    reqs = await db.store_requests.find({}, {"_id": 0, "otp_hash": 0}).sort("created_at", -1).to_list(1000)
+    # Stable sort on top of the created_at-desc order above: pending/
+    # otp_generated first, each group staying newest-first internally.
+    reqs.sort(key=lambda r: 0 if r.get("status") in ("pending", "otp_generated") else 1)
+    return reqs
+
+
+@api.post("/owner/store-requests/{request_id}/generate-otp")
+async def owner_generate_otp(request_id: str, user=Depends(require_owner)):
+    req = await db.store_requests.find_one({"id": request_id}, {"_id": 0})
+    if not req:
+        raise HTTPException(404, "Request not found")
+    if req.get("status") == "verified":
+        raise HTTPException(400, "This request is already verified")
+    otp = _gen_otp()
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=OTP_TTL_MINUTES)).isoformat()
+    await db.store_requests.update_one(
+        {"id": request_id},
+        # Regenerating replaces whatever OTP was issued before it — only the
+        # latest one this returns is ever valid.
+        {"$set": {"otp_hash": hash_pw(otp), "otp_expires_at": expires_at, "status": "otp_generated"}},
+    )
+    # The one and only place this is ever exposed in plaintext — directly in
+    # this response, to the owner's own screen. Never logged, never stored
+    # (only otp_hash is persisted), never sent anywhere by the server itself.
+    return {"ok": True, "otp": otp, "expires_at": expires_at}
+
+
+# ---------------- Owner: staff/admin accounts across every store ----------------
+# Individual-account actions, distinct from the store-wide lock/delete above
+# (locking a store already blocks everyone in it at once; this is for acting
+# on one specific person without touching the rest of their store).
+@api.get("/owner/users")
+async def owner_list_users(user=Depends(require_owner)):
+    proj = {"_id": 0, "password_hash": 0, "password_enc": 0, "google_api_key": 0, "google_cx": 0}
+    users = await db.users.find({"deleted_at": {"$exists": False}}, proj).sort("created_at", -1).to_list(5000)
+    store_names = {s["id"]: s.get("name", "") for s in await db.stores.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)}
+    out = []
+    for u in users:
+        sid = u.get("store_id")
+        out.append({
+            "id": u["id"], "name": u.get("name", ""), "username": u.get("username", ""),
+            "role": u.get("role"), "store_id": sid,
+            "store_name": store_names.get(sid, "") if sid else "—",
+            "disabled": u.get("disabled", False), "created_at": u.get("created_at"),
+            "created_by": u.get("created_by"),
+        })
+    return out
+
+
+@api.post("/owner/users/{user_id}/deactivate")
+async def owner_deactivate_user(user_id: str, user=Depends(require_owner)):
+    if user_id == user["id"]:
+        raise HTTPException(400, "You can't deactivate your own account")
+    target = await db.users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(404, "User not found")
+    await db.users.update_one({"id": user_id}, {"$set": {"disabled": True}})
+    return {"ok": True, "id": user_id, "disabled": True}
+
+
+@api.post("/owner/users/{user_id}/reactivate")
+async def owner_reactivate_user(user_id: str, user=Depends(require_owner)):
+    target = await db.users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(404, "User not found")
+    await db.users.update_one({"id": user_id}, {"$set": {"disabled": False}})
+    return {"ok": True, "id": user_id, "disabled": False}
+
+
 @api.get("/admin/gps-locations")
 async def admin_gps_locations(user=Depends(require_super_admin)):
     """God-view of every GPS point captured across all stores — from requirements
@@ -1207,6 +1429,9 @@ async def create_user(body: UserCreate, store_id: Optional[str] = None, user=Dep
         "role": role, "store_id": sid,
         "permissions": body.permissions if body.permissions is not None else STAFF_DEFAULT,
         "disabled": False, "created_at": now_iso(),
+        # Who added this account — from the authenticated caller's own DB
+        # record, never anything the client could pass in the request body.
+        "created_by": {"id": user["id"], "name": user.get("name", ""), "contact": user.get("contact", "")},
     }
     await db.users.insert_one(doc)
     return public_user(doc)

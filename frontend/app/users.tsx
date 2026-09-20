@@ -203,6 +203,9 @@ export default function Users() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.name}>{u.name}</Text>
                   <Text style={styles.username}>@{u.username}</Text>
+                  <Text style={styles.addedBy}>
+                    {t("users.addedBy")}: {u.created_by?.name || t("users.addedByUnknown")}
+                  </Text>
                 </View>
                 <StatusChip status={u.role === "admin" ? "Verified" : u.disabled ? "Cancelled" : "Pending"} />
               </View>
@@ -359,6 +362,7 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   name: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
   username: { color: colors.info, fontSize: font.sm },
+  addedBy: { color: colors.info, fontSize: font.sm - 1, marginTop: 2 },
   permLabel: { color: colors.info, fontSize: font.sm - 1, fontWeight: "800", letterSpacing: 1, marginTop: spacing.md, marginBottom: spacing.sm },
   permGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
   permChip: { paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.sm, borderWidth: 1 },

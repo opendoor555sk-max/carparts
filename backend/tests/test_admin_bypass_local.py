@@ -41,6 +41,11 @@ def client():
 
 
 def _register(client, prefix):
+    # /auth/register no longer exists -- store creation now goes through the
+    # owner-approved OTP flow (store_requests). Drives the exact same
+    # request -> owner generates OTP -> verify-otp sequence a real signup
+    # would, using the platform seed account (abdul/Salam@123, which is also
+    # the Owner per OWNER_CONTACT) to stand in for the owner approving it.
     suffix = uuid.uuid4().hex[:8]
     payload = {
         "store_name": f"TEST_{prefix}_{suffix}",
@@ -49,7 +54,20 @@ def _register(client, prefix):
         "password": "Test@1234",
         "contact": "9999999999",
     }
-    r = client.post("/api/auth/register", json=payload)
+    mobile = f"90000{uuid.uuid4().int % 100000:05d}"
+    reqr = client.post("/api/store-requests", json={"name": payload["store_name"], "mobile": mobile})
+    assert reqr.status_code == 200, reqr.text
+    request_id = reqr.json()["id"]
+
+    owner_login = client.post("/api/auth/login", json={"username": "abdul", "password": "Salam@123"})
+    assert owner_login.status_code == 200, owner_login.text
+    owner_token = owner_login.json()["access_token"]
+
+    otpr = client.post(f"/api/owner/store-requests/{request_id}/generate-otp", headers=_auth(owner_token))
+    assert otpr.status_code == 200, otpr.text
+    otp = otpr.json()["otp"]
+
+    r = client.post(f"/api/store-requests/{request_id}/verify-otp", json={"otp": otp})
     assert r.status_code == 200, r.text
     d = r.json()
     return {"payload": payload, "token": d["access_token"], "user": d["user"]}

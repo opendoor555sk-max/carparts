@@ -11,55 +11,94 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Clipboard from "expo-clipboard";
 
 import { useAuth } from "@/src/context/AuthContext";
 import { useLanguage } from "@/src/context/LanguageContext";
+import { useToast } from "@/src/context/ToastContext";
 import { Button, Field } from "@/src/components/ui";
 import { colors, font, radius, shadow, spacing } from "@/src/theme";
+import { OWNER_CONTACT } from "@/src/constants/owner";
+import { shareTextOnWhatsApp } from "@/src/utils/print";
+
+type Step = "form" | "otp" | "done";
 
 export default function SignUp() {
-  const { register } = useAuth();
+  const { createStoreRequest, verifyStoreRequestOtp } = useAuth();
   const { t } = useLanguage();
+  const { show } = useToast();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  const [step, setStep] = useState<Step>("form");
   const [storeName, setStoreName] = useState("");
-  const [name, setName] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [requestId, setRequestId] = useState("");
+  const [otp, setOtp] = useState("");
   const [username, setUsername] = useState("");
-  const [contact, setContact] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
+  const [tempPassword, setTempPassword] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const onSubmit = async () => {
+  const openWhatsApp = async (name: string, mob: string) => {
+    try {
+      await shareTextOnWhatsApp(`New store request: ${name}, ${mob}`, OWNER_CONTACT);
+    } catch {
+      // Non-fatal -- the request already exists server-side either way; the
+      // owner can also be reached by phone using the helper text on step 2.
+    }
+  };
+
+  const submitRequest = async () => {
     setErr("");
-    if (!storeName.trim() || !username.trim() || !password) {
-      setErr(t("signup.errRequired"));
+    if (!storeName.trim()) {
+      setErr(t("signup.errStoreNameRequired"));
       return;
     }
-    if (!contact.trim()) {
+    if (!mobile.trim()) {
       setErr(t("signup.errContact"));
-      return;
-    }
-    if (password.length < 6) {
-      setErr(t("signup.errPasswordLen"));
       return;
     }
     setLoading(true);
     try {
-      await register({
-        store_name: storeName.trim(),
-        name: name.trim(),
-        username: username.trim(),
-        password,
-        contact: contact.trim(),
-      });
-      router.replace("/(tabs)");
+      const req = await createStoreRequest(storeName.trim(), mobile.trim());
+      setRequestId(req.id);
+      await openWhatsApp(storeName.trim(), mobile.trim());
+      setStep("otp");
     } catch (e: any) {
       setErr(e?.message || t("signup.errFailed"));
     } finally {
       setLoading(false);
     }
+  };
+
+  const resendWhatsApp = async () => {
+    await openWhatsApp(storeName.trim(), mobile.trim());
+    show(t("signup.otpResent"), "info");
+  };
+
+  const submitOtp = async () => {
+    setErr("");
+    if (!otp.trim()) {
+      setErr(t("signup.errOtpRequired"));
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await verifyStoreRequestOtp(requestId, otp.trim());
+      setUsername(res.username);
+      setTempPassword(res.tempPassword);
+      setStep("done");
+    } catch (e: any) {
+      setErr(e?.message || t("signup.errOtpFailed"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyPassword = async () => {
+    await Clipboard.setStringAsync(tempPassword);
+    show(t("signup.copied"), "success");
   };
 
   return (
@@ -76,75 +115,123 @@ export default function SignUp() {
           <Text style={styles.subtitle}>{t("signup.subtitle")}</Text>
         </View>
 
-        <View style={styles.form}>
-          <Field
-            label={t("signup.storeName").toUpperCase()}
-            value={storeName}
-            onChangeText={setStoreName}
-            placeholder={t("signup.storeNamePlaceholder")}
-            testID="signup-store"
-          />
-          <Field
-            label={t("signup.yourName").toUpperCase()}
-            value={name}
-            onChangeText={setName}
-            placeholder={t("signup.yourNamePlaceholder")}
-            testID="signup-name"
-          />
-          <Field
-            label={t("signup.contact").toUpperCase()}
-            value={contact}
-            onChangeText={setContact}
-            placeholder="e.g. +91 98xxxxxxxx"
-            keyboardType="phone-pad"
-            testID="signup-contact"
-          />
-          <Field
-            label={t("signup.usernameLabel")}
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            autoCorrect={false}
-            placeholder={t("login.username")}
-            testID="signup-username"
-          />
-          <View>
+        {step === "form" ? (
+          <View style={styles.form}>
             <Field
-              label={t("login.password").toUpperCase()}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPw}
-              placeholder={t("signup.passwordPlaceholder")}
-              testID="signup-password"
-              onSubmitEditing={onSubmit}
+              label={t("signup.storeName").toUpperCase()}
+              value={storeName}
+              onChangeText={setStoreName}
+              placeholder={t("signup.storeNamePlaceholder")}
+              testID="signup-store"
+            />
+            <Field
+              label={t("signup.contact").toUpperCase()}
+              value={mobile}
+              onChangeText={setMobile}
+              placeholder="e.g. +91 98xxxxxxxx"
+              keyboardType="phone-pad"
+              testID="signup-mobile"
+              onSubmitEditing={submitRequest}
               returnKeyType="go"
             />
-            <Pressable style={styles.eye} onPress={() => setShowPw((s) => !s)} hitSlop={12}>
-              <Ionicons name={showPw ? "eye-off" : "eye"} size={20} color={colors.info} />
+
+            {err ? (
+              <View style={styles.errBanner} testID="signup-error">
+                <Ionicons name="warning" size={16} color={colors.onError} />
+                <Text style={styles.errText}>{err}</Text>
+              </View>
+            ) : null}
+
+            <Button
+              title={t("signup.sendRequest")}
+              onPress={submitRequest}
+              loading={loading}
+              icon="logo-whatsapp"
+              testID="signup-submit"
+              style={{ marginTop: spacing.sm }}
+            />
+          </View>
+        ) : null}
+
+        {step === "otp" ? (
+          <View style={styles.form}>
+            <Text style={styles.summary}>{storeName} · {mobile}</Text>
+            <Text style={styles.helper}>{t("signup.otpHelper")}</Text>
+
+            <Field
+              label={t("signup.otpLabel").toUpperCase()}
+              value={otp}
+              onChangeText={setOtp}
+              placeholder={t("signup.otpPlaceholder")}
+              keyboardType="number-pad"
+              maxLength={6}
+              testID="signup-otp"
+              onSubmitEditing={submitOtp}
+              returnKeyType="go"
+            />
+
+            {err ? (
+              <View style={styles.errBanner} testID="signup-otp-error">
+                <Ionicons name="warning" size={16} color={colors.onError} />
+                <Text style={styles.errText}>{err}</Text>
+              </View>
+            ) : null}
+
+            <Button
+              title={t("signup.verifySubmit")}
+              onPress={submitOtp}
+              loading={loading}
+              icon="checkmark-circle"
+              testID="signup-verify-otp"
+              style={{ marginTop: spacing.sm }}
+            />
+
+            <Pressable onPress={resendWhatsApp} style={styles.linkRow} testID="signup-resend-whatsapp">
+              <Ionicons name="logo-whatsapp" size={16} color={colors.brand} />
+              <Text style={[styles.linkText, { color: colors.brand, fontWeight: "800", marginLeft: spacing.xs }]}>
+                {t("signup.resendWhatsapp")}
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => { setStep("form"); setErr(""); setOtp(""); }} style={styles.linkRow} testID="signup-back">
+              <Text style={styles.linkText}>{t("signup.editDetails")}</Text>
             </Pressable>
           </View>
+        ) : null}
 
-          {err ? (
-            <View style={styles.errBanner} testID="signup-error">
-              <Ionicons name="warning" size={16} color={colors.onError} />
-              <Text style={styles.errText}>{err}</Text>
+        {step === "done" ? (
+          <View style={styles.form}>
+            <Ionicons name="checkmark-circle" size={40} color={colors.success} style={{ alignSelf: "center", marginBottom: spacing.sm }} />
+            <Text style={styles.summary}>{t("signup.storeReady")}</Text>
+            <Text style={styles.helper}>{t("signup.tempCredsHelper")}</Text>
+
+            <View style={styles.credRow}>
+              <Text style={styles.credLabel}>{t("signup.usernameLabel")}</Text>
+              <Text style={styles.credValue} selectable>{username}</Text>
             </View>
-          ) : null}
+            <View style={styles.credRow}>
+              <Text style={styles.credLabel}>{t("login.password")}</Text>
+              <Text style={styles.credValue} selectable>{tempPassword}</Text>
+              <Pressable onPress={copyPassword} hitSlop={10} testID="signup-copy-password">
+                <Ionicons name="copy-outline" size={18} color={colors.brand} />
+              </Pressable>
+            </View>
 
-          <Button
-            title={t("signup.submit")}
-            onPress={onSubmit}
-            loading={loading}
-            icon="add-circle"
-            testID="signup-submit"
-            style={{ marginTop: spacing.sm }}
-          />
-        </View>
+            <Button
+              title={t("signup.continueToApp")}
+              onPress={() => router.replace("/(tabs)")}
+              icon="arrow-forward-circle"
+              testID="signup-continue"
+              style={{ marginTop: spacing.lg }}
+            />
+          </View>
+        ) : null}
 
-        <Pressable onPress={() => router.replace("/login")} style={styles.linkRow} testID="go-login">
-          <Text style={styles.linkText}>{t("signup.haveAccount")} </Text>
-          <Text style={[styles.linkText, { color: colors.brand, fontWeight: "800" }]}>{t("login.signIn")}</Text>
-        </Pressable>
+        {step !== "done" ? (
+          <Pressable onPress={() => router.replace("/login")} style={styles.linkRow} testID="go-login">
+            <Text style={styles.linkText}>{t("signup.haveAccount")} </Text>
+            <Text style={[styles.linkText, { color: colors.brand, fontWeight: "800" }]}>{t("login.signIn")}</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -176,7 +263,11 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     ...shadow.md,
   },
-  eye: { position: "absolute", right: spacing.md, top: 34 },
+  summary: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800", textAlign: "center", marginBottom: spacing.xs },
+  helper: { color: colors.info, fontSize: font.sm, textAlign: "center", marginBottom: spacing.lg, lineHeight: 18 },
+  credRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, marginBottom: spacing.sm },
+  credLabel: { color: colors.info, fontSize: font.sm - 1, fontWeight: "700", width: 90 },
+  credValue: { color: colors.onSurface, fontSize: font.base, fontWeight: "700", flex: 1 },
   errBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -187,6 +278,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   errText: { color: colors.onError, fontSize: font.base, fontWeight: "700", flex: 1 },
-  linkRow: { flexDirection: "row", justifyContent: "center", marginTop: spacing.xl },
+  linkRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: spacing.xl },
   linkText: { color: colors.info, fontSize: font.base },
 });

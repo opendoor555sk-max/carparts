@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
+import * as Clipboard from "expo-clipboard";
 
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
@@ -23,18 +24,52 @@ type OwnerStore = {
   locked_by?: string | null;
 };
 
+type StoreRequestStatus = "pending" | "otp_generated" | "verified" | "expired";
+
+type OwnerStoreRequest = {
+  id: string;
+  name: string;
+  mobile: string;
+  status: StoreRequestStatus;
+  created_at: string;
+  verified_at?: string | null;
+};
+
+type OwnerUser = {
+  id: string;
+  name: string;
+  username: string;
+  role: "admin" | "staff" | "super_admin";
+  store_id: string | null;
+  store_name: string;
+  disabled: boolean;
+  created_at?: string | null;
+  created_by?: { id: string; name: string; contact?: string } | null;
+};
+
+type Tab = "stores" | "requests" | "staff";
+
 export default function OwnerPanel() {
   const router = useRouter();
   const { user } = useAuth();
   const { t } = useLanguage();
   const { show } = useToast();
 
-  const [stores, setStores] = useState<OwnerStore[]>([]);
+  const [tab, setTab] = useState<Tab>("stores");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const [stores, setStores] = useState<OwnerStore[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<OwnerStore | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [requests, setRequests] = useState<OwnerStoreRequest[]>([]);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [otpById, setOtpById] = useState<Record<string, { otp: string; expires_at: string }>>({});
+
+  const [staff, setStaff] = useState<OwnerUser[]>([]);
+  const [staffBusyId, setStaffBusyId] = useState<string | null>(null);
 
   // Client-side only — a purely cosmetic gate deciding whether this screen's
   // content ever renders for THIS device. A non-owner reaching this route
@@ -43,13 +78,15 @@ export default function OwnerPanel() {
   // server-side (is_owner() against the caller's own DB record).
   const isOwner = !!user?.contact && user.contact === OWNER_CONTACT;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (which: Tab) => {
     if (!isOwner) {
       setLoading(false);
       return;
     }
     try {
-      setStores(await api.get<OwnerStore[]>("/owner/stores"));
+      if (which === "stores") setStores(await api.get<OwnerStore[]>("/owner/stores"));
+      else if (which === "requests") setRequests(await api.get<OwnerStoreRequest[]>("/owner/store-requests"));
+      else setStaff(await api.get<OwnerUser[]>("/owner/users"));
     } catch (e: any) {
       show(e?.message || t("common.loadFailed"), "error");
     } finally {
@@ -66,14 +103,19 @@ export default function OwnerPanel() {
         return;
       }
       setLoading(true);
-      load();
+      load(tab);
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOwner, load]),
+    }, [isOwner, tab, load]),
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    load();
+    load(tab);
+  };
+
+  const switchTab = (next: Tab) => {
+    setTab(next);
+    setLoading(true);
   };
 
   const toggleLock = async (store: OwnerStore) => {
@@ -82,7 +124,7 @@ export default function OwnerPanel() {
       const action = store.status === "locked" ? "unlock" : "lock";
       await api.post(`/owner/stores/${store.id}/${action}`);
       show(action === "lock" ? t("ownerPanel.lockedToast") : t("ownerPanel.unlockedToast"), "success");
-      load();
+      load("stores");
     } catch (e: any) {
       show(e?.message || t("common.failed"), "error");
     } finally {
@@ -97,7 +139,7 @@ export default function OwnerPanel() {
       await api.del(`/owner/stores/${deleteTarget.id}`, { confirm_name: deleteTarget.name });
       show(t("ownerPanel.deletedToast"), "success");
       setDeleteTarget(null);
-      load();
+      load("stores");
     } catch (e: any) {
       show(e?.message || t("common.failed"), "error");
     } finally {
@@ -105,66 +147,220 @@ export default function OwnerPanel() {
     }
   };
 
+  const generateOtp = async (req: OwnerStoreRequest) => {
+    setGeneratingId(req.id);
+    try {
+      const res = await api.post<{ ok: boolean; otp: string; expires_at: string }>(
+        `/owner/store-requests/${req.id}/generate-otp`,
+      );
+      setOtpById((m) => ({ ...m, [req.id]: { otp: res.otp, expires_at: res.expires_at } }));
+      load("requests");
+    } catch (e: any) {
+      show(e?.message || t("common.failed"), "error");
+    } finally {
+      setGeneratingId(null);
+    }
+  };
+
+  const copyOtp = async (otp: string) => {
+    await Clipboard.setStringAsync(otp);
+    show(t("ownerPanel.copied"), "success");
+  };
+
+  const toggleStaffActive = async (u: OwnerUser) => {
+    setStaffBusyId(u.id);
+    try {
+      await api.post(`/owner/users/${u.id}/${u.disabled ? "reactivate" : "deactivate"}`);
+      show(u.disabled ? t("ownerPanel.reactivatedToast") : t("ownerPanel.deactivatedToast"), "success");
+      load("staff");
+    } catch (e: any) {
+      show(e?.message || t("common.failed"), "error");
+    } finally {
+      setStaffBusyId(null);
+    }
+  };
+
   if (!isOwner) return null;
+
+  const requestStatusColors: Record<StoreRequestStatus, { bg: string; fg: string }> = {
+    pending: { bg: colors.surface3, fg: colors.info },
+    otp_generated: { bg: colors.brandFaint, fg: colors.brand },
+    verified: { bg: colors.successFaint, fg: colors.success },
+    expired: { bg: colors.errorFaint, fg: colors.error },
+  };
+  const requestStatusLabel: Record<StoreRequestStatus, string> = {
+    pending: t("ownerPanel.reqPending"),
+    otp_generated: t("ownerPanel.reqOtpGenerated"),
+    verified: t("ownerPanel.reqVerified"),
+    expired: t("ownerPanel.reqExpired"),
+  };
 
   return (
     <View style={styles.flex}>
       <Header title={t("ownerPanel.title")} subtitle={t("ownerPanel.subtitle")} onBack={() => router.back()} />
+
+      <View style={styles.tabBar}>
+        {(["stores", "requests", "staff"] as Tab[]).map((tb) => (
+          <Pressable
+            key={tb}
+            onPress={() => switchTab(tb)}
+            style={[styles.tabBtn, tab === tb && styles.tabBtnActive]}
+            testID={`owner-tab-${tb}`}
+          >
+            <Text style={[styles.tabText, tab === tb && styles.tabTextActive]}>
+              {tb === "stores" ? t("ownerPanel.tabStores") : tb === "requests" ? t("ownerPanel.tabRequests") : t("ownerPanel.tabStaff")}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       {loading ? (
         <Loading />
-      ) : stores.length === 0 ? (
-        <EmptyState icon="business-outline" title={t("ownerPanel.noStores")} />
+      ) : tab === "stores" ? (
+        stores.length === 0 ? (
+          <EmptyState icon="business-outline" title={t("ownerPanel.noStores")} />
+        ) : (
+          <FlatList
+            data={stores}
+            keyExtractor={(s) => s.id}
+            contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />}
+            renderItem={({ item }) => {
+              const locked = item.status === "locked";
+              return (
+                <View style={styles.card} testID={`owner-store-${item.id}`}>
+                  <View style={styles.rowTop}>
+                    <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+                    <View style={[styles.badge, { backgroundColor: locked ? colors.errorFaint : colors.successFaint }]}>
+                      <Text style={[styles.badgeText, { color: locked ? colors.error : colors.success }]}>
+                        {locked ? t("ownerPanel.locked") : t("ownerPanel.active")}
+                      </Text>
+                    </View>
+                  </View>
+                  {item.admin_contact ? <Text style={styles.meta}>{t("ownerPanel.adminContact")}: {item.admin_contact}</Text> : null}
+                  <View style={styles.statsRow}>
+                    <View style={styles.stat}>
+                      <Ionicons name="people" size={14} color={colors.info} />
+                      <Text style={styles.statText}>{item.user_count} {t("ownerPanel.users")}</Text>
+                    </View>
+                    <View style={styles.stat}>
+                      <Ionicons name="cube" size={14} color={colors.info} />
+                      <Text style={styles.statText}>{item.part_count} {t("ownerPanel.parts")}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.actions}>
+                    <Button
+                      title={locked ? t("ownerPanel.unlock") : t("ownerPanel.lock")}
+                      onPress={() => toggleLock(item)}
+                      loading={busyId === item.id}
+                      variant="secondary"
+                      icon={locked ? "lock-open" : "lock-closed"}
+                      style={{ flex: 1 }}
+                      testID={`owner-toggle-${item.id}`}
+                    />
+                    <Button
+                      title={t("ownerPanel.delete")}
+                      onPress={() => setDeleteTarget(item)}
+                      variant="danger"
+                      icon="trash"
+                      style={{ flex: 1 }}
+                      testID={`owner-delete-${item.id}`}
+                    />
+                  </View>
+                </View>
+              );
+            }}
+          />
+        )
+      ) : tab === "requests" ? (
+        requests.length === 0 ? (
+          <EmptyState icon="mail-outline" title={t("ownerPanel.noRequests")} />
+        ) : (
+          <FlatList
+            data={requests}
+            keyExtractor={(r) => r.id}
+            contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />}
+            renderItem={({ item }) => {
+              const sc = requestStatusColors[item.status];
+              const live = otpById[item.id];
+              const canGenerate = item.status !== "verified";
+              return (
+                <View style={styles.card} testID={`owner-request-${item.id}`}>
+                  <View style={styles.rowTop}>
+                    <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+                    <View style={[styles.badge, { backgroundColor: sc.bg }]}>
+                      <Text style={[styles.badgeText, { color: sc.fg }]}>{requestStatusLabel[item.status]}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.meta}>{item.mobile}</Text>
+
+                  {live ? (
+                    <View style={styles.otpBox}>
+                      <Text style={styles.otpLabel}>{t("ownerPanel.otpLabel")}</Text>
+                      <View style={styles.otpRow}>
+                        <Text style={styles.otpValue} selectable testID={`owner-request-otp-${item.id}`}>{live.otp}</Text>
+                        <Pressable onPress={() => copyOtp(live.otp)} hitSlop={10} testID={`owner-request-otp-copy-${item.id}`}>
+                          <Ionicons name="copy-outline" size={20} color={colors.brand} />
+                        </Pressable>
+                      </View>
+                      <Text style={styles.otpExpiry}>{t("ownerPanel.otpExpiresLabel")}: {new Date(live.expires_at).toLocaleTimeString()}</Text>
+                    </View>
+                  ) : null}
+
+                  {item.status === "verified" ? (
+                    <Text style={styles.adminNote}>{t("ownerPanel.reqCompleted")}</Text>
+                  ) : canGenerate ? (
+                    <Button
+                      title={item.status === "pending" ? t("ownerPanel.generateOtp") : t("ownerPanel.regenerateOtp")}
+                      onPress={() => generateOtp(item)}
+                      loading={generatingId === item.id}
+                      icon="key"
+                      style={{ marginTop: spacing.xs }}
+                      testID={`owner-generate-otp-${item.id}`}
+                    />
+                  ) : null}
+                </View>
+              );
+            }}
+          />
+        )
+      ) : staff.length === 0 ? (
+        <EmptyState icon="people-outline" title={t("ownerPanel.noStaff")} />
       ) : (
         <FlatList
-          data={stores}
-          keyExtractor={(s) => s.id}
+          data={staff}
+          keyExtractor={(u) => u.id}
           contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />}
-          renderItem={({ item }) => {
-            const locked = item.status === "locked";
-            return (
-              <View style={styles.card} testID={`owner-store-${item.id}`}>
-                <View style={styles.rowTop}>
-                  <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-                  <View style={[styles.badge, { backgroundColor: locked ? colors.errorFaint : colors.successFaint }]}>
-                    <Text style={[styles.badgeText, { color: locked ? colors.error : colors.success }]}>
-                      {locked ? t("ownerPanel.locked") : t("ownerPanel.active")}
-                    </Text>
-                  </View>
-                </View>
-                {item.admin_contact ? <Text style={styles.meta}>{t("ownerPanel.adminContact")}: {item.admin_contact}</Text> : null}
-                <View style={styles.statsRow}>
-                  <View style={styles.stat}>
-                    <Ionicons name="people" size={14} color={colors.info} />
-                    <Text style={styles.statText}>{item.user_count} {t("ownerPanel.users")}</Text>
-                  </View>
-                  <View style={styles.stat}>
-                    <Ionicons name="cube" size={14} color={colors.info} />
-                    <Text style={styles.statText}>{item.part_count} {t("ownerPanel.parts")}</Text>
-                  </View>
-                </View>
-                <View style={styles.actions}>
-                  <Button
-                    title={locked ? t("ownerPanel.unlock") : t("ownerPanel.lock")}
-                    onPress={() => toggleLock(item)}
-                    loading={busyId === item.id}
-                    variant="secondary"
-                    icon={locked ? "lock-open" : "lock-closed"}
-                    style={{ flex: 1 }}
-                    testID={`owner-toggle-${item.id}`}
-                  />
-                  <Button
-                    title={t("ownerPanel.delete")}
-                    onPress={() => setDeleteTarget(item)}
-                    variant="danger"
-                    icon="trash"
-                    style={{ flex: 1 }}
-                    testID={`owner-delete-${item.id}`}
-                  />
+          renderItem={({ item }) => (
+            <View style={styles.card} testID={`owner-staff-${item.id}`}>
+              <View style={styles.rowTop}>
+                <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+                <View style={[styles.badge, { backgroundColor: item.disabled ? colors.errorFaint : colors.successFaint }]}>
+                  <Text style={[styles.badgeText, { color: item.disabled ? colors.error : colors.success }]}>
+                    {item.disabled ? t("ownerPanel.staffDisabled") : t("ownerPanel.staffActive")}
+                  </Text>
                 </View>
               </View>
-            );
-          }}
+              <Text style={styles.meta}>@{item.username} · {item.role}</Text>
+              <Text style={styles.meta}>{t("ownerPanel.staffStore")}: {item.store_name || "—"}</Text>
+              <Text style={styles.meta}>
+                {t("users.addedBy")}: {item.created_by?.name || t("users.addedByUnknown")}
+              </Text>
+              <View style={styles.actions}>
+                <Button
+                  title={item.disabled ? t("ownerPanel.reactivate") : t("ownerPanel.deactivate")}
+                  onPress={() => toggleStaffActive(item)}
+                  loading={staffBusyId === item.id}
+                  variant={item.disabled ? "secondary" : "danger"}
+                  icon={item.disabled ? "checkmark-circle" : "ban"}
+                  style={{ flex: 1 }}
+                  testID={`owner-staff-toggle-${item.id}`}
+                />
+              </View>
+            </View>
+          )}
         />
       )}
 
@@ -185,6 +381,11 @@ export default function OwnerPanel() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.surface },
+  tabBar: { flexDirection: "row", paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: spacing.sm },
+  tabBtn: { flex: 1, paddingVertical: spacing.sm, borderRadius: radius.sm, alignItems: "center", backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border },
+  tabBtnActive: { backgroundColor: colors.brandFaint, borderColor: colors.brand },
+  tabText: { color: colors.info, fontSize: font.sm, fontWeight: "700" },
+  tabTextActive: { color: colors.brand },
   card: {
     backgroundColor: colors.surface2,
     borderWidth: 1,
@@ -203,4 +404,10 @@ const styles = StyleSheet.create({
   stat: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   statText: { color: colors.info, fontSize: font.sm },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
+  adminNote: { color: colors.success, fontSize: font.sm, fontWeight: "700" },
+  otpBox: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.sm, padding: spacing.md, gap: 4 },
+  otpLabel: { color: colors.info, fontSize: font.sm - 1, fontWeight: "700", letterSpacing: 1 },
+  otpRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  otpValue: { color: colors.brand, fontSize: font.xxl, fontWeight: "800", letterSpacing: 4 },
+  otpExpiry: { color: colors.info, fontSize: font.sm - 1 },
 });

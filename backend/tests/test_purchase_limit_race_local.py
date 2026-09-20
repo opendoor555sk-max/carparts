@@ -65,14 +65,37 @@ async def _startup():
     await srv.startup()
 
 
+async def _register_admin(client: httpx.AsyncClient, prefix: str) -> dict:
+    """/auth/register no longer exists -- store creation now goes through
+    the owner-approved OTP flow (store_requests). Drives the exact same
+    request -> owner generates OTP -> verify-otp sequence a real signup
+    would, using the platform seed account (abdul/Salam@123, which is also
+    the Owner per OWNER_CONTACT) to stand in for the owner approving it.
+    Returns verify-otp's response body directly: {access_token, token_type,
+    user, temp_password}."""
+    suffix = uuid.uuid4().hex[:8]
+    mobile = f"90000{uuid.uuid4().int % 100000:05d}"
+    reqr = await client.post("/api/store-requests", json={"name": f"{prefix}_{suffix}", "mobile": mobile})
+    assert reqr.status_code == 200, reqr.text
+    request_id = reqr.json()["id"]
+
+    owner_login = await client.post("/api/auth/login", json={"username": "abdul", "password": "Salam@123"})
+    assert owner_login.status_code == 200, owner_login.text
+    owner_headers = {"Authorization": f"Bearer {owner_login.json()['access_token']}"}
+
+    otpr = await client.post(f"/api/owner/store-requests/{request_id}/generate-otp", headers=owner_headers)
+    assert otpr.status_code == 200, otpr.text
+    otp = otpr.json()["otp"]
+
+    r = await client.post(f"/api/store-requests/{request_id}/verify-otp", json={"otp": otp})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
 async def _register_and_set_limit(client: httpx.AsyncClient, limit: int):
     suffix = uuid.uuid4().hex[:8]
-    reg = await client.post("/api/auth/register", json={
-        "store_name": f"RACE_{suffix}", "name": "Race Owner",
-        "username": f"race_{suffix}", "password": "Test@1234", "contact": "9999999999",
-    })
-    assert reg.status_code == 200, reg.text
-    token = reg.json()["access_token"]
+    reg = await _register_admin(client, "RACE")
+    token = reg["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
     pn = f"RACEPN{suffix.upper()}"
     r = await client.post("/api/limits/part", json={"part_number": pn, "limit": limit, "enabled": True},
@@ -206,11 +229,8 @@ async def test_concurrent_brand_new_part_buys_dont_500():
     transport = httpx.ASGITransport(app=srv.app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         suffix = uuid.uuid4().hex[:8]
-        reg = await client.post("/api/auth/register", json={
-            "store_name": f"NEWPART_{suffix}", "name": "New Part Owner",
-            "username": f"newpart_{suffix}", "password": "Test@1234", "contact": "9999999999",
-        })
-        headers = {"Authorization": f"Bearer {reg.json()['access_token']}"}
+        reg = await _register_admin(client, "NEWPART")
+        headers = {"Authorization": f"Bearer {reg['access_token']}"}
         pn = f"BRANDNEW{suffix.upper()}"  # no limit set, never bought before
 
         results = await asyncio.gather(*[
@@ -220,7 +240,7 @@ async def test_concurrent_brand_new_part_buys_dont_500():
         statuses = [r.status_code for r in results]
         assert all(s == 200 for s in statuses), f"expected no errors (no limit set), got {statuses}"
 
-        parts = await srv.db.parts.count_documents({"store_id": reg.json()["user"]["store_id"], "part_number": pn})
+        parts = await srv.db.parts.count_documents({"store_id": reg["user"]["store_id"], "part_number": pn})
         assert parts == 1, "concurrent first-buys must converge on exactly one part doc, not fragment"
 
         inv = await client.get("/api/inventory", headers=headers)
@@ -291,11 +311,8 @@ async def test_concurrent_buys_race_closed_across_punctuation_variants(monkeypat
     transport = httpx.ASGITransport(app=srv.app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         suffix = uuid.uuid4().hex[:6]
-        reg = await client.post("/api/auth/register", json={
-            "store_name": f"RACEV_{suffix}", "name": "Race Owner",
-            "username": f"racev_{suffix}", "password": "Test@1234", "contact": "9999999999",
-        })
-        headers = {"Authorization": f"Bearer {reg.json()['access_token']}"}
+        reg = await _register_admin(client, "RACEV")
+        headers = {"Authorization": f"Bearer {reg['access_token']}"}
         hyphenated = f"954{suffix.upper()}-CCAF0"
         bare = f"954{suffix.upper()}CCAF0"  # same real part, no separator
 
@@ -336,12 +353,8 @@ async def test_stock_adjust_quick_plus_one_respects_purchase_limit():
     transport = httpx.ASGITransport(app=srv.app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         suffix = uuid.uuid4().hex[:8]
-        reg = await client.post("/api/auth/register", json={
-            "store_name": f"ADJ_{suffix}", "name": "Adjust Owner",
-            "username": f"adj_{suffix}", "password": "Test@1234", "contact": "9999999999",
-        })
-        assert reg.status_code == 200, reg.text
-        headers = {"Authorization": f"Bearer {reg.json()['access_token']}"}
+        reg = await _register_admin(client, "ADJ")
+        headers = {"Authorization": f"Bearer {reg['access_token']}"}
         pn = f"ADJPN{suffix.upper()}"
 
         # 5 pre-existing units via the normal /buy path, THEN a limit of 7 is
@@ -424,12 +437,8 @@ async def test_already_over_limit_blocks_everything_immediately():
     transport = httpx.ASGITransport(app=srv.app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         suffix = uuid.uuid4().hex[:8]
-        reg = await client.post("/api/auth/register", json={
-            "store_name": f"OVER_{suffix}", "name": "Over Owner",
-            "username": f"over_{suffix}", "password": "Test@1234", "contact": "9999999999",
-        })
-        assert reg.status_code == 200, reg.text
-        headers = {"Authorization": f"Bearer {reg.json()['access_token']}"}
+        reg = await _register_admin(client, "OVER")
+        headers = {"Authorization": f"Bearer {reg['access_token']}"}
         pn = f"OVERPN{suffix.upper()}"
 
         # 12 units bought with no limit configured yet...
