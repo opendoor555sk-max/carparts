@@ -123,6 +123,11 @@ class TestAdminCanCreateAdmin:
             headers=_auth(store_a["token"]),
         )
         assert r.status_code == 200, r.text
+        # New staff start verified=False (store-admin approval gate) and
+        # can't log in until approved -- not what this test is about, so
+        # approve immediately to isolate the actual assertion below.
+        v = client.post(f"/api/admin/users/{r.json()['id']}/verify", headers=_auth(store_a["token"]))
+        assert v.status_code == 200, v.text
         staff_token = client.post(
             "/api/auth/login", json={"username": un, "password": "Test@1234"}
         ).json()["access_token"]

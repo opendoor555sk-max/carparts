@@ -88,6 +88,11 @@ def test_staff_without_permission_sees_only_existence_on_parts_list(client):
     assert "view_part_details" not in staff_created.json()["permissions"], (
         "a freshly created staff account must not have view_part_details unless explicitly granted"
     )
+    # New staff start verified=False (a separate, later-added store-admin
+    # approval gate) and can't log in until approved -- not what this test
+    # is about, so approve immediately.
+    v = client.post(f"/api/admin/users/{staff_created.json()['id']}/verify", headers=admin_headers)
+    assert v.status_code == 200, v.text
     staff_login = client.post("/api/auth/login", json={"username": un, "password": "Test@1234"})
     assert staff_login.status_code == 200, staff_login.text
     staff_headers = _auth(staff_login.json()["access_token"])

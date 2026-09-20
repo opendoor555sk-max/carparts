@@ -46,6 +46,7 @@ export default function Users() {
   const [eUsername, setEUsername] = useState("");
   const [ePassword, setEPassword] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [verifying, setVerifying] = useState<string | null>(null);
 
   const revealPw = async (u: any) => {
     if (revealed[u.id]) {
@@ -156,6 +157,19 @@ export default function Users() {
     }
   };
 
+  const verifyUser = async (u: any) => {
+    setVerifying(u.id);
+    try {
+      await api.post(`/admin/users/${u.id}/verify`);
+      show(t("users.staffVerifiedToast"), "success");
+      load();
+    } catch (e: any) {
+      show(e?.message || t("common.failed"), "error");
+    } finally {
+      setVerifying(null);
+    }
+  };
+
   const removeUser = async () => {
     if (!confirmRemove) return;
     setRemoving(true);
@@ -207,10 +221,17 @@ export default function Users() {
                     {t("users.addedBy")}: {u.created_by?.name || t("users.addedByUnknown")}
                   </Text>
                 </View>
-                <View style={[styles.badge, { backgroundColor: u.disabled ? colors.errorFaint : colors.successFaint }]}>
-                  <Text style={[styles.badgeText, { color: u.disabled ? colors.error : colors.success }]}>
-                    {u.disabled ? t("users.disabled") : t("users.active")}
-                  </Text>
+                <View style={styles.badgeCol}>
+                  <View style={[styles.badge, { backgroundColor: u.verified ? colors.successFaint : colors.warningFaint }]}>
+                    <Text style={[styles.badgeText, { color: u.verified ? colors.success : colors.warning }]}>
+                      {u.verified ? t("users.verified") : t("users.pending")}
+                    </Text>
+                  </View>
+                  <View style={[styles.badge, { backgroundColor: u.disabled ? colors.errorFaint : colors.successFaint }]}>
+                    <Text style={[styles.badgeText, { color: u.disabled ? colors.error : colors.success }]}>
+                      {u.disabled ? t("users.disabled") : t("users.active")}
+                    </Text>
+                  </View>
                 </View>
               </View>
 
@@ -234,6 +255,16 @@ export default function Users() {
 
               {u.role !== "admin" ? (
                 <>
+                  {!u.verified ? (
+                    <Button
+                      title={t("users.verifyButton")}
+                      onPress={() => verifyUser(u)}
+                      loading={verifying === u.id}
+                      icon="checkmark-circle"
+                      testID={`verify-${u.username}`}
+                      style={{ marginTop: spacing.md }}
+                    />
+                  ) : null}
                   <Text style={styles.permLabel}>{t("users.permissionsTapToggle")}</Text>
                   <View style={styles.permGrid}>
                     {allPerms.map((perm) => {
@@ -367,6 +398,7 @@ const styles = StyleSheet.create({
   name: { color: colors.onSurface, fontSize: font.lg, fontWeight: "800" },
   username: { color: colors.info, fontSize: font.sm },
   addedBy: { color: colors.info, fontSize: font.sm - 1, marginTop: 2 },
+  badgeCol: { alignItems: "flex-end", gap: 4 },
   badge: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill },
   badgeText: { fontSize: font.sm - 1, fontWeight: "800" },
   permLabel: { color: colors.info, fontSize: font.sm - 1, fontWeight: "800", letterSpacing: 1, marginTop: spacing.md, marginBottom: spacing.sm },

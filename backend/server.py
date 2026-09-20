@@ -340,6 +340,7 @@ def public_user(u: dict) -> dict:
             # user's server-side DB record, done fresh on every call.
             "contact": u.get("contact", ""),
             "permissions": perms, "disabled": u.get("disabled", False),
+            "verified": u.get("verified", True),
             "has_google_key": bool(u.get("google_api_key") and u.get("google_cx"))}
 
 
@@ -787,7 +788,7 @@ async def startup():
             "password_enc": encrypt_pw(os.environ.get("ADMIN_PASSWORD", "Salam@123")),
             "role": "super_admin", "store_id": None, "permissions": ALL_PERMISSIONS,
             "contact": OWNER_CONTACT, "disabled": False, "created_at": now_iso(),
-            "platform_seed": True,
+            "platform_seed": True, "verified": True,
         })
         logger.info(f"Seeded platform super admin user (username={sa_username!r})")
     else:
@@ -838,6 +839,17 @@ async def startup():
             logger.info(f"Backfilled created_by=None on {r.modified_count} user(s)")
     except Exception as e:
         logger.warning(f"created_by backfill warning: {e}")
+
+    # verified backfill: any account predating this field (every role, not
+    # just staff) grandfathers in as verified=True -- new staff created from
+    # now on start explicitly verified=False in create_user() instead, so
+    # this never touches them (they already have the field set).
+    try:
+        r = await db.users.update_many({"verified": {"$exists": False}}, {"$set": {"verified": True}})
+        if r.modified_count:
+            logger.info(f"Backfilled verified=True on {r.modified_count} user(s)")
+    except Exception as e:
+        logger.warning(f"verified backfill warning: {e}")
 
     try:
         await db.store_requests.create_index("id", unique=True)
@@ -953,6 +965,7 @@ async def _create_store_and_admin(store_name: str, mobile: str) -> tuple:
         "contact": mobile, "disabled": False, "created_at": now_iso(),
         # The store's own first admin has no human creator.
         "created_by": None,
+        "verified": True,
     }
     await db.users.insert_one(dict(user))
     await db.settings.insert_one({"key": "purchase_limit", "store_id": store_id,
@@ -1022,6 +1035,16 @@ async def login(body: LoginIn):
         raise HTTPException(401, "ખોટું username અથવા password")
     if user.get("disabled"):
         raise HTTPException(403, "User disabled")
+    # Staff-only verification gate (separate from the store_requests owner-
+    # approval flow): a staff account a store admin just created starts
+    # verified=False and can't log in until that admin approves it. Admins
+    # (and everyone predating this field, via the startup backfill) are
+    # always verified=True, so this never blocks them.
+    if user.get("role") == "staff" and not user.get("verified", True):
+        raise HTTPException(403, detail={
+            "code": "staff_pending_approval",
+            "message": "Your account is pending approval from your store admin",
+        })
     store = await _attach_store(user)
     # Checked right after credentials verify, before a token is issued — a
     # locked store's users (owner excepted) can't log in at all, matching
@@ -1450,6 +1473,11 @@ async def create_user(body: UserCreate, store_id: Optional[str] = None, user=Dep
         # Who added this account — from the authenticated caller's own DB
         # record, never anything the client could pass in the request body.
         "created_by": {"id": user["id"], "name": user.get("name", ""), "contact": user.get("contact", "")},
+        # Staff accounts start unverified and can't log in until their store
+        # admin approves them (see /admin/users/{id}/verify below and the
+        # login() check) -- admin-role accounts are always implicitly
+        # verified, there's no one else in the store to approve them.
+        "verified": role != "staff",
     }
     await db.users.insert_one(doc)
     return public_user(doc)
@@ -1490,6 +1518,36 @@ async def update_user(user_id: str, body: UserUpdate, user=Depends(require("mana
         await db.users.update_one({"id": user_id}, {"$set": updates})
     fresh = await db.users.find_one({"id": user_id}, {"_id": 0})
     return public_user(fresh)
+
+
+# Store-admin staff approval -- separate from the platform Owner's
+# store_requests approval flow above: this is a store's own admin approving
+# their own staff, scoped to that one store, using the same "manage_users"
+# permission gate and store-isolation check as the rest of /admin/users/*.
+@api.post("/admin/users/{user_id}/verify")
+async def verify_user(user_id: str, user=Depends(require("manage_users"))):
+    target = await db.users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(404, "User not found")
+    if user.get("role") != "super_admin" and target.get("store_id") != user.get("store_id"):
+        raise HTTPException(403, "બીજા store નો user verify ન કરાય")
+    if target["role"] != "staff":
+        raise HTTPException(400, "Only staff accounts need verification")
+    await db.users.update_one({"id": user_id}, {"$set": {"verified": True}})
+    return {"ok": True, "id": user_id, "verified": True}
+
+
+@api.post("/admin/users/{user_id}/unverify")
+async def unverify_user(user_id: str, user=Depends(require("manage_users"))):
+    target = await db.users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(404, "User not found")
+    if user.get("role") != "super_admin" and target.get("store_id") != user.get("store_id"):
+        raise HTTPException(403, "બીજા store નો user unverify ન કરાય")
+    if target["role"] != "staff":
+        raise HTTPException(400, "Only staff accounts can be unverified")
+    await db.users.update_one({"id": user_id}, {"$set": {"verified": False}})
+    return {"ok": True, "id": user_id, "verified": False}
 
 
 @api.get("/admin/users/{user_id}/password")

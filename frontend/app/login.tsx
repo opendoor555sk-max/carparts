@@ -56,7 +56,11 @@ export default function Login() {
       await login(username.trim(), password);
       router.replace("/(tabs)");
     } catch (e: any) {
-      setErr(e?.message || t("login.errFailed"));
+      if (e?.detail?.code === "staff_pending_approval") {
+        setErr(t("login.pendingApproval"));
+      } else {
+        setErr(e?.message || t("login.errFailed"));
+      }
     } finally {
       setLoading(false);
     }
