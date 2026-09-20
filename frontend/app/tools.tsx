@@ -36,6 +36,7 @@ const TOOLS: ToolItem[] = [
   { key: "stockVerify", titleKey: "admin.toolStockVerify", subKey: "admin.linkStockVerifySub", icon: "clipboard", route: "/stock-verify" },
   { key: "unlinkedStock", titleKey: "admin.toolUnlinked", subKey: "admin.linkUnlinkedStockSub", icon: "warning", route: "/unlinked-stock" },
   { key: "history", titleKey: "admin.toolPsHistory", subKey: "admin.toolBulkDelete", icon: "receipt", route: "/history" },
+  { key: "searchLogs", titleKey: "admin.toolSearchLogs", subKey: "admin.linkSearchLogsSub", icon: "time", route: "/search-logs" },
 ];
 
 export default function Tools() {

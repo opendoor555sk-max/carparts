@@ -81,10 +81,13 @@ export default function Scan() {
           router.replace(`/requirement-new?pn=${encodeURIComponent(pn)}&company=${c}&gps=${encodeURIComponent(gps)}` as any);
           break;
         default:
-          router.replace(`/part/${encodeURIComponent(pn)}` as any);
+          // Same GPS this screen already captures for the requirement case
+          // above -- forwarded here too so a search's location can be shown
+          // on the admin/owner search-activity log (no new location prompt).
+          router.replace(`/part/${encodeURIComponent(pn)}${gps ? `?gps=${encodeURIComponent(gps)}` : ""}` as any);
       }
     },
-    [mode, company, router],
+    [mode, company, router, gps],
   );
 
   const onBarcode = useCallback(

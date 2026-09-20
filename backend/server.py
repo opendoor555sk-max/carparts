@@ -102,6 +102,21 @@ def new_id() -> str:
     return str(uuid.uuid4())
 
 
+def _parse_gps(g: Optional[str]) -> Optional[Dict[str, float]]:
+    """Shared with admin_gps_locations() below -- the one place in the app
+    that already parses the "lat,lng" string format stored on
+    requirements.gps / stock.location.gps into {lat, lng}."""
+    if not g:
+        return None
+    try:
+        parts = [float(x.strip()) for x in str(g).replace(";", ",").split(",")[:2]]
+        if len(parts) == 2 and -90 <= parts[0] <= 90 and -180 <= parts[1] <= 180:
+            return {"lat": parts[0], "lng": parts[1]}
+    except Exception:
+        return None
+    return None
+
+
 # ---------------- Hierarchical location address ----------------
 # "Store [name] · [Wall: Front/Back/Left/Right] · [Rack name OR Open Floor +
 # Carton number] · [Shelf: Top/Middle/Bottom]" — replaces the old free-text
@@ -856,6 +871,14 @@ async def startup():
     except Exception as e:
         logger.warning(f"store_requests index create warning: {e}")
 
+    # Backs both /admin/search-logs (store_id + created_at) and
+    # /owner/search-logs (created_at alone, across every store).
+    try:
+        await db.search_logs.create_index([("store_id", 1), ("created_at", -1)])
+        await db.search_logs.create_index("created_at")
+    except Exception as e:
+        logger.warning(f"search_logs index create warning: {e}")
+
     try:
         await run_in_threadpool(init_storage)
     except Exception as e:
@@ -1380,20 +1403,27 @@ async def owner_reactivate_user(user_id: str, user=Depends(require_owner)):
     return {"ok": True, "id": user_id, "disabled": False}
 
 
+@api.get("/owner/search-logs")
+async def owner_search_logs(page: int = 1, page_size: int = 50, user=Depends(require_owner)):
+    """Cross-store version of /admin/search-logs below -- every store's
+    search activity, for the platform Owner."""
+    page = max(1, page)
+    page_size = max(1, min(page_size, 200))
+    store_names = {s["id"]: s.get("name", "") for s in await db.stores.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)}
+    total = await db.search_logs.count_documents({})
+    rows = await db.search_logs.find({}, {"_id": 0}).sort("created_at", -1) \
+        .skip((page - 1) * page_size).limit(page_size).to_list(page_size)
+    for r in rows:
+        r["store_name"] = store_names.get(r.get("store_id"), "—")
+        r["gps_coord"] = _parse_gps(r.get("gps"))
+    return {"items": rows, "total": total, "page": page, "page_size": page_size}
+
+
 @api.get("/admin/gps-locations")
 async def admin_gps_locations(user=Depends(require_super_admin)):
     """God-view of every GPS point captured across all stores — from requirements
     (inquiries) and stock unit purchase locations. Used by the Super Admin map screen."""
-    def parse_gps(g: Optional[str]):
-        if not g:
-            return None
-        try:
-            parts = [float(x.strip()) for x in str(g).replace(";", ",").split(",")[:2]]
-            if len(parts) == 2 and -90 <= parts[0] <= 90 and -180 <= parts[1] <= 180:
-                return {"lat": parts[0], "lng": parts[1]}
-        except Exception:
-            return None
-        return None
+    parse_gps = _parse_gps
 
     store_names: Dict[str, str] = {}
     for s in await db.stores.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(1000):
@@ -1548,6 +1578,24 @@ async def unverify_user(user_id: str, user=Depends(require("manage_users"))):
         raise HTTPException(400, "Only staff accounts can be unverified")
     await db.users.update_one({"id": user_id}, {"$set": {"verified": False}})
     return {"ok": True, "id": user_id, "verified": False}
+
+
+@api.get("/admin/search-logs")
+async def admin_search_logs(page: int = 1, page_size: int = 50, store_id: Optional[str] = None,
+                            user=Depends(require("manage_users"))):
+    """That store's own staff/admin search activity -- store-scoped exactly
+    like the rest of /admin/users/* (locked to the caller's own store for a
+    normal admin; a super_admin may target any store via store_id, or see
+    all stores' logs when it's omitted, same as list_users())."""
+    page = max(1, page)
+    page_size = max(1, min(page_size, 200))
+    query = sq(user, None, store_id)
+    total = await db.search_logs.count_documents(query)
+    rows = await db.search_logs.find(query, {"_id": 0}).sort("created_at", -1) \
+        .skip((page - 1) * page_size).limit(page_size).to_list(page_size)
+    for r in rows:
+        r["gps_coord"] = _parse_gps(r.get("gps"))
+    return {"items": rows, "total": total, "page": page, "page_size": page_size}
 
 
 @api.get("/admin/users/{user_id}/password")
@@ -1878,8 +1926,31 @@ async def part_status(store_id: Optional[str], part_number: str) -> dict:
     }
 
 
+# db.search_history (above/below, via /search's own update_one call) is a
+# per-part-per-store AGGREGATE counter (count/last_searched/last_status) used
+# by /demand and /search-history -- it has no per-event who/when/where, so it
+# can't serve the admin/owner "who searched what, when, from where" log. This
+# is a genuinely new, separate collection, not a duplicate of it.
+async def _log_search(user: dict, store_id: Optional[str], part_number_searched: str, gps: Optional[str] = None) -> None:
+    try:
+        await db.search_logs.insert_one({
+            "id": new_id(), "user_id": user["id"], "user_name": user.get("name", ""),
+            "role": user.get("role"), "store_id": store_id,
+            "part_number_searched": part_number_searched,
+            # Raw "lat,lng" string, same format/field already used on
+            # requirements.gps and stock.location.gps -- parsed on read via
+            # _parse_gps(), same as admin_gps_locations() does for those.
+            # None whenever the caller's screen never captured GPS at all
+            # (no new location-permission prompt is added anywhere for this).
+            "gps": gps or None,
+            "created_at": now_iso(),
+        })
+    except Exception as e:
+        logger.warning(f"search_logs insert warning: {e}")
+
+
 @api.get("/search")
-async def search(q: str, store_id: Optional[str] = None, user=Depends(require("search"))):
+async def search(q: str, store_id: Optional[str] = None, gps: Optional[str] = None, user=Depends(require("search"))):
     pn = q.strip()
     if not pn:
         raise HTTPException(400, "Empty query")
@@ -1892,6 +1963,7 @@ async def search(q: str, store_id: Optional[str] = None, user=Depends(require("s
         upsert=True,
     )
     limit = await compute_limit(sid, pn)
+    await _log_search(user, sid, pn, gps)
     return {**result, "limit": limit}
 
 
@@ -1911,6 +1983,14 @@ async def list_parts(company: Optional[str] = None, category: Optional[str] = No
     for p in parts:
         p["stock_count"] = await db.stock.count_documents(
             {"store_id": p.get("store_id"), "part_number": p["part_number"], "sold": {"$ne": True}})
+    # This screen (the Catalog tab's category browse) never captures GPS,
+    # so gps is always omitted here -- q is the closest thing to a "part
+    # number searched" when given; otherwise this logs as a category/company
+    # browse rather than a specific part lookup.
+    await _log_search(
+        user, resolve_store(user, store_id),
+        q.strip() if q else f"(browse: {category or company or 'All'})",
+    )
     if not has_permission(user, "view_part_details"):
         # This is the only caller of /parts in the app (the Catalog tab's
         # category browse list) -- a staff account without view_part_details

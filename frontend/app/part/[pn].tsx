@@ -53,7 +53,7 @@ const EMPTY_EDIT: EditData = {
 };
 
 export default function PartDetail() {
-  const { pn } = useLocalSearchParams<{ pn: string }>();
+  const { pn, gps } = useLocalSearchParams<{ pn: string; gps?: string }>();
   const partNumber = decodeURIComponent(pn as string);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -128,7 +128,10 @@ export default function PartDetail() {
         setRestricted({ exists: (loc.units_total || 0) > 0, location: loc.assigned_location || null });
         return;
       }
-      const res = await api.get(`/search?q=${encodeURIComponent(partNumber)}`);
+      const gpsStr = Array.isArray(gps) ? gps[0] : gps;
+      const res = await api.get(
+        `/search?q=${encodeURIComponent(partNumber)}${gpsStr ? `&gps=${encodeURIComponent(gpsStr)}` : ""}`,
+      );
       setData(res);
       if (res.part) {
         const full = await api.get(`/parts/${encodeURIComponent(partNumber)}`);
@@ -153,7 +156,7 @@ export default function PartDetail() {
     } finally {
       setLoading(false);
     }
-  }, [partNumber, show, tr, canViewDetails]);
+  }, [partNumber, show, tr, canViewDetails, gps]);
 
   useEffect(() => {
     load();

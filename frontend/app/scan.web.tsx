@@ -76,10 +76,13 @@ export default function ScanWeb() {
           router.replace(`/requirement-new?pn=${encodeURIComponent(pn)}&company=${c}` as any);
           break;
         default:
-          router.replace(`/part/${encodeURIComponent(pn)}` as any);
+          // Same GPS this screen already captures (shown in the GPS bar
+          // below) -- forwarded here so a search's location can be shown
+          // on the admin/owner search-activity log (no new location prompt).
+          router.replace(`/part/${encodeURIComponent(pn)}${gps ? `?gps=${encodeURIComponent(gps)}` : ""}` as any);
       }
     },
-    [mode, company, router],
+    [mode, company, router, gps],
   );
 
   useEffect(() => {
