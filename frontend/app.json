@@ -49,6 +49,17 @@
     "plugins": [
       "expo-router",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "enableBundleCompression": true,
+            "enablePngCrunchInReleaseBuilds": true
+          }
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Scan part barcodes and QR codes"
