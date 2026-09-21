@@ -1365,10 +1365,13 @@ async def owner_generate_otp(request_id: str, user=Depends(require_owner)):
 # Individual-account actions, distinct from the store-wide lock/delete above
 # (locking a store already blocks everyone in it at once; this is for acting
 # on one specific person without touching the rest of their store).
-@api.get("/owner/users")
-async def owner_list_users(user=Depends(require_owner)):
+@@api.get("/owner/users")
+async def owner_list_users(store_id: Optional[str] = None, user=Depends(require_owner)):
     proj = {"_id": 0, "password_hash": 0, "password_enc": 0, "google_api_key": 0, "google_cx": 0}
-    users = await db.users.find({"deleted_at": {"$exists": False}}, proj).sort("created_at", -1).to_list(5000)
+    query = {"deleted_at": {"$exists": False}}
+    if store_id:
+        query["store_id"] = store_id
+    users = await db.users.find(query, proj).sort("created_at", -1).to_list(5000)
     store_names = {s["id"]: s.get("name", "") for s in await db.stores.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)}
     out = []
     for u in users:
