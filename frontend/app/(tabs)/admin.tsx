@@ -208,6 +208,11 @@ export default function Admin() {
               </Pressable>
             ) : null}
 
+            <View style={styles.note} testID="admin-location-notice">
+              <Ionicons name="location" size={16} color={colors.info} />
+              <Text style={styles.noteText}>{t("admin.locationNotice")}</Text>
+            </View>
+
             <Text style={[styles.section, { marginTop: spacing.xl }]}>{t("admin.account").toUpperCase()}</Text>
             <View style={[styles.link, { flexDirection: "column", alignItems: "stretch", marginBottom: spacing.md }]} testID="admin-language">
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.md }}>

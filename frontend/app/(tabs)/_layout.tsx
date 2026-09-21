@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, font, spacing } from "@/src/theme";
 import { useLowStockCount } from "@/src/hooks/use-low-stock-count";
+import { useLocationPing } from "@/src/hooks/use-location-ping";
 import { useLanguage } from "@/src/context/LanguageContext";
 
 // ~10mm of extra clearance so the tab bar's icons/labels sit further up from
@@ -17,6 +18,11 @@ const TAB_BAR_LIFT = spacing.xxl + spacing.xs; // 36
 export default function TabsLayout() {
   const lowStockCount = useLowStockCount();
   const { t } = useLanguage();
+  // Company-phone location ping (disclosed to staff, upserted as one
+  // latest-point-per-device row -- see use-location-ping.ts). Only fires
+  // once a user is inside the tabs (i.e. logged in), never on the login
+  // screen itself.
+  useLocationPing();
   // Real device safe-area inset (Android system nav bar height when
   // edgeToEdgeEnabled is on, or the iOS home-indicator strip) instead of a
   // guessed platform constant. Guessing under-shoots on phones with a taller
