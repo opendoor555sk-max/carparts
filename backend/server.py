@@ -1365,10 +1365,16 @@ async def owner_generate_otp(request_id: str, user=Depends(require_owner)):
 # Individual-account actions, distinct from the store-wide lock/delete above
 # (locking a store already blocks everyone in it at once; this is for acting
 # on one specific person without touching the rest of their store).
-@@api.get("/owner/users")
+@api.get("/owner/users")
 async def owner_list_users(store_id: Optional[str] = None, user=Depends(require_owner)):
     proj = {"_id": 0, "password_hash": 0, "password_enc": 0, "google_api_key": 0, "google_cx": 0}
     query = {"deleted_at": {"$exists": False}}
+    # Optional per-store scoping -- lets a caller (the store-detail screen,
+    # reached by tapping one store from owner-panel/stores) see only that
+    # store's own admin+staff instead of every store's accounts flattened
+    # together, which is confusing once there's more than a handful of
+    # stores. Omitted entirely (not "" or "all") keeps the old unscoped
+    # behavior for owner-panel's own flat "Staff" tab.
     if store_id:
         query["store_id"] = store_id
     users = await db.users.find(query, proj).sort("created_at", -1).to_list(5000)
@@ -1404,6 +1410,46 @@ async def owner_reactivate_user(user_id: str, user=Depends(require_owner)):
         raise HTTPException(404, "User not found")
     await db.users.update_one({"id": user_id}, {"$set": {"disabled": False}})
     return {"ok": True, "id": user_id, "disabled": False}
+
+
+# ---------------- Company-device location (disclosed) ----------------
+# A staff account only exists on a company-issued device (see /admin/users
+# above -- self-signup never creates a "staff" role at all), so this is
+# asset/device tracking of a company phone, not covert tracking of a
+# person's own phone. It piggybacks on the location permission the app
+# already requires for every screen (LocationGate.tsx) -- no separate
+# prompt -- and only ever stores each user's ONE latest point (an upsert,
+# never a history/trail), which is enough to answer "where is this store's
+# phone right now" without building a movement log.
+@api.post("/device/ping-location")
+async def device_ping_location(body: dict, user=Depends(get_current_user)):
+    lat = body.get("lat")
+    lng = body.get("lng")
+    if lat is None or lng is None:
+        raise HTTPException(400, "lat/lng required")
+    await db.device_locations.update_one(
+        {"user_id": user["id"]},
+        {"$set": {
+            "user_id": user["id"], "name": user.get("name", ""), "username": user.get("username", ""),
+            "store_id": user.get("store_id"), "lat": float(lat), "lng": float(lng), "at": now_iso(),
+        }},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+@api.get("/owner/device-locations")
+async def owner_device_locations(store_id: Optional[str] = None, user=Depends(require_owner)):
+    """Latest known point for every company phone that has pinged in --
+    one row per user (never a trail), newest first."""
+    query = {}
+    if store_id:
+        query["store_id"] = store_id
+    points = await db.device_locations.find(query, {"_id": 0}).sort("at", -1).to_list(2000)
+    store_names = {s["id"]: s.get("name", "") for s in await db.stores.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)}
+    for p in points:
+        p["store_name"] = store_names.get(p.get("store_id"), "") if p.get("store_id") else "—"
+    return points
 
 
 @api.get("/owner/search-logs")
