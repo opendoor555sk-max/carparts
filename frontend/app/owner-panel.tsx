@@ -272,7 +272,11 @@ export default function OwnerPanel() {
             renderItem={({ item }) => {
               const locked = item.status === "locked";
               return (
-                <View style={styles.card} testID={`owner-store-${item.id}`}>
+                <Pressable
+                  style={styles.card}
+                  onPress={() => router.push(`/store-detail?id=${item.id}&name=${encodeURIComponent(item.name)}` as any)}
+                  testID={`owner-store-${item.id}`}
+                >
                   <View style={styles.rowTop}>
                     <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
                     <View style={[styles.badge, { backgroundColor: locked ? colors.errorFaint : colors.successFaint }]}>
@@ -292,7 +296,15 @@ export default function OwnerPanel() {
                       <Text style={styles.statText}>{item.part_count} {t("ownerPanel.parts")}</Text>
                     </View>
                   </View>
-                  <View style={styles.actions}>
+                  {/* Buttons live inside the same Pressable card, so each
+                      stops its own tap from bubbling up to the card's
+                      onPress (which would otherwise also navigate to
+                      store-detail every time Lock/Delete is tapped). */}
+                  <View
+                    style={styles.actions}
+                    onStartShouldSetResponder={() => true}
+                    onTouchEnd={(e) => e.stopPropagation()}
+                  >
                     <Button
                       title={locked ? t("ownerPanel.unlock") : t("ownerPanel.lock")}
                       onPress={() => toggleLock(item)}
@@ -311,7 +323,7 @@ export default function OwnerPanel() {
                       testID={`owner-delete-${item.id}`}
                     />
                   </View>
-                </View>
+                </Pressable>
               );
             }}
           />
@@ -373,6 +385,12 @@ export default function OwnerPanel() {
             data={staff}
             keyExtractor={(u) => u.id}
             contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl }}
+            ListHeaderComponent={
+              <View style={styles.hint}>
+                <Ionicons name="information-circle-outline" size={14} color={colors.info} />
+                <Text style={styles.hintText}>{t("ownerPanel.staffHint")}</Text>
+              </View>
+            }
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />}
             renderItem={({ item }) => (
               <View style={styles.card} testID={`owner-staff-${item.id}`}>
@@ -494,4 +512,6 @@ const styles = StyleSheet.create({
   otpExpiry: { color: colors.info, fontSize: font.sm - 1 },
   pnRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   pnText: { color: colors.brand, fontSize: font.base, fontWeight: "800" },
+  hint: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginBottom: spacing.sm },
+  hintText: { color: colors.info, fontSize: font.sm - 1, flex: 1 },
 });
