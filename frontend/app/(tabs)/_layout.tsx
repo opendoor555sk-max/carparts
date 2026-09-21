@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, font, spacing } from "@/src/theme";
 import { useLowStockCount } from "@/src/hooks/use-low-stock-count";
 import { useLanguage } from "@/src/context/LanguageContext";
@@ -16,6 +17,13 @@ const TAB_BAR_LIFT = spacing.xxl + spacing.xs; // 36
 export default function TabsLayout() {
   const lowStockCount = useLowStockCount();
   const { t } = useLanguage();
+  // Real device safe-area inset (Android system nav bar height when
+  // edgeToEdgeEnabled is on, or the iOS home-indicator strip) instead of a
+  // guessed platform constant. Guessing under-shoots on phones with a taller
+  // gesture/nav bar, which is exactly what was making our tab bar buttons
+  // (Home/Inventory/Report/Admin) sit underneath — and get covered by — the
+  // phone's own on-screen Home/Back buttons.
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -27,8 +35,8 @@ export default function TabsLayout() {
           backgroundColor: colors.surface2,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: (Platform.OS === "ios" ? 88 : 64) + TAB_BAR_LIFT,
-          paddingBottom: (Platform.OS === "ios" ? 28 : 8) + TAB_BAR_LIFT,
+          height: (Platform.OS === "ios" ? 60 : 64) + TAB_BAR_LIFT + insets.bottom,
+          paddingBottom: 8 + TAB_BAR_LIFT + insets.bottom,
           paddingTop: 8,
         },
         tabBarLabelStyle: { fontSize: font.sm - 1, fontWeight: "700" },
