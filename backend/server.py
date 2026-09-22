@@ -665,6 +665,12 @@ class CustomerPaymentIn(BaseModel):
     note: Optional[str] = ""
 
 
+class CashEntryIn(BaseModel):
+    type: str  # "in" (rokad avi -- cash received) | "out" (rokad gai -- cash paid/spent)
+    amount: float
+    note: Optional[str] = ""
+
+
 class VendorIn(BaseModel):
     name: str
     phone: str
@@ -2871,6 +2877,69 @@ async def list_returns(type: Optional[str] = None, store_id: Optional[str] = Non
     if type:
         query["type"] = type
     return await db.stock_adjustments.find(query, {"_id": 0}).sort("at", -1).to_list(500)
+
+
+# ---------------- Cash Book (rokad no hisab) ----------------
+# A running day-to-day cash ledger, independent of the customer/vendor
+# ledgers above -- "type":"in" bumps the balance up (cash received, e.g. a
+# cash sale or a customer payment collected in hand), "type":"out" pulls it
+# down (cash spent -- fuel, labour, a supplier paid in cash). Deliberately
+# NOT auto-populated from /sell or /customers/{id}/payments: many of this
+# shop's sales are on credit (never touch cash) and payments may arrive by
+# UPI/bank, not cash in hand -- so cash entries are recorded explicitly here,
+# the same "only record what actually happened" approach used throughout
+# rather than inferring cash movement from unrelated transactions.
+@api.post("/cash-book")
+async def add_cash_entry(body: CashEntryIn, store_id: Optional[str] = None, user=Depends(require("sell"))):
+    if body.type not in ("in", "out"):
+        raise HTTPException(400, "type must be 'in' or 'out'")
+    if body.amount is None or body.amount <= 0:
+        raise HTTPException(400, "Amount must be greater than 0")
+    sid = resolve_store(user, store_id, require_write=True)
+    entry = {
+        "id": new_id(), "store_id": sid, "type": body.type, "amount": body.amount,
+        "note": body.note or "", "by": user["username"], "at": now_iso(),
+    }
+    await db.cash_book.insert_one(dict(entry))
+    entry.pop("_id", None)
+    return {"ok": True, "entry": entry, "balance": await _cash_book_balance(sid)}
+
+
+@api.delete("/cash-book/{entry_id}")
+async def delete_cash_entry(entry_id: str, store_id: Optional[str] = None, user=Depends(require_admin)):
+    # Admin-only, unlike adding an entry -- a wrong cash entry is corrected by
+    # deleting it, and that's a bigger footgun than recording one, so it's
+    # gated tighter than the "sell" permission staff already carry.
+    sid = resolve_store(user, store_id, require_write=True)
+    r = await db.cash_book.delete_one({"store_id": sid, "id": entry_id})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Entry not found")
+    return {"ok": True, "balance": await _cash_book_balance(sid)}
+
+
+async def _cash_book_balance(store_id: Optional[str]) -> float:
+    entries = await db.cash_book.find({"store_id": store_id}, {"_id": 0, "type": 1, "amount": 1}).to_list(20000)
+    balance = 0.0
+    for e in entries:
+        amt = e.get("amount") or 0
+        balance += amt if e.get("type") == "in" else -amt
+    return round(balance, 2)
+
+
+@api.get("/cash-book")
+async def list_cash_book(store_id: Optional[str] = None, user=Depends(get_current_user)):
+    # Same "sort newest-first, then walk it in reverse to stamp a running
+    # balance onto each entry" trick as _customer_ledger_data() above --
+    # mutating the already-descending-sorted list in place, so the response
+    # stays newest-first while running_balance still reads chronologically.
+    query = sq(user, None, store_id)
+    entries = await db.cash_book.find(query, {"_id": 0}).sort("at", -1).to_list(2000)
+    balance = 0.0
+    for e in reversed(entries):
+        amt = e.get("amount") or 0
+        balance += amt if e.get("type") == "in" else -amt
+        e["running_balance"] = round(balance, 2)
+    return {"balance": round(balance, 2), "entries": entries}
 
 
 # ---------------- Physical stock verification (Admin only) ----------------
