@@ -30,7 +30,7 @@ const dict = {
     "tabs.catalog": "કેટલોગ",
     "tabs.admin": "એડમિન",
 
-    "home.companyGate": "કંપની ગેટ",
+    "home.companyGate": "કંપની",
     "home.modules": "મોડ્યુલ્સ",
     "home.reports": "રિપોર્ટ્સ",
     "home.hint": "SEARCH, BUY, SELL ક્યારેય ભેગા થતા નથી — દરેક અલગ મોડ્યુલ છે. Primary ID = Part Number.",
@@ -970,7 +970,7 @@ const dict = {
     "tabs.catalog": "कैटलॉग",
     "tabs.admin": "एडमिन",
 
-    "home.companyGate": "कंपनी गेट",
+    "home.companyGate": "कंपनी",
     "home.modules": "मॉड्यूल",
     "home.reports": "रिपोर्ट्स",
     "home.hint": "SEARCH, BUY, SELL कभी मिक्स नहीं होते — हर एक अलग मॉड्यूल है। Primary ID = Part Number.",
@@ -1910,7 +1910,7 @@ const dict = {
     "tabs.catalog": "Catalog",
     "tabs.admin": "Admin",
 
-    "home.companyGate": "Company Gate",
+    "home.companyGate": "Company",
     "home.modules": "Modules",
     "home.reports": "Reports",
     "home.hint": "SEARCH, BUY, SELL are never mixed — each is a separate module. Primary ID = Part Number.",
