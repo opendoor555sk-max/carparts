@@ -53,6 +53,7 @@ const MODULES: Module[] = [
   { key: "customers", title: "CUSTOMERS", gujarati: "Grahak Khata", icon: "people", perm: "sell", route: "/customers", color: colors.brand },
   { key: "vendors", title: "VENDORS", gujarati: "Supplier records", icon: "briefcase", perm: "buy", route: "/vendors", color: colors.success },
   { key: "damaged-returns", title: "DAMAGED / RETURNS", gujarati: "Returns & spoilage", icon: "return-up-back", perm: "sell", route: "/damaged-returns", color: colors.error },
+  { key: "cash-book", title: "CASH BOOK", gujarati: "Rokad no hisab", icon: "wallet", perm: "sell", route: "/cash-book", color: colors.warning },
   // Moved from Admin Panel's Management section (was a single unconditional
   // row there, gated only by reaching the Admin tab at all) — no perm here
   // either, for the same reason. The 7 items inside /tools keep their own
