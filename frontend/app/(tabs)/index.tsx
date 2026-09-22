@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -16,14 +16,12 @@ import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/context/ToastContext";
 import { useLanguage } from "@/src/context/LanguageContext";
-import { FilterChip, SignOutButton } from "@/src/components/ui";
-import { storage } from "@/src/utils/storage";
+import { SignOutButton } from "@/src/components/ui";
 import { useLowStockCount } from "@/src/hooks/use-low-stock-count";
 import { brandingFromUser, shareLowStockOnWhatsApp, type LowStockRow } from "@/src/utils/print";
 import { colors, font, radius, shadow, spacing } from "@/src/theme";
 import type { TranslationKey } from "@/src/i18n/translations";
 
-const COMPANIES = ["All", "Maruti Suzuki", "Hyundai", "Tata", "Mahindra", "Kia", "Toyota", "Honda", "Nissan", "Renault", "Ford", "Volkswagen", "Skoda", "MG", "Datsun", "Chevrolet"];
 
 type Module = {
   key: string;
@@ -68,23 +66,17 @@ export default function Home() {
   const { t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [company, setCompany] = useState("All");
+  // Vehicle-company filter used to be a row of chips at the top of Home
+  // (removed at the owner's request — the "COMPANY GATE" label read as
+  // broken/nonsensical translated text and the whole row was more clutter
+  // than it was worth). `company` stays fixed at "All" so every module
+  // route below still gets its usual ?company= param -- unfiltered, exactly
+  // like picking "All" always did -- without touching buy/sell/search,
+  // which all read that param.
+  const company = "All";
   const [sharingLowStock, setSharingLowStock] = useState(false);
   const lowStockCount = useLowStockCount();
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
-
-  useEffect(() => {
-    (async () => {
-      const saved = await storage.getItem<string>("kabadi.company", "All");
-      if (saved) setCompany(saved);
-    })();
-  }, []);
-
-  const selectCompany = async (c: string) => {
-    setCompany(c);
-    await storage.setItem("kabadi.company", c);
-    Haptics.selectionAsync();
-  };
 
   // Tiles the caller has no permission for are filtered out entirely below
   // (visibleModules) rather than rendered dimmed/locked — a staff account
@@ -166,24 +158,6 @@ export default function Home() {
             </Pressable>
           </View>
         ) : null}
-
-        <Text style={styles.sectionLabel}>{t("home.companyGate").toUpperCase()}</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-          style={{ marginBottom: spacing.lg }}
-        >
-          {COMPANIES.map((c) => (
-            <FilterChip
-              key={c}
-              label={c}
-              active={company === c}
-              onPress={() => selectCompany(c)}
-              testID={`company-${c}`}
-            />
-          ))}
-        </ScrollView>
 
         <Text style={styles.sectionLabel}>{t("home.modules").toUpperCase()}</Text>
         <View style={styles.grid}>
