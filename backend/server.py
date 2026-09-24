@@ -671,6 +671,14 @@ class CashEntryIn(BaseModel):
     note: Optional[str] = ""
 
 
+class StockTransferIn(BaseModel):
+    from_store_id: str
+    to_store_id: str
+    part_number: str
+    quantity: int = 1
+    note: Optional[str] = ""
+
+
 class QuotationItemIn(BaseModel):
     part_number: str
     name: Optional[str] = ""
@@ -3118,6 +3126,52 @@ async def delete_purchase_order(po_id: str, store_id: Optional[str] = None, user
     if r.deleted_count == 0:
         raise HTTPException(404, "Purchase order not found")
     return {"ok": True}
+
+
+# ---------------- Stock Transfer (between stores) ----------------
+# Moves physical stock from one store's shelf to another store's -- this
+# owner runs more than one store, and this is how stock actually crosses
+# that boundary (nothing else in the app re-parents a unit's store_id).
+# super_admin-only because it's the only role that can see and touch both
+# stores' stock in one call; a store's own admin/staff can't reach into a
+# store they don't belong to.
+@api.post("/stock-transfer")
+async def transfer_stock(body: StockTransferIn, user=Depends(require_super_admin)):
+    if body.from_store_id == body.to_store_id:
+        raise HTTPException(400, "From and To store must be different")
+    if body.quantity is None or body.quantity <= 0:
+        raise HTTPException(400, "Quantity must be greater than 0")
+    pn = body.part_number.strip()
+    if not pn:
+        raise HTTPException(400, "Part number required")
+    for sid in (body.from_store_id, body.to_store_id):
+        if not await db.stores.find_one({"id": sid}):
+            raise HTTPException(404, f"Store {sid} not found")
+    units = await db.stock.find(
+        {"store_id": body.from_store_id, "part_number": pn, "sold": {"$ne": True}}
+    ).sort("created_at", 1).to_list(body.quantity)
+    if len(units) < body.quantity:
+        raise HTTPException(400, f"Only {len(units)} unit(s) of {pn} available at the source store")
+    unit_ids = [u["id"] for u in units]
+    await db.stock.update_many({"id": {"$in": unit_ids}}, {"$set": {"store_id": body.to_store_id}})
+    record = {
+        "id": new_id(), "part_number": pn, "quantity": len(unit_ids), "unit_ids": unit_ids,
+        "from_store_id": body.from_store_id, "to_store_id": body.to_store_id,
+        "note": body.note or "", "by": user["username"], "at": now_iso(),
+    }
+    await db.stock_transfers.insert_one(dict(record))
+    for sid, typ in ((body.from_store_id, "transfer_out"), (body.to_store_id, "transfer_in")):
+        await db.transactions.insert_one({
+            "id": new_id(), "store_id": sid, "type": typ, "part_number": pn,
+            "quantity": len(unit_ids), "by": user["username"], "at": now_iso(),
+        })
+    record.pop("_id", None)
+    return {"ok": True, "transfer": record}
+
+
+@api.get("/stock-transfer")
+async def list_stock_transfers(user=Depends(require_super_admin)):
+    return await db.stock_transfers.find({}, {"_id": 0}).sort("at", -1).to_list(1000)
 
 
 # ---------------- Physical stock verification (Admin only) ----------------
