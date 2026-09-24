@@ -80,6 +80,7 @@ export default function OwnerPanel() {
   const [requests, setRequests] = useState<OwnerStoreRequest[]>([]);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [otpById, setOtpById] = useState<Record<string, { otp: string; expires_at: string }>>({});
+  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
 
   const [staff, setStaff] = useState<OwnerUser[]>([]);
   const [staffBusyId, setStaffBusyId] = useState<string | null>(null);
@@ -185,6 +186,19 @@ export default function OwnerPanel() {
       show(e?.message || t("common.failed"), "error");
     } finally {
       setGeneratingId(null);
+    }
+  };
+
+  const deleteRequest = async (req: OwnerStoreRequest) => {
+    setDeletingRequestId(req.id);
+    try {
+      await api.del(`/owner/store-requests/${req.id}`);
+      show(t("ownerPanel.reqDeletedToast"), "success");
+      load("requests");
+    } catch (e: any) {
+      show(e?.message || t("common.failed"), "error");
+    } finally {
+      setDeletingRequestId(null);
     }
   };
 
@@ -362,16 +376,29 @@ export default function OwnerPanel() {
 
                   {item.status === "verified" ? (
                     <Text style={styles.adminNote}>{t("ownerPanel.reqCompleted")}</Text>
-                  ) : canGenerate ? (
-                    <Button
-                      title={item.status === "pending" ? t("ownerPanel.generateOtp") : t("ownerPanel.regenerateOtp")}
-                      onPress={() => generateOtp(item)}
-                      loading={generatingId === item.id}
-                      icon="key"
-                      style={{ marginTop: spacing.xs }}
-                      testID={`owner-generate-otp-${item.id}`}
-                    />
-                  ) : null}
+                  ) : (
+                    <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs }}>
+                      {canGenerate ? (
+                        <Button
+                          title={item.status === "pending" ? t("ownerPanel.generateOtp") : t("ownerPanel.regenerateOtp")}
+                          onPress={() => generateOtp(item)}
+                          loading={generatingId === item.id}
+                          icon="key"
+                          style={{ flex: 1 }}
+                          testID={`owner-generate-otp-${item.id}`}
+                        />
+                      ) : null}
+                      <Button
+                        title={t("ownerPanel.reqDelete")}
+                        onPress={() => deleteRequest(item)}
+                        loading={deletingRequestId === item.id}
+                        variant="danger"
+                        icon="trash"
+                        style={{ flex: 1 }}
+                        testID={`owner-delete-request-${item.id}`}
+                      />
+                    </View>
+                  )}
                 </View>
               );
             }}
