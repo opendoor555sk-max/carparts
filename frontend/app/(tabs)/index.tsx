@@ -35,6 +35,11 @@ type Module = {
   route: string;
   wide?: boolean;
   color: string;
+  // Only for tiles that must stay hidden from every store's own admin/staff,
+  // no matter their permissions -- Stock Transfer touches TWO stores' stock
+  // in one call, so it's restricted to the platform owner (super_admin), the
+  // only role that can even see more than one store.
+  superAdminOnly?: boolean;
 };
 
 const MODULES: Module[] = [
@@ -54,6 +59,7 @@ const MODULES: Module[] = [
   { key: "cash-book", title: "CASH BOOK", gujarati: "Rokad no hisab", icon: "wallet", perm: "sell", route: "/cash-book", color: colors.warning },
   { key: "purchase-orders", title: "PURCHASE ORDERS", gujarati: "Vendor ne order aapo", icon: "clipboard", perm: "buy", route: "/purchase-orders", color: colors.success },
   { key: "quotations", title: "QUOTATIONS", gujarati: "Grahak ne bhav aapo", icon: "document-text", perm: "sell", route: "/quotations", color: colors.brand },
+  { key: "stock-transfer", title: "STOCK TRANSFER", gujarati: "Store thi store stock mokalo", icon: "swap-horizontal", route: "/stock-transfer", color: colors.info, superAdminOnly: true },
   // Moved from Admin Panel's Management section (was a single unconditional
   // row there, gated only by reaching the Admin tab at all) — no perm here
   // either, for the same reason. The 7 items inside /tools keep their own
@@ -89,7 +95,9 @@ export default function Home() {
     router.push(`${m.route}${sep}company=${encodeURIComponent(company)}` as any);
   };
 
-  const visibleModules = MODULES.filter((m) => !m.perm || can(m.perm));
+  const visibleModules = MODULES.filter(
+    (m) => (!m.perm || can(m.perm)) && (!m.superAdminOnly || user?.role === "super_admin"),
+  );
 
   const shareLowStock = async () => {
     setSharingLowStock(true);
