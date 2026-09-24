@@ -671,6 +671,24 @@ class CashEntryIn(BaseModel):
     note: Optional[str] = ""
 
 
+class QuotationItemIn(BaseModel):
+    part_number: str
+    name: Optional[str] = ""
+    quantity: int = 1
+    price: Optional[float] = 0
+
+
+class QuotationIn(BaseModel):
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = ""  # free-text fallback when no saved customer is picked
+    items: List[QuotationItemIn]
+    note: Optional[str] = ""
+
+
+class QuotationStatusUpdate(BaseModel):
+    status: str  # "pending" | "accepted" | "rejected" | "converted"
+
+
 class PurchaseOrderItemIn(BaseModel):
     part_number: str
     name: Optional[str] = ""
@@ -2958,6 +2976,76 @@ async def list_cash_book(store_id: Optional[str] = None, user=Depends(get_curren
         balance += amt if e.get("type") == "in" else -amt
         e["running_balance"] = round(balance, 2)
     return {"balance": round(balance, 2), "entries": entries}
+
+
+# ---------------- Quotations ----------------
+# A price estimate given TO a customer before a sale happens -- separate
+# from /sell, which records a sale that's already final. A quotation never
+# touches /stock; "converted" is just a status flip the staff make by hand
+# once they've gone and actually run the real sale through /sell.
+@api.post("/quotations")
+async def create_quotation(body: QuotationIn, store_id: Optional[str] = None, user=Depends(require("sell"))):
+    if not body.items:
+        raise HTTPException(400, "Add at least one item")
+    sid = resolve_store(user, store_id, require_write=True)
+    items = []
+    total = 0.0
+    for it in body.items:
+        pn = (it.part_number or "").strip()
+        if not pn:
+            raise HTTPException(400, "Every item needs a part number")
+        qty = max(1, int(it.quantity or 1))
+        price = float(it.price or 0)
+        items.append({"part_number": pn, "name": it.name or "", "quantity": qty, "price": price})
+        total += qty * price
+    count = await db.quotations.count_documents({"store_id": sid})
+    quote = {
+        "id": new_id(), "store_id": sid, "quote_number": f"QT-{count + 1:04d}",
+        "customer_id": body.customer_id, "customer_name": body.customer_name or "",
+        "items": items, "total": round(total, 2), "status": "pending",
+        "note": body.note or "", "by": user["username"], "at": now_iso(),
+    }
+    await db.quotations.insert_one(dict(quote))
+    quote.pop("_id", None)
+    return quote
+
+
+@api.get("/quotations")
+async def list_quotations(status: Optional[str] = None, store_id: Optional[str] = None,
+                           user=Depends(get_current_user)):
+    query = sq(user, None, store_id)
+    if status:
+        query["status"] = status
+    return await db.quotations.find(query, {"_id": 0}).sort("at", -1).to_list(1000)
+
+
+@api.get("/quotations/{quote_id}")
+async def get_quotation(quote_id: str, store_id: Optional[str] = None, user=Depends(get_current_user)):
+    quote = await db.quotations.find_one(sq(user, {"id": quote_id}, store_id), {"_id": 0})
+    if not quote:
+        raise HTTPException(404, "Quotation not found")
+    return quote
+
+
+@api.patch("/quotations/{quote_id}/status")
+async def update_quotation_status(quote_id: str, body: QuotationStatusUpdate,
+                                   store_id: Optional[str] = None, user=Depends(require("sell"))):
+    if body.status not in ("pending", "accepted", "rejected", "converted"):
+        raise HTTPException(400, "status must be 'pending', 'accepted', 'rejected' or 'converted'")
+    sid = resolve_store(user, store_id, require_write=True)
+    r = await db.quotations.update_one({"store_id": sid, "id": quote_id}, {"$set": {"status": body.status}})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Quotation not found")
+    return await get_quotation(quote_id, sid, user)
+
+
+@api.delete("/quotations/{quote_id}")
+async def delete_quotation(quote_id: str, store_id: Optional[str] = None, user=Depends(require_admin)):
+    sid = resolve_store(user, store_id, require_write=True)
+    r = await db.quotations.delete_one({"store_id": sid, "id": quote_id})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Quotation not found")
+    return {"ok": True}
 
 
 # ---------------- Purchase Orders ----------------
