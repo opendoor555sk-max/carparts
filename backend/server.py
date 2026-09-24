@@ -1438,6 +1438,23 @@ async def owner_generate_otp(request_id: str, user=Depends(require_owner)):
     return {"ok": True, "otp": otp, "expires_at": expires_at}
 
 
+@api.delete("/owner/store-requests/{request_id}")
+async def owner_delete_store_request(request_id: str, user=Depends(require_owner)):
+    # Rejecting a "please open my store" request the owner doesn't want to
+    # act on -- e.g. a wrong number, a duplicate, someone who never actually
+    # intended to sign up. Only pending/otp_generated requests are meant to
+    # be cleared this way; a "verified" one already became a real store
+    # (delete THAT from the Stores tab instead, which is a bigger, more
+    # deliberate action -- this stays a lightweight "dismiss the ask").
+    req = await db.store_requests.find_one({"id": request_id}, {"_id": 0})
+    if not req:
+        raise HTTPException(404, "Request not found")
+    if req.get("status") == "verified":
+        raise HTTPException(400, "This request already became a store — delete it from the Stores tab instead")
+    await db.store_requests.delete_one({"id": request_id})
+    return {"ok": True}
+
+
 # ---------------- Owner: staff/admin accounts across every store ----------------
 # Individual-account actions, distinct from the store-wide lock/delete above
 # (locking a store already blocks everyone in it at once; this is for acting
