@@ -40,6 +40,11 @@ type Module = {
   // in one call, so it's restricted to the platform owner (super_admin), the
   // only role that can even see more than one store.
   superAdminOnly?: boolean;
+  // Visible to a store's own admin AND the platform owner, but never to
+  // staff regardless of their assigned permissions -- the audit trail is
+  // meant to watch staff actions, so staff themselves shouldn't be the ones
+  // who can browse or (via checking it) sanity-test it away.
+  adminOnly?: boolean;
 };
 
 const MODULES: Module[] = [
@@ -61,6 +66,7 @@ const MODULES: Module[] = [
   { key: "quotations", title: "QUOTATIONS", gujarati: "Grahak ne bhav aapo", icon: "document-text", perm: "sell", route: "/quotations", color: colors.brand },
   { key: "stock-transfer", title: "STOCK TRANSFER", gujarati: "Store thi store stock mokalo", icon: "swap-horizontal", route: "/stock-transfer", color: colors.info, superAdminOnly: true },
   { key: "reservations", title: "STOCK HOLD", gujarati: "Grahak mate stock rakho", icon: "lock-closed", perm: "sell", route: "/reservations", color: colors.warning },
+  { key: "audit-log", title: "ACTIVITY LOG", gujarati: "Kone shu badalyu", icon: "time", route: "/audit-log", color: colors.info, adminOnly: true },
   // Moved from Admin Panel's Management section (was a single unconditional
   // row there, gated only by reaching the Admin tab at all) — no perm here
   // either, for the same reason. The 7 items inside /tools keep their own
@@ -97,7 +103,10 @@ export default function Home() {
   };
 
   const visibleModules = MODULES.filter(
-    (m) => (!m.perm || can(m.perm)) && (!m.superAdminOnly || user?.role === "super_admin"),
+    (m) =>
+      (!m.perm || can(m.perm)) &&
+      (!m.superAdminOnly || user?.role === "super_admin") &&
+      (!m.adminOnly || isAdmin),
   );
 
   const shareLowStock = async () => {
