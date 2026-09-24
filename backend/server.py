@@ -671,6 +671,24 @@ class CashEntryIn(BaseModel):
     note: Optional[str] = ""
 
 
+class PurchaseOrderItemIn(BaseModel):
+    part_number: str
+    name: Optional[str] = ""
+    quantity: int = 1
+    price: Optional[float] = 0
+
+
+class PurchaseOrderIn(BaseModel):
+    vendor_id: Optional[str] = None
+    vendor_name: Optional[str] = ""  # free-text fallback when no saved vendor is picked
+    items: List[PurchaseOrderItemIn]
+    note: Optional[str] = ""
+
+
+class PurchaseOrderStatusUpdate(BaseModel):
+    status: str  # "pending" | "received" | "cancelled"
+
+
 class VendorIn(BaseModel):
     name: str
     phone: str
@@ -2940,6 +2958,78 @@ async def list_cash_book(store_id: Optional[str] = None, user=Depends(get_curren
         balance += amt if e.get("type") == "in" else -amt
         e["running_balance"] = round(balance, 2)
     return {"balance": round(balance, 2), "entries": entries}
+
+
+# ---------------- Purchase Orders ----------------
+# An order placed WITH a vendor for stock that hasn't arrived yet -- distinct
+# from /buy, which records stock that's already physically in hand. A PO is
+# just a plan + a paper trail ("received" is flipped by hand once the goods
+# actually show up); it deliberately does NOT touch /stock itself, so it
+# can't be used to fake inventory that was never received.
+@api.post("/purchase-orders")
+async def create_purchase_order(body: PurchaseOrderIn, store_id: Optional[str] = None,
+                                 user=Depends(require("buy"))):
+    if not body.items:
+        raise HTTPException(400, "Add at least one item")
+    sid = resolve_store(user, store_id, require_write=True)
+    items = []
+    total = 0.0
+    for it in body.items:
+        pn = (it.part_number or "").strip()
+        if not pn:
+            raise HTTPException(400, "Every item needs a part number")
+        qty = max(1, int(it.quantity or 1))
+        price = float(it.price or 0)
+        items.append({"part_number": pn, "name": it.name or "", "quantity": qty, "price": price})
+        total += qty * price
+    count = await db.purchase_orders.count_documents({"store_id": sid})
+    po = {
+        "id": new_id(), "store_id": sid, "po_number": f"PO-{count + 1:04d}",
+        "vendor_id": body.vendor_id, "vendor_name": body.vendor_name or "",
+        "items": items, "total": round(total, 2), "status": "pending",
+        "note": body.note or "", "by": user["username"], "at": now_iso(),
+    }
+    await db.purchase_orders.insert_one(dict(po))
+    po.pop("_id", None)
+    return po
+
+
+@api.get("/purchase-orders")
+async def list_purchase_orders(status: Optional[str] = None, store_id: Optional[str] = None,
+                                user=Depends(get_current_user)):
+    query = sq(user, None, store_id)
+    if status:
+        query["status"] = status
+    return await db.purchase_orders.find(query, {"_id": 0}).sort("at", -1).to_list(1000)
+
+
+@api.get("/purchase-orders/{po_id}")
+async def get_purchase_order(po_id: str, store_id: Optional[str] = None, user=Depends(get_current_user)):
+    po = await db.purchase_orders.find_one(sq(user, {"id": po_id}, store_id), {"_id": 0})
+    if not po:
+        raise HTTPException(404, "Purchase order not found")
+    return po
+
+
+@api.patch("/purchase-orders/{po_id}/status")
+async def update_purchase_order_status(po_id: str, body: PurchaseOrderStatusUpdate,
+                                        store_id: Optional[str] = None, user=Depends(require("buy"))):
+    if body.status not in ("pending", "received", "cancelled"):
+        raise HTTPException(400, "status must be 'pending', 'received' or 'cancelled'")
+    sid = resolve_store(user, store_id, require_write=True)
+    r = await db.purchase_orders.update_one({"store_id": sid, "id": po_id}, {"$set": {"status": body.status}})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Purchase order not found")
+    return await get_purchase_order(po_id, sid, user)
+
+
+@api.delete("/purchase-orders/{po_id}")
+async def delete_purchase_order(po_id: str, store_id: Optional[str] = None, user=Depends(require_admin)):
+    sid = resolve_store(user, store_id, require_write=True)
+    r = await db.purchase_orders.delete_one({"store_id": sid, "id": po_id})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Purchase order not found")
+    return {"ok": True}
 
 
 # ---------------- Physical stock verification (Admin only) ----------------
