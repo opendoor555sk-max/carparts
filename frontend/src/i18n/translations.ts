@@ -57,6 +57,7 @@ const dict = {
     "module.quotations": "ભાવ પત્રક",
     "module.stock-transfer": "સ્ટોક ટ્રાન્સફર",
     "module.reservations": "સ્ટોક હોલ્ડ",
+    "module.audit-log": "એક્ટિવિટી લોગ",
     "module.arrange": "સ્ટોર ગોઠવણ",
     "module.tools": "ટૂલ્સ",
 
@@ -170,6 +171,10 @@ const dict = {
     "reservations.updateFailed": "અપડેટ નિષ્ફળ",
     "reservations.deleted": "ડિલીટ થયું",
     "reservations.deleteFailed": "ડિલીટ નિષ્ફળ",
+
+    "auditLog.title": "એક્ટિવિટી લોગ",
+    "auditLog.noEntries": "હજુ કોઈ એક્ટિવિટી નથી",
+    "auditLog.loadFailed": "લોડ કરવામાં નિષ્ફળ",
 
     "admin.title": "એડમિન પેનલ",
     "admin.statistics": "આંકડા",
@@ -1113,6 +1118,7 @@ const dict = {
     "module.quotations": "भाव पत्रक",
     "module.stock-transfer": "स्टॉक ट्रांसफर",
     "module.reservations": "स्टॉक होल्ड",
+    "module.audit-log": "एक्टिविटी लॉग",
     "module.arrange": "स्टोर व्यवस्था",
     "module.tools": "टूल्स",
 
@@ -1226,6 +1232,10 @@ const dict = {
     "reservations.updateFailed": "अपडेट विफल",
     "reservations.deleted": "डिलीट हुआ",
     "reservations.deleteFailed": "डिलीट विफल",
+
+    "auditLog.title": "एक्टिविटी लॉग",
+    "auditLog.noEntries": "अभी कोई एक्टिविटी नहीं",
+    "auditLog.loadFailed": "लोड करने में विफल",
 
     "admin.title": "एडमिन पैनल",
     "admin.statistics": "आंकड़े",
@@ -2169,6 +2179,7 @@ const dict = {
     "module.quotations": "Quotations",
     "module.stock-transfer": "Stock Transfer",
     "module.reservations": "Stock Hold",
+    "module.audit-log": "Activity Log",
     "module.arrange": "Store Arrangement",
     "module.tools": "Tools",
 
@@ -2282,6 +2293,10 @@ const dict = {
     "reservations.updateFailed": "Update failed",
     "reservations.deleted": "Deleted",
     "reservations.deleteFailed": "Delete failed",
+
+    "auditLog.title": "Activity Log",
+    "auditLog.noEntries": "No activity yet",
+    "auditLog.loadFailed": "Failed to load",
 
     "admin.title": "Admin Panel",
     "admin.statistics": "Statistics",
