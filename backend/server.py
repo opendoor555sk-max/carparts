@@ -671,6 +671,18 @@ class CashEntryIn(BaseModel):
     note: Optional[str] = ""
 
 
+class StockReservationIn(BaseModel):
+    part_number: str
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = ""  # free-text fallback when no saved customer is picked
+    quantity: int = 1
+    note: Optional[str] = ""
+
+
+class ReservationStatusUpdate(BaseModel):
+    status: str  # "active" | "fulfilled" | "cancelled"
+
+
 class StockTransferIn(BaseModel):
     from_store_id: str
     to_store_id: str
@@ -3125,6 +3137,77 @@ async def delete_purchase_order(po_id: str, store_id: Optional[str] = None, user
     r = await db.purchase_orders.delete_one({"store_id": sid, "id": po_id})
     if r.deleted_count == 0:
         raise HTTPException(404, "Purchase order not found")
+    return {"ok": True}
+
+
+# ---------------- Stock Reservations ----------------
+# Holds a quantity of a part number aside for a specific customer -- e.g. "he's
+# coming tomorrow to collect it, don't sell it to anyone else meanwhile".
+# Deliberately does NOT touch /stock or /sell's own query: reserving is a
+# soft hold recorded here, checked only against OTHER active reservations
+# for the same part (so staff can't over-promise more units than exist),
+# same "record what was agreed, don't silently rewire the core sell flow"
+# approach as Purchase Orders/Quotations above. Staff still see the reserved
+# note here and skip that unit at the counter by hand.
+async def _reserved_quantity(store_id: Optional[str], part_number: str) -> int:
+    rows = await db.reservations.find(
+        {"store_id": store_id, "part_number": part_number, "status": "active"}, {"_id": 0, "quantity": 1}
+    ).to_list(2000)
+    return sum(r.get("quantity") or 0 for r in rows)
+
+
+@api.post("/reservations")
+async def create_reservation(body: StockReservationIn, store_id: Optional[str] = None,
+                              user=Depends(require("sell"))):
+    pn = body.part_number.strip()
+    if not pn:
+        raise HTTPException(400, "Part number required")
+    if body.quantity is None or body.quantity <= 0:
+        raise HTTPException(400, "Quantity must be greater than 0")
+    sid = resolve_store(user, store_id, require_write=True)
+    in_stock = await db.stock.count_documents({"store_id": sid, "part_number": pn, "sold": {"$ne": True}})
+    already_reserved = await _reserved_quantity(sid, pn)
+    available = in_stock - already_reserved
+    if body.quantity > available:
+        raise HTTPException(400, f"Only {max(available, 0)} unit(s) of {pn} available to reserve")
+    reservation = {
+        "id": new_id(), "store_id": sid, "part_number": pn,
+        "customer_id": body.customer_id, "customer_name": body.customer_name or "",
+        "quantity": body.quantity, "status": "active",
+        "note": body.note or "", "by": user["username"], "at": now_iso(),
+    }
+    await db.reservations.insert_one(dict(reservation))
+    reservation.pop("_id", None)
+    return reservation
+
+
+@api.get("/reservations")
+async def list_reservations(status: Optional[str] = None, store_id: Optional[str] = None,
+                             user=Depends(get_current_user)):
+    query = sq(user, None, store_id)
+    if status:
+        query["status"] = status
+    return await db.reservations.find(query, {"_id": 0}).sort("at", -1).to_list(1000)
+
+
+@api.patch("/reservations/{res_id}/status")
+async def update_reservation_status(res_id: str, body: ReservationStatusUpdate,
+                                     store_id: Optional[str] = None, user=Depends(require("sell"))):
+    if body.status not in ("active", "fulfilled", "cancelled"):
+        raise HTTPException(400, "status must be 'active', 'fulfilled' or 'cancelled'")
+    sid = resolve_store(user, store_id, require_write=True)
+    r = await db.reservations.update_one({"store_id": sid, "id": res_id}, {"$set": {"status": body.status}})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Reservation not found")
+    return {"ok": True}
+
+
+@api.delete("/reservations/{res_id}")
+async def delete_reservation(res_id: str, store_id: Optional[str] = None, user=Depends(require_admin)):
+    sid = resolve_store(user, store_id, require_write=True)
+    r = await db.reservations.delete_one({"store_id": sid, "id": res_id})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Reservation not found")
     return {"ok": True}
 
 
