@@ -60,6 +60,7 @@ const MODULES: Module[] = [
   { key: "purchase-orders", title: "PURCHASE ORDERS", gujarati: "Vendor ne order aapo", icon: "clipboard", perm: "buy", route: "/purchase-orders", color: colors.success },
   { key: "quotations", title: "QUOTATIONS", gujarati: "Grahak ne bhav aapo", icon: "document-text", perm: "sell", route: "/quotations", color: colors.brand },
   { key: "stock-transfer", title: "STOCK TRANSFER", gujarati: "Store thi store stock mokalo", icon: "swap-horizontal", route: "/stock-transfer", color: colors.info, superAdminOnly: true },
+  { key: "reservations", title: "STOCK HOLD", gujarati: "Grahak mate stock rakho", icon: "lock-closed", perm: "sell", route: "/reservations", color: colors.warning },
   // Moved from Admin Panel's Management section (was a single unconditional
   // row there, gated only by reaching the Admin tab at all) — no perm here
   // either, for the same reason. The 7 items inside /tools keep their own
