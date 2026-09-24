@@ -102,6 +102,21 @@ def new_id() -> str:
     return str(uuid.uuid4())
 
 
+async def _log_audit(user: dict, store_id: Optional[str], action: str, details: str = "") -> None:
+    """A single append-only trail of "who did what, when" -- store-scoped like
+    everything else, viewed only by that store's admin (or the platform owner
+    across all stores). Deliberately fire-and-forget: a logging failure must
+    never block the action it's describing, so callers await this but nothing
+    downstream depends on it succeeding."""
+    try:
+        await db.audit_log.insert_one({
+            "id": new_id(), "store_id": store_id, "action": action, "details": details,
+            "by": user.get("username"), "at": now_iso(),
+        })
+    except Exception:
+        pass
+
+
 def _parse_gps(g: Optional[str]) -> Optional[Dict[str, float]]:
     """Shared with admin_gps_locations() below -- the one place in the app
     that already parses the "lat,lng" string format stored on
@@ -2958,6 +2973,7 @@ async def add_cash_entry(body: CashEntryIn, store_id: Optional[str] = None, user
     }
     await db.cash_book.insert_one(dict(entry))
     entry.pop("_id", None)
+    await _log_audit(user, sid, "cash_book.add", f"{body.type} ₹{body.amount} — {body.note or ''}".strip())
     return {"ok": True, "entry": entry, "balance": await _cash_book_balance(sid)}
 
 
@@ -2970,6 +2986,7 @@ async def delete_cash_entry(entry_id: str, store_id: Optional[str] = None, user=
     r = await db.cash_book.delete_one({"store_id": sid, "id": entry_id})
     if r.deleted_count == 0:
         raise HTTPException(404, "Entry not found")
+    await _log_audit(user, sid, "cash_book.delete", f"entry {entry_id}")
     return {"ok": True, "balance": await _cash_book_balance(sid)}
 
 
@@ -3027,6 +3044,7 @@ async def create_quotation(body: QuotationIn, store_id: Optional[str] = None, us
     }
     await db.quotations.insert_one(dict(quote))
     quote.pop("_id", None)
+    await _log_audit(user, sid, "quotation.create", f"{quote['quote_number']} — ₹{quote['total']}")
     return quote
 
 
@@ -3056,6 +3074,7 @@ async def update_quotation_status(quote_id: str, body: QuotationStatusUpdate,
     r = await db.quotations.update_one({"store_id": sid, "id": quote_id}, {"$set": {"status": body.status}})
     if r.matched_count == 0:
         raise HTTPException(404, "Quotation not found")
+    await _log_audit(user, sid, "quotation.status", f"{quote_id} -> {body.status}")
     return await get_quotation(quote_id, sid, user)
 
 
@@ -3065,6 +3084,7 @@ async def delete_quotation(quote_id: str, store_id: Optional[str] = None, user=D
     r = await db.quotations.delete_one({"store_id": sid, "id": quote_id})
     if r.deleted_count == 0:
         raise HTTPException(404, "Quotation not found")
+    await _log_audit(user, sid, "quotation.delete", quote_id)
     return {"ok": True}
 
 
@@ -3099,6 +3119,7 @@ async def create_purchase_order(body: PurchaseOrderIn, store_id: Optional[str] =
     }
     await db.purchase_orders.insert_one(dict(po))
     po.pop("_id", None)
+    await _log_audit(user, sid, "purchase_order.create", f"{po['po_number']} — ₹{po['total']}")
     return po
 
 
@@ -3128,6 +3149,7 @@ async def update_purchase_order_status(po_id: str, body: PurchaseOrderStatusUpda
     r = await db.purchase_orders.update_one({"store_id": sid, "id": po_id}, {"$set": {"status": body.status}})
     if r.matched_count == 0:
         raise HTTPException(404, "Purchase order not found")
+    await _log_audit(user, sid, "purchase_order.status", f"{po_id} -> {body.status}")
     return await get_purchase_order(po_id, sid, user)
 
 
@@ -3137,7 +3159,23 @@ async def delete_purchase_order(po_id: str, store_id: Optional[str] = None, user
     r = await db.purchase_orders.delete_one({"store_id": sid, "id": po_id})
     if r.deleted_count == 0:
         raise HTTPException(404, "Purchase order not found")
+    await _log_audit(user, sid, "purchase_order.delete", po_id)
     return {"ok": True}
+
+
+# ---------------- Audit Log ----------------
+# Read-only trail of _log_audit() calls made across this file -- who did
+# what, when. A store's own admin sees only their store's rows; the
+# platform owner (super_admin) can see any store's, or all of them at once
+# by leaving store_id unset (resolve_store() already draws that line the
+# same way every other admin-only GET in this file does).
+@api.get("/audit-log")
+async def list_audit_log(store_id: Optional[str] = None, user=Depends(require_admin)):
+    if user.get("role") == "super_admin":
+        query = {"store_id": store_id} if store_id else {}
+    else:
+        query = {"store_id": user.get("store_id")}
+    return await db.audit_log.find(query, {"_id": 0}).sort("at", -1).to_list(2000)
 
 
 # ---------------- Stock Reservations ----------------
@@ -3178,6 +3216,7 @@ async def create_reservation(body: StockReservationIn, store_id: Optional[str] =
     }
     await db.reservations.insert_one(dict(reservation))
     reservation.pop("_id", None)
+    await _log_audit(user, sid, "reservation.create", f"{pn} × {body.quantity}")
     return reservation
 
 
@@ -3199,6 +3238,7 @@ async def update_reservation_status(res_id: str, body: ReservationStatusUpdate,
     r = await db.reservations.update_one({"store_id": sid, "id": res_id}, {"$set": {"status": body.status}})
     if r.matched_count == 0:
         raise HTTPException(404, "Reservation not found")
+    await _log_audit(user, sid, "reservation.status", f"{res_id} -> {body.status}")
     return {"ok": True}
 
 
@@ -3208,6 +3248,7 @@ async def delete_reservation(res_id: str, store_id: Optional[str] = None, user=D
     r = await db.reservations.delete_one({"store_id": sid, "id": res_id})
     if r.deleted_count == 0:
         raise HTTPException(404, "Reservation not found")
+    await _log_audit(user, sid, "reservation.delete", res_id)
     return {"ok": True}
 
 
@@ -3248,6 +3289,7 @@ async def transfer_stock(body: StockTransferIn, user=Depends(require_super_admin
             "id": new_id(), "store_id": sid, "type": typ, "part_number": pn,
             "quantity": len(unit_ids), "by": user["username"], "at": now_iso(),
         })
+        await _log_audit(user, sid, f"stock_transfer.{typ}", f"{pn} × {len(unit_ids)}")
     record.pop("_id", None)
     return {"ok": True, "transfer": record}
 
