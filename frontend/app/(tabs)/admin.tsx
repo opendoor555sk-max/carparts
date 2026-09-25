@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 
@@ -169,6 +169,26 @@ export default function Admin() {
                   <Text style={styles.linkSub}>{t("admin.linkOwnerPanelSub")}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.info} />
+              </Pressable>
+            ) : null}
+            {isAdmin || isSuperAdmin ? (
+              <Pressable
+                style={[styles.link, { marginBottom: spacing.md, borderColor: colors.info }]}
+                onPress={() =>
+                  Linking.openURL(
+                    "https://github.com/opendoor555sk-max/carparts/blob/conflict_040926_0622/PROJECT_BLUEPRINT.md",
+                  )
+                }
+                testID="admin-link-blueprint"
+              >
+                <View style={styles.linkIcon}>
+                  <Ionicons name="document-text" size={22} color={colors.info} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.linkTitle}>{t("admin.linkBlueprintTitle")}</Text>
+                  <Text style={styles.linkSub}>{t("admin.linkBlueprintSub")}</Text>
+                </View>
+                <Ionicons name="open-outline" size={18} color={colors.info} />
               </Pressable>
             ) : null}
             <View style={{ gap: spacing.md }}>
