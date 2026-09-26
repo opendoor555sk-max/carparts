@@ -1,0 +1,153 @@
+package com.kabadi.calc
+
+import java.math.BigDecimal
+import java.math.RoundingMode
+
+/* Data + maths only (no Android) so it can be unit tested. */
+
+/** one line of the hisab: an expense (always a fixed amount) or a part (kg × rate, or fixed) */
+class Line(
+    var key: String,              // built-in key ("body", "crane") or "" for a custom line
+    var name: String,             // what the user sees / edits (any language)
+    var fixed: Boolean,
+    var kgText: String = "",
+    var rateText: String = "",
+    var amountText: String = ""
+) {
+    val kg get() = evalExpr(kgText).let { if (it.isFinite()) it else 0.0 }
+    val rate get() = evalExpr(rateText).let { if (it.isFinite()) it else 0.0 }
+    val amount get() = evalExpr(amountText).let { if (it.isFinite()) it else 0.0 }
+    fun value(): Double = if (fixed) amount else kg * rate
+}
+
+class Hisab(
+    var id: Long,
+    var time: Long,
+    var party: String = "",
+    var vehicle: String = "",
+    var note: String = "",
+    var priceText: String = "",
+    val kharch: MutableList<Line> = mutableListOf(),
+    val maal: MutableList<Line> = mutableListOf()
+) {
+    val price get() = evalExpr(priceText).let { if (it.isFinite()) it else 0.0 }
+    fun kharchTotal() = kharch.sumOf { it.value() }
+    fun lagat() = price + kharchTotal()
+    fun maalTotal() = maal.sumOf { it.value() }
+    fun kg() = maal.filter { !it.fixed }.sumOf { it.kg }
+    fun munafa() = maalTotal() - lagat()
+}
+
+/** built-in parts: key, usually fixed?, names in English / Hindi / Gujarati */
+class Item(val key: String, val fixed: Boolean, val en: String, val hi: String, val gu: String) {
+    fun name(lang: Int) = when (lang) { 1 -> hi; 2 -> gu; else -> en }
+}
+
+val PARTS = listOf(
+    Item("cabin", false, "Cabin", "केबिन", "કેબિન"),
+    Item("body", false, "Body", "बॉडी", "બોડી"),
+    Item("chassis", false, "Chassis", "चेसिस", "ચેસિસ"),
+    Item("engine", true, "Engine", "इंजन", "એન્જિન"),
+    Item("gear", true, "Gear box", "गियर बॉक्स", "ગિયર બોક્સ"),
+    Item("line", false, "Line", "लाइन", "લાઇન"),
+    Item("kaman", false, "Kaman (patta)", "कमान", "કમાન"),
+    Item("dhari", false, "Dhari (axle)", "धुरी", "ધરી"),
+    Item("diff", true, "Differential", "डिफरेंशियल", "ડિફરન્શિયલ"),
+    Item("wheel", false, "Wheel plate", "व्हील प्लेट", "વ્હીલ પ્લેટ"),
+    Item("tyre", true, "Tyre", "टायर", "ટાયર"),
+    Item("tamba", false, "Tamba (copper)", "तांबा", "તાંબુ"),
+    Item("alu", false, "Aluminium", "एल्युमिनियम", "એલ્યુમિનિયમ"),
+    Item("bhangar", false, "Bhangar", "भंगार", "ભંગાર"),
+    Item("battery", true, "Battery", "बैटरी", "બેટરી"),
+    Item("seat", true, "Seat", "सीट", "સીટ"),
+    Item("wood", false, "Wood / Ply", "लकड़ी / प्लाई", "લાકડું / પ્લાય")
+)
+
+val EXPENSES = listOf(
+    Item("crane", true, "Crane kiraya", "क्रेन किराया", "ક્રેન ભાડું"),
+    Item("loading", true, "Loading charge", "लोडिंग चार्ज", "લોડિંગ ચાર્જ"),
+    Item("rickshaw", true, "Loading rickshaw", "लोडिंग रिक्शा", "લોડિંગ રિક્ષા"),
+    Item("hydra", true, "Hydra loading", "हाइड्रा लोडिंग", "હાઇડ્રા લોડિંગ"),
+    Item("bhada", true, "Bhada", "भाड़ा", "ભાડું"),
+    Item("chapani", true, "Chapani", "छपाणी", "છાપણી"),
+    Item("food", true, "Food / Jaman", "खाना", "જમવાનું"),
+    Item("petrol", true, "Petrol", "पेट्रोल", "પેટ્રોલ"),
+    Item("kiraya", true, "Kiraya", "किराया", "કિરાયું"),
+    Item("majuri", true, "Gaadi kholne ki majuri", "गाड़ी खोलने की मजदूरी", "ગાડી ખોલવાની મજૂરી"),
+    Item("gas", true, "Gas cutting", "गैस कटिंग", "ગેસ કટિંગ")
+)
+
+/** Indian money format: ₹ 1,23,456 (paise only when present) */
+fun money(x: Double): String {
+    if (!x.isFinite()) return "—"
+    val r = BigDecimal.valueOf(Math.abs(x)).setScale(2, RoundingMode.HALF_UP)
+    val whole = r.setScale(0, RoundingMode.DOWN)
+    val paise = r.subtract(whole).movePointRight(2).toInt()
+    val s = group(whole.toPlainString()) + (if (paise != 0) "." + paise.toString().padStart(2, '0') else "")
+    return (if (x < 0) "-" else "") + "₹ " + s
+}
+
+fun group(ip: String): String {
+    if (ip.length <= 3) return ip
+    val last3 = ip.takeLast(3)
+    var rest = ip.dropLast(3)
+    val parts = mutableListOf<String>()
+    while (rest.length > 2) { parts.add(0, rest.takeLast(2)); rest = rest.dropLast(2) }
+    if (rest.isNotEmpty()) parts.add(0, rest)
+    return parts.joinToString(",") + "," + last3
+}
+
+/** number without trailing zeros: 800, 12.5 */
+fun plain(x: Double): String {
+    if (!x.isFinite()) return "—"
+    val s = BigDecimal.valueOf(x).setScale(3, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+    return if (s == "-0") "0" else s
+}
+
+/** Small calculator for input boxes: "400+380", "2*55", "1,200", "(10+5)*3". NaN if it can't read it. */
+fun evalExpr(s0: String): Double {
+    val s = s0.replace(",", "").replace("₹", "").replace("×", "*").replace("x", "*").replace("X", "*")
+        .replace("÷", "/").replace("−", "-").replace(" ", "")
+    if (s.isEmpty()) return 0.0
+    return Parser(s).run()
+}
+
+private class Parser(val s: String) {
+    var i = 0
+    fun run(): Double {
+        val v = expr()
+        return if (i == s.length) v else Double.NaN
+    }
+    fun expr(): Double {
+        var v = term()
+        while (i < s.length && (s[i] == '+' || s[i] == '-')) {
+            val op = s[i++]
+            val r = term()
+            v = if (op == '+') v + r else v - r
+        }
+        return v
+    }
+    fun term(): Double {
+        var v = factor()
+        while (i < s.length && (s[i] == '*' || s[i] == '/' || s[i] == '%')) {
+            val op = s[i++]
+            if (op == '%') { v /= 100; continue }
+            val r = factor()
+            v = if (op == '*') v * r else v / r
+        }
+        return v
+    }
+    fun factor(): Double {
+        if (i < s.length && s[i] == '-') { i++; return -factor() }
+        if (i < s.length && s[i] == '+') { i++; return factor() }
+        if (i < s.length && s[i] == '(') {
+            i++
+            val v = expr()
+            if (i < s.length && s[i] == ')') i++ else return Double.NaN
+            return v
+        }
+        val st = i
+        while (i < s.length && (s[i].isDigit() || s[i] == '.')) i++
+        return s.substring(st, i).toDoubleOrNull() ?: Double.NaN
+    }
+}
