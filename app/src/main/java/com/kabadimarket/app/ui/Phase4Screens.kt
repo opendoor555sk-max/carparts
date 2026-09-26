@@ -487,7 +487,6 @@ fun ReportScreen(user: User, nav: Nav, mode: String) {
     }
 
     LaunchedEffect(range, company, category, apply) {
-        if (range == "custom" && apply == 0) return@LaunchedEffect
         loading = true
         try {
             val (f, tt) = resolveRange(range, fromDate, toDate)
@@ -604,7 +603,6 @@ fun ProfitReportScreen(nav: Nav) {
     }
 
     LaunchedEffect(range, apply) {
-        if (range == "custom" && apply == 0) return@LaunchedEffect
         loading = true
         try {
             report = Api.getObj("/reports/profit", params())
