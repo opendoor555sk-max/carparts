@@ -198,7 +198,7 @@ fun App() {
             Session.clear()
             user = null
         }
-        Api.onStoreLocked = { locked = it }
+        Api.onStoreLocked = { m, c -> locked = m to c }
         onDispose {
             Api.onUnauthorized = null
             Api.onStoreLocked = null
