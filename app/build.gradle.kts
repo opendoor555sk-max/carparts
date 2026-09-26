@@ -69,7 +69,9 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.compose.material:material-icons-extended")
+    // Networking (supports GET/POST/PATCH/DELETE and file downloads)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     // Google's ready-made barcode scanner (QR, DataMatrix, Code128 ...).

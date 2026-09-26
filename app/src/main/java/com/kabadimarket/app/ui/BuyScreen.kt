@@ -137,7 +137,7 @@ fun BuyScreen(user: User, nav: Nav, initialPartNumber: String) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar("Buy", subtitle = "Add a piece to stock", onBack = { nav.back() })
+        TopBar(t("module.buy"), subtitle = "Purchase", onBack = { nav.back() })
 
         val result = done
         if (result != null) {

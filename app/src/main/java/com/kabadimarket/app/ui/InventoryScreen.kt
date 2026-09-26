@@ -74,7 +74,7 @@ fun InventoryScreen(@Suppress("UNUSED_PARAMETER") user: User, nav: Nav) {
 
     Column(Modifier.fillMaxSize()) {
         TopBar(
-            "Inventory",
+            t("tabs.inventory"),
             subtitle = if (loading) "Loading…" else "${rows.size} pieces in stock",
             onBack = { nav.back() },
             actions = {

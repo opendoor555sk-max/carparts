@@ -125,7 +125,7 @@ fun SellScreen(@Suppress("UNUSED_PARAMETER") user: User, nav: Nav, initialPartNu
     }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar("Sell", subtitle = "Make a bill", onBack = { nav.back() })
+        TopBar(t("module.sell"), subtitle = "Sale", onBack = { nav.back() })
 
         val result = done
         if (result != null) {

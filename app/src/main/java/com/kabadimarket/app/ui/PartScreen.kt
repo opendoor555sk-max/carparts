@@ -50,6 +50,16 @@ fun PartScreen(user: User, nav: Nav, initialPartNumber: String) {
     var result by remember { mutableStateOf<JSONObject?>(null) }
     var detail by remember { mutableStateOf<JSONObject?>(null) }
 
+    // Opened from the SEARCH module with no part number: open the camera straight away (like the old app).
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var autoScanned by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (initialPartNumber.isBlank() && !autoScanned) {
+            autoScanned = true
+            com.kabadimarket.app.data.scanBarcode(context) { code -> input = code; partNumber = code.trim() }
+        }
+    }
+
     LaunchedEffect(partNumber, reload) {
         if (partNumber.isBlank()) return@LaunchedEffect
         loading = true
@@ -81,7 +91,7 @@ fun PartScreen(user: User, nav: Nav, initialPartNumber: String) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar("Part", subtitle = partNumber.ifBlank { null }, onBack = { nav.back() })
+        TopBar(t("module.search"), subtitle = partNumber.ifBlank { null }, onBack = { nav.back() })
         Column(
             Modifier
                 .fillMaxSize()
@@ -96,7 +106,7 @@ fun PartScreen(user: User, nav: Nav, initialPartNumber: String) {
             )
 
             when {
-                loading -> Loading("Searching…")
+                loading -> Loading(t("common.searching"))
                 error != null -> ErrorBox(error)
                 result != null -> PartResult(user, nav, result!!, detail)
                 else -> Text("Type or scan a part number.", color = C.Muted)
@@ -118,7 +128,7 @@ private fun PartResult(user: User, nav: Nav, r: JSONObject, detail: JSONObject?)
             Column(Modifier.weight(1f)) {
                 Text(pn, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = C.Text)
                 Spacer(Modifier.height(4.dp))
-                Badge(status, fg, bg)
+                Badge(com.kabadimarket.app.data.I18n.status(status), fg, bg)
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(stock.toString(), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = if (stock > 0) C.Green else C.Muted)

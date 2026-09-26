@@ -5,13 +5,17 @@ import android.os.Looper
 import com.kabadimarket.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
-import java.net.URL
 import java.net.URLEncoder
+import java.util.concurrent.TimeUnit
 
 /** Error from the server (or network), with a message that can be shown to the user. */
 class ApiException(
@@ -24,10 +28,17 @@ class ApiException(
 /**
  * Talks to the existing Kabadi Market server (the same one the old app uses),
  * so all data, stock and users stay exactly the same.
- * Uses Android's built-in HTTP + JSON, so no extra libraries (smaller APK).
  */
 object Api {
     private val BASE = BuildConfig.API_BASE
+    private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
+
+    // The free server "sleeps" when unused and can take ~1 minute to wake up.
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .build()
 
     @Volatile
     var token: String? = null
@@ -38,8 +49,14 @@ object Api {
     suspend fun get(path: String, query: Map<String, String?> = emptyMap()): Any =
         call("GET", path, query, null)
 
-    suspend fun post(path: String, body: JSONObject, query: Map<String, String?> = emptyMap()): Any =
+    suspend fun post(path: String, body: JSONObject = JSONObject(), query: Map<String, String?> = emptyMap()): Any =
         call("POST", path, query, body)
+
+    suspend fun patch(path: String, body: JSONObject, query: Map<String, String?> = emptyMap()): Any =
+        call("PATCH", path, query, body)
+
+    suspend fun delete(path: String, query: Map<String, String?> = emptyMap()): Any =
+        call("DELETE", path, query, null)
 
     suspend fun getObj(path: String, query: Map<String, String?> = emptyMap()): JSONObject =
         get(path, query) as? JSONObject ?: JSONObject()
@@ -47,8 +64,34 @@ object Api {
     suspend fun getArr(path: String, query: Map<String, String?> = emptyMap()): JSONArray =
         get(path, query) as? JSONArray ?: JSONArray()
 
-    /** Encodes one piece of a URL path, e.g. a part number. */
+    /** Downloads a file (e.g. an Excel export) as raw bytes. */
+    suspend fun download(path: String, query: Map<String, String?> = emptyMap()): ByteArray =
+        withContext(Dispatchers.IO) {
+            val req = baseRequest(path, query).get().build()
+            try {
+                client.newCall(req).execute().use { resp ->
+                    val bytes = resp.body?.bytes() ?: ByteArray(0)
+                    if (!resp.isSuccessful) throw handleError(resp.code, String(bytes, Charsets.UTF_8))
+                    bytes
+                }
+            } catch (e: ApiException) {
+                throw e
+            } catch (e: IOException) {
+                throw networkError(e)
+            }
+        }
+
+    /** Encodes one piece of a URL path, e.g. a part number or id. */
     fun seg(s: String): String = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
+
+    private fun baseRequest(path: String, query: Map<String, String?>): Request.Builder {
+        val url = (BASE + path).toHttpUrl().newBuilder().apply {
+            query.forEach { (k, v) -> if (!v.isNullOrBlank()) addQueryParameter(k, v) }
+        }.build()
+        return Request.Builder().url(url).header("Accept", "application/json").apply {
+            token?.let { header("Authorization", "Bearer $it") }
+        }
+    }
 
     private suspend fun call(
         method: String,
@@ -56,46 +99,35 @@ object Api {
         query: Map<String, String?>,
         body: JSONObject?,
     ): Any = withContext(Dispatchers.IO) {
-        val qs = query.entries
-            .filter { !it.value.isNullOrBlank() }
-            .joinToString("&") { enc(it.key) + "=" + enc(it.value ?: "") }
-        val url = URL(BASE + path + if (qs.isEmpty()) "" else "?$qs")
-        val conn = url.openConnection() as HttpURLConnection
+        val reqBody = body?.toString()?.toRequestBody(JSON_TYPE)
+        val req = baseRequest(path, query).method(method, reqBody).build()
         try {
-            conn.requestMethod = method
-            // The free server "sleeps" when unused and can take ~1 minute to wake up.
-            conn.connectTimeout = 60_000
-            conn.readTimeout = 90_000
-            conn.setRequestProperty("Accept", "application/json")
-            token?.let { conn.setRequestProperty("Authorization", "Bearer $it") }
-            if (body != null) {
-                conn.doOutput = true
-                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+            client.newCall(req).execute().use { resp ->
+                val text = resp.body?.string() ?: ""
+                if (!resp.isSuccessful) throw handleError(resp.code, text)
+                parseJson(text)
             }
-            val status = conn.responseCode
-            val stream = if (status in 200..299) conn.inputStream else conn.errorStream
-            val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-            if (status !in 200..299) {
-                val err = parseError(status, text)
-                if (status == 401 && token != null) {
-                    Handler(Looper.getMainLooper()).post { onUnauthorized?.invoke() }
-                }
-                throw err
-            }
-            parseJson(text)
         } catch (e: ApiException) {
             throw e
-        } catch (e: SocketTimeoutException) {
-            throw ApiException(0, "Server is taking too long. It may be waking up — please try again in a minute.")
         } catch (e: IOException) {
-            throw ApiException(0, "Cannot reach server. Check internet and try again.")
-        } finally {
-            conn.disconnect()
+            throw networkError(e)
         }
     }
 
-    private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
+    private fun networkError(e: IOException): ApiException =
+        if (e is SocketTimeoutException) {
+            ApiException(0, I18n.x("err.slow"))
+        } else {
+            ApiException(0, I18n.x("err.offline"))
+        }
+
+    private fun handleError(status: Int, text: String): ApiException {
+        val err = parseError(status, text)
+        if (status == 401 && token != null) {
+            Handler(Looper.getMainLooper()).post { onUnauthorized?.invoke() }
+        }
+        return err
+    }
 
     private fun parseJson(text: String): Any {
         val t = text.trim()
@@ -108,11 +140,11 @@ object Api {
 
     private fun parseError(status: Int, text: String): ApiException {
         val fallback = when (status) {
-            401 -> "Login expired. Please login again."
-            403 -> "You don't have permission for this."
-            404 -> "Not found."
-            503 -> "Server busy — please try again."
-            in 500..599 -> "Server error ($status). Please try again."
+            401 -> I18n.x("err.401")
+            403 -> I18n.x("err.403")
+            404 -> I18n.x("err.404")
+            503 -> I18n.x("err.503")
+            in 500..599 -> I18n.x("err.500") + " ($status)"
             else -> "Error $status"
         }
         return try {
