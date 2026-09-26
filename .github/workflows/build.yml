@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [main]
+    branches: [nirmaan-calc]
   workflow_dispatch:
 
 permissions:
@@ -39,8 +39,8 @@ jobs:
       - name: Publish release (direct download link)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
+          tag_name: calc-v1.0.${{ github.run_number }}
           name: Nirmaan Calc 1.0.${{ github.run_number }}
           body: "Phone par NirmaanCalc.apk download karke install karein."
           files: NirmaanCalc.apk
-          make_latest: true
+          make_latest: false
