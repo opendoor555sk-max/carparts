@@ -47,13 +47,19 @@ object UpdateState {
 
     /** Checks GitHub now. manual = true shows a message when already up to date. */
     suspend fun checkNow(manual: Boolean) {
-        lastCheck = System.currentTimeMillis()
-        val r = Updater.check()
-        if (r != null) {
-            release = r
-            dismissed = false
-        } else if (manual) {
-            Toast.success(ux("તમે નવીનતમ વર્ઝન પર છો ✓", "आप नवीनतम वर्ज़न पर हैं ✓", "You are on the latest version ✓"))
+        if (manual) Toast.show(ux("અપડેટ તપાસી રહ્યા છીએ…", "अपडेट जांच रहे हैं…", "Checking for update…"))
+        when (val r = Updater.checkDetailed()) {
+            is Updater.Result.Update -> {
+                lastCheck = System.currentTimeMillis()
+                release = r.release
+                dismissed = false
+            }
+            Updater.Result.UpToDate -> {
+                lastCheck = System.currentTimeMillis()
+                if (manual) Toast.success(ux("તમે નવીનતમ વર્ઝન પર છો ✓ (v${BuildConfig.VERSION_NAME})", "आप नवीनतम वर्ज़न पर हैं ✓ (v${BuildConfig.VERSION_NAME})", "You are on the latest version ✓ (v${BuildConfig.VERSION_NAME})"))
+            }
+            // Failed: don't wait 15 min — try again next time the app opens.
+            Updater.Result.Failed -> if (manual) Toast.error(ux("અપડેટ તપાસી ન શકાયું — ઇન્ટરનેટ ચાલુ કરી ફરી દબાવો", "अपडेट जांच नहीं हो सका — इंटरनेट चालू करके फिर दबाएं", "Could not check — turn on internet and try again"))
         }
     }
 }

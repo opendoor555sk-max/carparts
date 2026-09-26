@@ -22,6 +22,8 @@ import java.util.concurrent.TimeUnit
  */
 object Updater {
     private const val LATEST = "https://api.github.com/repos/opendoor555sk-max/carparts/releases/latest"
+    private const val REPO = "https://github.com/opendoor555sk-max/carparts"
+    private const val WEB_LATEST = "$REPO/releases/latest"
 
     data class Release(val version: Int, val name: String, val notes: String, val url: String, val size: Long)
 
@@ -31,26 +33,54 @@ object Updater {
         .followRedirects(true)
         .build()
 
+    sealed class Result {
+        data class Update(val release: Release) : Result()
+        data object UpToDate : Result()
+        data object Failed : Result()
+    }
+
     /** Newer release than the installed one, or null. Never throws. */
-    suspend fun check(): Release? = withContext(Dispatchers.IO) {
-        try {
-            val req = Request.Builder().url(LATEST).header("Accept", "application/vnd.github+json").build()
+    suspend fun check(): Release? = (checkDetailed() as? Result.Update)?.release
+
+    /**
+     * Asks GitHub for the newest build. First the API; if that fails (no internet,
+     * or GitHub's 60-checks-per-hour limit on shared mobile networks), falls back
+     * to the normal release page, which has no such limit.
+     */
+    suspend fun checkDetailed(): Result = withContext(Dispatchers.IO) {
+        val viaApi = try {
+            val req = Request.Builder().url(LATEST)
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "KabadiMarket-Android")
+                .build()
             client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return@withContext null
-                val j = JSONObject(resp.body?.string() ?: return@withContext null)
-                val version = j.str("tag_name").removePrefix("apk-v").toIntOrNull() ?: return@withContext null
-                if (version <= BuildConfig.VERSION_CODE) return@withContext null
-                val asset = j.arr("assets").objects().firstOrNull { it.str("name").endsWith(".apk") } ?: return@withContext null
-                Release(
-                    version = version,
-                    name = j.str("name"),
-                    notes = j.str("body"),
-                    url = asset.str("browser_download_url"),
-                    size = asset.optLong("size", 0),
-                )
+                if (!resp.isSuccessful) null else {
+                    val j = JSONObject(resp.body?.string() ?: "{}")
+                    val version = j.str("tag_name").removePrefix("apk-v").toIntOrNull()
+                    val asset = j.arr("assets").objects().firstOrNull { it.str("name").endsWith(".apk") }
+                    if (version == null || asset == null) null
+                    else Release(version, j.str("name"), j.str("body"), asset.str("browser_download_url"), asset.optLong("size", 0))
+                }
             }
         } catch (e: Exception) {
             null
+        }
+        val rel = viaApi ?: try {
+            // github.com/.../releases/latest redirects to .../releases/tag/apk-vN
+            val req = Request.Builder().url(WEB_LATEST).head().header("User-Agent", "KabadiMarket-Android").build()
+            client.newCall(req).execute().use { resp ->
+                val tag = resp.request.url.pathSegments.lastOrNull().orEmpty()
+                val version = tag.removePrefix("apk-v").toIntOrNull()
+                if (!tag.startsWith("apk-v") || version == null) null
+                else Release(version, tag, "", "$REPO/releases/download/$tag/KabadiMarket-v2.0.$version.apk", 0)
+            }
+        } catch (e: Exception) {
+            null
+        }
+        when {
+            rel == null -> Result.Failed
+            rel.version > BuildConfig.VERSION_CODE -> Result.Update(rel)
+            else -> Result.UpToDate
         }
     }
 
@@ -60,7 +90,7 @@ object Updater {
             val dir = File(context.cacheDir, "updates").apply { mkdirs() }
             dir.listFiles()?.forEach { it.delete() }
             val file = File(dir, "update-${r.version}.apk")
-            client.newCall(Request.Builder().url(r.url).build()).execute().use { resp ->
+            client.newCall(Request.Builder().url(r.url).header("User-Agent", "KabadiMarket-Android").build()).execute().use { resp ->
                 if (!resp.isSuccessful) return@withContext null
                 val body = resp.body ?: return@withContext null
                 val total = if (r.size > 0) r.size else body.contentLength()
