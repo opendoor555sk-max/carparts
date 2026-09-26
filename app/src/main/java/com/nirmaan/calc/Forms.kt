@@ -96,7 +96,9 @@ fun Engine.hipForm(irr: Boolean) {
     val fields = mutableListOf(pitchField("pa", if (irr) "Pitch A (lambi deewar wali chhat)" else "Pitch", pitchDef()))
     if (irr) fields.add(pitchField("pb", "Pitch B (doosri deewar wali chhat)", pitchDef()))
     fields.add(Field("run", if (irr) "Common Run A (deewar A se ridge tak)" else "Common Run (deewar se ridge tak)", true, runDef))
-    ui.form(FormSpec(if (irr) "Irregular Hip / Valley" else "Hip / Valley Function", fields, null) { v, _ ->
+    ui.form(FormSpec(if (irr) "Irregular Hip / Valley" else "Hip / Valley Function", fields, listOf("Miter Saw", "Protractor")) { v, mode ->
+        val pr = mode == "Protractor"
+        fun cut(a: Double) = f2(if (pr) 90 - a else a) + "°"
         val pA = v["pa"] ?: Double.NaN
         val pB = if (irr) v["pb"] ?: Double.NaN else pA
         val run = v["run"] ?: Double.NaN
@@ -105,11 +107,11 @@ fun Engine.hipForm(irr: Boolean) {
         val g = hipGeo(pA, pB, run)
         val rows = mutableListOf(
             sec("Hip / Valley rafter"),
-            Row("Plumb Cut", f2(g.hipPitch) + "°"),
-            Row("Level Cut", f2(90 - g.hipPitch) + "°"),
-            Row(if (irr) "Cheek Cut A – saw bevel" else "Cheek Cut – saw bevel", f2(90 - g.planA) + "°")
+            Row("Plumb Cut", cut(g.hipPitch)),
+            Row("Level Cut", cut(90 - g.hipPitch)),
+            Row(if (irr) "Cheek Cut A – saw bevel" else "Cheek Cut – saw bevel", cut(90 - g.planA))
         )
-        if (irr) rows.add(Row("Cheek Cut B – saw bevel", f2(g.planA) + "°"))
+        if (irr) rows.add(Row("Cheek Cut B – saw bevel", cut(g.planA)))
         rows.add(Row(if (irr) "Hip Backing Angle A" else "Hip Backing Angle", f2(g.backA) + "°"))
         if (irr) rows.add(Row("Hip Backing Angle B", f2(g.backB) + "°"))
         rows.addAll(
@@ -432,20 +434,27 @@ fun Engine.balusterForm() {
         Field("run", "Run (do post ke beech)", true, lt(T["run"]?.v, "12'", "365")),
         Field("rk", "Rake angle (°) – seedha ho to 0", false, "0"),
         Field("w", "Baluster width", true, if (metric) "4" else "1-3/8\""),
-        Field("g", "Maximum khali jagah", true, if (metric) "10" else "4\"", "code: 4\" / 10 cm se kam")
-    ), null) { v, _ ->
+        Field("g", "Maximum khali jagah", true, if (metric) "10" else "4\"", "code: 4\" / 10 cm se kam"),
+        Field("cnt", "Kitne baluster (sirf Evenly Space ke liye)", false, "0")
+    ), listOf("Limit Opening", "Evenly Space", "Best Fit")) { v, mode ->
         val run = v["run"] ?: Double.NaN
         val w = v["w"] ?: Double.NaN
         val gm = v["g"] ?: Double.NaN
         val rk = (v["rk"] ?: 0.0).let { if (it.isFinite() && it >= 0 && it < 80) it else 0.0 }
         if (!ok(run, w, gm)) return@FormSpec bad("Run, width aur khali jagah daaliye")
-        val n = max(0, ceil((run - gm) / (w + gm) - 1e-9).toInt())
+        val cnt = (v["cnt"] ?: 0.0).let { if (it.isFinite() && it >= 1) it.toInt() else 0 }
+        val n = when {
+            mode == "Evenly Space" && cnt > 0 -> cnt
+            mode == "Best Fit" -> max(0, Math.round((run - gm) / (w + gm)).toInt())
+            else -> max(0, ceil((run - gm) / (w + gm) - 1e-9).toInt())
+        }
+        if (n * w >= run) return@FormSpec bad("Itne baluster is run mein nahi aayenge")
         val gap = (run - n * w) / (n + 1)
         val oc = gap + w
         val rows = mutableListOf(
             sec("Results"),
             Row("Balusters ki ginti", n.toString()),
-            Row("Asli khali jagah", fL(gap, 1, sm())),
+            Row("Asli khali jagah", fL(gap, 1, sm()), gap > gm + 1e-9),
             Row("Spacing (on-center)", fL(oc, 1, sm())),
             Row("Spacing rail par (rake ke saath)", fL(oc / cos(rk * D2R), 1, sm())),
             sec("Layout marks (centre, post se)")

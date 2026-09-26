@@ -969,14 +969,15 @@ class Engine(val ui: Ui) {
                     Field("hr", "Headroom", true, if (m) "203" else "6' 8\""),
                     Field("th", "Floor thickness (upar wala)", true, if (m) "25" else "10\""),
                     Field("bw", "Stringer board width (patiya)", true, if (m) "28" else "11-1/4\"", if (m) "cm mein" else "2x12 = 11-1/4\"")
-                ), null
-            ) { v, _ ->
+                ), listOf("Riser limit ON", "Riser limit OFF")
+            ) { v, lim ->
                 val rise = v["rise"] ?: Double.NaN
                 val run = v["run"] ?: Double.NaN
                 val dr = v["dr"] ?: Double.NaN
                 val dt = v["dt"] ?: Double.NaN
                 if (!(rise > 0) || !(dr > 0) || !(dt > 0)) return@FormSpec listOf(Row("Rise, Riser aur Tread daaliye", "—"))
-                val n = ceil(rise / dr - 1e-9).toInt()
+                // ON: riser kabhi desired se uncha nahi; OFF: desired ke sabse nazdeek
+                val n = if (lim == "Riser limit OFF") max(1, Math.round(rise / dr).toInt()) else ceil(rise / dr - 1e-9).toInt()
                 if (n > 60) return@FormSpec listOf(Row("Bahut zyada steps — values check karein", "—", true))
                 val ur = rise / n
                 val tr = n - 1
