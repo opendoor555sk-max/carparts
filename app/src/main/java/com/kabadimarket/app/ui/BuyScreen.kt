@@ -426,7 +426,7 @@ fun BuyScreen(user: User, nav: Nav, routePn: String) {
                                     } catch (e: ApiException) {
                                         if (e.code == "NO_KEY") {
                                             Toast.error(t("buy.noGoogleKey"))
-                                            nav.open(Route.Soon("admin.toolSearchSetup"))
+                                            nav.open(Route.SearchSetup)
                                         } else Toast.error(e.message ?: t("buy.searchFailed"))
                                     } finally {
                                         line.searching = false

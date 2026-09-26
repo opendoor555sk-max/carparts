@@ -200,7 +200,6 @@ private data class Module(
     val route: (Nav) -> Unit,
 )
 
-private fun soon(nav: Nav, key: String) = nav.open(Route.Soon(key))
 
 private val MODULES = listOf(
     Module("search", "Find part", Icons.Filled.Search, C.Muted, "search") { it.open(Route.Scan("search")) },
@@ -215,7 +214,7 @@ private val MODULES = listOf(
     Module("quotations", "Grahak ne bhav aapo", Icons.Filled.Description, C.Brand, "sell") { it.open(Route.Quotations) },
     Module("stock-transfer", "Store thi store stock mokalo", Icons.Filled.SwapHoriz, C.Muted, superAdminOnly = true) { it.open(Route.StockTransfer) },
     Module("reservations", "Grahak mate stock rakho", Icons.Filled.Lock, C.Amber, "sell") { it.open(Route.Reservations) },
-    Module("audit-log", "Kone shu badalyu", Icons.Filled.History, C.Muted, adminOnly = true) { soon(it, "module.audit-log") },
+    Module("audit-log", "Kone shu badalyu", Icons.Filled.History, C.Muted, adminOnly = true) { it.open(Route.AuditLog) },
     Module("tools", "Admin utilities", Icons.Filled.Build, C.Brand) { it.open(Route.Tools) },
     Module("arrange", "Place bought stock", Icons.Filled.LocationOn, C.Muted, "buy", wide = true) { it.open(Route.StoreArrangement) },
 )
@@ -329,7 +328,7 @@ private fun HomeTab(user: User, nav: Nav, onLogout: () -> Unit) {
                 Spacer(Modifier.height(24.dp))
                 SectionTitle(I18n.x("sticker.printing"))
                 LinkRow(Icons.Filled.DocumentScanner, I18n.x("sticker.title"), I18n.x("sticker.sub")) {
-                    nav.open(Route.Soon("sticker.title"))
+                    nav.open(Route.StickerScanner)
                 }
             }
             Spacer(Modifier.height(32.dp))
@@ -602,7 +601,7 @@ private fun AdminTab(user: User, nav: Nav, onLogout: () -> Unit) {
                     add(Stat(t("admin.statInStock"), s.int("in_stock_units"), C.Green, Icons.Filled.Inventory2) { nav.open(Route.Inventory) })
                     if (user.isAdmin) add(Stat(t("admin.statSold"), s.int("sold_units"), C.Muted, Icons.Filled.Payments) { nav.open(Route.Report("sell")) })
                     add(Stat(t("admin.statPendingNeeds"), s.int("pending_requirements"), C.Amber, Icons.Filled.Checklist) { nav.open(Route.Requirements) })
-                    add(Stat(t("admin.statAiPending"), s.int("pending_ai"), C.Amber, Icons.Filled.AutoAwesome) { soon(nav, "admin.toolAiApprovals") })
+                    add(Stat(t("admin.statAiPending"), s.int("pending_ai"), C.Amber, Icons.Filled.AutoAwesome) { nav.open(Route.AiApprovals) })
                     add(Stat(t("admin.statVerified"), s.int("verified_parts"), C.Green, Icons.Filled.Verified) { nav.open(Route.Report("stock")) })
                 }
                 FlowRow(
@@ -633,11 +632,11 @@ private fun AdminTab(user: User, nav: Nav, onLogout: () -> Unit) {
             SectionTitle(t("admin.management"))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (user.isSuperAdmin) {
-                    LinkRow(Icons.Filled.Business, t("stores.title"), t("admin.linkAllStoresSub")) { soon(nav, "stores.title") }
-                    LinkRow(Icons.Filled.LocationOn, t("admin.linkGpsTitle"), t("admin.linkGpsSub"), C.Green) { soon(nav, "admin.linkGpsTitle") }
+                    LinkRow(Icons.Filled.Business, t("stores.title"), t("admin.linkAllStoresSub")) { nav.open(Route.Stores) }
+                    LinkRow(Icons.Filled.LocationOn, t("admin.linkGpsTitle"), t("admin.linkGpsSub"), C.Green) { nav.open(Route.AdminGps) }
                 }
                 if (user.isOwner) {
-                    LinkRow(Icons.Filled.Public, t("ownerPanel.title"), t("admin.linkOwnerPanelSub"), C.Red) { soon(nav, "ownerPanel.title") }
+                    LinkRow(Icons.Filled.Public, t("ownerPanel.title"), t("admin.linkOwnerPanelSub"), C.Red) { nav.open(Route.OwnerPanel) }
                 }
                 if (user.isAdmin) {
                     LinkRow(
@@ -648,10 +647,10 @@ private fun AdminTab(user: User, nav: Nav, onLogout: () -> Unit) {
                     }
                 }
                 if (user.can("manage_users")) {
-                    LinkRow(Icons.Filled.People, t("users.title"), t("admin.linkManageUsersSub")) { soon(nav, "users.title") }
+                    LinkRow(Icons.Filled.People, t("users.title"), t("admin.linkManageUsersSub")) { nav.open(Route.Users) }
                 }
                 if (user.isStoreAdmin) {
-                    LinkRow(Icons.Filled.CloudDownload, t("backup.title"), t("admin.linkBackupSub")) { soon(nav, "backup.title") }
+                    LinkRow(Icons.Filled.CloudDownload, t("backup.title"), t("admin.linkBackupSub")) { nav.open(Route.Backup) }
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -685,7 +684,7 @@ private fun AdminTab(user: User, nav: Nav, onLogout: () -> Unit) {
             Spacer(Modifier.height(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (user.isStoreAdmin) {
-                    LinkRow(Icons.Filled.Storefront, t("admin.linkStoreProfileTitle"), t("admin.linkStoreProfileSub")) { soon(nav, "admin.linkStoreProfileTitle") }
+                    LinkRow(Icons.Filled.Storefront, t("admin.linkStoreProfileTitle"), t("admin.linkStoreProfileSub")) { nav.open(Route.StoreProfile) }
                 }
                 LinkRow(Icons.Filled.Key, t("admin.linkMyPasswordTitle"), t("admin.linkMyPasswordSub")) { nav.open(Route.ChangePassword) }
                 val scope2 = rememberCoroutineScope()

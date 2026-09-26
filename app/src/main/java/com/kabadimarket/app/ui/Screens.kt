@@ -122,14 +122,14 @@ fun SoonScreen(nav: Nav, titleKey: String) {
 fun ToolsScreen(user: User, nav: Nav) {
     data class Tool(val title: String, val sub: String, val icon: ImageVector, val perm: String?, val go: () -> Unit)
     val tools = listOf(
-        Tool("admin.toolAiApprovals", "admin.linkAiApprovalsSub", Icons.Filled.AutoAwesome, "ai_approve") { nav.open(Route.Soon("admin.toolAiApprovals")) },
-        Tool("admin.toolSearchSetup", "admin.linkGoogleSearchSub", Icons.Filled.Key, "search") { nav.open(Route.Soon("admin.toolSearchSetup")) },
+        Tool("admin.toolAiApprovals", "admin.linkAiApprovalsSub", Icons.Filled.AutoAwesome, "ai_approve") { nav.open(Route.AiApprovals) },
+        Tool("admin.toolSearchSetup", "admin.linkGoogleSearchSub", Icons.Filled.Key, "search") { nav.open(Route.SearchSetup) },
         Tool("admin.toolBuyLimit", "admin.linkPurchaseLimitsSub", Icons.Filled.Speed, "manage_limits") { nav.open(Route.Limits) },
-        Tool("admin.toolDemand", "admin.linkDemandSearchSub", Icons.Filled.TrendingUp, "view_stats") { nav.open(Route.Soon("admin.toolDemand")) },
+        Tool("admin.toolDemand", "admin.linkDemandSearchSub", Icons.Filled.TrendingUp, "view_stats") { nav.open(Route.Demand) },
         Tool("admin.toolStockVerify", "admin.linkStockVerifySub", Icons.Filled.Assignment, null) { nav.open(Route.StockVerify) },
-        Tool("admin.toolUnlinked", "admin.linkUnlinkedStockSub", Icons.Filled.Warning, null) { nav.open(Route.Soon("admin.toolUnlinked")) },
-        Tool("admin.toolPsHistory", "admin.toolBulkDelete", Icons.Filled.Receipt, null) { nav.open(Route.Soon("admin.toolPsHistory")) },
-        Tool("admin.toolSearchLogs", "admin.linkSearchLogsSub", Icons.Filled.History, null) { nav.open(Route.Soon("admin.toolSearchLogs")) },
+        Tool("admin.toolUnlinked", "admin.linkUnlinkedStockSub", Icons.Filled.Warning, null) { nav.open(Route.UnlinkedStock) },
+        Tool("admin.toolPsHistory", "admin.toolBulkDelete", Icons.Filled.Receipt, null) { nav.open(Route.History) },
+        Tool("admin.toolSearchLogs", "admin.linkSearchLogsSub", Icons.Filled.History, null) { nav.open(Route.SearchLogs) },
     ).filter { if (it.perm != null) user.can(it.perm) else user.isAdmin }
 
     Screen {

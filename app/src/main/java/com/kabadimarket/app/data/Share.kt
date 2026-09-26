@@ -23,6 +23,12 @@ object Share {
         }
     }
 
+    /** WhatsApp chat with a specific number (old app: wa.me link). */
+    fun waMe(context: Context, text: String, phone: String) {
+        val digits = phone.filter { it.isDigit() }
+        openUrl(context, "https://wa.me/$digits?text=" + Uri.encode(text))
+    }
+
     /** Saves a downloaded file (e.g. Excel) and opens the share menu for it. */
     fun file(context: Context, bytes: ByteArray, fileName: String, mime: String) {
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }

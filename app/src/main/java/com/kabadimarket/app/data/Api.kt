@@ -47,6 +47,9 @@ object Api {
     /** Called when the server says the login is no longer valid. */
     var onUnauthorized: (() -> Unit)? = null
 
+    /** Called when the store is locked by the platform owner: (message, contact). */
+    var onStoreLocked: ((String, String) -> Unit)? = null
+
     suspend fun get(path: String, query: Map<String, String?> = emptyMap()): Any =
         call("GET", path, query, null)
 
@@ -56,8 +59,8 @@ object Api {
     suspend fun patch(path: String, body: JSONObject, query: Map<String, String?> = emptyMap()): Any =
         call("PATCH", path, query, body)
 
-    suspend fun delete(path: String, query: Map<String, String?> = emptyMap()): Any =
-        call("DELETE", path, query, null)
+    suspend fun delete(path: String, query: Map<String, String?> = emptyMap(), body: JSONObject? = null): Any =
+        call("DELETE", path, query, body)
 
     suspend fun getObj(path: String, query: Map<String, String?> = emptyMap()): JSONObject =
         get(path, query) as? JSONObject ?: JSONObject()
@@ -154,6 +157,10 @@ object Api {
 
     private fun handleError(status: Int, text: String): ApiException {
         val err = parseError(status, text)
+        if (err.code == "store_locked") {
+            val contact = err.detail?.str("contact") ?: ""
+            Handler(Looper.getMainLooper()).post { onStoreLocked?.invoke(err.message ?: "", contact) }
+        }
         if (status == 401 && token != null) {
             Handler(Looper.getMainLooper()).post { onUnauthorized?.invoke() }
         }

@@ -88,7 +88,7 @@ fun SplashScreen() {
 }
 
 @Composable
-fun LoginScreen(onLoggedIn: (User) -> Unit) {
+fun LoginScreen(onLoggedIn: (User) -> Unit, onSignUp: () -> Unit = {}) {
     var username by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var showPw by remember { mutableStateOf(false) }
@@ -187,7 +187,7 @@ fun LoginScreen(onLoggedIn: (User) -> Unit) {
             Spacer(Modifier.height(12.dp))
             BigButton(
                 t("login.createStore"),
-                onClick = { Toast.show(I18n.x("soon.title")) },
+                onClick = onSignUp,
                 outlined = true,
                 icon = Icons.Filled.Storefront,
             )

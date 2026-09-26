@@ -117,6 +117,21 @@ sealed interface Route {
     data class Vendor(val id: String) : Route
     data class PartsList(val category: String) : Route
     data object ChangePassword : Route
+    data object AuditLog : Route
+    data object AiApprovals : Route
+    data object Stores : Route
+    data class StoreDetail(val id: String, val name: String) : Route
+    data object SearchSetup : Route
+    data object UnlinkedStock : Route
+    data object SearchLogs : Route
+    data object StoreProfile : Route
+    data object History : Route
+    data object Backup : Route
+    data object Demand : Route
+    data object AdminGps : Route
+    data object Users : Route
+    data object OwnerPanel : Route
+    data object StickerScanner : Route
 
     /** A section of the old app that is not rebuilt yet. */
     data class Soon(val title: String) : Route
@@ -170,6 +185,8 @@ fun App() {
     var user by remember { mutableStateOf(Session.user) }
     var splash by rememberSaveable { mutableStateOf(true) }
     val nav = remember { Nav() }
+    var signUp by rememberSaveable { mutableStateOf(false) }
+    var locked by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     LaunchedEffect(Unit) {
         delay(1700)
@@ -181,7 +198,11 @@ fun App() {
             Session.clear()
             user = null
         }
-        onDispose { Api.onUnauthorized = null }
+        Api.onStoreLocked = { locked = it }
+        onDispose {
+            Api.onUnauthorized = null
+            Api.onStoreLocked = null
+        }
     }
 
     val logout = {
@@ -192,6 +213,8 @@ fun App() {
 
     val stage = when {
         splash -> 0
+        locked != null -> 4
+        user == null && signUp -> 3
         user == null -> 1
         else -> 2
     }
@@ -201,6 +224,17 @@ fun App() {
             1 -> LoginScreen(onLoggedIn = {
                 nav.home()
                 user = it
+            }, onSignUp = { signUp = true })
+            3 -> com.kabadimarket.app.ui.SignUpScreen(onBackToLogin = { signUp = false }, onDone = {
+                signUp = false
+                nav.home()
+                user = it
+            })
+            4 -> com.kabadimarket.app.ui.StoreLockedScreen(locked?.first ?: "", locked?.second ?: "", onBackToLogin = {
+                locked = null
+                Session.clear()
+                nav.home()
+                user = null
             })
             else -> user?.let { u -> MainArea(u, nav, logout) }
         }
@@ -274,6 +308,21 @@ private fun Screen(u: User, nav: Nav, r: Route, logout: () -> Unit) {
         is Route.Vendor -> VendorDetailScreen(u, nav, r.id)
         is Route.PartsList -> PartsListScreen(u, nav, r.category)
         Route.ChangePassword -> ChangePasswordScreen(nav)
+        Route.AuditLog -> com.kabadimarket.app.ui.AuditLogScreen(nav)
+        Route.AiApprovals -> com.kabadimarket.app.ui.AiApprovalsScreen(u, nav)
+        Route.Stores -> com.kabadimarket.app.ui.StoresScreen(nav)
+        is Route.StoreDetail -> com.kabadimarket.app.ui.StoreDetailScreen(nav, r.id, r.name)
+        Route.SearchSetup -> com.kabadimarket.app.ui.SearchSetupScreen(nav)
+        Route.UnlinkedStock -> com.kabadimarket.app.ui.UnlinkedStockScreen(nav)
+        Route.SearchLogs -> com.kabadimarket.app.ui.SearchLogsScreen(nav)
+        Route.StoreProfile -> com.kabadimarket.app.ui.StoreProfileScreen(nav)
+        Route.History -> com.kabadimarket.app.ui.HistoryScreen(u, nav)
+        Route.Backup -> com.kabadimarket.app.ui.BackupScreen(nav)
+        Route.Demand -> com.kabadimarket.app.ui.DemandScreen(nav)
+        Route.AdminGps -> com.kabadimarket.app.ui.AdminGpsScreen(nav)
+        Route.Users -> com.kabadimarket.app.ui.UsersScreen(nav)
+        Route.OwnerPanel -> com.kabadimarket.app.ui.OwnerPanelScreen(u, nav)
+        Route.StickerScanner -> com.kabadimarket.app.ui.StickerScannerScreen(u, nav)
         is Route.Soon -> SoonScreen(nav, r.title)
     }
 }
