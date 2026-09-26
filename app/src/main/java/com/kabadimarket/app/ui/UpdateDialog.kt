@@ -33,30 +33,58 @@ import com.kabadimarket.app.data.Updater
 import kotlinx.coroutines.launch
 import java.io.File
 
-private fun ux(gu: String, hi: String, en: String) = when (I18n.lang) {
+internal fun ux(gu: String, hi: String, en: String) = when (I18n.lang) {
     "gu" -> gu
     "hi" -> hi
     else -> en
 }
 
-/** Checks for a new version once per app start and offers a one-tap update (OTA). */
+/** Shared update state, so the Admin screen can also start a check. */
+object UpdateState {
+    var release by mutableStateOf<Updater.Release?>(null)
+    var dismissed by mutableStateOf(false)
+    var lastCheck = 0L
+
+    /** Checks GitHub now. manual = true shows a message when already up to date. */
+    suspend fun checkNow(manual: Boolean) {
+        lastCheck = System.currentTimeMillis()
+        val r = Updater.check()
+        if (r != null) {
+            release = r
+            dismissed = false
+        } else if (manual) {
+            Toast.success(ux("તમે નવીનતમ વર્ઝન પર છો ✓", "आप नवीनतम वर्ज़न पर हैं ✓", "You are on the latest version ✓"))
+        }
+    }
+}
+
+/** Checks for a new version when the app opens / comes back, and offers a one-tap update (OTA). */
 @Composable
 fun UpdateChecker() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var release by remember { mutableStateOf<Updater.Release?>(null) }
-    var dismissed by rememberSaveable { mutableStateOf(false) }
     var downloading by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
     var file by remember { mutableStateOf<File?>(null) }
     var failed by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        if (!dismissed) release = Updater.check()
+    // Check on start, and again whenever the app comes back to the screen (max every 15 min).
+    @Suppress("DEPRECATION")
+    val owner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(owner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME &&
+                System.currentTimeMillis() - UpdateState.lastCheck > 15 * 60 * 1000L
+            ) {
+                scope.launch { UpdateState.checkNow(false) }
+            }
+        }
+        owner.lifecycle.addObserver(obs)
+        onDispose { owner.lifecycle.removeObserver(obs) }
     }
 
-    val r = release ?: return
-    if (dismissed) return
+    val r = UpdateState.release ?: return
+    if (UpdateState.dismissed) return
     val anim by animateFloatAsState(progress, label = "dl")
 
     fun installNow(f: File) {
@@ -68,7 +96,7 @@ fun UpdateChecker() {
     }
 
     AlertDialog(
-        onDismissRequest = { if (!downloading) dismissed = true },
+        onDismissRequest = { if (!downloading) UpdateState.dismissed = true },
         icon = { Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = C.Brand, modifier = Modifier.size(36.dp)) },
         title = { Text(ux("નવું અપડેટ આવ્યું છે", "नया अपडेट आया है", "New update available"), fontWeight = FontWeight.Bold) },
         text = {
@@ -123,7 +151,7 @@ fun UpdateChecker() {
             }
         },
         dismissButton = {
-            if (!downloading) TextButton(onClick = { dismissed = true }) { Text(ux("પછી", "बाद में", "Later")) }
+            if (!downloading) TextButton(onClick = { UpdateState.dismissed = true }) { Text(ux("પછી", "बाद में", "Later")) }
         },
     )
 }

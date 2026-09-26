@@ -688,6 +688,13 @@ private fun AdminTab(user: User, nav: Nav, onLogout: () -> Unit) {
                     LinkRow(Icons.Filled.Storefront, t("admin.linkStoreProfileTitle"), t("admin.linkStoreProfileSub")) { soon(nav, "admin.linkStoreProfileTitle") }
                 }
                 LinkRow(Icons.Filled.Key, t("admin.linkMyPasswordTitle"), t("admin.linkMyPasswordSub")) { nav.open(Route.ChangePassword) }
+                val scope2 = rememberCoroutineScope()
+                LinkRow(
+                    Icons.Filled.CloudDownload,
+                    ux("એપ અપડેટ તપાસો", "ऐप अपडेट जांचें", "Check for app update"),
+                    "v${com.kabadimarket.app.BuildConfig.VERSION_NAME}",
+                    C.Green,
+                ) { scope2.launch { UpdateState.checkNow(true) } }
             }
             if (!user.isStoreAdmin) {
                 Spacer(Modifier.height(12.dp))
