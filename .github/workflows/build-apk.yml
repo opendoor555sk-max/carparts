@@ -31,7 +31,7 @@ jobs:
       - name: Show build errors
         if: failure()
         run: |
-          grep -E "^e: |error:|What went wrong|Could not|Unresolved|> " build.log | head -60 | while IFS= read -r line; do
+          { grep -E "^e: " build.log; grep -E "What went wrong|Could not|error:" build.log | grep -v "^e: "; } | head -60 | while IFS= read -r line; do
             echo "::error::${line}"
           done
 
