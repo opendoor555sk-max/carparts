@@ -41,6 +41,7 @@ class StairView(ctx: Context, private val p: StairPlan) : View(ctx) {
         val ut = p.ut
         val bw = p.bw
         if (n < 1 || ur <= 0 || ut <= 0) return
+        if (p.finished) return drawFinished(c)
         val th = atan2(ur, ut)
         val m = ur / ut
         val xEnd = (n - 1) * ut
@@ -116,5 +117,76 @@ class StairView(ctx: Context, private val p: StairPlan) : View(ctx) {
             y -= info.textSize * 1.3f
         }
         c.drawText("Stringer Layout", W - pad, y - sp(2f), title)
+    }
+
+    /** Finished staircase: floor, landing, stringer (dropped by tread thickness), tread + riser boards. */
+    private fun drawFinished(c: Canvas) {
+        val n = p.n
+        val ur = p.ur
+        val ut = p.ut
+        val tt = p.tt
+        val nose = p.nose
+        val rt = p.rt
+        val bw = p.bw
+        val th = atan2(ur, ut)
+        val m = ur / ut
+        val xEnd = (n - 1) * ut
+        val top = n * ur
+        val drop = bw / cos(th)
+        val xb = (drop - ur) / m
+        val xmin = min(-ut, xb) - 0.3 * ut
+        val xmax = xEnd + 1.6 * ut
+        val ymin = -0.12 * top
+        val ymax = top * 1.06
+        val pad = dp(10f)
+        val W = width.toFloat()
+        val H = height.toFloat()
+        val s = min((W - 2 * pad) / (xmax - xmin), (H - 2 * pad) / (ymax - ymin)).toFloat()
+        val ox = pad + ((W - 2 * pad) - (xmax - xmin).toFloat() * s) / 2
+        fun X(x: Double) = ox + ((x - xmin) * s).toFloat()
+        fun Y(y: Double) = H - pad - ((y - ymin) * s).toFloat()
+        val board = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0xB9, 0x7A, 0x3C); style = Paint.Style.FILL }
+        val riser = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0xF3, 0xE2, 0xC3); style = Paint.Style.FILL }
+        val pale = Paint(wood).apply { alpha = 150 }
+
+        c.drawRect(X(xmin), Y(0.0), X(xmax), Y(ymin), floor)
+        c.drawRect(X(xEnd), Y(top), X(xmax), Y(top - max(0.6 * ur, bw * 0.8)), floor)
+
+        // stringer, lowered by the tread thickness so finished treads land on the step heights
+        val path = Path()
+        path.moveTo(X(xb), Y(0.0))
+        path.lineTo(X(0.0), Y(0.0))
+        for (k in 1..n) {
+            path.lineTo(X((k - 1) * ut), Y(k * ur - tt))
+            if (k < n) path.lineTo(X(k * ut), Y(k * ur - tt))
+        }
+        path.lineTo(X(xEnd), Y(m * xEnd + ur - drop - tt))
+        path.close()
+        c.drawPath(path, pale)
+        c.drawPath(path, line)
+
+        for (k in 1..n) {
+            // riser board in front of each step face
+            val rx = (k - 1) * ut
+            c.drawRect(X(rx - rt), Y(k * ur - tt), X(rx), Y((k - 1) * ur), riser)
+            c.drawRect(X(rx - rt), Y(k * ur - tt), X(rx), Y((k - 1) * ur), line)
+            if (k < n) {
+                // tread board with nosing over the riser
+                c.drawRect(X(rx - rt - nose), Y(k * ur), X(k * ut), Y(k * ur - tt), board)
+                c.drawRect(X(rx - rt - nose), Y(k * ur), X(k * ut), Y(k * ur - tt), line)
+            }
+        }
+        // step numbers
+        val num = Paint(dimTxt).apply { textAlign = Paint.Align.CENTER }
+        for (k in 1 until n) c.drawText(k.toString(), X((k - 0.5) * ut), Y(k * ur) - dp(3f), num)
+
+        info.textAlign = Paint.Align.RIGHT
+        title.textAlign = Paint.Align.RIGHT
+        var y = Y(0.0) - dp(6f)
+        for (t in p.info.reversed()) {
+            c.drawText(t, W - pad, y, info)
+            y -= info.textSize * 1.3f
+        }
+        c.drawText("Finished Layout", W - pad, y - sp(2f), title)
     }
 }

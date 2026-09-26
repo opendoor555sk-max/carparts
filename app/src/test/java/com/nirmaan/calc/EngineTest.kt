@@ -58,8 +58,9 @@ class EngineTest {
         assertEquals("19ft 2- 1/2in", k("1 2 Feet Rise 1 5 Feet Run Diag"))
         k("Diag")
         assertEquals("Common Rafter", ui.title)
-        assertEquals("38.66°", ui.value("Pitch (angle)"))
-        assertEquals("9- 5/8in", ui.value("Pitch (inch per 12\")"))
+        val r = formRows(mapOf("ridge" to "0", "oh" to "0", "seat" to "0"))
+        assertEquals("38.66°  (9-5/8/12)", r.v("Pitch"))
+        assertEquals("19ft 2- 1/2in", r.v("Diagonal (line length)"))
     }
 
     @Test fun pitchFromRiseRun() = assertEquals("16in", k("8 Feet Rise 6 Feet Run Pitch"))
@@ -74,7 +75,8 @@ class EngineTest {
 
     @Test fun qtyOnCenter() {
         k("2 2 Feet 8 Inches 3 / 4 ^qty@oc")
-        assertEquals("19 pieces", ui.value("@ 16in on-center"))
+        assertEquals("19 pieces", formRows().v("@ 16in on-center"))
+        assertEquals("15 pieces", formRows(mapOf("sp" to "19-1/2\"")).v("@ 19- 1/2in on-center"))
     }
 
     @Test fun room() {
@@ -129,11 +131,13 @@ class EngineTest {
 
     private fun formRows(vals: Map<String, String>? = null, seg: String? = null): List<Row> {
         val sp = ui.spec!!
-        val v = sp.fields.associate { f ->
+        val v = HashMap<String, Double>()
+        sp.fields.forEach { f ->
             val t = vals?.get(f.key) ?: f.value
-            f.key to (if (f.isPitch) e.parsePitch(t) else if (f.isLen) e.parseLen(t) else (t.toDoubleOrNull() ?: Double.NaN))
+            if (f.isSize) e.parseSize(t)?.let { v[f.key + "_a"] = it.first; v[f.key + "_b"] = it.second }
+            else v[f.key] = if (f.isPitch) e.parsePitch(t) else if (f.isLen) e.parseLen(t) else (t.toDoubleOrNull() ?: Double.NaN)
         }
-        return sp.compute(v, seg ?: sp.seg?.firstOrNull())
+        return sp.compute(v, seg ?: sp.seg?.getOrNull(sp.segSel))
     }
 
     private fun List<Row>.v(label: String) = first { !it.section && it.label == label }.value
@@ -215,9 +219,82 @@ class EngineTest {
         assertEquals("1073.31ft²", r.v("Roof area (chhajje ke saath)"))
     }
 
-    @Test fun cost() {
-        k("1 0 ^Cost")
+    @Test fun costForm() {
+        k("C ^Cost")
         val r = formRows(mapOf("q" to "10", "r" to "50", "g" to "18"))
         assertEquals("₹ 590.00", r.v("Kul"))
     }
+
+    @Test fun costKeys() {
+        assertEquals("₹ 1,107.00", k("9 Yards Yards Yards × 1 2 3 ^Cost"))
+        assertEquals("₹ 23.07", k("C 5 6 ^BdFt × 4 1 2 ^Cost"))
+        assertEquals("₹ 1,500.00", k("C 5 0 0 ^Cost × 3 ="))
+    }
+
+    @Test fun densityConversions() {
+        assertEquals("14968.5482kg", k("1 1 Yards Yards Yards ^kg"))
+        assertEquals("22.5ft³", k("C 1 . 2 5 ^Tons Feet"))
+        assertEquals("16.5tons", k("C 1 1 Yards Yards Yards ^Tons"))
+        assertEquals("50.1751bf", k("C 4 m × 3 7 ^cm × 8 ^cm = ^BdFt"))
+    }
+
+    @Test fun wtVolMemory() {
+        assertEquals("1600T/yd³", k("1 6 0 0 Store 0"))
+        k("Store 0"); k("Store 0"); k("Store 0")
+        assertEquals("1600kg/m³", k("Store 0"))
+        assertEquals("1.348444T/yd³", k("C Recall 0"))
+        assertTrue(k("Recall 0").startsWith("2696.88"))
+    }
+
+    @Test fun dmsCycle() {
+        assertEquals("23.28°", k("2 3 . 1 6 . 4 5 ^dms⇄deg"))
+        assertEquals("5- 3/16in", k("^dms⇄deg"))
+        assertTrue(k("^dms⇄deg").startsWith("43.02"))
+        assertEquals("0.430237", k("^dms⇄deg"))
+        assertEquals("0.406298", k("^dms⇄deg"))
+    }
+
+    @Test fun meterCycle() {
+        assertEquals("1.4224m", k("5 6 Inches m"))
+        assertEquals("142.24cm", k("m"))
+        assertEquals("1422.4mm", k("m"))
+    }
+
+    @Test fun arcRiseRun() {
+        k("2 m Circle 2 0 Arc")
+        assertEquals("0.3473m", k("Run"))
+        assertEquals("0.0152m", k("Rise"))
+    }
+
+    @Test fun arcDiameter() = assertEquals("24ft 8in", k("6 Feet 2 Inches Rise 1 2 0 Arc Circle"))
+
+    @Test fun rafterForm() {
+        k("1 2 Feet Run 7 Inches 1 / 2 Pitch Diag")
+        k("Diag")
+        assertEquals("Common Rafter", ui.title)
+        val r = formRows(mapOf("ridge" to "0", "oh" to "0", "seat" to "0"))
+        assertEquals("14ft 1- 13/16in", r.v("Kul rafter length"))
+    }
+
+    @Test fun jackMating() {
+        k("^IrJack")
+        val r = formRows(mapOf("pa" to "45", "pb" to "30", "run" to "10'", "sp" to "16\""), "Chhote se shuru|Mating (hip par milte)")
+        assertTrue(r.any { it.section && it.label == "Side B jacks (mating)" })
+    }
+
+    @Test fun drywallSizes() {
+        k("4 8 Feet Length 9 Feet 6 Inches Height ^Drywall")
+        val r = formRows(mapOf("cs" to "100x200"), "Deewar L×H")
+        e.metric = false
+        assertTrue(r.any { it.label.startsWith("4'×12'") })
+    }
+
+    @Test fun moneyGroup() = assertEquals("₹ 12,34,567.50", e.money(1234567.5))
+
+    @Test fun fracKey() {
+        k("2 5 9 Inches 3 / 1 6")
+        pressLabel("Conv"); pressLabel("Frac")
+        assertEquals(32, e.res)
+    }
+
 }

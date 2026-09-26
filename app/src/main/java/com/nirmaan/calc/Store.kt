@@ -42,6 +42,9 @@ object Store {
             val t = JSONObject(); e.T.forEach { (k, v) -> if (v.v.isFinite()) t.put(k, mj(v)) }; o.put("T", t)
             val g = JSONObject(); e.G.forEach { (k, v) -> if (v.v.isFinite()) g.put(k, mj(v)) }; o.put("G", g)
             val tp = JSONArray(); e.tape.takeLast(100).forEach { tp.put(it) }; o.put("tape", tp)
+            o.put("lbsPerTon", e.lbsPerTon).put("haptic", e.haptic).put("thousands", e.thousands)
+                .put("fracConst", e.fracConst).put("dens", e.dens)
+            val sv = JSONArray(); e.saved.forEach { (l, t) -> sv.put(JSONObject().put("l", l).put("t", t)) }; o.put("saved", sv)
             ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY, o.toString()).apply()
         } catch (_: Exception) {
         }
@@ -61,6 +64,14 @@ object Store {
             o.optJSONObject("T")?.let { m -> m.keys().forEach { k -> e.T[k] = jm(m.getJSONObject(k)) } }
             o.optJSONObject("G")?.let { m -> m.keys().forEach { k -> e.G[k] = jm(m.getJSONObject(k)) } }
             o.optJSONArray("tape")?.let { a -> for (i in 0 until a.length()) e.tape.add(a.getString(i)) }
+            e.lbsPerTon = o.optDouble("lbsPerTon", 2000.0)
+            e.haptic = o.optBoolean("haptic", true)
+            e.thousands = o.optBoolean("thousands", false)
+            e.fracConst = o.optBoolean("fracConst", false)
+            if (o.has("dens")) e.dens = o.getDouble("dens")
+            o.optJSONArray("saved")?.let { a ->
+                for (i in 0 until a.length()) a.getJSONObject(i).let { x -> e.saved.add(x.optString("l") to x.optString("t")) }
+            }
         } catch (_: Exception) {
         }
     }

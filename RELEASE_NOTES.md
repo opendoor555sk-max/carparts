@@ -1,5 +1,12 @@
-Final options (manual ke hisaab se):
-- Hip/Valley: Miter Saw / Protractor dono ke angle
-- Baluster: Limit Opening / Evenly Space / Best Fit
-- Stair: Riser limit ON / OFF
-Saare 5 phase poore.
+Phase 6 – BuildCalc jaisa poora:
+- Cost ab calculator par: quantity × rate, Conv + 0 = ₹ total (board feet par rate per 1000 BF). Cost screen mein rate ka khana khali, seedha likhein.
+- wt/vol density memory (Store/Recall + 0) + wazan ↔ volume badlav (kg, lbs, tons, metric ton, Yards, Feet, m, board feet)
+- Board feet unit, m → cm → mm, Fraction 1/2–1/64 (Conv + /), DMS se pitch / % / radians
+- Common Rafter screen: ridge deduction, overhang, birdsmouth (seat, heel, HAP), kharidne wali lakdi
+- Arch framing studs, Arc se Rise/Run
+- Jack: chhote/bade se shuru + Mating; Rake Wall: base wall + order
+- Drywall, Masonry (tile/paver), Roof, Fence, Qty@oc: saari sizes ek saath + apni size
+- Footing: building ka perimeter (strip footing)
+- Stair: Simple/Advanced, Finished Layout drawing, overage/underage, sirf Run se seedhi
+- Hip: sheathing angle
+- Save results naam ke saath, button par long-press = madad, nayi Prefs (ton, 1,00,000 separator, vibration, fraction mode)

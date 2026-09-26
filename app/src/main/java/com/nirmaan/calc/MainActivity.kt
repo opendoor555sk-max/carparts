@@ -214,12 +214,21 @@ class MainActivity : Activity(), Ui {
                 keys.add(kv)
                 btn.setOnClickListener { v ->
                     if (swiped) return@setOnClickListener
-                    v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    if (eng.haptic) v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     v.animate().scaleX(0.92f).scaleY(0.92f).setDuration(45)
                         .withEndAction { v.animate().scaleX(1f).scaleY(1f).setDuration(90).start() }.start()
                     eng.press(r, col)
                     Store.save(this, eng)
                     render()
+                }
+                btn.setOnLongClickListener {
+                    val d = eng.keyDef(r, col)
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle(d.main)
+                        .setMessage(KeyHelp.text(d.main, d.conv, d.blue))
+                        .setPositiveButton("Theek hai", null)
+                        .show()
+                    true
                 }
                 attachSwipe(btn, r)
             }
@@ -355,7 +364,14 @@ class MainActivity : Activity(), Ui {
             setPadding(dpi(24f), dpi(10f), dpi(24f), dpi(10f))
             setOnClickListener { shareResults() }
         }
+        val save = TextView(this).apply {
+            text = "Save"; textSize = 17f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(c(0xFFFFA726), c(0xFFEF6C00))).apply { cornerRadius = dp(8f) }
+            setPadding(dpi(20f), dpi(10f), dpi(20f), dpi(10f))
+            setOnClickListener { saveResult() }
+        }
         foot.addView(share)
+        foot.addView(save, llp(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dpi(8f) })
         foot.addView(View(this), llp(0, 1, 1f))
         foot.addView(done)
         panelRoot.addView(foot, llp(MATCH_PARENT, WRAP_CONTENT))
@@ -384,6 +400,53 @@ class MainActivity : Activity(), Ui {
             else sb.append(r.label).append(": ").append(r.value).append("\n")
         }
         return sb.append("\n— Nirmaan Calc").toString()
+    }
+
+    private fun saveResult() {
+        val text = if (shareText.isNotEmpty()) shareText else return toast("Save karne ko kuch nahi")
+        val et = EditText(this).apply {
+            setText(panelTitle.text.toString() + " " + java.text.SimpleDateFormat("dd-MM HH:mm", java.util.Locale.US).format(java.util.Date()))
+            setSelectAllOnFocus(true)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Naam dein (jaise: Ramesh bhai ki seedhi)")
+            .setView(et)
+            .setPositiveButton("Save") { _, _ ->
+                eng.saved.add(0, et.text.toString().ifBlank { panelTitle.text.toString() } to text)
+                while (eng.saved.size > 200) eng.saved.removeAt(eng.saved.size - 1)
+                Store.save(this, eng)
+                toast("Save ho gaya")
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun savedPanel() {
+        openPanel("Saved results (" + eng.saved.size + ")")
+        if (eng.saved.isEmpty()) {
+            panelBody.addView(rowView(Row("Abhi kuch save nahi hai. Kisi result screen par neeche Save dabayein.")))
+            return
+        }
+        eng.saved.forEachIndexed { i, (lbl, txt) ->
+            val v = rowView(Row(lbl, txt.lineSequence().drop(1).firstOrNull { it.isNotBlank() && !it.startsWith("—") } ?: ""))
+            v.isClickable = true
+            v.setOnClickListener {
+                openPanel(lbl)
+                panelBody.addView(TextView(this).apply {
+                    text = txt; textSize = 15f; setTextColor(c(0xFF222222)); setTextIsSelectable(true)
+                    setPadding(dpi(12f), dpi(10f), dpi(12f), dpi(10f))
+                })
+                shareText = txt
+            }
+            v.setOnLongClickListener {
+                AlertDialog.Builder(this).setMessage("\"$lbl\" delete karein?")
+                    .setPositiveButton("Delete") { _, _ -> eng.saved.removeAt(i); Store.save(this, eng); savedPanel() }
+                    .setNegativeButton("Nahi", null).show()
+                true
+            }
+            panelBody.addView(v)
+        }
+        panelBody.addView(rowView(Row("Kholne ke liye tap, delete ke liye dabakar rakhein")))
     }
 
     private fun shareResults() {
@@ -452,7 +515,7 @@ class MainActivity : Activity(), Ui {
         }
         opts.forEachIndexed { i, o ->
             s.addView(TextView(this).apply {
-                text = o; textSize = 15f; gravity = Gravity.CENTER; maxLines = 1
+                text = o; textSize = if (opts.size > 3) 13f else 15f; gravity = Gravity.CENTER; maxLines = 2
                 setPadding(dpi(4f), dpi(10f), dpi(4f), dpi(10f))
                 if (i == sel) {
                     background = GradientDrawable().apply { setColor(c(0xFF777777)); cornerRadius = dp(7f) }
@@ -466,7 +529,8 @@ class MainActivity : Activity(), Ui {
 
     override fun form(spec: FormSpec) {
         openPanel(spec.title)
-        var segVal: String? = spec.seg?.firstOrNull()
+        var segVal: String? = spec.seg?.let { it.getOrNull(spec.segSel) ?: it.firstOrNull() }
+        var seg2Val: String? = spec.seg2?.firstOrNull()
         val out = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val inputs = LinkedHashMap<String, EditText>()
 
@@ -474,25 +538,39 @@ class MainActivity : Activity(), Ui {
             val vals = HashMap<String, Double>()
             spec.fields.forEach { f ->
                 val s = inputs.getValue(f.key).text.toString()
-                vals[f.key] = if (f.isPitch) eng.parsePitch(s) else if (f.isLen) eng.parseLen(s) else (s.trim().toDoubleOrNull() ?: Double.NaN)
+                if (f.isSize) {
+                    eng.parseSize(s)?.let { vals[f.key + "_a"] = it.first; vals[f.key + "_b"] = it.second }
+                } else {
+                    vals[f.key] = if (f.isPitch) eng.parsePitch(s) else if (f.isLen) eng.parseLen(s)
+                    else (s.trim().replace(",", ".").replace("₹", "").trim().toDoubleOrNull() ?: Double.NaN)
+                }
             }
             out.removeAllViews()
-            val rows = spec.compute(vals, segVal)
+            val combined = if (spec.seg2 != null) (segVal ?: "") + "|" + (seg2Val ?: "") else segVal
+            val rows = try { spec.compute(vals, combined) } catch (e: Exception) { listOf(Row("Values check karein", "—", true)) }
             rows.forEach { out.addView(rowView(it)) }
             val inp = spec.fields.map { Row(it.label, inputs.getValue(it.key).text.toString()) }
-            shareText = rowsText(spec.title, listOf(sec("Inputs")) + inp + (segVal?.let { listOf(Row("Option", it)) } ?: emptyList()) + rows)
+            val opt = listOfNotNull(segVal, seg2Val).joinToString(", ")
+            shareText = rowsText(spec.title, listOf(sec("Inputs")) + inp + (if (opt.isNotEmpty()) listOf(Row("Option", opt)) else emptyList()) + rows)
         }
 
-        spec.seg?.let { opts ->
-            val holder = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(8f))
+        val holder = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpi(12f), dpi(4f), dpi(12f), dpi(4f))
+        }
+        fun drawSegs() {
+            holder.removeAllViews()
+            spec.seg?.let { opts ->
+                holder.addView(seg(opts, opts.indexOf(segVal)) { i -> segVal = opts[i]; drawSegs(); recompute() },
+                    llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(4f) })
             }
-            fun draw() {
-                holder.removeAllViews()
-                holder.addView(seg(opts, opts.indexOf(segVal)) { i -> segVal = opts[i]; draw(); recompute() })
+            spec.seg2?.let { opts ->
+                holder.addView(seg(opts, opts.indexOf(seg2Val)) { i -> seg2Val = opts[i]; drawSegs(); recompute() },
+                    llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             }
-            draw()
+        }
+        if (spec.seg != null || spec.seg2 != null) {
+            drawSegs()
             panelBody.addView(holder)
         }
         panelBody.addView(secView("Input Parameters"))
@@ -507,8 +585,10 @@ class MainActivity : Activity(), Ui {
                 textSize = 22f
                 gravity = Gravity.END
                 setTextColor(c(0xFF1636D8))
-                inputType = if (f.isLen || f.isPitch) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-                else InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+                inputType = if (f.isLen || f.isPitch || f.isSize) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+                else InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
+                if (f.value.isEmpty()) hint = if (f.isSize) "4'x8'" else "0"
+                setSelectAllOnFocus(true)
                 setSingleLine()
             }
             box.addView(et, llp(MATCH_PARENT, WRAP_CONTENT))
@@ -542,11 +622,26 @@ class MainActivity : Activity(), Ui {
             panelBody.addView(box)
             panelBody.addView(divider())
         }
+        val sv = LinearLayout(this).apply { setPadding(dpi(12f), dpi(12f), dpi(12f), dpi(4f)) }
+        sv.addView(TextView(this).apply {
+            text = "Saved results (" + eng.saved.size + ")"; textSize = 16f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(c(0xFFFFA726), c(0xFFEF6C00))).apply { cornerRadius = dp(8f) }
+            setPadding(0, dpi(12f), 0, dpi(12f))
+            setOnClickListener { savedPanel() }
+        }, llp(MATCH_PARENT, WRAP_CONTENT))
+        panelBody.addView(sv)
         add("Theme", listOf("Dark", "Light"), if (eng.light) 1 else 0) { eng.light = it == 1; render() }
         add("Units System", listOf("Feet-Inch", "Metric"), if (eng.metric) 1 else 0) { eng.metric = it == 1 }
         val resList = listOf(2, 4, 8, 16, 32, 64)
         add("Fraction Resolution", resList.map { "1/$it" }, resList.indexOf(eng.res)) { eng.res = resList[it] }
+        add("Fraction mode", listOf("Standard (7/8)", "Constant (14/16)"), if (eng.fracConst) 1 else 0) { eng.fracConst = it == 1 }
         add("Green keys", listOf("Length/W/H", "SIN/COS/TAN"), if (eng.trig) 1 else 0) { eng.trig = it == 1 }
+        add("Pounds per ton", listOf("2000 (short)", "2240 (long)"), if (eng.lbsPerTon > 2100) 1 else 0) {
+            val old = eng.lbsPerTon; eng.lbsPerTon = if (it == 1) 2240.0 else 2000.0
+            if (old != eng.lbsPerTon && abs(eng.dens - 1.5 * old * LB / YD3) < 1e-6) eng.dens = 1.5 * eng.lbsPerTon * LB / YD3
+        }
+        add("Thousands separator (1,00,000)", listOf("Off", "On"), if (eng.thousands) 1 else 0) { eng.thousands = it == 1 }
+        add("Button vibration", listOf("On", "Off"), if (eng.haptic) 0 else 1) { eng.haptic = it == 0 }
 
         val box = LinearLayout(this).apply { setPadding(dpi(12f), dpi(12f), dpi(12f), dpi(12f)) }
         box.addView(TextView(this).apply {
@@ -598,7 +693,14 @@ class MainActivity : Activity(), Ui {
             "<b>Chhat:</b> Hip/V, Jack, Conv+Hip/V = Irregular Pitch, Conv+Jack = Irregular Jack, Conv+Rise = Rake Wall, Conv+Run = Roof.",
             "<b>Material:</b> Conv + Length = Masonry (int/block), Conv + Width = Footing, Conv + Height = Drywall/Paint, Conv + 8 = Board Feet (cft), Conv + CmpMtr = Fence, Conv + Stair = Baluster.",
             "<b>Wazan:</b> 5 Conv+1 = 5 kg. Phir Conv+4 = lbs, Conv+6 = tons, Conv+3 = metric ton. Store/Recall + 0 = volume se wazan.",
-            "<b>Kharcha:</b> value ke baad Conv + 0 = Cost (rate aur GST).",
+            "<b>Kisi bhi button ko dabakar rakhein</b> (long press): us button ka poora kaam likha aata hai.",
+            "<b>Kharcha (Cost):</b> quantity × rate, phir Conv + 0. Jaise 9 Yards Yards Yards × 5000 Conv 0 = ₹ 45,000. Board feet par rate 1000 BF ka. Sirf Conv + 0 = rate aur GST screen.",
+            "<b>wt/vol (density):</b> 1600 Store 0 = density save (Store 0 dobara = unit badlein: T/yd³, lb/yd³, lb/ft³, MT/m³, kg/m³). Phir volume par Conv + kg/lbs/tons = wazan, aur wazan par Feet/Yards/m = volume.",
+            "<b>Board feet:</b> 35 Conv 8 = 35 bf. Volume par Conv 8 = board feet.",
+            "<b>DMS:</b> 23.16.45 Conv . = 23.28°. Conv . dobara: pitch, % pitch, % slope, radians.",
+            "<b>Fraction:</b> Conv + / = 1/2 se 1/64 tak badlein. m dobara dabane par m → cm → mm.",
+            "<b>Rafter:</b> Rise/Run/Pitch ke baad Diag dobara = ridge deduction, overhang, birdsmouth, lakdi ki lambai.",
+            "<b>Save:</b> har result screen par Save dabakar naam dein. Prefs mein 'Saved results'.",
             "<b>Share:</b> kisi bhi result screen par neeche Share dabayein (WhatsApp etc.).",
             "<b>Theme:</b> Conv + Store = Prefs, wahan Dark / Light.",
             "<b>C button:</b> screen saaf. Conv + × = ClrAll (saari memory saaf)."

@@ -30,8 +30,16 @@ val SUP = arrayOf("", "", "²", "³")
 val WF = mapOf("kg" to 1.0, "lbs" to 0.45359237, "tons" to 907.18474, "mt" to 1000.0)
 val WN = mapOf("kg" to "kg", "lbs" to "lbs", "tons" to "tons", "mt" to "mt")
 const val SOON = "Ye function agle phase mein aayega"
+const val CFT = 0.028316846592      // 1 cubic foot in m³
+const val BAG = 0.0347              // 50 kg cement bag in m³
+const val BDFT = 0.002359737216     // 1 board foot in m³
+const val YD3 = 0.764554857984      // 1 cubic yard in m³
+const val LB = 0.45359237
 
-/** t: 'n' number, 'p' percent, 'a' angle (deg), 'L' length/area/volume (SI, d = dimension), 'e' error */
+/**
+ * t: 'n' number, 'p' percent, 'a' angle (deg), 'L' length/area/volume (SI, d = dimension),
+ * 'W' weight (kg), 'c' money (₹), 'D' density (kg/m³), 'e' error
+ */
 data class Q(
     val t: Char,
     val v: Double,
@@ -69,7 +77,11 @@ class StairPlan(
     val ut: Double,
     val bw: Double,
     val marks: List<String>,
-    val info: List<String>
+    val info: List<String>,
+    val finished: Boolean = false,
+    val tt: Double = 0.0,
+    val nose: Double = 0.0,
+    val rt: Double = 0.0
 )
 
 fun sec(t: String) = Row(t, section = true)
@@ -80,13 +92,18 @@ class Field(
     val isLen: Boolean,
     val value: String,
     val hint: String = "",
-    val isPitch: Boolean = false
+    val isPitch: Boolean = false,
+    /** "AxB" text; compute receives key_a and key_b in metres */
+    val isSize: Boolean = false
 )
 
 class FormSpec(
     val title: String,
     val fields: List<Field>,
     val seg: List<String>?,
+    /** optional second option row; compute then receives "seg|seg2" */
+    val seg2: List<String>? = null,
+    val segSel: Int = 0,
     val compute: (Map<String, Double>, String?) -> List<Row>
 )
 
@@ -118,6 +135,11 @@ class Engine(val ui: Ui) {
     var metric = false
     var trig = false
     var light = false
+    var lbsPerTon = 2000.0
+    var haptic = true
+    var thousands = false
+    var fracConst = false
+    var dens = 1.5 * 2000 * LB / YD3          // wt/vol memory, kg/m³ (1.5 T/yd³)
 
     // live state
     var cur = Q('n', 0.0)
@@ -138,6 +160,11 @@ class Engine(val ui: Ui) {
     var triU: String? = null
     val G = mutableMapOf<String, Mem>()
     var TS = 0
+    var dmsBase: Double? = null
+    var dmsStep = 0
+    var densStep = 0
+    var densRaw = 0.0
+    val saved = mutableListOf<Pair<String, String>>()   // label -> text
 
     // ================= FORMATTING =================
     private fun gcd(a: Long, b: Long): Long = if (b == 0L) a else gcd(b, a % b)
@@ -148,7 +175,7 @@ class Engine(val ui: Ui) {
         val w = Math.floorDiv(n, rr)
         val r = Math.floorMod(n, rr)
         if (r == 0L) return w.toString()
-        val g = gcd(r, rr)
+        val g = if (fracConst) 1L else gcd(r, rr)
         return "$w- ${r / g}/${rr / g}"
     }
 
@@ -161,8 +188,44 @@ class Engine(val ui: Ui) {
         if (a != 0.0 && (a >= 1e12 || a < 1e-6)) return String.format(Locale.US, "%.5e", x)
         var s = BigDecimal.valueOf(x).setScale(6, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
         if (s == "-0") s = "0"
-        return s
+        return if (thousands) group(s) else s
     }
+
+    /** Indian digit grouping: 12,34,567.89 */
+    fun group(s: String): String {
+        val neg = s.startsWith("-")
+        val t = if (neg) s.substring(1) else s
+        val dot = t.indexOf('.')
+        val ip = if (dot >= 0) t.substring(0, dot) else t
+        val fp = if (dot >= 0) t.substring(dot) else ""
+        if (ip.length <= 3) return s
+        val last3 = ip.takeLast(3)
+        var rest = ip.dropLast(3)
+        val parts = mutableListOf<String>()
+        while (rest.length > 2) { parts.add(0, rest.takeLast(2)); rest = rest.dropLast(2) }
+        if (rest.isNotEmpty()) parts.add(0, rest)
+        return (if (neg) "-" else "") + parts.joinToString(",") + "," + last3 + fp
+    }
+
+    fun money(x: Double): String {
+        if (!x.isFinite()) return "Error"
+        val s = BigDecimal.valueOf(abs(x)).setScale(2, RoundingMode.HALF_UP).toPlainString()
+        return (if (x < 0) "-" else "") + "₹ " + group(s)
+    }
+
+    fun wf(u: String): Double = if (u == "tons") lbsPerTon * LB else WF[u] ?: 1.0
+
+    val DENS_U = listOf("T/yd³", "lb/yd³", "lb/ft³", "MT/m³", "kg/m³")
+    fun densF(i: Int): Double = when (i) {
+        0 -> lbsPerTon * LB / YD3
+        1 -> LB / YD3
+        2 -> LB / CFT
+        3 -> 1000.0
+        else -> 1.0
+    }
+
+    /** size of one unit of q (m, m², m³ or one board foot) */
+    fun scale(u: String, d: Int): Double = if (u == "bf") BDFT else UF.getValue(baseU(u)).pow(d)
 
     fun f2(x: Double) = String.format(Locale.US, "%.2f", x)
 
@@ -186,7 +249,9 @@ class Engine(val ui: Ui) {
             'p' -> num(q.v) + "%"
             'a' -> if (q.dms) dms(q.v) else if (q.v.isFinite()) f2(q.v) + "°" else "Error"
             'L' -> fmtL(q)
-            'W' -> num(rnd(q.v / (WF[q.u] ?: 1.0), 4)) + (WN[q.u] ?: "kg")
+            'W' -> num(rnd(q.v / wf(q.u), 4)) + (WN[q.u] ?: "kg")
+            'c' -> money(q.v)
+            'D' -> num(rnd(q.v / densF(q.d), 6)) + DENS_U[q.d.coerceIn(0, 4)]
             else -> "?"
         }
     }
@@ -196,6 +261,7 @@ class Engine(val ui: Ui) {
         val u = q.u
         val d = q.d
         if (u == "acre") return num(q.v / ACRE) + "acre"
+        if (u == "bf") return num(rnd(q.v / BDFT, 4)) + "bf"
         if (d == 1 && q.f != "dec" && (u == "ftin" || u == "in")) {
             val neg = q.v < 0
             val n = Math.round(abs(q.v) / IN * res).toDouble() / res
@@ -308,7 +374,7 @@ class Engine(val ui: Ui) {
         if (a.t == 'e' || b.t == 'e') return Q.ERR
         var A = norm(a)
         var B = norm(b)
-        if (A.t == 'W' || B.t == 'W') return calcW(A, op, B)
+        if (A.t == 'W' || B.t == 'W' || A.t == 'c' || B.t == 'c') return calcW(A, op, B)
         if (A.t != 'L' && B.t != 'L') {
             val x = A.v
             val y = B.v
@@ -322,8 +388,8 @@ class Engine(val ui: Ui) {
             return Q(if (A.t == 'a' && (op != "÷" || B.t != 'a')) 'a' else 'n', r)
         }
         if (op == "+" || op == "−") {
-            if (A.t != 'L') A = B.copy(v = A.v * UF.getValue(baseU(B.u)).pow(B.d))
-            if (B.t != 'L') B = A.copy(v = B.v * UF.getValue(baseU(A.u)).pow(A.d))
+            if (A.t != 'L') A = B.copy(v = A.v * scale(B.u, B.d))
+            if (B.t != 'L') B = A.copy(v = B.v * scale(A.u, A.d))
             if (A.d != B.d) return Q.ERR
             return A.copy(v = if (op == "+") A.v + B.v else A.v - B.v)
         }
@@ -346,20 +412,24 @@ class Engine(val ui: Ui) {
         var A = A0
         var B = B0
         if (A.t == 'L' || B.t == 'L') return Q.ERR
+        val tag = if (A.t == 'W' || A.t == 'c') A.t else B.t
+        val other = if (A.t == tag) B.t else A.t
+        if (other != tag && other != 'n' && other != 'a') return Q.ERR
+        fun f(q: Q) = if (q.t == 'W') wf(q.u) else 1.0
         when (op) {
             "+", "−" -> {
-                if (A.t != 'W') A = B.copy(v = A.v * (WF[B.u] ?: 1.0))
-                if (B.t != 'W') B = A.copy(v = B.v * (WF[A.u] ?: 1.0))
+                if (A.t != tag) A = B.copy(v = A.v * f(B))
+                if (B.t != tag) B = A.copy(v = B.v * f(A))
                 return A.copy(v = if (op == "+") A.v + B.v else A.v - B.v)
             }
             "×" -> {
-                if (A.t == 'W' && B.t == 'W') return Q.ERR
-                return if (A.t == 'W') A.copy(v = A.v * B.v) else B.copy(v = B.v * A.v)
+                if (A.t == tag && B.t == tag) return Q.ERR
+                return if (A.t == tag) A.copy(v = A.v * B.v) else B.copy(v = B.v * A.v)
             }
             else -> {
                 if (B.v == 0.0) return Q.ERR
-                if (A.t == 'W' && B.t == 'W') return Q('n', A.v / B.v)
-                if (A.t == 'W') return A.copy(v = A.v / B.v)
+                if (A.t == tag && B.t == tag) return Q('n', A.v / B.v)
+                if (A.t == tag) return A.copy(v = A.v / B.v)
                 return Q.ERR
             }
         }
@@ -368,12 +438,81 @@ class Engine(val ui: Ui) {
     private fun weightKey(u: String) {
         commit()
         val q = cur
-        cur = when (q.t) {
-            'n' -> Q('W', q.v * WF.getValue(u), u = u)
-            'W' -> q.copy(u = u)
-            else -> return ui.toast("Pehle number daaliye, phir kg / lbs / tons")
+        cur = when {
+            q.t == 'n' -> Q('W', q.v * wf(u), u = u)
+            q.t == 'W' -> q.copy(u = u)
+            q.t == 'L' && q.d == 3 -> Q('W', q.v * dens, u = u)
+            else -> return ui.toast("Pehle number ya volume daaliye, phir kg / lbs / tons")
         }
-        fresh = true; label = "Weight"
+        fresh = true; label = if (q.t == 'L') "Wazan (wt/vol se)" else "Weight"
+    }
+
+    /** weight -> volume using wt/vol density */
+    private fun volOf(q: Q, u: String): Q = Q('L', q.v / dens, 3, if (u == "ftin") "ft" else u, "dec")
+
+    private fun boardFeetKey() {
+        if (!isFresh()) return boardFeetForm()
+        commit()
+        val q = cur
+        cur = when {
+            q.t == 'n' -> Q('L', q.v * BDFT, 3, "bf", "dec")
+            q.t == 'L' && q.d == 3 -> q.copy(u = "bf", f = "dec")
+            q.t == 'W' -> Q('L', q.v / dens, 3, "bf", "dec")
+            else -> return boardFeetForm()
+        }
+        fresh = true; label = "Board feet"
+    }
+
+    /** qty × price [Conv][Cost]  →  money.  A plain number + Cost marks it as ₹. */
+    private fun costKey() {
+        val p = pend
+        if (p != null && p.op == "×" && entry != null) {
+            val price = commit()
+            if (price.t != 'n') return ui.toast("Rate sirf number mein daaliye")
+            val a = p.a
+            val (qty, per) = when {
+                a.t == 'L' && a.u == "bf" -> a.v / BDFT / 1000 to "1000bf"
+                a.t == 'L' -> {
+                    val uu = baseU(a.u)
+                    a.v / scale(a.u, a.d) to (if (a.u == "acre") "acre" else uu + SUP[a.d.coerceIn(0, 3)])
+                }
+                a.t == 'W' -> a.v / wf(a.u) to (WN[a.u] ?: "kg")
+                else -> a.v to "nag"
+            }
+            val total = qty * price.v
+            val r = Q('c', total)
+            label = fmt(a) + " × " + money(price.v) + " per " + per + " ="
+            tape.add(label + " " + money(total))
+            cur = r; pend = null; fresh = true
+            return
+        }
+        if (isFresh()) {
+            commit()
+            if (cur.t == 'n') { cur = Q('c', cur.v); fresh = true; label = "Rakam"; return }
+        }
+        costForm()
+    }
+
+    /** Store+0: save density (repeat to change its unit); Recall+0: show it (repeat to cycle units). */
+    private fun wtVolKey(md: String) {
+        if (md == "store") {
+            if (lastKey == "wvS") {
+                densStep = (densStep + 1) % 5
+            } else {
+                if (!isFresh()) { lastKey = ""; return wtVolForm() }
+                val q = commit()
+                if (q.t != 'n' || q.v <= 0) return ui.toast("Density number mein daaliye (jaise 1600)")
+                densRaw = q.v; densStep = 0
+            }
+            dens = densRaw * densF(densStep)
+            set(Q('D', dens, densStep), "wt/vol saved")
+            lastKey = "wvS"
+        } else {
+            densStep = if (lastKey == "wvR") (densStep + 1) % 5 else 0
+            entry = null
+            set(Q('D', dens, densStep), "wt/vol (density)")
+            lastKey = "wvR"
+        }
     }
 
     // ================= KEY ACTIONS =================
@@ -425,8 +564,12 @@ class Engine(val ui: Ui) {
             commit()
         }
         val q = cur
+        if (q.t == 'W') { cur = volOf(q, u); fresh = true; label = "Volume (wt/vol se)"; return }
         if (q.t == 'n') cur = Q('L', q.v * UF.getValue(u), 1, if (u == "ft") "ftin" else u)
-        else if (q.t == 'L') {
+        else if (q.t == 'L' && u == "m" && q.u in listOf("m", "cm", "mm")) {
+            // [m] [m] [m]: m -> cm -> mm -> m
+            cur = q.copy(u = mapOf("m" to "cm", "cm" to "mm", "mm" to "m").getValue(q.u), f = "dec")
+        } else if (q.t == 'L') {
             val tu = if (u == "ft" && q.d == 1) "ftin" else u
             cur = if (q.u == tu) q.copy(f = if (q.f == "dec") "frac" else "dec")
             else q.copy(u = tu, f = if (tu == "ftin" || tu == "in") "frac" else "dec")
@@ -505,13 +648,38 @@ class Engine(val ui: Ui) {
         cur = r; label = k; fresh = true
     }
 
+    /** DMS -> degrees -> pitch (in/12) -> % pitch -> % slope -> radians -> DMS ... */
     private fun dmsKey() {
+        val base = dmsBase
+        if (lastKey == "dms⇄deg" && base != null && entry == null) {
+            dmsStep = (dmsStep + 1) % 6
+            val t = tan(base * D2R)
+            when (dmsStep) {
+                0 -> { cur = Q('a', base); label = "Degrees" }
+                1 -> { cur = Q('L', 12 * t * IN, 1, "in"); label = "Pitch (inch per 12\")" }
+                2 -> { cur = Q('n', t * 100); label = "% Pitch (grade)" }
+                3 -> { cur = Q('n', t); label = "% Slope (rise ÷ run)" }
+                4 -> { cur = Q('n', base * D2R); label = "Radians" }
+                else -> { cur = Q('a', base, dms = true); label = "DMS" }
+            }
+            fresh = true
+            return
+        }
         commit()
         if (cur.t == 'a' || cur.t == 'n') {
             cur = cur.copy(t = 'a', dms = !cur.dms)
             label = if (cur.dms) "DMS" else "Degrees"
+            dmsBase = cur.v
+            dmsStep = if (cur.dms) 5 else 0
             fresh = true
         } else ui.toast("Angle chahiye")
+    }
+
+    private fun fracKey() {
+        val list = listOf(2, 4, 8, 16, 32, 64)
+        res = list[(list.indexOf(res) + 1) % list.size]
+        ui.toast("Fraction ab 1/$res tak")
+        label = "Fraction 1/$res"
     }
 
     private fun acreKey() {
@@ -652,7 +820,20 @@ class Engine(val ui: Ui) {
             if (k == "pitch") cur = pitchQ(v)
             lastKey = k; return
         }
-        if (lastKey == k || lastKey == k + "2") { triPanel(); lastKey = k + "2"; return }
+        if (lastKey == k || lastKey == k + "2") { rafterForm(); lastKey = k + "2"; return }
+        // Rise / Run of an arc from Diameter + Arc angle (when those are newer than the triangle values)
+        if (k == "rise" || k == "run") {
+            val c = G["circle"]
+            val a = G["arc"]
+            if (c != null && a != null && max(c.ts, a.ts) > (T[k]?.ts ?: 0)) {
+                val R = c.v / 2
+                val th = a.ang ?: ((a.len ?: 0.0) / R / D2R)
+                val hr = th * D2R / 2
+                val v = if (k == "run") 2 * R * sin(hr) else R * (1 - cos(hr))
+                set(lq(v, 1, circU()), if (k == "run") "Chord (Run)" else "Segment (Rise)")
+                lastKey = k; return
+            }
+        }
         val s = solveTri()
         if (s == null) {
             val t = T[k]
@@ -850,13 +1031,28 @@ class Engine(val ui: Ui) {
 
     private fun arcPanel(a: Arc) {
         val u = circU()
-        ui.panel(
-            "Arc Function", listOf(
-                sec("Results"), Row("Arc Angle", f2(a.th) + "°"), Row("Arc Length", fL(a.len, 1, u)),
-                Row("Chord Length (Run)", fL(a.chord, 1, u)), Row("Segment Height (Rise)", fL(a.rise, 1, u)),
-                Row("Radius", fL(a.R, 1, u)), Row("Diameter", fL(2 * a.R, 1, u))
-            )
+        val rows = mutableListOf(
+            sec("Results"), Row("Arc Angle", f2(a.th) + "°"), Row("Arc Length", fL(a.len, 1, u)),
+            Row("Chord Length (Run)", fL(a.chord, 1, u)), Row("Segment Height (Rise)", fL(a.rise, 1, u)),
+            Row("Radius", fL(a.R, 1, u)), Row("Diameter", fL(2 * a.R, 1, u))
         )
+        // arched wall framing: stud heights at o.c. across the chord (+ R/Wall base)
+        if (a.th <= 180.0) {
+            val oc = M["oc"]?.v ?: (if (metric) 0.4 else 16 * IN)
+            val base = M["rwall"]?.v ?: 0.0
+            val half = a.chord / 2
+            rows.add(sec("Arch framing studs (" + fL(oc, 1, if (metric) "cm" else "in") + " o.c., base " + fL(base) + ")"))
+            var i = 0
+            while (i <= 80) {
+                val x = min(i * oc, a.chord)
+                val dx = x - half
+                val h = base + sqrt(max(0.0, a.R * a.R - dx * dx)) - (a.R - a.rise)
+                rows.add(Row("Stud ${i + 1}  (" + fL(x) + " par)", fL(h)))
+                if (x >= a.chord - 1e-9) break
+                i++
+            }
+        }
+        ui.panel("Arc Function", rows)
     }
 
     private fun polygonKey() {
@@ -962,26 +1158,38 @@ class Engine(val ui: Ui) {
         ui.form(
             FormSpec(
                 "Stairs Function", listOf(
-                    Field("rise", "Rise (floor to floor)", true, lenTxt(T["rise"]?.v), if (m) "cm mein" else "jaise 9' 10\""),
+                    Field("rise", "Rise (floor to floor) – khali ho to Run se", true, lenTxt(T["rise"]?.v), if (m) "cm mein" else "jaise 9' 10\""),
                     Field("run", "Run (khaali chhod sakte hain)", true, lenTxt(T["run"]?.v), if (m) "cm mein" else "jaise 12'"),
                     Field("dr", "Desired Riser Height", true, if (m) "19" else "7-1/2\""),
                     Field("dt", "Desired Tread Width", true, if (m) "25" else "10\""),
                     Field("hr", "Headroom", true, if (m) "203" else "6' 8\""),
                     Field("th", "Floor thickness (upar wala)", true, if (m) "25" else "10\""),
-                    Field("bw", "Stringer board width (patiya)", true, if (m) "28" else "11-1/4\"", if (m) "cm mein" else "2x12 = 11-1/4\"")
-                ), listOf("Riser limit ON", "Riser limit OFF")
-            ) { v, lim ->
-                val rise = v["rise"] ?: Double.NaN
+                    Field("bw", "Stringer board width (patiya)", true, if (m) "28" else "11-1/4\"", if (m) "cm mein" else "2x12 = 11-1/4\""),
+                    Field("tt", "Tread (paydan) ki motai – Advanced", true, if (m) "2.5" else "1\""),
+                    Field("nose", "Nosing (aage nikla hissa) – Advanced", true, if (m) "2.5" else "1\""),
+                    Field("rtk", "Riser board ki motai – Advanced", true, if (m) "2" else "3/4\"")
+                ), listOf("Riser limit ON", "Riser limit OFF"), listOf("Advanced", "Simple")
+            ) { v, sg ->
+                val lim = sg?.split('|')?.getOrNull(0) ?: "Riser limit ON"
+                val adv = (sg?.split('|')?.getOrNull(1) ?: "Advanced") == "Advanced"
+                var rise = v["rise"] ?: Double.NaN
                 val run = v["run"] ?: Double.NaN
                 val dr = v["dr"] ?: Double.NaN
                 val dt = v["dt"] ?: Double.NaN
-                if (!(rise > 0) || !(dr > 0) || !(dt > 0)) return@FormSpec listOf(Row("Rise, Riser aur Tread daaliye", "—"))
+                if (!(dr > 0) || !(dt > 0)) return@FormSpec listOf(Row("Riser aur Tread daaliye", "—", true))
+                var fromRun = false
+                if (!(rise > 0)) {
+                    if (!(run > 0)) return@FormSpec listOf(Row("Rise ya Run daaliye", "—", true))
+                    // Run only: how many steps fit, and the rise they make
+                    rise = (floor(run / dt + 1e-9) + 1) * dr
+                    fromRun = true
+                }
                 // ON: riser kabhi desired se uncha nahi; OFF: desired ke sabse nazdeek
                 val n = if (lim == "Riser limit OFF") max(1, Math.round(rise / dr).toInt()) else ceil(rise / dr - 1e-9).toInt()
                 if (n > 60) return@FormSpec listOf(Row("Bahut zyada steps — values check karein", "—", true))
                 val ur = rise / n
                 val tr = n - 1
-                val ut = if (run > 0 && tr > 0) run / tr else dt
+                val ut = if (!fromRun && run > 0 && tr > 0) run / tr else if (fromRun && tr > 0) run / tr else dt
                 val tot = ut * tr
                 val ang = atan(ur / ut) / D2R
                 val diag = hypot(ur, ut)
@@ -991,20 +1199,36 @@ class Engine(val ui: Ui) {
                 val hr = v["hr"] ?: 0.0
                 val th = v["th"] ?: 0.0
                 val open = (if (hr > 0) hr else 0.0) + (if (th > 0) th else 0.0)
-                val plan = StairPlan(
-                    n, ur, ut, if (bw > 0) bw else notch * 2,
-                    (1..n).map { k -> fL(k * diag) },
-                    listOf(
-                        "Rise: " + fL(rise), "Run: " + fL(tot),
-                        "Riser: " + fL(ur, 1, sm) + " × " + n, "Tread: " + fL(ut, 1, sm) + " × " + tr,
-                        "Angle: " + f2(ang) + "°", "Throat: " + (if (throat.isFinite()) fL(throat, 1, sm) else "—")
-                    )
+                fun pos(x: Double?) = if (x != null && x.isFinite() && x > 0) x else 0.0
+                val tt = pos(v["tt"])
+                val nose = pos(v["nose"])
+                val rtk = pos(v["rtk"])
+                // layout marks are rounded to the fraction setting; show how much that adds up
+                val step = if (m) 0.001 else IN / res
+                val urR = Math.round(ur / step) * step
+                val utR = Math.round(ut / step) * step
+                val info = listOf(
+                    "Rise: " + fL(rise), "Run: " + fL(tot),
+                    "Riser: " + fL(ur, 1, sm) + " × " + n, "Tread: " + fL(ut, 1, sm) + " × " + tr,
+                    "Angle: " + f2(ang) + "°", "Throat: " + (if (throat.isFinite()) fL(throat, 1, sm) else "—")
                 )
-                val rows = mutableListOf(
-                    sec("Stringer Layout (drawing)"), Row("", stair = plan),
+                val plan = StairPlan(n, ur, ut, if (bw > 0) bw else notch * 2, (1..n).map { k -> fL(k * diag) }, info)
+                val rows = mutableListOf<Row>()
+                if (adv) {
+                    rows.add(sec("Stringer Layout (drawing)"))
+                    rows.add(Row("", stair = plan))
+                    rows.add(sec("Finished Layout (drawing)"))
+                    rows.add(Row("", stair = StairPlan(n, ur, ut, if (bw > 0) bw else notch * 2, emptyList(),
+                        listOf("Steps: $n", "Tread board: " + fL(ut + nose + rtk, 1, sm), "Nosing: " + fL(nose, 1, sm)),
+                        finished = true, tt = tt, nose = nose, rt = rtk)))
+                }
+                if (fromRun) rows.add(Row("Rise Run se nikala (" + fL(rise) + ")", "i"))
+                rows.addAll(listOf(
                     sec("Steps"), Row("Number of Risers", n.toString()), Row("Number of Treads", tr.toString()),
                     Row("Actual Riser Height", fL(ur, 1, sm), ur > dr + 1e-6),
                     Row("Actual Tread Width", fL(ut, 1, sm), ut < dt - 1e-6),
+                    Row("Riser overage / underage", (if (n * urR - rise >= 0) "+" else "") + fL(n * urR - rise, 1, sm)),
+                    Row("Tread overage / underage", (if (tr * utR - tot >= 0) "+" else "") + fL(tr * utR - tot, 1, sm)),
                     sec("Staircase"), Row("Total Rise", fL(rise)), Row("Total Run", fL(tot)),
                     Row("Angle of Incline", f2(ang) + "°"),
                     Row("Step diagonal (har step)", fL(diag, 1, sm)),
@@ -1013,7 +1237,15 @@ class Engine(val ui: Ui) {
                     Row("Throat (bachi lakdi)", if (throat.isFinite()) fL(throat, 1, sm) else "—", throat.isFinite() && throat < 3.5 * IN),
                     Row("Stairwell Opening (lagbhag)", fL(open / tan(ang * D2R) + ut)),
                     Row("2R + T (60-65 cm theek)", fL(2 * ur + ut, 1, sm))
-                )
+                ))
+                if (adv) rows.addAll(listOf(
+                    sec("Advanced (tread / riser boards)"),
+                    Row("Stringer ko neeche se kaatein (drop)", fL(tt, 1, sm)),
+                    Row("Pehla step stringer par", fL(ur - tt, 1, sm)),
+                    Row("Tread board ki chaudai", fL(ut + nose + rtk, 1, sm)),
+                    Row("Tread boards", tr.toString() + " nag"),
+                    Row("Riser boards (" + fL(ur, 1, sm) + " oonche)", n.toString() + " nag")
+                ))
                 if (ang > 42) rows.add(Row("Seedhi bahut steep hai", "⚠", true))
                 if (throat.isFinite() && throat < 3.5 * IN) rows.add(Row("Throat kam hai — chaudi patiya lein", "⚠", true))
                 rows
@@ -1071,6 +1303,7 @@ class Engine(val ui: Ui) {
 
     fun clrAll() {
         clearTemp(); T.clear(); G.clear(); M.clear(); cumQ = null; cumN = 0; TS = 0; triU = null
+        dens = 1.5 * lbsPerTon * LB / YD3; densStep = 0; dmsBase = null
     }
 
     // ================= KEYPAD =================
@@ -1079,7 +1312,7 @@ class Engine(val ui: Ui) {
         arrayOf(k("Rise", "R/Wall", "fn"), k("Run", "Roof", "fn"), k("Pitch", "Slope", "fn"), k("Diag", "Polygon", "fn"), k("Stair", "Baluster", "fn")),
         arrayOf(k("Hip/V", "IrPitch", "fn"), k("Jack", "IrJack", "fn"), k("Arc", "Radius", "fn"), k("Circle", "ColCon", "fn"), k("CmpMtr", "Fence", "fn")),
         arrayOf(k("m", "", "unit"), k("Length", "Masonry", "green"), k("Width", "Footing", "green"), k("Height", "Drywall", "green"), k("⌫", "√x", "red")),
-        arrayOf(k("Yards", "", "unit"), k("Feet", "", "unit"), k("Inches", "", "unit"), k("/", "", "unit"), k("%", "x²", "op")),
+        arrayOf(k("Yards", "", "unit"), k("Feet", "", "unit"), k("Inches", "", "unit"), k("/", "Frac", "unit"), k("%", "x²", "op")),
         arrayOf(k("Conv", "", "conv"), k("7", "cm", "num", "Rails"), k("8", "BdFt", "num"), k("9", "mm", "num"), k("÷", "1/x", "op")),
         arrayOf(k("Store", "Prefs", "st"), k("4", "lbs", "num"), k("5", "qty@oc", "num", "o.c."), k("6", "Tons", "num"), k("×", "ClrAll", "op")),
         arrayOf(k("Recall", "M-R/C", "st"), k("1", "kg", "num", "M1"), k("2", "Acre", "num", "M2"), k("3", "met tons", "num", "M3"), k("−", "+/-", "op")),
@@ -1132,10 +1365,15 @@ class Engine(val ui: Ui) {
         conv = false
         val n = if (wasConv && d.conv.isNotEmpty()) d.conv else d.main
         val md0 = mode
+        if (md0 != null && !wasConv && d.blue == "wt/vol") {
+            mode = null
+            wtVolKey(md0)
+            return
+        }
         if (md0 != null && !wasConv && d.blue.isNotEmpty()) {
             val k = mapOf("M1" to "m1", "M2" to "m2", "M3" to "m3", "o.c." to "oc", "Rails" to "rails")[d.blue]
             mode = null
-            if (k != null) memKey(k, md0) else wtVolForm()
+            if (k != null) memKey(k, md0) else ui.toast(SOON)
             after(n); return
         }
         if (n == "Store") { mode = if (mode == "store") null else "store"; return }
@@ -1154,7 +1392,7 @@ class Engine(val ui: Ui) {
     }
 
     private fun after(n: String) {
-        if (n !in MEMABLE) lastKey = ""
+        if (n !in MEMABLE && n != "dms⇄deg") lastKey = ""
     }
 
     private fun handle(n: String, md: String?) {
@@ -1179,7 +1417,7 @@ class Engine(val ui: Ui) {
             "M+" -> if (md == "recall") mRecall() else mPlus(false)
             "M-" -> mPlus(true)
             "SIN", "COS", "TAN", "ASIN", "ACOS", "ATAN" -> trigKey(n)
-            "dms⇄deg" -> dmsKey()
+            "dms⇄deg" -> { dmsKey(); lastKey = "dms⇄deg" }
             "Acre" -> acreKey()
             "Pitch" -> triKey("pitch", md)
             "Slope" -> triKey("pitch", md, true)
@@ -1194,22 +1432,23 @@ class Engine(val ui: Ui) {
             "Arc" -> arcKey(md)
             "Polygon" -> polygonKey()
             "ColCon" -> colConKey()
-            "qty@oc" -> qtyKey()
+            "qty@oc" -> qtyForm()
             "Stair" -> stairKey()
             "CmpMtr" -> miterKey()
             "Hip/V" -> hipForm(false)
             "IrPitch" -> hipForm(true)
             "Jack" -> jackForm(false)
             "IrJack" -> jackForm(true)
-            "R/Wall" -> rakeWallForm()
+            "R/Wall" -> rakeWallKey()
             "Roof" -> roofForm()
             "Masonry" -> masonryForm()
             "Footing" -> footingForm()
             "Drywall" -> drywallForm()
-            "BdFt" -> boardFeetForm()
+            "BdFt" -> boardFeetKey()
             "Fence" -> fenceForm()
             "Baluster" -> balusterForm()
-            "Cost" -> costForm()
+            "Cost" -> costKey()
+            "Frac" -> fracKey()
             "kg" -> weightKey("kg")
             "lbs" -> weightKey("lbs")
             "Tons" -> weightKey("tons")
