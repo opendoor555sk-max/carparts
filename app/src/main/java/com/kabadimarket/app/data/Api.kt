@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -80,6 +81,36 @@ object Api {
                 throw networkError(e)
             }
         }
+
+    /** Full link to an uploaded photo/logo (same as old app's fileUrl()). */
+    fun fileUrl(path: String): String = "$BASE/files/$path?token=${token ?: ""}"
+
+    /** Raw bytes from any full URL (used for photos). */
+    suspend fun fetchUrl(url: String): ByteArray = withContext(Dispatchers.IO) {
+        client.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+            if (!resp.isSuccessful) throw ApiException(resp.code, "HTTP ${resp.code}")
+            resp.body?.bytes() ?: ByteArray(0)
+        }
+    }
+
+    /** Uploads a photo (JPEG) and returns its server path. */
+    suspend fun uploadImage(bytes: ByteArray, name: String = "photo.jpg"): String = withContext(Dispatchers.IO) {
+        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("file", name, bytes.toRequestBody("image/jpeg".toMediaType()))
+            .build()
+        val req = baseRequest("/upload", emptyMap()).post(body).build()
+        try {
+            client.newCall(req).execute().use { resp ->
+                val text = resp.body?.string() ?: ""
+                if (!resp.isSuccessful) throw handleError(resp.code, text)
+                (parseJson(text) as? JSONObject)?.str("path") ?: ""
+            }
+        } catch (e: ApiException) {
+            throw e
+        } catch (e: IOException) {
+            throw networkError(e)
+        }
+    }
 
     /** Encodes one piece of a URL path, e.g. a part number or id. */
     fun seg(s: String): String = URLEncoder.encode(s, "UTF-8").replace("+", "%20")

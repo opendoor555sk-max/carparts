@@ -41,6 +41,11 @@ import com.kabadimarket.app.ui.CustomerDetailScreen
 import com.kabadimarket.app.ui.CustomerNewScreen
 import com.kabadimarket.app.ui.CustomersScreen
 import com.kabadimarket.app.ui.InventoryScreen
+import com.kabadimarket.app.ui.InvoiceScreen
+import com.kabadimarket.app.ui.RequirementNewScreen
+import com.kabadimarket.app.ui.RequirementsScreen
+import com.kabadimarket.app.ui.ScanScreen
+import com.kabadimarket.app.ui.UpdateChecker
 import com.kabadimarket.app.ui.LimitsScreen
 import com.kabadimarket.app.ui.LoginScreen
 import com.kabadimarket.app.ui.PartScreen
@@ -72,6 +77,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     App()
                     ToastHost()
+                    UpdateChecker()
                 }
             }
         }
@@ -82,9 +88,14 @@ class MainActivity : ComponentActivity() {
 sealed interface Route {
     data object Tabs : Route
     data object Inventory : Route
-    data class Part(val partNumber: String) : Route
+    /** mode: "search", "sell" or "requirement" (camera + manual entry) */
+    data class Scan(val mode: String) : Route
+    data class Part(val partNumber: String, val gps: String = "") : Route
     data class Buy(val partNumber: String = "") : Route
-    data class Sell(val partNumber: String = "", val unitId: String? = null) : Route
+    data class Sell(val partNumber: String) : Route
+    data class Invoice(val id: String) : Route
+    data object Requirements : Route
+    data class RequirementNew(val partNumber: String = "", val gps: String = "") : Route
     data object Limits : Route
     data object Tools : Route
     data object Customers : Route
@@ -187,6 +198,14 @@ fun App() {
 
 @Composable
 private fun MainArea(u: User, nav: Nav, logout: () -> Unit) {
+    // Company-phone location ping every 10 minutes while logged in (same as old app).
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(u.id) {
+        while (true) {
+            com.kabadimarket.app.data.Gps.ping(ctx)
+            delay(10 * 60 * 1000L)
+        }
+    }
     BackHandler(enabled = nav.stack.size > 1) { nav.back() }
     BackHandler(enabled = nav.stack.size == 1 && nav.tab != 0) { nav.tab = 0 }
 
@@ -216,10 +235,14 @@ private fun MainArea(u: User, nav: Nav, logout: () -> Unit) {
 private fun Screen(u: User, nav: Nav, r: Route, logout: () -> Unit) {
     when (r) {
         Route.Tabs -> TabsScreen(u, nav, logout)
-        Route.Inventory -> InventoryScreen(u, nav)
-        is Route.Part -> PartScreen(u, nav, r.partNumber)
+        Route.Inventory -> InventoryScreen(u, nav, logout)
+        is Route.Scan -> ScanScreen(u, nav, r.mode)
+        is Route.Part -> PartScreen(u, nav, r.partNumber, r.gps)
         is Route.Buy -> BuyScreen(u, nav, r.partNumber)
-        is Route.Sell -> SellScreen(u, nav, r.partNumber, r.unitId)
+        is Route.Sell -> SellScreen(u, nav, r.partNumber)
+        is Route.Invoice -> InvoiceScreen(u, nav, r.id)
+        Route.Requirements -> RequirementsScreen(u, nav)
+        is Route.RequirementNew -> RequirementNewScreen(nav, r.partNumber, r.gps)
         Route.Limits -> LimitsScreen(nav)
         Route.Tools -> ToolsScreen(u, nav)
         Route.Customers -> CustomersScreen(nav)

@@ -203,10 +203,10 @@ private data class Module(
 private fun soon(nav: Nav, key: String) = nav.open(Route.Soon(key))
 
 private val MODULES = listOf(
-    Module("search", "Find part", Icons.Filled.Search, C.Muted, "search") { it.open(Route.Part("")) },
+    Module("search", "Find part", Icons.Filled.Search, C.Muted, "search") { it.open(Route.Scan("search")) },
     Module("buy", "Purchase", Icons.Filled.Download, C.Green, "buy") { it.open(Route.Buy()) },
-    Module("sell", "Sale", Icons.Filled.Payments, C.Brand, "sell") { it.open(Route.Sell()) },
-    Module("requirement", "Inquiry / Need", Icons.Filled.AddCircle, C.Amber, "requirement") { soon(it, "module.requirement") },
+    Module("sell", "Sale", Icons.Filled.Payments, C.Brand, "sell") { it.open(Route.Scan("sell")) },
+    Module("requirement", "Inquiry / Need", Icons.Filled.AddCircle, C.Amber, "requirement") { it.open(Route.Scan("requirement")) },
     Module("customers", "Grahak Khata", Icons.Filled.People, C.Brand, "sell") { it.open(Route.Customers) },
     Module("vendors", "Supplier records", Icons.Filled.Work, C.Green, "buy") { it.open(Route.Vendors) },
     Module("damaged-returns", "Returns & spoilage", Icons.AutoMirrored.Filled.Undo, C.Red, "sell") { soon(it, "module.damaged-returns") },
@@ -421,7 +421,7 @@ private fun ReportsTab(user: User, nav: Nav, onLogout: () -> Unit) {
         L("buy", "report.purchases", "home.reportBuySub", Icons.Filled.Download, C.Green, true) { soon(nav, "report.purchases") },
         L("sell", "report.sales", "home.reportSellSub", Icons.Filled.Payments, C.Brand, true) { soon(nav, "report.sales") },
         L("inventory", "tabs.inventory", "home.reportInventorySub", Icons.Filled.Inventory, C.Brand, false) { nav.open(Route.Inventory) },
-        L("requirements", "tabs.needs", "home.reportRequirementsSub", Icons.Filled.Checklist, C.Amber, false) { soon(nav, "tabs.needs") },
+        L("requirements", "tabs.needs", "home.reportRequirementsSub", Icons.Filled.Checklist, C.Amber, false) { nav.open(Route.Requirements) },
     ).filter { !it.adminOnly || user.isAdmin }
 
     Column(Modifier.fillMaxSize()) {
@@ -601,7 +601,7 @@ private fun AdminTab(user: User, nav: Nav, onLogout: () -> Unit) {
                     add(Stat(t("admin.statParts"), s.int("total_parts"), C.Brand, Icons.Filled.Description) { soon(nav, "report.stockReport") })
                     add(Stat(t("admin.statInStock"), s.int("in_stock_units"), C.Green, Icons.Filled.Inventory2) { nav.open(Route.Inventory) })
                     if (user.isAdmin) add(Stat(t("admin.statSold"), s.int("sold_units"), C.Muted, Icons.Filled.Payments) { soon(nav, "report.sales") })
-                    add(Stat(t("admin.statPendingNeeds"), s.int("pending_requirements"), C.Amber, Icons.Filled.Checklist) { soon(nav, "tabs.needs") })
+                    add(Stat(t("admin.statPendingNeeds"), s.int("pending_requirements"), C.Amber, Icons.Filled.Checklist) { nav.open(Route.Requirements) })
                     add(Stat(t("admin.statAiPending"), s.int("pending_ai"), C.Amber, Icons.Filled.AutoAwesome) { soon(nav, "admin.toolAiApprovals") })
                     add(Stat(t("admin.statVerified"), s.int("verified_parts"), C.Green, Icons.Filled.Verified) { soon(nav, "report.stockReport") })
                 }

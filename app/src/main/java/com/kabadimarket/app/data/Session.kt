@@ -114,6 +114,8 @@ data class User(
     val storePhone: String,
     val storeAddress: String,
     val contact: String,
+    val storeLogo: String,
+    val storeBank: String,
     val permissions: Set<String>,
 ) {
     val isAdmin: Boolean get() = role == "admin" || role == "super_admin"
@@ -136,6 +138,8 @@ data class User(
             storePhone = j.str("store_phone"),
             storeAddress = j.str("store_address"),
             contact = j.str("contact"),
+            storeLogo = j.str("store_logo"),
+            storeBank = j.str("store_bank"),
             permissions = j.arr("permissions").strings().toSet(),
         )
     }

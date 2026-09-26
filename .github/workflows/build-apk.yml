@@ -47,7 +47,8 @@ jobs:
           tag_name: apk-v${{ github.run_number }}
           name: Kabadi Market v2.0.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
-          prerelease: true
+          prerelease: false
+          make_latest: true
           body: |
             New Kotlin app — phone par download karke install karo.
             (Open this page on your phone → tap the .apk file below.)
