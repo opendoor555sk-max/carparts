@@ -113,14 +113,28 @@ val CONDITIONS = listOf("Working", "Testing", "Repairable", "Damaged", "Incomple
 
 /** Asks for location permission once and gives back the GPS text ("lat,lng"). */
 @Composable
-fun rememberGps(decimals: Int = 6, sep: String = ","): String {
+fun rememberGps(decimals: Int = 6, sep: String = ",", afterCamera: Boolean = false): String {
     val context = LocalContext.current
     var gps by rememberSaveable { mutableStateOf("") }
     var granted by remember { mutableStateOf(Gps.hasPermission(context)) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
         granted = res.values.any { it }
     }
-    LaunchedEffect(Unit) { if (!granted) launcher.launch(Gps.PERMISSIONS) }
+    LaunchedEffect(Unit) {
+        if (granted) return@LaunchedEffect
+        // Android can show only one permission box at a time: on camera screens,
+        // wait until the camera question is answered before asking for location.
+        if (afterCamera) {
+            repeat(40) {
+                val cam = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (cam) return@repeat
+                delay(500)
+            }
+            delay(300)
+        }
+        launcher.launch(Gps.PERMISSIONS)
+    }
     LaunchedEffect(granted) {
         if (granted && gps.isEmpty()) gps = Gps.format(Gps.current(context), decimals, sep)
     }
@@ -133,7 +147,7 @@ fun rememberGps(decimals: Int = 6, sep: String = ","): String {
 
 @Composable
 fun ScanScreen(user: User, nav: Nav, mode: String) {
-    val gps = rememberGps()
+    val gps = rememberGps(afterCamera = true)
     var manual by rememberSaveable { mutableStateOf("") }
     var scanning by remember { mutableStateOf(true) }
     val context = LocalContext.current

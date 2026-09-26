@@ -137,7 +137,7 @@ private suspend fun compressPhoto(bytes: ByteArray): ByteArray = withContext(Dis
 fun BuyScreen(user: User, nav: Nav, routePn: String) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val gps = rememberGps(5, ", ")
+    val gps = rememberGps(5, ", ", afterCamera = true)
     val lines = remember { mutableStateListOf<DraftLine>() }
     var manual by rememberSaveable { mutableStateOf("") }
     var confirming by remember { mutableStateOf(false) }
