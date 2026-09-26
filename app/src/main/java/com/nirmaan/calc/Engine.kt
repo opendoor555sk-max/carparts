@@ -27,6 +27,8 @@ const val ACRE = 4046.8564224
 const val D2R = PI / 180
 val UF = mapOf("in" to IN, "ft" to FT, "ftin" to FT, "yd" to YD, "m" to 1.0, "cm" to 0.01, "mm" to 0.001)
 val SUP = arrayOf("", "", "²", "³")
+val WF = mapOf("kg" to 1.0, "lbs" to 0.45359237, "tons" to 907.18474, "mt" to 1000.0)
+val WN = mapOf("kg" to "kg", "lbs" to "lbs", "tons" to "tons", "mt" to "mt")
 const val SOON = "Ye function agle phase mein aayega"
 
 /** t: 'n' number, 'p' percent, 'a' angle (deg), 'L' length/area/volume (SI, d = dimension), 'e' error */
@@ -52,11 +54,34 @@ data class Mem(
     val len: Double? = null
 )
 
-class Row(val label: String, val value: String = "", val warn: Boolean = false, val section: Boolean = false)
+class Row(
+    val label: String,
+    val value: String = "",
+    val warn: Boolean = false,
+    val section: Boolean = false,
+    val stair: StairPlan? = null
+)
+
+/** Everything the stair drawing needs (lengths in metres, labels already formatted). */
+class StairPlan(
+    val n: Int,
+    val ur: Double,
+    val ut: Double,
+    val bw: Double,
+    val marks: List<String>,
+    val info: List<String>
+)
 
 fun sec(t: String) = Row(t, section = true)
 
-class Field(val key: String, val label: String, val isLen: Boolean, val value: String, val hint: String = "")
+class Field(
+    val key: String,
+    val label: String,
+    val isLen: Boolean,
+    val value: String,
+    val hint: String = "",
+    val isPitch: Boolean = false
+)
 
 class FormSpec(
     val title: String,
@@ -87,11 +112,12 @@ class Entry {
 
 class Pend(val a: Q, val op: String)
 
-class Engine(private val ui: Ui) {
+class Engine(val ui: Ui) {
     // preferences
     var res = 16
     var metric = false
     var trig = false
+    var light = false
 
     // live state
     var cur = Q('n', 0.0)
@@ -160,6 +186,7 @@ class Engine(private val ui: Ui) {
             'p' -> num(q.v) + "%"
             'a' -> if (q.dms) dms(q.v) else if (q.v.isFinite()) f2(q.v) + "°" else "Error"
             'L' -> fmtL(q)
+            'W' -> num(rnd(q.v / (WF[q.u] ?: 1.0), 4)) + (WN[q.u] ?: "kg")
             else -> "?"
         }
     }
@@ -281,6 +308,7 @@ class Engine(private val ui: Ui) {
         if (a.t == 'e' || b.t == 'e') return Q.ERR
         var A = norm(a)
         var B = norm(b)
+        if (A.t == 'W' || B.t == 'W') return calcW(A, op, B)
         if (A.t != 'L' && B.t != 'L') {
             val x = A.v
             val y = B.v
@@ -312,6 +340,40 @@ class Engine(private val ui: Ui) {
         if (d < 0) return Q.ERR
         if (d == 0) return Q('n', A.v / B.v)
         return Q('L', A.v / B.v, d, resU(A, d))
+    }
+
+    private fun calcW(A0: Q, op: String, B0: Q): Q {
+        var A = A0
+        var B = B0
+        if (A.t == 'L' || B.t == 'L') return Q.ERR
+        when (op) {
+            "+", "−" -> {
+                if (A.t != 'W') A = B.copy(v = A.v * (WF[B.u] ?: 1.0))
+                if (B.t != 'W') B = A.copy(v = B.v * (WF[A.u] ?: 1.0))
+                return A.copy(v = if (op == "+") A.v + B.v else A.v - B.v)
+            }
+            "×" -> {
+                if (A.t == 'W' && B.t == 'W') return Q.ERR
+                return if (A.t == 'W') A.copy(v = A.v * B.v) else B.copy(v = B.v * A.v)
+            }
+            else -> {
+                if (B.v == 0.0) return Q.ERR
+                if (A.t == 'W' && B.t == 'W') return Q('n', A.v / B.v)
+                if (A.t == 'W') return A.copy(v = A.v / B.v)
+                return Q.ERR
+            }
+        }
+    }
+
+    private fun weightKey(u: String) {
+        commit()
+        val q = cur
+        cur = when (q.t) {
+            'n' -> Q('W', q.v * WF.getValue(u), u = u)
+            'W' -> q.copy(u = u)
+            else -> return ui.toast("Pehle number daaliye, phir kg / lbs / tons")
+        }
+        fresh = true; label = "Weight"
     }
 
     // ================= KEY ACTIONS =================
@@ -519,7 +581,7 @@ class Engine(private val ui: Ui) {
         "len" to "Length", "wid" to "Width", "hei" to "Height"
     )
 
-    private fun toLen(q: Q): Double? {
+    fun toLen(q: Q): Double? {
         if (q.t == 'L' && q.d == 1) return q.v
         if (q.t == 'n') return q.v * UF.getValue(baseU(defU()))
         return null
@@ -643,8 +705,8 @@ class Engine(private val ui: Ui) {
         set(lq(g.v, 1, g.u), nm)
     }
 
-    private fun areaStr(a: Double) = if (metric) fL(a, 2, "m") else fL(a, 2, "ft")
-    private fun volStr(v: Double) = if (metric) fL(v, 3, "m") else fL(v, 3, "ft") + "  |  " + fL(v, 3, "yd")
+    fun areaStr(a: Double) = if (metric) fL(a, 2, "m") else fL(a, 2, "ft")
+    fun volStr(v: Double) = if (metric) fL(v, 3, "m") else fL(v, 3, "ft") + "  |  " + fL(v, 3, "yd")
 
     private fun widthPanel() {
         val L = G.getValue("len").v
@@ -905,7 +967,8 @@ class Engine(private val ui: Ui) {
                     Field("dr", "Desired Riser Height", true, if (m) "19" else "7-1/2\""),
                     Field("dt", "Desired Tread Width", true, if (m) "25" else "10\""),
                     Field("hr", "Headroom", true, if (m) "203" else "6' 8\""),
-                    Field("th", "Floor thickness (upar wala)", true, if (m) "25" else "10\"")
+                    Field("th", "Floor thickness (upar wala)", true, if (m) "25" else "10\""),
+                    Field("bw", "Stringer board width (patiya)", true, if (m) "28" else "11-1/4\"", if (m) "cm mein" else "2x12 = 11-1/4\"")
                 ), null
             ) { v, _ ->
                 val rise = v["rise"] ?: Double.NaN
@@ -914,25 +977,44 @@ class Engine(private val ui: Ui) {
                 val dt = v["dt"] ?: Double.NaN
                 if (!(rise > 0) || !(dr > 0) || !(dt > 0)) return@FormSpec listOf(Row("Rise, Riser aur Tread daaliye", "—"))
                 val n = ceil(rise / dr - 1e-9).toInt()
+                if (n > 60) return@FormSpec listOf(Row("Bahut zyada steps — values check karein", "—", true))
                 val ur = rise / n
                 val tr = n - 1
                 val ut = if (run > 0 && tr > 0) run / tr else dt
                 val tot = ut * tr
                 val ang = atan(ur / ut) / D2R
-                val str = hypot(rise - ur, tot)
+                val diag = hypot(ur, ut)
+                val bw = v["bw"] ?: Double.NaN
+                val notch = ur * ut / diag
+                val throat = if (bw > 0) bw - notch else Double.NaN
                 val hr = v["hr"] ?: 0.0
                 val th = v["th"] ?: 0.0
                 val open = (if (hr > 0) hr else 0.0) + (if (th > 0) th else 0.0)
+                val plan = StairPlan(
+                    n, ur, ut, if (bw > 0) bw else notch * 2,
+                    (1..n).map { k -> fL(k * diag) },
+                    listOf(
+                        "Rise: " + fL(rise), "Run: " + fL(tot),
+                        "Riser: " + fL(ur, 1, sm) + " × " + n, "Tread: " + fL(ut, 1, sm) + " × " + tr,
+                        "Angle: " + f2(ang) + "°", "Throat: " + (if (throat.isFinite()) fL(throat, 1, sm) else "—")
+                    )
+                )
                 val rows = mutableListOf(
+                    sec("Stringer Layout (drawing)"), Row("", stair = plan),
                     sec("Steps"), Row("Number of Risers", n.toString()), Row("Number of Treads", tr.toString()),
                     Row("Actual Riser Height", fL(ur, 1, sm), ur > dr + 1e-6),
                     Row("Actual Tread Width", fL(ut, 1, sm), ut < dt - 1e-6),
-                    sec("Staircase"), Row("Total Run", fL(tot)), Row("Angle of Incline", f2(ang) + "°"),
-                    Row("Stringer Length (lagbhag)", fL(str)),
+                    sec("Staircase"), Row("Total Rise", fL(rise)), Row("Total Run", fL(tot)),
+                    Row("Angle of Incline", f2(ang) + "°"),
+                    Row("Step diagonal (har step)", fL(diag, 1, sm)),
+                    Row("Stringer board length (kharidne ke liye)", fL(n * diag)),
+                    Row("Notch depth", fL(notch, 1, sm)),
+                    Row("Throat (bachi lakdi)", if (throat.isFinite()) fL(throat, 1, sm) else "—", throat.isFinite() && throat < 3.5 * IN),
                     Row("Stairwell Opening (lagbhag)", fL(open / tan(ang * D2R) + ut)),
                     Row("2R + T (60-65 cm theek)", fL(2 * ur + ut, 1, sm))
                 )
                 if (ang > 42) rows.add(Row("Seedhi bahut steep hai", "⚠", true))
+                if (throat.isFinite() && throat < 3.5 * IN) rows.add(Row("Throat kam hai — chaudi patiya lein", "⚠", true))
                 rows
             }
         )
@@ -993,8 +1075,8 @@ class Engine(private val ui: Ui) {
     // ================= KEYPAD =================
     /** [primary, conv (yellow), class, store-label (blue)] */
     private val ROWS = arrayOf(
-        arrayOf(k("Stair", "Baluster", "fn"), k("CmpMtr", "Fence", "fn"), k("Arc", "Radius", "fn"), k("Circle", "ColCon", "fn"), k("Hip/V", "IrPitch", "fn")),
-        arrayOf(k("Pitch", "Slope", "fn"), k("Rise", "R/Wall", "fn"), k("Run", "Polygon", "fn"), k("Diag", "Roof", "fn"), k("Jack", "IrJack", "fn")),
+        arrayOf(k("Rise", "R/Wall", "fn"), k("Run", "Roof", "fn"), k("Pitch", "Slope", "fn"), k("Diag", "Polygon", "fn"), k("Stair", "Baluster", "fn")),
+        arrayOf(k("Hip/V", "IrPitch", "fn"), k("Jack", "IrJack", "fn"), k("Arc", "Radius", "fn"), k("Circle", "ColCon", "fn"), k("CmpMtr", "Fence", "fn")),
         arrayOf(k("m", "", "unit"), k("Length", "Masonry", "green"), k("Width", "Footing", "green"), k("Height", "Drywall", "green"), k("⌫", "√x", "red")),
         arrayOf(k("Yards", "", "unit"), k("Feet", "", "unit"), k("Inches", "", "unit"), k("/", "", "unit"), k("%", "x²", "op")),
         arrayOf(k("Conv", "", "conv"), k("7", "cm", "num", "Rails"), k("8", "BdFt", "num"), k("9", "mm", "num"), k("÷", "1/x", "op")),
@@ -1052,7 +1134,7 @@ class Engine(private val ui: Ui) {
         if (md0 != null && !wasConv && d.blue.isNotEmpty()) {
             val k = mapOf("M1" to "m1", "M2" to "m2", "M3" to "m3", "o.c." to "oc", "Rails" to "rails")[d.blue]
             mode = null
-            if (k != null) memKey(k, md0) else ui.toast(SOON)
+            if (k != null) memKey(k, md0) else wtVolForm()
             after(n); return
         }
         if (n == "Store") { mode = if (mode == "store") null else "store"; return }
@@ -1114,6 +1196,23 @@ class Engine(private val ui: Ui) {
             "qty@oc" -> qtyKey()
             "Stair" -> stairKey()
             "CmpMtr" -> miterKey()
+            "Hip/V" -> hipForm(false)
+            "IrPitch" -> hipForm(true)
+            "Jack" -> jackForm(false)
+            "IrJack" -> jackForm(true)
+            "R/Wall" -> rakeWallForm()
+            "Roof" -> roofForm()
+            "Masonry" -> masonryForm()
+            "Footing" -> footingForm()
+            "Drywall" -> drywallForm()
+            "BdFt" -> boardFeetForm()
+            "Fence" -> fenceForm()
+            "Baluster" -> balusterForm()
+            "Cost" -> costForm()
+            "kg" -> weightKey("kg")
+            "lbs" -> weightKey("lbs")
+            "Tons" -> weightKey("tons")
+            "met tons" -> weightKey("mt")
             else -> ui.toast(SOON)
         }
     }

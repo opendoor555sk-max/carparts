@@ -3,6 +3,7 @@ package com.nirmaan.calc
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
@@ -13,6 +14,7 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.Html
 import android.text.InputType
+import android.text.TextPaint
 import android.text.TextUtils
 import android.text.TextWatcher
 import android.util.TypedValue
@@ -43,6 +45,8 @@ class MainActivity : Activity(), Ui {
     private var panelOpen = false
     private var swiped = false
     private var toastObj: Toast? = null
+    private lateinit var root: FrameLayout
+    private var shareText = ""
 
     private class KeyView(val r: Int, val c: Int, val btn: TextView, val top: TextView, val blue: TextView)
 
@@ -60,13 +64,12 @@ class MainActivity : Activity(), Ui {
         eng = Engine(this)
         Store.load(this, eng)
 
-        val root = FrameLayout(this)
-        root.setBackgroundColor(c(0xFF0D0D0D))
+        root = FrameLayout(this)
         root.fitsSystemWindows = true
 
         val main = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dpi(6f), dpi(6f), dpi(6f), dpi(8f))
+            setPadding(dpi(3f), dpi(4f), dpi(3f), dpi(6f))
         }
         main.addView(buildLcd(), llp(MATCH_PARENT, WRAP_CONTENT))
         main.addView(buildPad(), llp(MATCH_PARENT, 0, 1f).apply { topMargin = dpi(4f) })
@@ -101,13 +104,13 @@ class MainActivity : Activity(), Ui {
             background = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR, intArrayOf(c(0xFFBCCBB8), c(0xFF8EA28C))
             ).apply { cornerRadius = dp(10f); setStroke(dpi(3f), c(0xFF555555)) }
-            setPadding(dpi(10f), dpi(6f), dpi(10f), dpi(4f))
-            minimumHeight = dpi(96f)
+            setPadding(dpi(10f), dpi(6f), dpi(10f), dpi(2f))
+            minimumHeight = dpi(118f)
         }
         val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         top.addView(circleIcon("i") { help() })
         lblTv = TextView(this).apply {
-            textSize = 19f; setTextColor(c(0xFF111111)); maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+            textSize = 20f; setTextColor(c(0xFF111111)); maxLines = 1; ellipsize = TextUtils.TruncateAt.END
             setPadding(dpi(8f), 0, dpi(6f), 0)
         }
         top.addView(lblTv, llp(0, WRAP_CONTENT, 1f))
@@ -122,14 +125,28 @@ class MainActivity : Activity(), Ui {
         valTv = TextView(this).apply {
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
             setTextColor(c(0xFF111111)); maxLines = 1
-            textSize = 42f
+            textSize = 52f
+            includeFontPadding = false
         }
-        lcd.addView(valTv, llp(MATCH_PARENT, dpi(58f)))
+        lcd.addView(valTv, llp(MATCH_PARENT, dpi(72f)))
         return lcd
     }
 
     // ================= KEYPAD =================
-    private fun colors(cls: String): IntArray = when (cls) {
+    private fun colors(cls: String): IntArray = if (eng.light) lightColors(cls) else darkColors(cls)
+
+    private fun lightColors(cls: String): IntArray = when (cls) {
+        "fn" -> intArrayOf(c(0xFFDCE3E8), c(0xFFB0BEC5))
+        "green" -> intArrayOf(c(0xFF66BB6A), c(0xFF388E3C))
+        "red" -> intArrayOf(c(0xFFEF5350), c(0xFFC62828))
+        "num" -> intArrayOf(c(0xFFFFFFFF), c(0xFFE3E3E3))
+        "op" -> intArrayOf(c(0xFF42A5F5), c(0xFF1E88E5))
+        "conv" -> intArrayOf(c(0xFFFFB74D), c(0xFFFB8C00))
+        "st" -> intArrayOf(c(0xFF4DD0E1), c(0xFF0097A7))
+        else -> intArrayOf(c(0xFFF5F5F5), c(0xFFD6DBDE))
+    }
+
+    private fun darkColors(cls: String): IntArray = when (cls) {
         "fn" -> intArrayOf(c(0xFF66737F), c(0xFF353F48))
         "green" -> intArrayOf(c(0xFF2C9A6B), c(0xFF156344))
         "red" -> intArrayOf(c(0xFFE0343D), c(0xFF9C141B))
@@ -148,14 +165,14 @@ class MainActivity : Activity(), Ui {
     private fun keyShape(cols: IntArray, lit: Boolean): Drawable {
         val face = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, cols).apply {
             cornerRadius = dp(9f)
-            if (lit) setStroke(dpi(2f), Color.WHITE)
+            if (lit) setStroke(dpi(2f), if (eng.light) c(0xFF0D47A1) else Color.WHITE)
         }
-        val shadow = GradientDrawable().apply { cornerRadius = dp(9f); setColor(Color.BLACK) }
+        val shadow = GradientDrawable().apply { cornerRadius = dp(9f); setColor(if (eng.light) c(0xFF9AA7AE) else Color.BLACK) }
         return LayerDrawable(arrayOf(shadow, face)).apply { setLayerInset(1, 0, 0, 0, dpi(2f)) }
     }
 
     private fun keyBg(cls: String, lit: Boolean): Drawable {
-        val id = "$cls/$lit"
+        val id = "$cls/$lit/${eng.light}"
         bgCache[id]?.let { return it.newDrawable() }
         val cols = colors(cls)
         val s = StateListDrawable()
@@ -198,6 +215,8 @@ class MainActivity : Activity(), Ui {
                 btn.setOnClickListener { v ->
                     if (swiped) return@setOnClickListener
                     v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    v.animate().scaleX(0.92f).scaleY(0.92f).setDuration(45)
+                        .withEndAction { v.animate().scaleX(1f).scaleY(1f).setDuration(90).start() }.start()
                     eng.press(r, col)
                     Store.save(this, eng)
                     render()
@@ -262,23 +281,44 @@ class MainActivity : Activity(), Ui {
                     k.btn.textSize = if (txt.length > 7) 13f else if (txt.length > 5) 15f else 18f
                 }
             }
+            val darkText = eng.light && d.cls in setOf("num", "fn", "unit")
             k.btn.setTextColor(
                 when {
-                    showConv -> c(0xFFF4C430)
+                    showConv -> if (eng.light) c(0xFFB25E00) else c(0xFFF4C430)
                     d.cls == "conv" -> c(0xFF222222)
+                    darkText -> c(0xFF1C2328)
                     else -> Color.WHITE
                 }
             )
             k.top.text = eng.keyTop(k.r, k.c)
+            k.top.setTextColor(if (eng.light) c(0xFFB25E00) else c(0xFFF4C430))
             k.blue.text = d.blue
+            k.blue.setTextColor(if (eng.light) c(0xFF1565C0) else c(0xFF4AA8FF))
         }
+        root.setBackgroundColor(if (eng.light) c(0xFFF2F4F5) else c(0xFF0D0D0D))
+        window.statusBarColor = if (eng.light) c(0xFF9AA7AE) else Color.BLACK
+        window.navigationBarColor = window.statusBarColor
         val t = eng.display()
         valTv.text = t
-        valTv.textSize = if (t.length > 18) 21f else if (t.length > 12) 30f else 42f
+        fitValue(t)
         lblTv.text = eng.displayLabel()
         val tg = eng.tag()
         tagTv.text = tg
         tagTv.visibility = if (tg.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    /** Biggest text size (max 56sp) that still fits the full display width. */
+    private fun fitValue(t: String) {
+        val avail = valTv.width - valTv.paddingLeft - valTv.paddingRight
+        if (avail <= 0) { valTv.post { if (valTv.width > 0) fitValue(valTv.text.toString()) }; return }
+        val tp = TextPaint(valTv.paint)
+        var size = 56f
+        while (size > 16f) {
+            tp.textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, size, resources.displayMetrics)
+            if (tp.measureText(t) <= avail) break
+            size -= 2f
+        }
+        valTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, size)
     }
 
     // ================= PANEL =================
@@ -309,6 +349,14 @@ class MainActivity : Activity(), Ui {
             setPadding(dpi(28f), dpi(10f), dpi(28f), dpi(10f))
             setOnClickListener { closePanel() }
         }
+        val share = TextView(this).apply {
+            text = "Share"; textSize = 17f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(c(0xFF4CAF50), c(0xFF2E7D32))).apply { cornerRadius = dp(8f) }
+            setPadding(dpi(24f), dpi(10f), dpi(24f), dpi(10f))
+            setOnClickListener { shareResults() }
+        }
+        foot.addView(share)
+        foot.addView(View(this), llp(0, 1, 1f))
         foot.addView(done)
         panelRoot.addView(foot, llp(MATCH_PARENT, WRAP_CONTENT))
         return panelRoot
@@ -317,8 +365,31 @@ class MainActivity : Activity(), Ui {
     private fun openPanel(title: String) {
         panelTitle.text = title
         panelBody.removeAllViews()
-        panelRoot.visibility = View.VISIBLE
+        shareText = ""
+        if (!panelOpen) {
+            panelRoot.visibility = View.VISIBLE
+            panelRoot.alpha = 0f
+            panelRoot.translationY = dp(60f)
+            panelRoot.animate().alpha(1f).translationY(0f).setDuration(180).start()
+        }
         panelOpen = true
+    }
+
+    private fun rowsText(title: String, rows: List<Row>): String {
+        val sb = StringBuilder(title).append("\n")
+        for (r in rows) {
+            if (r.stair != null) continue
+            if (r.section) sb.append("\n— ").append(r.label).append(" —\n")
+            else if (r.value.isEmpty()) sb.append(r.label).append("\n")
+            else sb.append(r.label).append(": ").append(r.value).append("\n")
+        }
+        return sb.append("\n— Nirmaan Calc").toString()
+    }
+
+    private fun shareResults() {
+        val t = if (shareText.isNotEmpty()) shareText else panelTitle.text.toString()
+        val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, t)
+        try { startActivity(Intent.createChooser(i, "Share")) } catch (_: Exception) { toast("Share nahi ho paya") }
     }
 
     private fun closePanel() {
@@ -347,6 +418,9 @@ class MainActivity : Activity(), Ui {
 
     private fun rowView(r: Row): View {
         if (r.section) return secView(r.label)
+        if (r.stair != null) return StairView(this, r.stair).apply {
+            layoutParams = llp(MATCH_PARENT, WRAP_CONTENT)
+        }
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(8f))
@@ -367,6 +441,7 @@ class MainActivity : Activity(), Ui {
     override fun panel(title: String, rows: List<Row>) {
         openPanel(title)
         rows.forEach { panelBody.addView(rowView(it)) }
+        shareText = rowsText(title, rows)
     }
 
     private fun seg(opts: List<String>, sel: Int, onPick: (Int) -> Unit): View {
@@ -399,10 +474,13 @@ class MainActivity : Activity(), Ui {
             val vals = HashMap<String, Double>()
             spec.fields.forEach { f ->
                 val s = inputs.getValue(f.key).text.toString()
-                vals[f.key] = if (f.isLen) eng.parseLen(s) else (s.trim().toDoubleOrNull() ?: Double.NaN)
+                vals[f.key] = if (f.isPitch) eng.parsePitch(s) else if (f.isLen) eng.parseLen(s) else (s.trim().toDoubleOrNull() ?: Double.NaN)
             }
             out.removeAllViews()
-            spec.compute(vals, segVal).forEach { out.addView(rowView(it)) }
+            val rows = spec.compute(vals, segVal)
+            rows.forEach { out.addView(rowView(it)) }
+            val inp = spec.fields.map { Row(it.label, inputs.getValue(it.key).text.toString()) }
+            shareText = rowsText(spec.title, listOf(sec("Inputs")) + inp + (segVal?.let { listOf(Row("Option", it)) } ?: emptyList()) + rows)
         }
 
         spec.seg?.let { opts ->
@@ -429,7 +507,7 @@ class MainActivity : Activity(), Ui {
                 textSize = 22f
                 gravity = Gravity.END
                 setTextColor(c(0xFF1636D8))
-                inputType = if (f.isLen) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+                inputType = if (f.isLen || f.isPitch) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
                 else InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
                 setSingleLine()
             }
@@ -464,6 +542,7 @@ class MainActivity : Activity(), Ui {
             panelBody.addView(box)
             panelBody.addView(divider())
         }
+        add("Theme", listOf("Dark", "Light"), if (eng.light) 1 else 0) { eng.light = it == 1; render() }
         add("Units System", listOf("Feet-Inch", "Metric"), if (eng.metric) 1 else 0) { eng.metric = it == 1 }
         val resList = listOf(2, 4, 8, 16, 32, 64)
         add("Fraction Resolution", resList.map { "1/$it" }, resList.indexOf(eng.res)) { eng.res = resList[it] }
@@ -516,6 +595,12 @@ class MainActivity : Activity(), Ui {
             "<b>Kamra:</b> [Length], [Width], [Height] mein values daalein. Value ke bina [Width] ya [Height] dabane par area/volume ki list aati hai.",
             "<b>Arc:</b> Run (chord) aur Rise daalkar [Arc] → angle, dobara [Arc] → poori list.",
             "<b>Seedhi:</b> Rise daalkar [Stair]. Values screen par badal sakte hain.",
+            "<b>Chhat:</b> Hip/V, Jack, Conv+Hip/V = Irregular Pitch, Conv+Jack = Irregular Jack, Conv+Rise = Rake Wall, Conv+Run = Roof.",
+            "<b>Material:</b> Conv + Length = Masonry (int/block), Conv + Width = Footing, Conv + Height = Drywall/Paint, Conv + 8 = Board Feet (cft), Conv + CmpMtr = Fence, Conv + Stair = Baluster.",
+            "<b>Wazan:</b> 5 Conv+1 = 5 kg. Phir Conv+4 = lbs, Conv+6 = tons, Conv+3 = metric ton. Store/Recall + 0 = volume se wazan.",
+            "<b>Kharcha:</b> value ke baad Conv + 0 = Cost (rate aur GST).",
+            "<b>Share:</b> kisi bhi result screen par neeche Share dabayein (WhatsApp etc.).",
+            "<b>Theme:</b> Conv + Store = Prefs, wahan Dark / Light.",
             "<b>C button:</b> screen saaf. Conv + × = ClrAll (saari memory saaf)."
         ).forEach {
             panelBody.addView(TextView(this).apply {

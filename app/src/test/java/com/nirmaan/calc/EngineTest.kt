@@ -126,4 +126,98 @@ class EngineTest {
         e.trig = true
         assertTrue(k("3 0 SIN").startsWith("0.5"))
     }
+
+    private fun formRows(vals: Map<String, String>? = null, seg: String? = null): List<Row> {
+        val sp = ui.spec!!
+        val v = sp.fields.associate { f ->
+            val t = vals?.get(f.key) ?: f.value
+            f.key to (if (f.isPitch) e.parsePitch(t) else if (f.isLen) e.parseLen(t) else (t.toDoubleOrNull() ?: Double.NaN))
+        }
+        return sp.compute(v, seg ?: sp.seg?.firstOrNull())
+    }
+
+    private fun List<Row>.v(label: String) = first { !it.section && it.label == label }.value
+
+    @Test fun hipRegular() {
+        k("^Conv") // no-op safety
+        e.clearTemp()
+        pressLabel("Hip/V")
+        val r = formRows(mapOf("pa" to "47", "run" to "9' 3-7/8\""))
+        assertEquals("37.17°", r.v("Plumb Cut"))
+        assertEquals("52.83°", r.v("Level Cut"))
+        assertEquals("45.00°", r.v("Cheek Cut – saw bevel"))
+        assertEquals("31.14°", r.v("Hip Backing Angle"))
+        assertEquals("117.72°", r.v("Dihedral Angle"))
+        assertEquals("45.00°", r.v("Plan Angle (deewar A se)"))
+    }
+
+    @Test fun hipIrregularSymmetric() {
+        k("^IrPitch")
+        val r = formRows(mapOf("pa" to "47", "pb" to "47", "run" to "10'"))
+        assertEquals("31.14°", r.v("Hip Backing Angle B"))
+    }
+
+    @Test fun pitchParse() {
+        assertEquals(33.69, e.parsePitch("8/12"), 0.01)
+        assertEquals(30.0, e.parsePitch("30"), 1e-9)
+    }
+
+    @Test fun jacks() {
+        k("Jack")
+        val r = formRows(mapOf("pa" to "45", "run" to "4'", "sp" to "16\""))
+        assertEquals("22- 5/8in", r.v("Common Difference (har jack ka farak)"))
+        assertTrue(r.any { it.label.startsWith("Jack 2") })
+    }
+
+    @Test fun weights() {
+        assertEquals("15kg", k("5 ^kg + 1 0 ^kg ="))
+        assertEquals("33.0693lbs", k("^lbs"))
+        pressLabel("Conv"); pressLabel("met tons"); assertEquals("0.015mt", e.display())
+    }
+
+    @Test fun masonry() {
+        e.metric = true
+        k("^Masonry")
+        val r = formRows(mapOf("l" to "1000", "h" to "300", "t" to "23", "op" to "0"))
+        assertEquals("3623 nag", r.v("Int (+5% waste)"))
+    }
+
+    @Test fun footing() {
+        e.metric = true
+        k("^Footing")
+        val r = formRows(mapOf("l" to "100", "w" to "100", "d" to "100", "n" to "1"), "M20 1:1.5:3")
+        assertEquals("8.1 bag", r.v("Cement (50 kg bag)"))
+    }
+
+    @Test fun boardFeet() {
+        k("^BdFt")
+        val r = formRows(mapOf("t" to "2\"", "w" to "6\"", "l" to "12'", "q" to "1", "r" to "0"))
+        assertEquals("12 BF", r.v("Board feet"))
+    }
+
+    @Test fun baluster() {
+        k("^Baluster")
+        val r = formRows(mapOf("run" to "4'", "w" to "1-1/2\"", "g" to "4\"", "rk" to "0"))
+        assertEquals("8", r.v("Balusters ki ginti"))
+    }
+
+    @Test fun stairDrawingData() {
+        k("1 0 Feet Rise 1 2 Feet Run Stair")
+        val r = formRows()
+        val plan = r.first { it.stair != null }.stair!!
+        assertEquals(16, plan.n)
+        assertEquals("5- 5/16in", r.v("Throat (bachi lakdi)"))
+    }
+
+    @Test fun roof() {
+        k("^Roof")
+        val r = formRows(mapOf("l" to "40'", "w" to "24'", "p" to "6/12", "oh" to "0", "sp" to "24\""))
+        assertEquals("1073.31ft²", r.v("Roof area (chhajje ke saath)"))
+    }
+
+    @Test fun cost() {
+        k("1 0 ^Cost")
+        val r = formRows(mapOf("q" to "10", "r" to "50", "g" to "18"))
+        assertEquals("₹ 590.00", r.v("Kul"))
+    }
 }

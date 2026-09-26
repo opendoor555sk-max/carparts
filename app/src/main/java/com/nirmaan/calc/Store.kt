@@ -36,7 +36,7 @@ object Store {
     fun save(ctx: Context, e: Engine) {
         try {
             val o = JSONObject()
-            o.put("res", e.res).put("metric", e.metric).put("trig", e.trig).put("TS", e.TS)
+            o.put("res", e.res).put("metric", e.metric).put("trig", e.trig).put("light", e.light).put("TS", e.TS)
             e.triU?.let { o.put("triU", it) }
             val m = JSONObject(); e.M.forEach { (k, q) -> qj(q)?.let { m.put(k, it) } }; o.put("M", m)
             val t = JSONObject(); e.T.forEach { (k, v) -> if (v.v.isFinite()) t.put(k, mj(v)) }; o.put("T", t)
@@ -54,6 +54,7 @@ object Store {
             e.res = o.optInt("res", 16)
             e.metric = o.optBoolean("metric")
             e.trig = o.optBoolean("trig")
+            e.light = o.optBoolean("light")
             e.TS = o.optInt("TS")
             e.triU = if (o.has("triU")) o.getString("triU") else null
             o.optJSONObject("M")?.let { m -> m.keys().forEach { k -> e.M[k] = jq(m.getJSONObject(k)) } }
