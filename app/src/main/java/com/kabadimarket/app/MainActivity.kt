@@ -95,6 +95,11 @@ sealed interface Route {
     data class Sell(val partNumber: String) : Route
     data class Invoice(val id: String) : Route
     data object Requirements : Route
+    data object CashBook : Route
+    data object DamagedReturns : Route
+    /** mode: "stock", "buy" or "sell" */
+    data class Report(val mode: String) : Route
+    data object ProfitReport : Route
     data class RequirementNew(val partNumber: String = "", val gps: String = "") : Route
     data object Limits : Route
     data object Tools : Route
@@ -242,6 +247,10 @@ private fun Screen(u: User, nav: Nav, r: Route, logout: () -> Unit) {
         is Route.Sell -> SellScreen(u, nav, r.partNumber)
         is Route.Invoice -> InvoiceScreen(u, nav, r.id)
         Route.Requirements -> RequirementsScreen(u, nav)
+        Route.CashBook -> com.kabadimarket.app.ui.CashBookScreen(u, nav)
+        Route.DamagedReturns -> com.kabadimarket.app.ui.DamagedReturnsScreen(nav)
+        is Route.Report -> com.kabadimarket.app.ui.ReportScreen(u, nav, r.mode)
+        Route.ProfitReport -> com.kabadimarket.app.ui.ProfitReportScreen(nav)
         is Route.RequirementNew -> RequirementNewScreen(nav, r.partNumber, r.gps)
         Route.Limits -> LimitsScreen(nav)
         Route.Tools -> ToolsScreen(u, nav)

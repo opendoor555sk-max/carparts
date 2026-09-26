@@ -154,6 +154,38 @@ object Printer {
         return wrap("Requirements / Inquiry List", b, body)
     }
 
+    /** Report grouped by company → category (same as old printReport). */
+    fun reportHtml(b: Branding, title: String, items: List<JSONObject>, showPrice: Boolean): String {
+        val groups = sortedMapOf<String, java.util.SortedMap<String, MutableList<JSONObject>>>()
+        items.forEach { it0 ->
+            val co = it0.str("company").ifBlank { "All" }
+            val cat = it0.str("category").ifBlank { "Uncategorized" }
+            groups.getOrPut(co) { sortedMapOf() }.getOrPut(cat) { mutableListOf() }.add(it0)
+        }
+        val body = StringBuilder()
+        var grand = 0.0
+        groups.forEach { (co, cats) ->
+            body.append("<h3 style=\"margin:16px 0 4px;font-size:15px;border-bottom:2px solid #333\">${esc(co)}</h3>")
+            cats.forEach { (cat, list) ->
+                val rows = list.joinToString("") { x ->
+                    val price = x.num("price")
+                    grand += price ?: 0.0
+                    val date = x.str("at").ifBlank { x.str("created_at") }
+                    "<tr><td>${esc(x.str("part_number"))}</td><td>${esc(x.str("part_name"))}</td><td>${esc(x.str("condition"))}</td>" +
+                        (if (showPrice) "<td>${if (price != null) "Rs. " + fmtNum(price) else ""}</td>" else "") +
+                        "<td>${esc(if (date.isNotBlank()) serverDate(date, false) else "")}</td></tr>"
+                }
+                body.append("<div style=\"font-weight:bold;color:#555;margin:8px 0 2px\">${esc(cat)} (${list.size})</div>")
+                body.append("<table><thead><tr><th>Part Number</th><th>Name</th><th>Condition</th>${if (showPrice) "<th>Price</th>" else ""}<th>Date</th></tr></thead><tbody>$rows</tbody></table>")
+            }
+        }
+        body.append("<div class=\"tot\">Total items: ${items.size}${if (showPrice) " &nbsp;|&nbsp; Total Rs. ${fmtNum(grand)}" else ""}</div>")
+        return wrap(title, b, body.toString())
+    }
+
+    /** 1250.0 → "1250", 99.5 → "99.5" (like JavaScript number printing). */
+    fun fmtNum(v: Double): String = if (v % 1.0 == 0.0) v.toLong().toString() else v.toString()
+
     fun invoiceHtml(b: Branding, inv: JSONObject): String {
         val meta = mutableListOf("Invoice No." to inv.str("invoice_number"), "Date" to serverDate(inv.str("at")))
         if (inv.str("customer_name").isNotBlank()) meta.add("Customer" to inv.str("customer_name"))

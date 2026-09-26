@@ -209,8 +209,8 @@ private val MODULES = listOf(
     Module("requirement", "Inquiry / Need", Icons.Filled.AddCircle, C.Amber, "requirement") { it.open(Route.Scan("requirement")) },
     Module("customers", "Grahak Khata", Icons.Filled.People, C.Brand, "sell") { it.open(Route.Customers) },
     Module("vendors", "Supplier records", Icons.Filled.Work, C.Green, "buy") { it.open(Route.Vendors) },
-    Module("damaged-returns", "Returns & spoilage", Icons.AutoMirrored.Filled.Undo, C.Red, "sell") { soon(it, "module.damaged-returns") },
-    Module("cash-book", "Rokad no hisab", Icons.Filled.Wallet, C.Amber, "sell") { soon(it, "module.cash-book") },
+    Module("damaged-returns", "Returns & spoilage", Icons.AutoMirrored.Filled.Undo, C.Red, "sell") { it.open(Route.DamagedReturns) },
+    Module("cash-book", "Rokad no hisab", Icons.Filled.Wallet, C.Amber, "sell") { it.open(Route.CashBook) },
     Module("purchase-orders", "Vendor ne order aapo", Icons.Filled.ListAlt, C.Green, "buy") { soon(it, "module.purchase-orders") },
     Module("quotations", "Grahak ne bhav aapo", Icons.Filled.Description, C.Brand, "sell") { soon(it, "module.quotations") },
     Module("stock-transfer", "Store thi store stock mokalo", Icons.Filled.SwapHoriz, C.Muted, superAdminOnly = true) { soon(it, "module.stock-transfer") },
@@ -416,10 +416,10 @@ private fun ReportsTab(user: User, nav: Nav, onLogout: () -> Unit) {
 
     data class L(val key: String, val title: String, val sub: String, val icon: ImageVector, val color: Color, val adminOnly: Boolean, val go: () -> Unit)
     val links = listOf(
-        L("profit", "profitReport.title", "home.reportProfitSub", Icons.Filled.TrendingUp, C.Amber, true) { soon(nav, "profitReport.title") },
-        L("stock", "report.stockReport", "home.reportStockSub", Icons.Filled.Inventory2, C.Muted, false) { soon(nav, "report.stockReport") },
-        L("buy", "report.purchases", "home.reportBuySub", Icons.Filled.Download, C.Green, true) { soon(nav, "report.purchases") },
-        L("sell", "report.sales", "home.reportSellSub", Icons.Filled.Payments, C.Brand, true) { soon(nav, "report.sales") },
+        L("profit", "profitReport.title", "home.reportProfitSub", Icons.Filled.TrendingUp, C.Amber, true) { nav.open(Route.ProfitReport) },
+        L("stock", "report.stockReport", "home.reportStockSub", Icons.Filled.Inventory2, C.Muted, false) { nav.open(Route.Report("stock")) },
+        L("buy", "report.purchases", "home.reportBuySub", Icons.Filled.Download, C.Green, true) { nav.open(Route.Report("buy")) },
+        L("sell", "report.sales", "home.reportSellSub", Icons.Filled.Payments, C.Brand, true) { nav.open(Route.Report("sell")) },
         L("inventory", "tabs.inventory", "home.reportInventorySub", Icons.Filled.Inventory, C.Brand, false) { nav.open(Route.Inventory) },
         L("requirements", "tabs.needs", "home.reportRequirementsSub", Icons.Filled.Checklist, C.Amber, false) { nav.open(Route.Requirements) },
     ).filter { !it.adminOnly || user.isAdmin }
@@ -598,12 +598,12 @@ private fun AdminTab(user: User, nav: Nav, onLogout: () -> Unit) {
                 SectionTitle(t("admin.statistics"))
                 data class Stat(val label: String, val value: Int, val color: Color, val icon: ImageVector, val go: () -> Unit)
                 val cards = buildList {
-                    add(Stat(t("admin.statParts"), s.int("total_parts"), C.Brand, Icons.Filled.Description) { soon(nav, "report.stockReport") })
+                    add(Stat(t("admin.statParts"), s.int("total_parts"), C.Brand, Icons.Filled.Description) { nav.open(Route.Report("stock")) })
                     add(Stat(t("admin.statInStock"), s.int("in_stock_units"), C.Green, Icons.Filled.Inventory2) { nav.open(Route.Inventory) })
-                    if (user.isAdmin) add(Stat(t("admin.statSold"), s.int("sold_units"), C.Muted, Icons.Filled.Payments) { soon(nav, "report.sales") })
+                    if (user.isAdmin) add(Stat(t("admin.statSold"), s.int("sold_units"), C.Muted, Icons.Filled.Payments) { nav.open(Route.Report("sell")) })
                     add(Stat(t("admin.statPendingNeeds"), s.int("pending_requirements"), C.Amber, Icons.Filled.Checklist) { nav.open(Route.Requirements) })
                     add(Stat(t("admin.statAiPending"), s.int("pending_ai"), C.Amber, Icons.Filled.AutoAwesome) { soon(nav, "admin.toolAiApprovals") })
-                    add(Stat(t("admin.statVerified"), s.int("verified_parts"), C.Green, Icons.Filled.Verified) { soon(nav, "report.stockReport") })
+                    add(Stat(t("admin.statVerified"), s.int("verified_parts"), C.Green, Icons.Filled.Verified) { nav.open(Route.Report("stock")) })
                 }
                 FlowRow(
                     Modifier.fillMaxWidth(),
