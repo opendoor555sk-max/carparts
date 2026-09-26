@@ -41,6 +41,6 @@ jobs:
         with:
           tag_name: calc-v1.0.${{ github.run_number }}
           name: Nirmaan Calc 1.0.${{ github.run_number }}
-          body: "Phone par NirmaanCalc.apk download karke install karein."
+          body_path: RELEASE_NOTES.md
           files: NirmaanCalc.apk
           make_latest: false

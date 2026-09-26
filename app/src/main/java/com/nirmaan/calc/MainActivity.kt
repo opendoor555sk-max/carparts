@@ -75,6 +75,7 @@ class MainActivity : Activity(), Ui {
         root.addView(buildPanel(), FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         setContentView(root)
         render()
+        Updater.autoCheck(this)
     }
 
     override fun onPause() {
@@ -485,6 +486,16 @@ class MainActivity : Activity(), Ui {
             }
         }, llp(MATCH_PARENT, WRAP_CONTENT))
         panelBody.addView(box)
+
+        val upd = LinearLayout(this).apply { setPadding(dpi(12f), 0, dpi(12f), dpi(12f)) }
+        upd.addView(TextView(this).apply {
+            text = "Update check karein  (version " + Updater.myVersionName(this@MainActivity) + ")"
+            textSize = 16f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, colors("op")).apply { cornerRadius = dp(8f) }
+            setPadding(0, dpi(12f), 0, dpi(12f))
+            setOnClickListener { Updater.check(this@MainActivity, manual = true) }
+        }, llp(MATCH_PARENT, WRAP_CONTENT))
+        panelBody.addView(upd)
         panelBody.addView(TextView(this).apply {
             text = "Tip: green keys par ungli left-right sarkayein to SIN/COS/TAN aa jayenge. " +
                 "Yards/Feet/Inches wali line par sarkayein to metric (m/cm/mm) ho jayega."
