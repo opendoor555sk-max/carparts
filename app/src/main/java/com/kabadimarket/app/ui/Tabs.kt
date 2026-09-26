@@ -211,13 +211,13 @@ private val MODULES = listOf(
     Module("vendors", "Supplier records", Icons.Filled.Work, C.Green, "buy") { it.open(Route.Vendors) },
     Module("damaged-returns", "Returns & spoilage", Icons.AutoMirrored.Filled.Undo, C.Red, "sell") { it.open(Route.DamagedReturns) },
     Module("cash-book", "Rokad no hisab", Icons.Filled.Wallet, C.Amber, "sell") { it.open(Route.CashBook) },
-    Module("purchase-orders", "Vendor ne order aapo", Icons.Filled.ListAlt, C.Green, "buy") { soon(it, "module.purchase-orders") },
-    Module("quotations", "Grahak ne bhav aapo", Icons.Filled.Description, C.Brand, "sell") { soon(it, "module.quotations") },
-    Module("stock-transfer", "Store thi store stock mokalo", Icons.Filled.SwapHoriz, C.Muted, superAdminOnly = true) { soon(it, "module.stock-transfer") },
-    Module("reservations", "Grahak mate stock rakho", Icons.Filled.Lock, C.Amber, "sell") { soon(it, "module.reservations") },
+    Module("purchase-orders", "Vendor ne order aapo", Icons.Filled.ListAlt, C.Green, "buy") { it.open(Route.PurchaseOrders) },
+    Module("quotations", "Grahak ne bhav aapo", Icons.Filled.Description, C.Brand, "sell") { it.open(Route.Quotations) },
+    Module("stock-transfer", "Store thi store stock mokalo", Icons.Filled.SwapHoriz, C.Muted, superAdminOnly = true) { it.open(Route.StockTransfer) },
+    Module("reservations", "Grahak mate stock rakho", Icons.Filled.Lock, C.Amber, "sell") { it.open(Route.Reservations) },
     Module("audit-log", "Kone shu badalyu", Icons.Filled.History, C.Muted, adminOnly = true) { soon(it, "module.audit-log") },
     Module("tools", "Admin utilities", Icons.Filled.Build, C.Brand) { it.open(Route.Tools) },
-    Module("arrange", "Place bought stock", Icons.Filled.LocationOn, C.Muted, "buy", wide = true) { soon(it, "module.arrange") },
+    Module("arrange", "Place bought stock", Icons.Filled.LocationOn, C.Muted, "buy", wide = true) { it.open(Route.StoreArrangement) },
 )
 
 @OptIn(ExperimentalLayoutApi::class)

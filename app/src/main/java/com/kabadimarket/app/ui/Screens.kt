@@ -126,7 +126,7 @@ fun ToolsScreen(user: User, nav: Nav) {
         Tool("admin.toolSearchSetup", "admin.linkGoogleSearchSub", Icons.Filled.Key, "search") { nav.open(Route.Soon("admin.toolSearchSetup")) },
         Tool("admin.toolBuyLimit", "admin.linkPurchaseLimitsSub", Icons.Filled.Speed, "manage_limits") { nav.open(Route.Limits) },
         Tool("admin.toolDemand", "admin.linkDemandSearchSub", Icons.Filled.TrendingUp, "view_stats") { nav.open(Route.Soon("admin.toolDemand")) },
-        Tool("admin.toolStockVerify", "admin.linkStockVerifySub", Icons.Filled.Assignment, null) { nav.open(Route.Soon("admin.toolStockVerify")) },
+        Tool("admin.toolStockVerify", "admin.linkStockVerifySub", Icons.Filled.Assignment, null) { nav.open(Route.StockVerify) },
         Tool("admin.toolUnlinked", "admin.linkUnlinkedStockSub", Icons.Filled.Warning, null) { nav.open(Route.Soon("admin.toolUnlinked")) },
         Tool("admin.toolPsHistory", "admin.toolBulkDelete", Icons.Filled.Receipt, null) { nav.open(Route.Soon("admin.toolPsHistory")) },
         Tool("admin.toolSearchLogs", "admin.linkSearchLogsSub", Icons.Filled.History, null) { nav.open(Route.Soon("admin.toolSearchLogs")) },

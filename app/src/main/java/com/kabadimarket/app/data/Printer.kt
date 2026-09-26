@@ -154,6 +154,22 @@ object Printer {
         return wrap("Requirements / Inquiry List", b, body)
     }
 
+    /** Sticker for the rack/shelf spot itself (old printLocationSticker). */
+    fun locationStickerHtml(b: Branding, partNumber: String, address: String, partName: String?): String {
+        val addr = address.ifBlank { "No location set" }
+        val body = """<div style="text-align:center;padding:10px">
+    <div style="font-size:20px;font-weight:900;letter-spacing:0.5px">${esc(partNumber)}</div>
+    ${if (!partName.isNullOrBlank()) "<div style=\"font-size:13px;color:#555;margin-top:2px\">${esc(partName)}</div>" else ""}
+    <div style="margin-top:16px;font-size:17px;font-weight:800;line-height:1.5;border:2px solid #222;border-radius:10px;padding:14px">
+      ${esc(addr)}
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;margin-top:14px">
+      ${Codes.code128Svg(partNumber, height = 60, moduleWidth = 2)}
+    </div>
+  </div>"""
+        return wrap("Location Sticker", b, body)
+    }
+
     /** Report grouped by company → category (same as old printReport). */
     fun reportHtml(b: Branding, title: String, items: List<JSONObject>, showPrice: Boolean): String {
         val groups = sortedMapOf<String, java.util.SortedMap<String, MutableList<JSONObject>>>()
