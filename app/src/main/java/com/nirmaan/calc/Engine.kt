@@ -79,6 +79,9 @@ class StairPlan(
     val marks: List<String>,
     val info: List<String>,
     val finished: Boolean = false,
+    /** installation view: header / upper floor, lower floor, stringer attachment */
+    val install: Boolean = false,
+    val floorTh: Double = 0.0,
     val tt: Double = 0.0,
     val nose: Double = 0.0,
     val rt: Double = 0.0
@@ -104,10 +107,13 @@ class FormSpec(
     /** optional second option row; compute then receives "seg|seg2" */
     val seg2: List<String>? = null,
     val segSel: Int = 0,
+    val seg2Sel: Int = 0,
+    /** size list the user can edit on this screen: drywall, roof, tile, oc, picket */
+    val sizeCat: String? = null,
     val compute: (Map<String, Double>, String?) -> List<Row>
 )
 
-class KeyDef(var main: String, var conv: String, val cls: String, val blue: String)
+class KeyDef(var main: String, var conv: String, val cls: String, var blue: String)
 
 interface Ui {
     fun toast(m: String)
@@ -139,6 +145,11 @@ class Engine(val ui: Ui) {
     var haptic = true
     var thousands = false
     var fracConst = false
+    var decPlaces = -1                        // -1 = auto
+    var clickSound = false
+    var advanced = true                       // false = BuildCalc 1.x memory keys (MsnSz, SprAng, TreadW ...)
+    var archInside = false                    // arched wall studs: outside (default) / inside
+    val sizes = mutableMapOf<String, MutableList<Pair<Double, Double>>>()
     var dens = 1.5 * 2000 * LB / YD3          // wt/vol memory, kg/m³ (1.5 T/yd³)
 
     // live state
@@ -213,6 +224,24 @@ class Engine(val ui: Ui) {
         return (if (x < 0) "-" else "") + "₹ " + group(s)
     }
 
+    fun sizeDefaults(cat: String): List<Pair<Double, Double>> = when (cat) {
+        "drywall" -> listOf(4 * FT to 8 * FT, 4 * FT to 9 * FT, 4 * FT to 10 * FT, 4 * FT to 12 * FT)
+        "roof" -> listOf(4 * FT to 8 * FT, 4 * FT to 10 * FT)
+        "tile" -> if (metric) listOf(0.6 to 0.6, 0.3 to 0.3, 0.8 to 0.8, 0.6 to 1.2, 0.2 to 0.1)
+        else listOf(FT to FT, 2 * FT to 2 * FT, 12 * IN to 24 * IN, 6 * IN to 6 * IN, 8 * IN to 4 * IN)
+        "oc" -> (if (metric) listOf(0.3, 0.4, 0.6) else listOf(12 * IN, 16 * IN, 19.2 * IN, 24 * IN)).map { it to 0.0 }
+        "picket" -> (if (metric) listOf(0.1, 0.12, 0.15) else listOf(4 * IN, 5.5 * IN, 6 * IN)).map { it to 0.0 }
+        else -> emptyList()
+    }
+
+    fun sizeList(cat: String): List<Pair<Double, Double>> = sizes[cat] ?: sizeDefaults(cat)
+
+    fun sizeLabel(p: Pair<Double, Double>): String {
+        fun one(x: Double) = if (metric) num(rnd(x * 100, 1)) else if (x >= FT - 1e-9 && abs(x / FT - Math.round(x / FT)) < 1e-6) num(rnd(x / FT, 2)) + "'" else fracStr(x / IN).replace("- ", "-") + "\""
+        return if (p.second <= 0) one(p.first) + (if (metric) " cm" else "")
+        else one(p.first) + "×" + one(p.second) + (if (metric) " cm" else "")
+    }
+
     fun wf(u: String): Double = if (u == "tons") lbsPerTon * LB else WF[u] ?: 1.0
 
     val DENS_U = listOf("T/yd³", "lb/yd³", "lb/ft³", "MT/m³", "kg/m³")
@@ -245,7 +274,7 @@ class Engine(val ui: Ui) {
     fun fmt(q: Q?): String {
         if (q == null || q.t == 'e') return "Error"
         return when (q.t) {
-            'n' -> if (q.dms) dms(q.v) else num(q.v)
+            'n' -> if (q.dms) dms(q.v) else num(if (decPlaces >= 0) rnd(q.v, decPlaces) else q.v)
             'p' -> num(q.v) + "%"
             'a' -> if (q.dms) dms(q.v) else if (q.v.isFinite()) f2(q.v) + "°" else "Error"
             'L' -> fmtL(q)
@@ -275,7 +304,7 @@ class Engine(val ui: Ui) {
         }
         val uu = baseU(u)
         val x = q.v / UF.getValue(uu).pow(d)
-        return num(rnd(x, if (d > 1) 2 else 4)) + uu + SUP[d.coerceIn(0, 3)]
+        return num(rnd(x, if (decPlaces >= 0) decPlaces else if (d > 1) 2 else 4)) + uu + SUP[d.coerceIn(0, 3)]
     }
 
     fun defU() = if (metric) "m" else "ftin"
@@ -694,7 +723,11 @@ class Engine(val ui: Ui) {
 
     // ================= MEMORY =================
     private fun memKey(k: String, md: String) {
-        val nm = mapOf("m1" to "M1", "m2" to "M2", "m3" to "M3", "oc" to "On-Center", "rails" to "Rails").getValue(k)
+        val nm = mapOf(
+            "m1" to "M1", "m2" to "M2", "m3" to "M3", "oc" to "On-Center", "rails" to "Rails",
+            "msnsz" to "Masonry size", "sprang" to "Spring angle", "treadw" to "Tread width", "riserh" to "Riser height",
+            "floorh" to "Floor thickness", "ftarea" to "Footing area"
+        ).getValue(k)
         if (md == "store") {
             val q = value()
             when (k) {
@@ -1041,12 +1074,18 @@ class Engine(val ui: Ui) {
             val oc = M["oc"]?.v ?: (if (metric) 0.4 else 16 * IN)
             val base = M["rwall"]?.v ?: 0.0
             val half = a.chord / 2
-            rows.add(sec("Arch framing studs (" + fL(oc, 1, if (metric) "cm" else "in") + " o.c., base " + fL(base) + ")"))
+            rows.add(sec("Arch framing studs (" + fL(oc, 1, if (metric) "cm" else "in") + " o.c., base " + fL(base) + ", " + (if (archInside) "inside" else "outside") + ")"))
             var i = 0
             while (i <= 80) {
                 val x = min(i * oc, a.chord)
-                val dx = x - half
-                val h = base + sqrt(max(0.0, a.R * a.R - dx * dx)) - (a.R - a.rise)
+                val sw = if (metric) 0.038 else 1.5 * IN
+                fun hAt(px: Double): Double {
+                    val dx = px.coerceIn(0.0, a.chord) - half
+                    return base + sqrt(max(0.0, a.R * a.R - dx * dx)) - (a.R - a.rise)
+                }
+                val h1 = hAt(x - sw / 2)
+                val h2 = hAt(x + sw / 2)
+                val h = if (archInside) min(h1, h2) else max(h1, h2)
                 rows.add(Row("Stud ${i + 1}  (" + fL(x) + " par)", fL(h)))
                 if (x >= a.chord - 1e-9) break
                 i++
@@ -1160,10 +1199,11 @@ class Engine(val ui: Ui) {
                 "Stairs Function", listOf(
                     Field("rise", "Rise (floor to floor) – khali ho to Run se", true, lenTxt(T["rise"]?.v), if (m) "cm mein" else "jaise 9' 10\""),
                     Field("run", "Run (khaali chhod sakte hain)", true, lenTxt(T["run"]?.v), if (m) "cm mein" else "jaise 12'"),
-                    Field("dr", "Desired Riser Height", true, if (m) "19" else "7-1/2\""),
-                    Field("dt", "Desired Tread Width", true, if (m) "25" else "10\""),
+                    Field("dr", "Desired Riser Height", true, M["riserh"]?.let { lenTxt(toLen(it)) } ?: if (m) "19" else "7-1/2\""),
+                    Field("dt", "Desired Tread Width", true, M["treadw"]?.let { lenTxt(toLen(it)) } ?: if (m) "25" else "10\""),
                     Field("hr", "Headroom", true, if (m) "203" else "6' 8\""),
-                    Field("th", "Floor thickness (upar wala)", true, if (m) "25" else "10\""),
+                    Field("th", "Floor thickness (upar wala)", true, M["floorh"]?.let { lenTxt(toLen(it)) } ?: if (m) "25" else "10\""),
+                    Field("sw", "Seedhi ki chaudai (stringers ginne ke liye)", true, if (m) "90" else "36\""),
                     Field("bw", "Stringer board width (patiya)", true, if (m) "28" else "11-1/4\"", if (m) "cm mein" else "2x12 = 11-1/4\""),
                     Field("tt", "Tread (paydan) ki motai – Advanced", true, if (m) "2.5" else "1\""),
                     Field("nose", "Nosing (aage nikla hissa) – Advanced", true, if (m) "2.5" else "1\""),
@@ -1200,6 +1240,7 @@ class Engine(val ui: Ui) {
                 val th = v["th"] ?: 0.0
                 val open = (if (hr > 0) hr else 0.0) + (if (th > 0) th else 0.0)
                 fun pos(x: Double?) = if (x != null && x.isFinite() && x > 0) x else 0.0
+                fun m2(x: Double) = x
                 val tt = pos(v["tt"])
                 val nose = pos(v["nose"])
                 val rtk = pos(v["rtk"])
@@ -1221,6 +1262,12 @@ class Engine(val ui: Ui) {
                     rows.add(Row("", stair = StairPlan(n, ur, ut, if (bw > 0) bw else notch * 2, emptyList(),
                         listOf("Steps: $n", "Tread board: " + fL(ut + nose + rtk, 1, sm), "Nosing: " + fL(nose, 1, sm)),
                         finished = true, tt = tt, nose = nose, rt = rtk)))
+                    val below = (m2(n * ur - (if (th > 0) th else 0.0)) - (m2((n - 1) * ut) * ur / ut + ur - (if (bw > 0) bw else notch * 2) / cos(atan(ur / ut)) - tt))
+                    rows.add(sec("Installation (lagane ka tareeka)"))
+                    rows.add(Row("", stair = StairPlan(n, ur, ut, if (bw > 0) bw else notch * 2, emptyList(),
+                        listOf("Top: header ke face se", "Bottom: floor par, " + fL(tt, 1, sm) + " kaat kar",
+                            if (below > 0) "Stringer header se " + fL(below, 1, sm) + " neeche: hanger lagayein" else "Stringer header par poora baithta hai"),
+                        tt = tt, install = true, floorTh = if (th > 0) th else 0.0)))
                 }
                 if (fromRun) rows.add(Row("Rise Run se nikala (" + fL(rise) + ")", "i"))
                 rows.addAll(listOf(
@@ -1244,7 +1291,10 @@ class Engine(val ui: Ui) {
                     Row("Pehla step stringer par", fL(ur - tt, 1, sm)),
                     Row("Tread board ki chaudai", fL(ut + nose + rtk, 1, sm)),
                     Row("Tread boards", tr.toString() + " nag"),
-                    Row("Riser boards (" + fL(ur, 1, sm) + " oonche)", n.toString() + " nag")
+                    Row("Riser boards (" + fL(ur, 1, sm) + " oonche)", n.toString() + " nag"),
+                    Row("Stringers ki ginti (max " + (if (m) "40 cm" else "16\"") + " doori)",
+                        pos(v["sw"]).let { w -> if (w > 0) (ceil(w / (if (m) 0.4 else 16 * IN) - 1e-9).toInt() + 1).toString() + " nag" else "—" }),
+                    Row("Top par stringer lagayein", "floor se " + fL(ur, 1, sm) + " neeche pehla notch")
                 ))
                 if (ang > 42) rows.add(Row("Seedhi bahut steep hai", "⚠", true))
                 if (throat.isFinite() && throat < 3.5 * IN) rows.add(Row("Throat kam hai — chaudi patiya lein", "⚠", true))
@@ -1267,7 +1317,7 @@ class Engine(val ui: Ui) {
             FormSpec(
                 "Compound + Simple Miters", listOf(
                     Field("c", "Corner Angle (°)", false, num(rnd(corner, 2))),
-                    Field("s", "Spring Angle (°)", false, "38", "Crown molding ki deewar se angle")
+                    Field("s", "Spring Angle (°)", false, M["sprang"]?.let { num(it.v) } ?: "38", "Crown molding ki deewar se angle")
                 ), listOf("Miter Saw", "Protractor")
             ) { v, mode ->
                 val c = v["c"] ?: Double.NaN
@@ -1327,6 +1377,10 @@ class Engine(val ui: Ui) {
         if (trig && r == 2 && c in 1..3) { d.main = listOf("SIN", "COS", "TAN")[c - 1]; d.conv = listOf("ASIN", "ACOS", "ATAN")[c - 1] }
         if (metric && r == 3 && c <= 2) d.main = listOf("m", "cm", "mm")[c]
         if (metric && r == 2 && c == 0) d.main = "Feet"
+        if (!advanced) {
+            val legacy = mapOf("4" to "MsnSz", "6" to "SprAng", "8" to "TreadW", "9" to "RiserH", "." to "FloorH", "+" to "FtArea")
+            legacy[d.main]?.let { d.blue = it }
+        }
         return d
     }
 
@@ -1371,7 +1425,10 @@ class Engine(val ui: Ui) {
             return
         }
         if (md0 != null && !wasConv && d.blue.isNotEmpty()) {
-            val k = mapOf("M1" to "m1", "M2" to "m2", "M3" to "m3", "o.c." to "oc", "Rails" to "rails")[d.blue]
+            val k = mapOf(
+                "M1" to "m1", "M2" to "m2", "M3" to "m3", "o.c." to "oc", "Rails" to "rails",
+                "MsnSz" to "msnsz", "SprAng" to "sprang", "TreadW" to "treadw", "RiserH" to "riserh", "FloorH" to "floorh", "FtArea" to "ftarea"
+            )[d.blue]
             mode = null
             if (k != null) memKey(k, md0) else ui.toast(SOON)
             after(n); return

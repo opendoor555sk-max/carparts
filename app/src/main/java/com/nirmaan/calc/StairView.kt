@@ -41,6 +41,7 @@ class StairView(ctx: Context, private val p: StairPlan) : View(ctx) {
         val ut = p.ut
         val bw = p.bw
         if (n < 1 || ur <= 0 || ut <= 0) return
+        if (p.install) return drawInstall(c)
         if (p.finished) return drawFinished(c)
         val th = atan2(ur, ut)
         val m = ur / ut
@@ -188,5 +189,69 @@ class StairView(ctx: Context, private val p: StairPlan) : View(ctx) {
             y -= info.textSize * 1.3f
         }
         c.drawText("Finished Layout", W - pad, y - sp(2f), title)
+    }
+
+    /** How the stringer sits: on the lower floor (cut by tread thickness) and against the header of the upper floor. */
+    private fun drawInstall(c: Canvas) {
+        val n = p.n
+        val ur = p.ur
+        val ut = p.ut
+        val tt = p.tt
+        val bw = p.bw
+        val th = atan2(ur, ut)
+        val m = ur / ut
+        val xEnd = (n - 1) * ut
+        val top = n * ur
+        val drop = bw / cos(th)
+        val xb = (drop - ur) / m
+        val fth = if (p.floorTh > 0) p.floorTh else 0.6 * ur
+        val xmin = min(-ut, xb) - 0.3 * ut
+        val xmax = xEnd + 2.2 * ut
+        val ymin = -0.12 * top
+        val ymax = top * 1.06
+        val pad = dp(10f)
+        val W = width.toFloat()
+        val H = height.toFloat()
+        val s = min((W - 2 * pad) / (xmax - xmin), (H - 2 * pad) / (ymax - ymin)).toFloat()
+        val ox = pad + ((W - 2 * pad) - (xmax - xmin).toFloat() * s) / 2
+        fun X(x: Double) = ox + ((x - xmin) * s).toFloat()
+        fun Y(y: Double) = H - pad - ((y - ymin) * s).toFloat()
+        val header = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0x8D, 0x6E, 0x63); style = Paint.Style.FILL }
+        val red = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0xC6, 0x28, 0x28); style = Paint.Style.STROKE; strokeWidth = dp(2f) }
+
+        c.drawRect(X(xmin), Y(0.0), X(xmax), Y(ymin), floor)
+        // upper floor with its header (rim) at the stair opening
+        c.drawRect(X(xEnd), Y(top), X(xmax), Y(top - fth), floor)
+        c.drawRect(X(xEnd), Y(top), X(xEnd + 0.25 * ut), Y(top - fth), header)
+
+        val yb = m * xEnd + ur - drop - tt
+        val path = Path()
+        path.moveTo(X(xb), Y(0.0))
+        path.lineTo(X(0.0), Y(0.0))
+        for (k in 1..n) {
+            path.lineTo(X((k - 1) * ut), Y(k * ur - tt))
+            if (k < n) path.lineTo(X(k * ut), Y(k * ur - tt))
+        }
+        path.lineTo(X(xEnd), Y(yb))
+        path.close()
+        c.drawPath(path, wood)
+        c.drawPath(path, line)
+        // attachment points
+        c.drawLine(X(xEnd) + dp(2f), Y(top - tt - ur), X(xEnd) + dp(2f), Y(yb), red)
+        c.drawLine(X(xb), Y(0.0) + dp(2f), X(0.0), Y(0.0) + dp(2f), red)
+
+        val lbl = Paint(dimTxt).apply { textAlign = Paint.Align.LEFT; textSize = sp(11f) }
+        c.drawText("Header", X(xEnd + 0.3 * ut), Y(top - fth / 2) + lbl.textSize / 2, lbl)
+        c.drawText("Upar ka floor", X(xEnd + 0.3 * ut), Y(top) - dp(4f), lbl)
+        c.drawText("Neeche ka floor", X(xmin) + dp(4f), Y(0.0) + lbl.textSize + dp(3f), lbl)
+
+        info.textAlign = Paint.Align.RIGHT
+        title.textAlign = Paint.Align.RIGHT
+        var y = Y(0.0) - dp(6f)
+        for (t in p.info.reversed()) {
+            c.drawText(t, W - pad, y, info)
+            y -= info.textSize * 1.3f
+        }
+        c.drawText("Installation", W - pad, y - sp(2f), title)
     }
 }

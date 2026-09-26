@@ -108,16 +108,36 @@ fun hipGeo(pA: Double, pB: Double, runA: Double): HipGeo {
     )
 }
 
+/** Purlin square to roof plane A, running along wall A, cut against the side face of the hip.
+ *  Returns (face cut on the top face, edge cut on the side face), degrees from a square cut. */
+fun purlinCuts(pA: Double, pB: Double): Pair<Double, Double> {
+    val tA = tan(pA * D2R)
+    val tB = tan(pB * D2R)
+    val h = doubleArrayOf(1 / tB, 1 / tA, 1.0)
+    val nc = cross(h, doubleArrayOf(0.0, 0.0, 1.0))
+    val nA = doubleArrayOf(0.0, -tA, 1.0)
+    val a = doubleArrayOf(1.0, 0.0, 0.0)
+    val side = cross(a, nA)
+    fun ang(u: DoubleArray, v: DoubleArray) = acos(abs(dot(norm3(u), norm3(v))).coerceAtMost(1.0)) / D2R
+    return ang(cross(nc, nA), cross(nA, a)) to ang(cross(nc, side), cross(side, a))
+}
+
 fun Engine.hipForm(irr: Boolean) {
     val runDef = lt(solveTri()?.run ?: T["run"]?.v, "12'", "365")
-    val fields = mutableListOf(pitchField("pa", if (irr) "Pitch A (lambi deewar wali chhat)" else "Pitch", pitchDef()))
-    if (irr) fields.add(pitchField("pb", "Pitch B (doosri deewar wali chhat)", pitchDef()))
-    fields.add(Field("run", if (irr) "Common Run A (deewar A se ridge tak)" else "Common Run (deewar se ridge tak)", true, runDef))
-    ui.form(FormSpec(if (irr) "Irregular Hip / Valley" else "Hip / Valley Function", fields, listOf("Miter Saw", "Protractor")) { v, mode ->
-        val pr = seg(mode, 0, "Miter Saw") == "Protractor"
+    val fields = mutableListOf(
+        pitchField("pa", "Pitch (A – lambi deewar wali chhat)", pitchDef()),
+        pitchField("pb", "Pitch B (sirf Irregular – doosri chhat)", pitchDef()),
+        Field("run", "Common Run A (deewar A se ridge tak)", true, runDef),
+        Field("bl", "Building length (chhat ka area ke liye, khali chhod sakte)", true, lt(G["len"]?.v, "", ""))
+    )
+    val defType = if (irr) "Irregular" else "Regular"
+    ui.form(FormSpec("Hip / Valley Function", fields, listOf("Miter Saw", "Protractor"), listOf("Regular", "Irregular"),
+        seg2Sel = if (irr) 1 else 0) { v, sg ->
+        val pr = seg(sg, 0, "Miter Saw") == "Protractor"
+        val ir = seg(sg, 1, defType) == "Irregular"
         fun cut(a: Double) = f2(if (pr) 90 - a else a) + "°"
         val pA = v["pa"] ?: Double.NaN
-        val pB = if (irr) v["pb"] ?: Double.NaN else pA
+        val pB = if (ir) v["pb"] ?: Double.NaN else pA
         val run = v["run"] ?: Double.NaN
         if (!(pA > 0 && pA < 90 && pB > 0 && pB < 90)) return@FormSpec bad("Pitch 0 se 90 ke beech daaliye")
         if (!ok(run)) return@FormSpec bad("Run daaliye")
@@ -130,11 +150,11 @@ fun Engine.hipForm(irr: Boolean) {
             sec("Hip / Valley rafter"),
             Row("Plumb Cut", cut(g.hipPitch)),
             Row("Level Cut", cut(90 - g.hipPitch)),
-            Row(if (irr) "Cheek Cut A – saw bevel" else "Cheek Cut – saw bevel", cut(90 - g.planA))
+            Row(if (ir) "Cheek Cut A – saw bevel" else "Cheek Cut – saw bevel", cut(90 - g.planA))
         )
-        if (irr) rows.add(Row("Cheek Cut B – saw bevel", cut(g.planA)))
-        rows.add(Row(if (irr) "Hip Backing Angle A" else "Hip Backing Angle", f2(g.backA) + "°"))
-        if (irr) rows.add(Row("Hip Backing Angle B", f2(g.backB) + "°"))
+        if (ir) rows.add(Row("Cheek Cut B – saw bevel", cut(g.planA)))
+        rows.add(Row(if (ir) "Hip Backing Angle A" else "Hip Backing Angle", f2(g.backA) + "°"))
+        if (ir) rows.add(Row("Hip Backing Angle B", f2(g.backB) + "°"))
         rows.addAll(
             listOf(
                 Row("Dihedral Angle", f2(g.dihedral) + "°"),
@@ -143,14 +163,40 @@ fun Engine.hipForm(irr: Boolean) {
                 Row("Hip Run", fL(g.hipRun)),
                 Row("Hip Rafter Length", fL(g.hipLen)),
                 sec("Sheathing (chhat ki sheet) cut"),
-                Row(if (irr) "Sheathing angle A (eave se hip)" else "Sheathing angle (eave se hip)", f2(shA) + "°")
+                Row(if (ir) "Sheathing angle A (eave se hip)" else "Sheathing angle (eave se hip)", f2(shA) + "°")
             )
         )
-        if (irr) rows.add(Row("Sheathing angle B (eave se hip)", f2(shB) + "°"))
-        rows.addAll(listOf(sec("Common rafters"), Row("Rise", fL(g.rise)), Row(if (irr) "Common A length" else "Common length", fL(g.comA))))
-        if (irr) {
+        if (ir) rows.add(Row("Sheathing angle B (eave se hip)", f2(shB) + "°"))
+        // purlins square to the roof (butt / under purlins)
+        val pa = purlinCuts(pA, pB)
+        rows.add(sec("Purlin (roof ke square, butt/under) – board par angle"))
+        rows.add(Row(if (ir) "Side A: face cut (upar ki satah)" else "Face cut (upar ki satah)", cut(pa.first)))
+        rows.add(Row(if (ir) "Side A: edge cut (bagal ki satah)" else "Edge cut (bagal ki satah)", cut(pa.second)))
+        if (ir) {
+            val pb = purlinCuts(pB, pA)
+            rows.add(Row("Side B: face cut (upar ki satah)", cut(pb.first)))
+            rows.add(Row("Side B: edge cut (bagal ki satah)", cut(pb.second)))
+        }
+        rows.add(Row("Vertical purlin: miter = plan angle, bevel 90°", f2(g.planA) + "°"))
+        rows.add(Row("Batten (over-purlin): face aur edge cut ulat dein"))
+        rows.addAll(listOf(sec("Common rafters"), Row("Rise", fL(g.rise)), Row(if (ir) "Common A length" else "Common length", fL(g.comA))))
+        if (ir) {
             rows.add(Row("Run B", fL(g.runB)))
             rows.add(Row("Common B length", fL(g.comB)))
+        }
+        // roof areas of a hip roof on a rectangle: long sides pitch A (width = 2 × run A), ends pitch B
+        val bl = v["bl"] ?: Double.NaN
+        if (ok(bl) && bl > 2 * g.runB) {
+            val ridge = bl - 2 * g.runB
+            val sideA = (bl + ridge) / 2 * run / cos(pA * D2R)
+            val endB = run * g.runB / cos(pB * D2R)
+            rows.addAll(listOf(
+                sec("Hip roof areas (building " + fL(bl) + " × " + fL(2 * run) + ")"),
+                Row("Ridge length", fL(ridge)),
+                Row("Lambi taraf (trapezoid) × 2", areaStr(sideA) + " × 2"),
+                Row("Chhoti taraf (triangle) × 2", areaStr(endB) + " × 2"),
+                Row("Kul roof area", areaStr(2 * sideA + 2 * endB))
+            ))
         }
         rows.add(Row("Lengths centre-line tak hain (ridge/hip ki moti ka aadha ghataein)"))
         rows
@@ -339,7 +385,7 @@ fun Engine.roofForm() {
         Field("oh", "Overhang (chhajja)", true, if (metric) "45" else "18\""),
         Field("sp", "Rafter spacing (on-center)", true, lt(M["oc"]?.v, "24\"", "60")),
         Field("cs", "Apni sheet size (jaise 4'x8' ya 105x300)", false, "", "khali chhod sakte hain", isSize = true)
-    ), listOf("Gable (do dhalan)", "Hip (char dhalan)")) { v, sg ->
+    ), listOf("Gable (do dhalan)", "Hip (char dhalan)"), sizeCat = "roof") { v, sg ->
         val l = v["l"] ?: Double.NaN
         val w = v["w"] ?: Double.NaN
         val area0 = v["a"] ?: Double.NaN
@@ -362,9 +408,8 @@ fun Engine.roofForm() {
             Row("Squares (100 ft²)", num(rnd(sq, 2))),
             Row("Shingle bundles (3 per square, +10%)", ceil(sq * 3 * 1.1).toInt().toString()),
             sec("Sheets (+10% waste)"),
-            Row("4'×8' sheets", ceil(area / (32 * FT * FT) * 1.1).toInt().toString()),
-            Row("4'×10' sheets", ceil(area / (40 * FT * FT) * 1.1).toInt().toString())
         )
+        sizeList("roof").forEach { rows.add(Row(sizeLabel(it) + " sheets", ceil(area / (it.first * it.second) * 1.1).toInt().toString())) }
         rows.addAll(customSheetRows(v, area))
         if (!useArea) {
             val l2 = l + 2 * oh
@@ -420,7 +465,7 @@ fun Engine.masonryForm() {
         Field("a", "Ya seedha area (" + areaUnit() + ") – khali chhodein to L×H", false, areaDef),
         Field("op", "Khidki/Darwaza area (" + areaUnit() + ")", false, "0"),
         Field("cs", "Apni tile/piece size (jaise 2'x2' ya 60x60)", false, "", "khali chhod sakte hain", isSize = true)
-    ), listOf("Int (brick)", "Block", "Tile / Paver"), segSel = if (areaDef.isNotEmpty()) 2 else 0) { v, sg ->
+    ), listOf("Int (brick)", "Block", "Tile / Paver"), segSel = if (areaDef.isNotEmpty()) 2 else 0, sizeCat = "tile") { v, sg ->
         val l = v["l"] ?: Double.NaN
         val h = v["h"] ?: Double.NaN
         val t = v["t"] ?: Double.NaN
@@ -430,11 +475,10 @@ fun Engine.masonryForm() {
         if (!area.isFinite()) return@FormSpec bad("Length aur Height (ya area) daaliye")
         if (area <= 0) return@FormSpec bad("Khidki/darwaza ka area zyada hai")
         if (mode == "Tile / Paver") {
-            val sizes = if (metric) listOf(0.6 to 0.6, 0.3 to 0.3, 0.8 to 0.8, 0.6 to 1.2, 0.2 to 0.1)
-            else listOf(FT to FT, 2 * FT to 2 * FT, 12 * IN to 24 * IN, 6 * IN to 6 * IN, 8 * IN to 4 * IN)
+            val sizes = sizeList("tile")
             val rows = mutableListOf(sec("Area"), Row("Area", areaStr(area)), sec("Pieces (+10% waste)"))
             sizeOf(v)?.let { rows.add(Row(sizeName(it.first, it.second) + " (aapki size)", ceil(area / (it.first * it.second) * 1.1).toLong().toString() + " nag")) }
-            sizes.forEach { (x, y) -> rows.add(Row(sizeName(x, y), ceil(area / (x * y) * 1.1).toLong().toString() + " nag")) }
+            sizes.forEach { (x, y) -> rows.add(Row(sizeLabel(x to y), ceil(area / (x * y) * 1.1).toLong().toString() + " nag")) }
             if (ok(l)) {
                 rows.add(sec("Border (sirf Length par, ek line)"))
                 sizeOf(v)?.let { rows.add(Row(lenTxt(it.first) + " lambi piece", ceil(l / it.first).toLong().toString() + " nag")) }
@@ -510,7 +554,9 @@ fun Engine.footingForm() {
             Row("Kapchi / gitti (aggregate)", m3(dry * mix[2] / sum)),
             Row("Paani (lagbhag, w/c 0.5)", num(rnd(bags * 50 * 0.5, 0)) + " litre"),
             Row("Wazan (2400 kg/m³)", num(rnd(vol * 2400, 0)) + " kg")
-        )
+        ) + (M["ftarea"]?.let { fa ->
+            if (fa.t == 'L' && fa.d == 2) listOf(sec("FtArea memory (" + fmt(fa) + ")"), Row("Length × FtArea", m3(l * fa.v * n))) else emptyList()
+        } ?: emptyList())
     })
 }
 
@@ -534,16 +580,15 @@ fun Engine.drywallForm() {
         Field("a", "Area (" + areaUnit() + ") – 'Area' option ke liye", false, areaDef),
         Field("op", "Khidki/Darwaza area (" + areaUnit() + ")", false, "0"),
         Field("cs", "Apni sheet size (jaise 1000x2000 mm = 100x200)", false, "", "khali chhod sakte hain", isSize = true)
-    ), listOf("Kamra", "Deewar L×H", "Area", "Sirf Length"), segSel = sel) { v, sg ->
+    ), listOf("Kamra", "Deewar L×H", "Area", "Sirf Length"), segSel = sel, sizeCat = "drywall") { v, sg ->
         val l = v["l"] ?: Double.NaN
         val w = v["w"] ?: Double.NaN
         val h = v["h"] ?: Double.NaN
         val op = areaIn(v["op"] ?: 0.0)
         val mode = seg(sg, 0, "Kamra")
-        val sizes = mutableListOf(4 * FT to 8 * FT, 4 * FT to 9 * FT, 4 * FT to 10 * FT, 4 * FT to 12 * FT)
+        val sizes = sizeList("drywall").toMutableList()
         sizeOf(v)?.let { sizes.add(0, it) }
-        fun name(sz: Pair<Double, Double>) = if (metric) sizeName(sz.first, sz.second) else
-            num(rnd(sz.first / FT, 2)) + "'×" + num(rnd(sz.second / FT, 2)) + "'"
+        fun name(sz: Pair<Double, Double>) = sizeLabel(sz)
         val rows = mutableListOf<Row>()
         when (mode) {
             "Sirf Length" -> {
@@ -631,7 +676,7 @@ fun Engine.fenceForm() {
         Field("r", "Har section mein rails", false, num(M["rails"]?.v ?: 3.0)),
         Field("pw", "Picket / patti width", true, if (metric) "9" else "3-1/2\""),
         Field("g", "Picket ke beech gap", true, if (metric) "5" else "2\"")
-    ), null) { v, _ ->
+    ), null, sizeCat = "picket") { v, _ ->
         val ps = v["ps"] ?: Double.NaN
         val pn = (v["pn"] ?: 0.0).let { if (it.isFinite() && it >= 1) it.toInt() else 0 }
         val l = if (pn > 0 && ok(ps)) pn * ps else v["l"] ?: Double.NaN
@@ -658,7 +703,7 @@ fun Engine.fenceForm() {
         rows.add(Row("Rail kul length", fL(l * rails)))
         rows.add(sec("Pickets"))
         if (ok(pw)) rows.add(Row("Aapki patti (" + lenTxt(pw + g) + " o.c.)", ceil(l / (pw + g)).toInt().toString() + " nag"))
-        val ocs = if (metric) listOf(0.1, 0.12, 0.15) else listOf(4 * IN, 5.5 * IN, 6 * IN)
+        val ocs = sizeList("picket").map { it.first }
         ocs.forEach { rows.add(Row(lenTxt(it) + " o.c. par", ceil(l / it).toInt().toString() + " nag")) }
         rows
     })
@@ -679,8 +724,8 @@ fun Engine.qtyForm() {
         Field("l", "Length", true, lDef),
         Field("n", "Kitne members ('Length' option ke liye)", false, nDef),
         Field("sp", "Apni spacing (o.c.)", true, M["oc"]?.let { lenTxt(it.v) } ?: "", "khali chhod sakte hain")
-    ), listOf("Ginti (length se)", "Length (ginti se)"), segSel = sel) { v, sg ->
-        val sp = (if (metric) mutableListOf(0.3, 0.4, 0.6) else mutableListOf(12 * IN, 16 * IN, 19.2 * IN, 24 * IN))
+    ), listOf("Ginti (length se)", "Length (ginti se)"), segSel = sel, sizeCat = "oc") { v, sg ->
+        val sp = sizeList("oc").map { it.first }.toMutableList()
         val own = v["sp"] ?: Double.NaN
         if (ok(own) && sp.none { abs(it - own) < 1e-6 }) sp.add(own)
         sp.sort()

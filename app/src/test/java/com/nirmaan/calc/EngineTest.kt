@@ -297,4 +297,44 @@ class EngineTest {
         assertEquals(32, e.res)
     }
 
+
+    @Test fun purlinRegular45() {
+        val (face, edge) = purlinCuts(45.0, 45.0)
+        assertEquals(35.26, face, 0.01)
+        assertEquals(35.26, edge, 0.01)
+    }
+
+    @Test fun hipAreas() {
+        k("Hip/V")
+        val r = formRows(mapOf("pa" to "30", "run" to "12'", "bl" to "40'"))
+        assertEquals("16ft", r.v("Ridge length"))
+    }
+
+    @Test fun hipSwitchIrregular() {
+        k("Hip/V")
+        val r = formRows(mapOf("pa" to "45", "pb" to "30", "run" to "12'"), "Miter Saw|Irregular")
+        assertTrue(r.any { it.label == "Side B: face cut (upar ki satah)" })
+    }
+
+    @Test fun editableSizes() {
+        e.metric = true
+        e.sizes["oc"] = mutableListOf(0.5 to 0.0)
+        k("1 0 m ^qty@oc")
+        val r = formRows()
+        assertTrue(r.any { it.label.contains("500mm") })
+    }
+
+    @Test fun legacyMemory() {
+        e.advanced = false
+        assertEquals("7in", k("7 Inches Store 9"))
+        k("C 1 0 Feet Rise Stair")
+        assertEquals("7in", ui.spec!!.fields.first { it.key == "dr" }.value.replace("\"", "in"))
+    }
+
+    @Test fun stairInstall() {
+        k("1 0 Feet Rise 1 2 Feet Run Stair")
+        val r = formRows()
+        assertTrue(r.any { it.stair?.install == true })
+        assertEquals("4 nag", r.v("Stringers ki ginti (max 16\" doori)"))
+    }
 }

@@ -47,6 +47,7 @@ class MainActivity : Activity(), Ui {
     private var toastObj: Toast? = null
     private lateinit var root: FrameLayout
     private var shareText = ""
+    private var curRows: List<Row> = emptyList()
 
     private class KeyView(val r: Int, val c: Int, val btn: TextView, val top: TextView, val blue: TextView)
 
@@ -215,6 +216,8 @@ class MainActivity : Activity(), Ui {
                 btn.setOnClickListener { v ->
                     if (swiped) return@setOnClickListener
                     if (eng.haptic) v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    if (eng.clickSound) (getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager)
+                        .playSoundEffect(android.media.AudioManager.FX_KEY_CLICK, 0.6f)
                     v.animate().scaleX(0.92f).scaleY(0.92f).setDuration(45)
                         .withEndAction { v.animate().scaleX(1f).scaleY(1f).setDuration(90).start() }.start()
                     eng.press(r, col)
@@ -372,6 +375,13 @@ class MainActivity : Activity(), Ui {
         }
         foot.addView(share)
         foot.addView(save, llp(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dpi(8f) })
+        val pdf = TextView(this).apply {
+            text = "PDF"; textSize = 17f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(c(0xFFE57373), c(0xFFC62828))).apply { cornerRadius = dp(8f) }
+            setPadding(dpi(16f), dpi(10f), dpi(16f), dpi(10f))
+            setOnClickListener { printPdf() }
+        }
+        foot.addView(pdf, llp(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dpi(8f) })
         foot.addView(View(this), llp(0, 1, 1f))
         foot.addView(done)
         panelRoot.addView(foot, llp(MATCH_PARENT, WRAP_CONTENT))
@@ -382,6 +392,7 @@ class MainActivity : Activity(), Ui {
         panelTitle.text = title
         panelBody.removeAllViews()
         shareText = ""
+        curRows = emptyList()
         if (!panelOpen) {
             panelRoot.visibility = View.VISIBLE
             panelRoot.alpha = 0f
@@ -449,6 +460,131 @@ class MainActivity : Activity(), Ui {
         panelBody.addView(rowView(Row("Kholne ke liye tap, delete ke liye dabakar rakhein")))
     }
 
+    /** BuildCalc "Edit Sizes": add, delete, move up. */
+    private fun editSizes(cat: String, done: () -> Unit) {
+        val single = cat == "oc" || cat == "picket"
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(16f), dpi(8f), dpi(16f), dpi(8f)) }
+        val dlg = AlertDialog.Builder(this).setTitle("Sizes").setView(ScrollView(this).apply { addView(box) })
+            .setPositiveButton("Done", null)
+            .setNeutralButton("Default") { _, _ -> eng.sizes.remove(cat); Store.save(this, eng); done() }
+            .create()
+        fun list() = eng.sizes.getOrPut(cat) { eng.sizeDefaults(cat).toMutableList() }
+        fun draw() {
+            box.removeAllViews()
+            val l = list()
+            l.forEachIndexed { i, sz ->
+                val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dpi(4f), 0, dpi(4f)) }
+                row.addView(TextView(this).apply { text = eng.sizeLabel(sz); textSize = 17f; setTextColor(c(0xFF222222)) }, llp(0, WRAP_CONTENT, 1f))
+                fun btn(t: String, act: () -> Unit) = TextView(this).apply {
+                    text = t; textSize = 18f; gravity = Gravity.CENTER; setPadding(dpi(14f), dpi(6f), dpi(14f), dpi(6f))
+                    setTextColor(c(0xFF1565C0)); setOnClickListener { act(); Store.save(this@MainActivity, eng); draw(); done() }
+                }
+                if (i > 0) row.addView(btn("▲") { val x = l.removeAt(i); l.add(i - 1, x) })
+                row.addView(btn("✕") { l.removeAt(i) })
+                box.addView(row)
+            }
+            val et = EditText(this).apply {
+                hint = if (single) (if (eng.metric) "jaise 45" else "jaise 19-1/2\"") else (if (eng.metric) "jaise 100x200" else "jaise 4'x8' ya 6\"x6\"")
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+                setSingleLine()
+            }
+            box.addView(et, llp(MATCH_PARENT, WRAP_CONTENT))
+            box.addView(TextView(this).apply {
+                text = "+ Size jodein"; textSize = 16f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+                background = GradientDrawable().apply { setColor(c(0xFF1E88E5)); cornerRadius = dp(8f) }
+                setPadding(0, dpi(10f), 0, dpi(10f))
+                setOnClickListener {
+                    val t = et.text.toString()
+                    val sz = if (single) eng.parseLen(t).let { if (it.isFinite() && it > 0) it to 0.0 else null } else eng.parseSize(t)
+                    if (sz == null) toast("Size samajh nahi aayi") else { list().add(0, sz); Store.save(this@MainActivity, eng); draw(); done() }
+                }
+            }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+            box.addView(TextView(this).apply {
+                text = if (eng.metric) "Metric mein cm likhein (1000×2000 mm = 100x200)" else "Feet ke liye ' aur inch ke liye \" lagayein"
+                textSize = 12f; setTextColor(c(0xFF777777))
+            })
+        }
+        draw()
+        dlg.show()
+    }
+
+    /** Print / save the open screen (text + drawings) as PDF with Android's print system. */
+    private fun printPdf() {
+        val title = panelTitle.text.toString()
+        val rows = curRows
+        val textOnly = if (rows.isEmpty()) shareText else ""
+        val pm = getSystemService(Context.PRINT_SERVICE) as android.print.PrintManager
+        val act = this
+        val adapter = object : android.print.PrintDocumentAdapter() {
+            var attrs: android.print.PrintAttributes? = null
+            override fun onLayout(old: android.print.PrintAttributes?, new: android.print.PrintAttributes,
+                                  cancel: android.os.CancellationSignal?, cb: android.print.PrintDocumentAdapter.LayoutResultCallback, extras: Bundle?) {
+                attrs = new
+                if (cancel?.isCanceled == true) { cb.onLayoutCancelled(); return }
+                cb.onLayoutFinished(android.print.PrintDocumentInfo.Builder("NirmaanCalc.pdf")
+                    .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).build(), true)
+            }
+
+            override fun onWrite(pages: Array<out android.print.PageRange>?, dest: android.os.ParcelFileDescriptor,
+                                 cancel: android.os.CancellationSignal?, cb: android.print.PrintDocumentAdapter.WriteResultCallback) {
+                val doc = android.print.pdf.PrintedPdfDocument(act, attrs ?: android.print.PrintAttributes.Builder()
+                    .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4)
+                    .setResolution(android.print.PrintAttributes.Resolution("pdf", "pdf", 300, 300))
+                    .setMinMargins(android.print.PrintAttributes.Margins.NO_MARGINS).build())
+                try {
+                    var pageNo = 0
+                    var page = doc.startPage(pageNo)
+                    val pw = page.info.pageWidth.toFloat()
+                    val ph = page.info.pageHeight.toFloat()
+                    val margin = 36f
+                    var y = margin
+                    val tp = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { textSize = 10f; color = Color.BLACK }
+                    val hp = android.graphics.Paint(tp).apply { textSize = 16f; isFakeBoldText = true }
+                    val sp2 = android.graphics.Paint(tp).apply { textSize = 11f; isFakeBoldText = true; color = c(0xFF1565C0) }
+                    fun newPage() { doc.finishPage(page); pageNo++; page = doc.startPage(pageNo); y = margin }
+                    fun need(h: Float) { if (y + h > ph - margin) newPage() }
+                    need(24f); page.canvas.drawText(title, margin, y + 16f, hp); y += 26f
+                    val lines = if (textOnly.isNotEmpty()) textOnly.lines().map { Row(it) } else rows
+                    for (r in lines) {
+                        val st = r.stair
+                        if (st != null) {
+                            val w = pw - 2 * margin
+                            val h = w * 0.95f
+                            need(h + 8f)
+                            val dens = resources.displayMetrics.density
+                            val v = StairView(act, st)
+                            val wpx = (w * dens).toInt()
+                            v.measure(View.MeasureSpec.makeMeasureSpec(wpx, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+                            v.layout(0, 0, v.measuredWidth, v.measuredHeight)
+                            val cv = page.canvas
+                            cv.save(); cv.translate(margin, y); cv.scale(1 / dens, 1 / dens); v.draw(cv); cv.restore()
+                            y += h + 8f
+                        } else if (r.section) {
+                            need(22f); y += 6f; page.canvas.drawText(r.label, margin, y + 11f, sp2); y += 16f
+                        } else {
+                            need(14f)
+                            page.canvas.drawText(r.label, margin, y + 10f, tp)
+                            if (r.value.isNotEmpty()) {
+                                val vp = android.graphics.Paint(tp).apply { textAlign = android.graphics.Paint.Align.RIGHT; if (r.warn) color = c(0xFFC62828) }
+                                page.canvas.drawText(r.value, pw - margin, y + 10f, vp)
+                            }
+                            y += 14f
+                        }
+                    }
+                    need(20f); page.canvas.drawText("— Nirmaan Calc", margin, y + 14f, tp)
+                    doc.finishPage(page)
+                    java.io.FileOutputStream(dest.fileDescriptor).use { doc.writeTo(it) }
+                    cb.onWriteFinished(arrayOf(android.print.PageRange.ALL_PAGES))
+                } catch (e: Exception) {
+                    cb.onWriteFailed(e.message)
+                } finally {
+                    doc.close()
+                }
+            }
+        }
+        try { pm.print(title, adapter, null) } catch (e: Exception) { toast("PDF nahi ban paya: " + e.message) }
+    }
+
     private fun shareResults() {
         val t = if (shareText.isNotEmpty()) shareText else panelTitle.text.toString()
         val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, t)
@@ -505,6 +641,7 @@ class MainActivity : Activity(), Ui {
         openPanel(title)
         rows.forEach { panelBody.addView(rowView(it)) }
         shareText = rowsText(title, rows)
+        curRows = rows
     }
 
     private fun seg(opts: List<String>, sel: Int, onPick: (Int) -> Unit): View {
@@ -530,7 +667,7 @@ class MainActivity : Activity(), Ui {
     override fun form(spec: FormSpec) {
         openPanel(spec.title)
         var segVal: String? = spec.seg?.let { it.getOrNull(spec.segSel) ?: it.firstOrNull() }
-        var seg2Val: String? = spec.seg2?.firstOrNull()
+        var seg2Val: String? = spec.seg2?.let { it.getOrNull(spec.seg2Sel) ?: it.firstOrNull() }
         val out = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val inputs = LinkedHashMap<String, EditText>()
 
@@ -548,6 +685,7 @@ class MainActivity : Activity(), Ui {
             out.removeAllViews()
             val combined = if (spec.seg2 != null) (segVal ?: "") + "|" + (seg2Val ?: "") else segVal
             val rows = try { spec.compute(vals, combined) } catch (e: Exception) { listOf(Row("Values check karein", "—", true)) }
+            curRows = rows
             rows.forEach { out.addView(rowView(it)) }
             val inp = spec.fields.map { Row(it.label, inputs.getValue(it.key).text.toString()) }
             val opt = listOfNotNull(segVal, seg2Val).joinToString(", ")
@@ -597,6 +735,17 @@ class MainActivity : Activity(), Ui {
             panelBody.addView(box)
             panelBody.addView(divider())
         }
+        spec.sizeCat?.let { cat ->
+            val eb = LinearLayout(this).apply { setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(8f)) }
+            eb.addView(TextView(this).apply {
+                text = "Sizes edit karein (jodein / hatayein / upar karein)"; textSize = 15f; gravity = Gravity.CENTER
+                setTextColor(c(0xFF1565C0))
+                background = GradientDrawable().apply { setStroke(dpi(1f), c(0xFF1565C0)); cornerRadius = dp(8f); setColor(Color.WHITE) }
+                setPadding(0, dpi(10f), 0, dpi(10f))
+                setOnClickListener { editSizes(cat) { recompute() } }
+            }, llp(MATCH_PARENT, WRAP_CONTENT))
+            panelBody.addView(eb)
+        }
         panelBody.addView(secView("Calculated Results"))
         panelBody.addView(out)
         inputs.values.forEach {
@@ -642,6 +791,11 @@ class MainActivity : Activity(), Ui {
         }
         add("Thousands separator (1,00,000)", listOf("Off", "On"), if (eng.thousands) 1 else 0) { eng.thousands = it == 1 }
         add("Button vibration", listOf("On", "Off"), if (eng.haptic) 0 else 1) { eng.haptic = it == 0 }
+        add("Button click awaaz", listOf("Off", "On"), if (eng.clickSound) 1 else 0) { eng.clickSound = it == 1 }
+        val decList = listOf(-1, 2, 3, 4, 6)
+        add("Decimal places", listOf("Auto", "2", "3", "4", "6"), decList.indexOf(eng.decPlaces).coerceAtLeast(0)) { eng.decPlaces = decList[it] }
+        add("Arched wall studs", listOf("Outside (bahar)", "Inside (andar)"), if (eng.archInside) 1 else 0) { eng.archInside = it == 1 }
+        add("Advanced Function Mode", listOf("ON", "OFF (purane MsnSz, SprAng, TreadW... keys)"), if (eng.advanced) 0 else 1) { eng.advanced = it == 0 }
 
         val box = LinearLayout(this).apply { setPadding(dpi(12f), dpi(12f), dpi(12f), dpi(12f)) }
         box.addView(TextView(this).apply {
@@ -701,6 +855,10 @@ class MainActivity : Activity(), Ui {
             "<b>Fraction:</b> Conv + / = 1/2 se 1/64 tak badlein. m dobara dabane par m → cm → mm.",
             "<b>Rafter:</b> Rise/Run/Pitch ke baad Diag dobara = ridge deduction, overhang, birdsmouth, lakdi ki lambai.",
             "<b>Save:</b> har result screen par Save dabakar naam dein. Prefs mein 'Saved results'.",
+            "<b>PDF / Print:</b> result screen par neeche PDF dabayein → 'Save as PDF' ya printer chunein. Seedhi ki drawings bhi aati hain.",
+            "<b>Sizes edit:</b> Drywall, Roof, Tile, Fence, Qty@oc screen par 'Sizes edit karein' se apni sizes jodein, hatayein, upar karein. Yaad rehti hain.",
+            "<b>Hip/V:</b> screen ke andar Regular / Irregular switch, purlin angles, aur building length daalne par chhat ke har hisse ka area.",
+            "<b>Purane keys:</b> Prefs mein Advanced Function Mode OFF karein to Store + 4/6/8/9/./+ = MsnSz, SprAng, TreadW, RiserH, FloorH, FtArea.",
             "<b>Share:</b> kisi bhi result screen par neeche Share dabayein (WhatsApp etc.).",
             "<b>Theme:</b> Conv + Store = Prefs, wahan Dark / Light.",
             "<b>C button:</b> screen saaf. Conv + × = ClrAll (saari memory saaf)."
