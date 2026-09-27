@@ -82,6 +82,15 @@ class MainActivity : Activity() {
         root.addView(bottom, llp(MATCH_PARENT, WRAP_CONTENT))
         setContentView(root)
         showHome()
+        Reminders.schedule(this)
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
+            requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 9)
+        if (intent?.getBooleanExtra("khata", false) == true) showKhata()
+    }
+
+    override fun onNewIntent(i: Intent?) {
+        super.onNewIntent(i)
+        if (i?.getBooleanExtra("khata", false) == true) { autoSave(); showKhata() }
     }
 
     override fun onResume() {
@@ -197,7 +206,12 @@ class MainActivity : Activity() {
         editing = null
         val body = setScreen("home", L.t("app"), null)
         body.addView(bigButton(L.t("new_gaadi"), GREEN) { newHisab("gaadi") }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
-        body.addView(bigButton(L.t("new_haraji"), 0xFF6A1B9A.toInt()) { newHisab("haraji") }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
+        body.addView(bigButton(L.t("new_haraji"), 0xFF6A1B9A.toInt()) { newHisab("haraji") }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+        val dues = openDues(Store.hisabs)
+        val late = dues.count { it.due != null && it.due <= Reminders.endOfToday() }
+        body.addView(bigButton(L.t("khata_btn") + "   ⬇ " + money(dues.filter { it.lena }.sumOf { it.left }) + "   ⬆ " + money(dues.filter { !it.lena }.sumOf { it.left }) +
+            (if (late > 0) "   ⚠ $late" else ""), if (late > 0) RED else 0xFF455A64.toInt()) { showKhata() }.apply { textSize = 15f },
+            llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
 
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun fill(q: String) {
@@ -290,6 +304,8 @@ class MainActivity : Activity() {
             .setNegativeButton(L.t("back"), null).show()
     }
 
+    private lateinit var splitBox: LinearLayout
+    private lateinit var checkTv: TextView
     private lateinit var sumDena: TextView
     private lateinit var sumLena: TextView
     private lateinit var sumSale: TextView
@@ -306,8 +322,31 @@ class MainActivity : Activity() {
         sumKg.text = plain(h.kg()) + " " + L.t("kg")
         sumLtr.text = plain(h.litre()) + " " + L.t("ltr")
         (sumLtr.parent as? View)?.visibility = if (h.maal.any { !it.fixed && it.litre }) View.VISIBLE else View.GONE
-        sumDena.text = money(h.kharchBaaki())
-        sumLena.text = money(h.udhaarBikri())
+        sumDena.text = money(h.denaBaaki())
+        sumLena.text = money(h.lenaBaaki())
+        splitBox.removeAllViews()
+        if (h.hasSplit()) {
+            val mm = h.munafa()
+            splitBox.addView(heading(L.t("split"), 0xFF00695C.toInt()).apply { textSize = 15f; setPadding(0, dpi(10f), 0, dpi(4f)) })
+            listOf(Triple(h.mudiName.ifBlank { L.t("mudi") }, h.mudiPct, h.mudiMobile), Triple(h.khedName.ifBlank { L.t("khed") }, h.khedPct, h.khedMobile)).forEach { (n, p, mob) ->
+                val v = mm * p / 100
+                val r = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dpi(3f), 0, dpi(3f)) }
+                r.addView(TextView(this).apply { text = n + "  (" + plain(p) + "%)"; textSize = 15f; setTextColor(INK) }, llp(0, WRAP_CONTENT, 1f))
+                r.addView(TextView(this).apply {
+                    text = (if (v >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(v)); textSize = 15f; typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(if (v >= 0) GREEN else RED)
+                })
+                if (mob.isNotBlank()) r.addView(TextView(this).apply {
+                    text = "💬"; textSize = 20f; setPadding(dpi(8f), 0, 0, 0)
+                    setOnClickListener { whatsapp(mob, Bill.text(h) + "\n" + n + " (" + plain(p) + "%): " + (if (v >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(v))) }
+                })
+                splitBox.addView(r)
+            }
+            if (Math.abs(h.mudiPct + h.khedPct - 100) > 0.001) splitBox.addView(small(L.t("not100"), RED).apply { typeface = Typeface.DEFAULT_BOLD })
+        }
+        val bad = h.verify()
+        checkTv.text = if (bad.isEmpty()) L.t("check_ok") else L.t("check_bad") + " (" + bad.joinToString() + ")"
+        checkTv.setTextColor(if (bad.isEmpty()) GREEN else RED)
         val m = h.munafa()
         sumResult.text = (if (m >= 0) L.t("profit") else L.t("loss")) + "   " + money(Math.abs(m))
         resultBox.background = round(if (m >= 0) GREEN else RED, 12f)
@@ -368,6 +407,21 @@ class MainActivity : Activity() {
             llp(0, WRAP_CONTENT, 2f).apply { leftMargin = dpi(8f) })
         vc.addView(row2)
         body.addView(vc, cardLp())
+
+        // A. mudiwala / khedut
+        val sc0 = card()
+        sc0.addView(heading(L.t("split"), 0xFF00695C.toInt()))
+        fun person(label: String, name: String, mob: String, pct: String, setN: (String) -> Unit, setM: (String) -> Unit, setP: (String) -> Unit) {
+            val r = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dpi(4f), 0, dpi(2f)) }
+            r.addView(input(label, name, false, setN).apply { textSize = 15f }, llp(0, WRAP_CONTENT, 1.6f))
+            r.addView(input(L.t("pct_hint"), pct, true) { setP(it); refreshTotals() }.apply { gravity = Gravity.END },
+                llp(0, WRAP_CONTENT, 0.8f).apply { leftMargin = dpi(6f) })
+            sc0.addView(r)
+            sc0.addView(input(L.t("cmobile"), mob, true, setM).apply { textSize = 14f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(4f) })
+        }
+        person(L.t("mudi"), h.mudiName, h.mudiMobile, h.mudiPctText, { h.mudiName = it }, { h.mudiMobile = it }, { h.mudiPctText = it })
+        person(L.t("khed"), h.khedName, h.khedMobile, h.khedPctText, { h.khedName = it }, { h.khedMobile = it }, { h.khedPctText = it })
+        body.addView(sc0, cardLp())
 
         // 1. vehicle price
         val pc = card()
@@ -499,6 +553,10 @@ class MainActivity : Activity() {
         tc.addView(resultBox, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
         partnerBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         tc.addView(partnerBox)
+        splitBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        tc.addView(splitBox)
+        checkTv = small("").apply { gravity = Gravity.CENTER; setPadding(0, dpi(8f), 0, 0) }
+        tc.addView(checkTv)
         body.addView(tc, cardLp())
         body.addView(small(L.t("tip")).apply { gravity = Gravity.CENTER })
 
@@ -569,9 +627,10 @@ class MainActivity : Activity() {
             l.pay = if (i == 1) "udhaar" else "rokad"; redraw()
         }, llp(0, WRAP_CONTENT, 1f))
         if (l.udhaar) t.addView(toggle(listOf(L.t("baaki"), L.t("chukaya")), if (l.paid) 1 else 0, RED) { i ->
-            l.paid = i == 1; refreshTotals()
+            l.paid = i == 1; redraw()
         }, llp(0, WRAP_CONTENT, 1f).apply { leftMargin = dpi(8f) })
         box.addView(t)
+        if (l.udhaar && !l.paid) kistBlock(l, box, false, redraw)
         return wrap(box)
     }
 
@@ -594,6 +653,98 @@ class MainActivity : Activity() {
         }
         paint()
         return r
+    }
+
+    /** installments on a credit line: list, + Kist, received / left */
+    private fun kistBlock(l: Line, box: LinearLayout, lena: Boolean, redraw: () -> Unit) {
+        val k = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = round(Color.WHITE, 8f, 0xFFB0BEC5.toInt())
+            setPadding(dpi(8f), dpi(6f), dpi(8f), dpi(6f))
+        }
+        l.pays.forEachIndexed { i, p ->
+            val r = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            r.addView(small("${i + 1}. " + Bill.dateText(p.time).substringBefore("  ")), llp(0, WRAP_CONTENT, 1f))
+            r.addView(TextView(this).apply { text = money(p.amount); textSize = 15f; setTextColor(INK) })
+            r.addView(xBtn { confirmRemove { l.pays.remove(p); redraw(); refreshTotals() } })
+            k.addView(r)
+        }
+        val sumRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dpi(4f), 0, 0) }
+        sumRow.addView(small((if (lena) L.t("got") else L.t("gave")) + ": " + money(l.received()) + "   •   " + L.t("left") + ": " + money(l.remaining()),
+            if (l.remaining() > 0.004) RED else GREEN).apply { typeface = Typeface.DEFAULT_BOLD }, llp(0, WRAP_CONTENT, 1f))
+        sumRow.addView(TextView(this).apply {
+            text = L.t("kist"); textSize = 14f; setTextColor(Color.WHITE); background = round(BLUE, 14f)
+            setPadding(dpi(12f), dpi(6f), dpi(12f), dpi(6f))
+            setOnClickListener { askKist(l) { redraw(); refreshTotals() } }
+        })
+        k.addView(sumRow)
+        box.addView(k, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+    }
+
+    private fun askKist(l: Line, done: () -> Unit) {
+        val et = input(L.t("kist_amt"), plain(l.remaining()), true) {}
+        val pad = LinearLayout(this).apply { setPadding(dpi(20f), dpi(8f), dpi(20f), 0); addView(et, llp(MATCH_PARENT, WRAP_CONTENT)) }
+        AlertDialog.Builder(this).setTitle(l.name + "  •  " + L.t("left") + " " + money(l.remaining())).setView(pad)
+            .setPositiveButton(L.t("add")) { _, _ ->
+                val a = evalExpr(et.text.toString())
+                if (a.isFinite() && a > 0) { l.pays.add(Pay(System.currentTimeMillis(), et.text.toString())); done() }
+            }
+            .setNegativeButton(L.t("no"), null).show()
+    }
+
+    // ================= CREDIT BOOK =================
+    private fun showKhata() {
+        val from = editing
+        autoSave()
+        editing = null
+        val body = setScreen("khata", L.t("khata"), { if (from != null) showEditor(from) else showHome() })
+        val dues = openDues(Store.hisabs)
+        val tot = card()
+        tot.addView(TextView(this).apply { text = "⬇ " + L.t("lena") + ": " + money(dues.filter { it.lena }.sumOf { it.left }); textSize = 18f; setTextColor(GREEN); typeface = Typeface.DEFAULT_BOLD })
+        tot.addView(TextView(this).apply { text = "⬆ " + L.t("dena") + ": " + money(dues.filter { !it.lena }.sumOf { it.left }); textSize = 18f; setTextColor(RED); typeface = Typeface.DEFAULT_BOLD })
+        body.addView(tot, cardLp())
+        if (dues.isEmpty()) body.addView(small(L.t("no_due")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) })
+        val today = Reminders.endOfToday()
+        dues.forEach { d ->
+            val c = card()
+            val top = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            top.addView(TextView(this).apply {
+                text = (if (d.lena) "⬇ " else "⬆ ") + (if (d.lena) d.l.cName.ifBlank { d.h.party } else d.l.name).ifBlank { "—" }
+                textSize = 17f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD; maxLines = 1
+            }, llp(0, WRAP_CONTENT, 1f))
+            top.addView(TextView(this).apply { text = money(d.left); textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (d.lena) GREEN else RED) })
+            c.addView(top)
+            val status = when {
+                d.due == null -> ""
+                d.due < today - 86400000L + 1 -> "⚠ " + L.t("overdue") + " (" + Bill.dateText(d.due).substringBefore("  ") + ")"
+                d.due <= today -> "⚠ " + L.t("today")
+                else -> L.t("due") + ": " + Bill.dateText(d.due).substringBefore("  ")
+            }
+            c.addView(small(listOf(d.l.name, d.h.party, d.h.vehicleInfo(), status).filter { it.isNotBlank() }.joinToString("  •  "),
+                if (status.startsWith("⚠")) RED else MUTED))
+            val acts = LinearLayout(this).apply { setPadding(0, dpi(6f), 0, 0) }
+            fun act(t: String, color: Int, a: () -> Unit) = acts.addView(TextView(this).apply {
+                text = t; textSize = 14f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = round(color, 14f)
+                setPadding(dpi(8f), dpi(7f), dpi(8f), dpi(7f)); setOnClickListener { a() }
+            }, llp(0, WRAP_CONTENT, 1f).apply { setMargins(dpi(3f), 0, dpi(3f), 0) })
+            act(L.t("kist"), BLUE) { askKist(d.l) { Store.save(this); showKhata() } }
+            if (d.lena && d.l.cMobile.isNotBlank()) act(L.t("remind"), GREEN) { whatsapp(d.l.cMobile, reminderText(d)) }
+            if (d.lena && d.l.gMobile.isNotBlank()) act("💬 " + L.t("gname").substringBefore(" ("), 0xFF6A1B9A.toInt()) { whatsapp(d.l.gMobile, reminderText(d)) }
+            act(L.t("open"), 0xFF78909C.toInt()) { showEditor(d.h) }
+            c.addView(acts)
+            body.addView(c, cardLp())
+        }
+    }
+
+    private fun reminderText(d: Due): String {
+        val sb = StringBuilder()
+        sb.append(Store.owner.ifBlank { L.t("app") }).append("\n")
+        sb.append(d.l.name).append(": ").append(money(d.l.value())).append("\n")
+        if (d.l.pays.isNotEmpty()) sb.append(L.t("got")).append(": ").append(money(d.l.received())).append("\n")
+        sb.append("*").append(L.t("left")).append(": ").append(money(d.left)).append("*\n")
+        d.due?.let { sb.append(L.t("due")).append(": ").append(Bill.dateText(it).substringBefore("  ")).append("\n") }
+        if (Store.mobile.isNotBlank()) sb.append(Store.mobile)
+        return sb.toString()
     }
 
     private fun whatsapp(num: String, text: String) {
@@ -666,7 +817,10 @@ class MainActivity : Activity() {
             setOnClickListener { whatsapp(l.cMobile, sellMessage(h, l)) }
         })
         box.addView(c1)
-        if (l.udhaar) box.addView(labeled(L.t("days"), input("30", l.daysText, true) { l.daysText = it }))
+        if (l.udhaar) {
+            box.addView(labeled(L.t("days"), input("30", l.daysText, true) { l.daysText = it }))
+            kistBlock(l, box, true, redraw)
+        }
         if (h.type == "haraji") {
             val c2 = LinearLayout(this).apply { setPadding(0, dpi(6f), 0, 0) }
             c2.addView(input(L.t("gname"), l.gName, false) { l.gName = it }.apply { textSize = 15f }, llp(0, WRAP_CONTENT, 1.2f))

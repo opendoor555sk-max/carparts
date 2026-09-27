@@ -101,17 +101,22 @@ object Store {
         .put("kg", l.kgText).put("r", l.rateText).put("a", l.amountText).put("l", l.litre)
         .put("pay", l.pay).put("paid", l.paid).put("cn", l.cName).put("cm", l.cMobile).put("d", l.daysText)
         .put("gn", l.gName).put("gm", l.gMobile).put("sh", l.shop)
+        .put("py", JSONArray().also { a -> l.pays.forEach { a.put(JSONObject().put("t", it.time).put("a", it.amountText)) } })
 
     private fun jl(o: JSONObject) = Line(o.optString("k"), o.optString("n"), o.optBoolean("f"),
         kgText = o.optString("kg"), rateText = o.optString("r"), amountText = o.optString("a"), litre = o.optBoolean("l"),
         pay = o.optString("pay", "rokad"), paid = o.optBoolean("paid"), cName = o.optString("cn"), cMobile = o.optString("cm"),
-        daysText = o.optString("d"), gName = o.optString("gn"), gMobile = o.optString("gm"), shop = o.optString("sh"))
+        daysText = o.optString("d"), gName = o.optString("gn"), gMobile = o.optString("gm"), shop = o.optString("sh")).also { l ->
+        o.optJSONArray("py")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { l.pays.add(Pay(it.optLong("t"), it.optString("a"))) } }
+    }
 
     fun hj(h: Hisab): JSONObject {
         val o = JSONObject().put("id", h.id).put("t", h.time).put("p", h.party).put("v", h.vehicle)
             .put("no", h.note).put("pr", h.priceText)
             .put("ty", h.type).put("sa", h.saleText).put("co", h.commText).put("cp", h.commPct)
             .put("ro", h.role).put("br", h.brand).put("va", h.variant).put("tr", h.tyres).put("yr", h.year).put("pl", h.place)
+            .put("mn", h.mudiName).put("mm", h.mudiMobile).put("mp", h.mudiPctText)
+            .put("kn", h.khedName).put("km", h.khedMobile).put("kp", h.khedPctText)
         o.put("pa", JSONArray().also { a -> h.partners.forEach { a.put(JSONObject().put("n", it.name).put("s", it.shareText)) } })
         o.put("k", JSONArray().also { a -> h.kharch.forEach { a.put(lj(it)) } })
         o.put("m", JSONArray().also { a -> h.maal.forEach { a.put(lj(it)) } })
@@ -122,7 +127,9 @@ object Store {
         val h = Hisab(o.optLong("id"), o.optLong("t"), o.optString("p"), o.optString("v"), o.optString("no"), o.optString("pr"),
             type = o.optString("ty", "gaadi"), saleText = o.optString("sa"), commText = o.optString("co"), commPct = o.optBoolean("cp", true),
             role = o.optString("ro", "seller"), brand = o.optString("br"), variant = o.optString("va"), tyres = o.optString("tr"),
-            year = o.optString("yr"), place = o.optString("pl"))
+            year = o.optString("yr"), place = o.optString("pl"),
+            mudiName = o.optString("mn"), mudiMobile = o.optString("mm"), mudiPctText = o.optString("mp"),
+            khedName = o.optString("kn"), khedMobile = o.optString("km"), khedPctText = o.optString("kp"))
         o.optJSONArray("pa")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { h.partners.add(Partner(it.optString("n"), it.optString("s"))) } }
         o.optJSONArray("k")?.let { a -> for (i in 0 until a.length()) h.kharch.add(jl(a.getJSONObject(i))) }
         o.optJSONArray("m")?.let { a -> for (i in 0 until a.length()) h.maal.add(jl(a.getJSONObject(i))) }

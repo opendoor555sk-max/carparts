@@ -78,4 +78,23 @@ class ModelTest {
         assertEquals(12000.0, h.rokadBikri(), 1e-9)
         assertEquals(40000.0 - 54000.0, h.munafa(), 1e-9)
     }
+
+    @Test fun kistAndSplit() {
+        val h = Hisab(1, 0, priceText = "50000", mudiName = "Salambhai", mudiPctText = "55", khedName = "Asif", khedPctText = "45")
+        val body = Line("body", "Body", false, kgText = "800", rateText = "100", pay = "udhaar", cName = "Rafiq", daysText = "30")
+        body.pays.add(Pay(1, "20000"))
+        body.pays.add(Pay(2, "10000"))
+        h.maal.add(body)
+        h.kharch.add(Line("crane", "Crane", true, amountText = "5000", pay = "udhaar"))
+        assertEquals(30000.0, body.received(), 1e-9)
+        assertEquals(50000.0, h.lenaBaaki(), 1e-9)
+        assertEquals(5000.0, h.denaBaaki(), 1e-9)
+        assertEquals(25000.0, h.munafa(), 1e-9)
+        assertEquals(13750.0, h.mudiShare(), 1e-9)
+        assertEquals(11250.0, h.khedShare(), 1e-9)
+        assertTrue(h.verify().isEmpty())
+        val d = openDues(listOf(h))
+        assertEquals(2, d.size)
+        assertEquals(30L * 86400000L, d.first().due)
+    }
 }

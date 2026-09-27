@@ -96,7 +96,7 @@ object Bill {
         if (h.kharch.isNotEmpty()) {
             section(L.t("kharch").substringBefore(" (").removePrefix("2. "))
             h.kharch.forEachIndexed { i, l ->
-                row("${i + 1}. " + l.name + if (l.udhaar) "  (" + L.t("udhaar") + " • " + (if (l.paid) L.t("chukaya") else L.t("baaki")) + ")" else "", money(l.value()),
+                row("${i + 1}. " + l.name + if (l.udhaar) "  (" + L.t("udhaar") + " • " + (if (l.remaining() < 0.005) L.t("chukaya") else L.t("left") + " " + money(l.remaining())) + ")" else "", money(l.value()),
                     color = if (l.udhaar && !l.paid) red else Color.rgb(0x21, 0x21, 0x21))
             }
             rule()
@@ -132,7 +132,8 @@ object Bill {
                 c?.drawText(money(l.value()).removePrefix("₹ "), W - pad, y + 13 * u, tp(12.5f * u, false, Color.rgb(0x21, 0x21, 0x21), Paint.Align.RIGHT))
                 y += 19 * u
                 if (h.role == "seller") {
-                    val who = listOf(l.cName, l.cMobile, if (l.udhaar) L.t("udhaar") + (if (l.daysText.isNotBlank()) " • " + L.t("due") + " " + dueDate(h.time, l.daysText) else "") else L.t("rokad"),
+                    val who = listOf(l.cName, l.cMobile, if (l.udhaar) L.t("udhaar") + (if (l.daysText.isNotBlank()) " • " + L.t("due") + " " + dueDate(h.time, l.daysText) else "") +
+                        (if (l.pays.isNotEmpty()) " • " + L.t("got") + " " + money(l.received()) + " • " + L.t("left") + " " + money(l.remaining()) else "") else L.t("rokad"),
                         if (l.gName.isNotBlank() || l.gMobile.isNotBlank()) L.t("gname").substringBefore(" (") + ": " + (l.gName + " " + l.gMobile).trim() else "",
                         if (l.shop.isNotBlank()) L.t("shop") + " " + l.shop else "").filter { it.isNotBlank() }.joinToString("  •  ")
                     if (who.isNotEmpty()) {
@@ -148,7 +149,7 @@ object Bill {
             row(L.t("sum_maal"), money(h.maalTotal()), true, green, 13.5f)
             if (h.udhaarBikri() > 0) {
                 row(L.t("rokad_bikri"), money(h.rokadBikri()))
-                row(L.t("lena_baaki"), money(h.udhaarBikri()), false, Color.rgb(0xEF, 0x6C, 0x00))
+                row(L.t("lena_baaki"), money(h.lenaBaaki()), false, Color.rgb(0xEF, 0x6C, 0x00))
             }
             y += 6 * u
         }
@@ -170,6 +171,13 @@ object Bill {
         c?.drawText(if (m >= 0) L.t("profit") else L.t("loss"), pad + 12 * u, y + 32 * u, tp(16 * u, true, Color.WHITE))
         c?.drawText(money(Math.abs(m)), W - pad - 12 * u, y + 34 * u, tp(22 * u, true, Color.WHITE, Paint.Align.RIGHT))
         y += boxH + 6 * u
+        if (h.hasSplit()) {
+            listOf(h.mudiName.ifBlank { L.t("mudi") } to h.mudiPct, h.khedName.ifBlank { L.t("khed") } to h.khedPct).forEach { (n, p) ->
+                val v = m * p / 100
+                row(n + "  (" + plain(p) + "%)", (if (v >= 0) L.t("profit") else L.t("loss")) + "  " + money(Math.abs(v)), true, if (v >= 0) green else red)
+            }
+            y += 4 * u
+        }
         c?.drawText(L.t("sum_maal") + " " + money(h.maalTotal()) + "  −  " + L.t("sum_lagat").substringBefore(" (") + " " + money(h.lagat()),
             W / 2, y + 11 * u, tp(9.5f * u, false, Color.rgb(0x78, 0x90, 0x9C), Paint.Align.CENTER))
         y += 18 * u
@@ -326,6 +334,14 @@ object Bill {
         }
         val m = h.munafa()
         sb.append("\n*").append(if (m >= 0) L.t("profit") else L.t("loss")).append(": ").append(money(Math.abs(m))).append("*\n")
+        if (h.hasSplit()) {
+            listOf(h.mudiName.ifBlank { L.t("mudi") } to h.mudiPct, h.khedName.ifBlank { L.t("khed") } to h.khedPct).forEach { (n, p) ->
+                val v = m * p / 100
+                sb.append("• ").append(n).append(" (").append(plain(p)).append("%): ").append(if (v >= 0) L.t("profit") else L.t("loss")).append(" ").append(money(Math.abs(v))).append("\n")
+            }
+        }
+        if (h.lenaBaaki() > 0) sb.append(L.t("lena_baaki")).append(": ").append(money(h.lenaBaaki())).append("\n")
+        if (h.denaBaaki() > 0) sb.append(L.t("dena_baaki")).append(": ").append(money(h.denaBaaki())).append("\n")
         if (h.type == "haraji" && h.partners.isNotEmpty()) {
             sb.append("\n_").append(L.t("company").removePrefix("6. ")).append("_\n")
             h.partners.forEach { p ->

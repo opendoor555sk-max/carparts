@@ -25,8 +25,14 @@ class Line(
     // auction sale: guarantor + shop
     var gName: String = "",
     var gMobile: String = "",
-    var shop: String = ""
+    var shop: String = "",
+    /** installments received / paid on a credit line */
+    val pays: MutableList<Pay> = mutableListOf()
 ) {
+    /** money already received / paid on this credit line */
+    fun received(): Double = if (paid) value() else pays.sumOf { it.amount }
+    /** still to receive / to pay (0 for cash lines) */
+    fun remaining(): Double = if (!udhaar) 0.0 else (value() - received()).coerceAtLeast(0.0)
     val udhaar get() = pay == "udhaar"
     val kg get() = evalExpr(kgText).let { if (it.isFinite()) it else 0.0 }
     val rate get() = evalExpr(rateText).let { if (it.isFinite()) it else 0.0 }
@@ -35,6 +41,11 @@ class Line(
 }
 
 /** a partner in the "company": share in paise (1 paisa = 1 %) */
+/** one installment (kist): when and how much */
+class Pay(var time: Long, var amountText: String) {
+    val amount get() = evalExpr(amountText).let { if (it.isFinite()) it else 0.0 }
+}
+
 class Partner(var name: String, var shareText: String = "") {
     val share get() = evalExpr(shareText).let { if (it.isFinite() && it > 0) it else 0.0 }
 }
@@ -60,12 +71,44 @@ class Hisab(
     var variant: String = "",
     var tyres: String = "",
     var year: String = "",
-    var place: String = ""
+    var place: String = "",
+    // A. mudiwala (puts the money) and khedut (does the work): profit / loss split
+    var mudiName: String = "",
+    var mudiMobile: String = "",
+    var mudiPctText: String = "",
+    var khedName: String = "",
+    var khedMobile: String = "",
+    var khedPctText: String = ""
 ) {
+    val mudiPct get() = evalExpr(mudiPctText).let { if (it.isFinite() && it > 0) it else 0.0 }
+    val khedPct get() = evalExpr(khedPctText).let { if (it.isFinite() && it > 0) it else 0.0 }
+    fun hasSplit() = mudiName.isNotBlank() || khedName.isNotBlank() || mudiPct > 0 || khedPct > 0
+    fun mudiShare() = munafa() * mudiPct / 100
+    fun khedShare() = munafa() * khedPct / 100
+
+    /** credit sales still to collect / credit expenses still to pay, after installments */
+    fun lenaBaaki() = maal.filter { it.udhaar }.sumOf { it.remaining() }
+    fun denaBaaki() = kharch.filter { it.udhaar }.sumOf { it.remaining() }
     /** credit expenses not paid yet (dena baaki) */
-    fun kharchBaaki() = kharch.filter { it.udhaar && !it.paid }.sumOf { it.value() }
+    fun kharchBaaki() = denaBaaki()
     /** items sold on credit (lena baaki) */
     fun udhaarBikri() = maal.filter { it.udhaar }.sumOf { it.value() }
+
+    /** F: totals re-added a second, independent way (exact decimals). Empty list = all correct. */
+    fun verify(): List<String> {
+        fun bd(x: Double) = BigDecimal.valueOf(x)
+        fun lineBd(l: Line): BigDecimal =
+            if (l.fixed) bd(l.amount) else bd(l.kg).multiply(bd(l.rate))
+        val bad = mutableListOf<String>()
+        val k = kharch.fold(BigDecimal.ZERO) { a, l -> a.add(lineBd(l)) }
+        val m = maal.fold(BigDecimal.ZERO) { a, l -> a.add(lineBd(l)) }
+        fun off(x: Double, y: BigDecimal) = Math.abs(x - y.toDouble()) > 0.005
+        if (off(kharchTotal(), k)) bad.add("kharch")
+        if (off(maalTotal(), m)) bad.add("maal")
+        if (off(lagat(), bd(price).add(k))) bad.add("lagat")
+        if (off(munafa() + commission(), bd(sale).add(m).subtract(bd(price)).subtract(k))) bad.add("munafa")
+        return bad
+    }
     fun rokadBikri() = maal.filter { !it.udhaar }.sumOf { it.value() }
     fun vehicleInfo() = listOf(brand, variant, if (tyres.isNotBlank()) tyres + " tyre" else "", year).filter { it.isNotBlank() }.joinToString(" • ")
     private fun ev(t: String) = evalExpr(t).let { if (it.isFinite()) it else 0.0 }
@@ -221,3 +264,23 @@ private class Parser(val s: String) {
 
 val BRANDS = listOf("Tata", "Ashok Leyland", "Mahindra", "Eicher", "BharatBenz", "Volvo", "Scania", "SML Isuzu", "Swaraj Mazda", "Force", "Maruti", "Toyota")
 val TYRES = listOf("4", "6", "8", "10", "12", "14", "16")
+
+/** credit due date: entry time + credit days (null when no days given) */
+fun dueTime(h: Hisab, l: Line): Long? {
+    val d = evalExpr(l.daysText)
+    if (l.daysText.isBlank() || !d.isFinite()) return null
+    return h.time + (d * 86400000L).toLong()
+}
+
+/** one open credit: who owes whom, how much is left, when it is due */
+class Due(val h: Hisab, val l: Line, val lena: Boolean, val left: Double, val due: Long?)
+
+/** every open credit in all hisabs, most urgent first */
+fun openDues(all: List<Hisab>): List<Due> {
+    val out = mutableListOf<Due>()
+    all.forEach { h ->
+        h.maal.filter { it.udhaar && it.remaining() > 0.004 }.forEach { out.add(Due(h, it, true, it.remaining(), dueTime(h, it))) }
+        h.kharch.filter { it.udhaar && it.remaining() > 0.004 }.forEach { out.add(Due(h, it, false, it.remaining(), dueTime(h, it))) }
+    }
+    return out.sortedWith(compareBy({ it.due ?: Long.MAX_VALUE }, { -it.left }))
+}
