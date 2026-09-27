@@ -137,7 +137,9 @@ object Bill {
                 c?.drawText(money(l.value()).removePrefix("₹ "), W - pad, y + 13 * u, tp(12.5f * u, false, Color.rgb(0x21, 0x21, 0x21), Paint.Align.RIGHT))
                 y += 19 * u
                 if (h.role == "seller") {
-                    val who = listOf(l.cName, l.cMobile, if (l.udhaar) L.t("udhaar") + (if (l.daysText.isNotBlank()) " • " + L.t("due") + " " + dueDate(h.time, l.daysText) else "") +
+                    val mob = l.cMobile.filter { it.isDigit() }
+                    val plainRokad = !l.udhaar && l.cName.isBlank() && mob.length < 10 && l.gName.isBlank() && l.gMobile.isBlank() && l.shop.isBlank()
+                    val who = if (plainRokad) "" else listOf(l.cName, if (mob.length >= 10) "📞 " + mob else "", if (l.udhaar) L.t("udhaar") + (if (l.daysText.isNotBlank()) " • " + L.t("due") + " " + dueDate(h.time, l.daysText) else "") +
                         (if (l.pays.isNotEmpty()) " • " + L.t("got") + " " + money(l.received()) + " • " + L.t("left") + " " + money(l.remaining()) else "") else L.t("rokad"),
                         if (l.gName.isNotBlank() || l.gMobile.isNotBlank()) L.t("gname").substringBefore(" (") + ": " + (l.gName + " " + l.gMobile).trim() else "",
                         if (l.shop.isNotBlank()) L.t("shop") + " " + l.shop else "").filter { it.isNotBlank() }.joinToString("  •  ")

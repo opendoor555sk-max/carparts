@@ -163,6 +163,7 @@ object L {
         "bad_file" to arrayOf("This is not a Kabadi Market Hisab backup", "यह कबाड़ी मार्केट हिसाब का बैकअप नहीं है", "આ કબાડી માર્કેટ હિસાબનો બેકઅપ નથી"),
         "last_backup" to arrayOf("Last backup", "आखिरी बैकअप", "છેલ્લો બેકઅપ"),
         "send_list" to arrayOf("💬 Send list on WhatsApp", "💬 लिस्ट WhatsApp पर भेजें", "💬 યાદી WhatsApp પર મોકલો"),
+        "more" to arrayOf("Mobile / note", "मोबाइल / नोट", "મોબાઇલ / નોંધ"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 
