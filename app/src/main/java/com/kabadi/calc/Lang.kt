@@ -146,6 +146,9 @@ object L {
         "check_bad" to arrayOf("Total mismatch – please check the numbers", "टोटल मेल नहीं खा रहा – आंकड़े जाँचें", "ટોટલ મેળ નથી ખાતો – આંકડા તપાસો"),
         "check_ok" to arrayOf("✓ Totals checked twice", "✓ टोटल दो बार जाँचा", "✓ ટોટલ બે વાર તપાસ્યું"),
         "open" to arrayOf("Open", "खोलें", "ખોલો"),
+        "role_s" to arrayOf("Type", "प्रकार", "પ્રકાર"),
+        "mudi_h" to arrayOf("Mudi malik", "मुडी मालिक", "મૂડી માલિક"),
+        "khed_h" to arrayOf("Khedut", "खेडूत", "ખેડૂત"),
         "made" to arrayOf("Made with Kabadi Calculator", "कबाड़ी कैलकुलेटर से बना", "કબાડી કેલ્ક્યુલેટરથી બનાવ્યું")
     )
 

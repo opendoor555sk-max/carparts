@@ -68,7 +68,12 @@ object Bill {
             c?.drawText(TextUtils.ellipsize(v, tp(13 * u, true), W - 2 * pad - 110 * u, TextUtils.TruncateAt.END).toString(), pad + 110 * u, y + 13 * u, tp(13 * u, true))
             y += 19 * u
         }
-        info("party", h.party + "  (" + (if (h.role == "buyer") L.t("buyer_s") else L.t("seller_s")) + ")")
+        if (h.party.isNotBlank()) info("party", h.party)
+        if (h.hasSplit()) {
+            info("mudi_h", h.mudiName + "   " + plain(h.mudiPct) + "%")
+            info("khed_h", h.khedName + "   " + plain(h.khedPct) + "%")
+        }
+        info("role_s", if (h.role == "buyer") L.t("buyer_s") else L.t("seller_s"))
         info("vinfo", h.vehicleInfo())
         info("vehicle", h.vehicle)
         info("place", h.place)
@@ -211,7 +216,7 @@ object Bill {
     }
 
     private fun fileName(h: Hisab, ext: String): String {
-        val p = h.party.replace(Regex("[^A-Za-z0-9]+"), "_").trim('_').take(20)
+        val p = h.party.ifBlank { h.mudiName }.replace(Regex("[^A-Za-z0-9]+"), "_").trim('_').take(20)
         return "Hisab_" + SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date(h.time)) + (if (p.isNotEmpty()) "_$p" else "") + "." + ext
     }
 
@@ -297,6 +302,8 @@ object Bill {
         if (Store.mobile.isNotBlank()) sb.append(Store.mobile).append("\n")
         sb.append(L.t("hisab")).append("  ").append(dateText(h.time)).append("\n")
         if (h.party.isNotBlank()) sb.append(L.t("party")).append(": ").append(h.party).append("\n")
+        if (h.mudiName.isNotBlank() || h.mudiPct > 0) sb.append(L.t("mudi_h")).append(": ").append(h.mudiName).append(" (").append(plain(h.mudiPct)).append("%)\n")
+        if (h.khedName.isNotBlank() || h.khedPct > 0) sb.append(L.t("khed_h")).append(": ").append(h.khedName).append(" (").append(plain(h.khedPct)).append("%)\n")
         if (h.vehicleInfo().isNotBlank()) sb.append(h.vehicleInfo()).append("\n")
         if (h.vehicle.isNotBlank()) sb.append(L.t("vehicle")).append(": ").append(h.vehicle).append("\n")
         if (h.place.isNotBlank()) sb.append(L.t("place").substringBefore(" (")).append(": ").append(h.place).append("\n")

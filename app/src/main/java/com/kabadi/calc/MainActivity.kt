@@ -217,7 +217,7 @@ class MainActivity : Activity() {
         fun fill(q: String) {
             list.removeAllViews()
             val items = Store.hisabs.filter {
-                q.isBlank() || it.party.contains(q, true) || it.vehicle.contains(q, true) || it.note.contains(q, true)
+                q.isBlank() || it.party.contains(q, true) || it.mudiName.contains(q, true) || it.khedName.contains(q, true) || it.vehicle.contains(q, true) || it.note.contains(q, true)
             }.sortedByDescending { it.time }
             if (Store.hisabs.isNotEmpty()) {
                 val all = items.sumOf { it.munafa() }
@@ -230,7 +230,7 @@ class MainActivity : Activity() {
                 val c = card()
                 val top = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
                 top.addView(TextView(this).apply {
-                    text = h.party.ifBlank { h.vehicle.ifBlank { "—" } }; textSize = 17f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD; maxLines = 1
+                    text = hTitle(h); textSize = 17f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD; maxLines = 1
                 }, llp(0, WRAP_CONTENT, 1f))
                 val m = h.munafa()
                 top.addView(TextView(this).apply { text = money(m); textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (m >= 0) GREEN else RED) })
@@ -253,7 +253,7 @@ class MainActivity : Activity() {
     }
 
     private fun askDelete(h: Hisab, after: () -> Unit) {
-        AlertDialog.Builder(this).setMessage(L.t("del_q") + "\n" + h.party + "  " + money(h.munafa()))
+        AlertDialog.Builder(this).setMessage(L.t("del_q") + "\n" + hTitle(h) + "  " + money(h.munafa()))
             .setPositiveButton(L.t("yes")) { _, _ -> Store.hisabs.remove(h); Store.save(this); after() }
             .setNegativeButton(L.t("no"), null).show()
     }
@@ -277,7 +277,7 @@ class MainActivity : Activity() {
     private lateinit var resultBox: LinearLayout
     private var scrollTo: View? = null
 
-    private fun hasContent(h: Hisab) = h.party.isNotBlank() || h.vehicle.isNotBlank() || h.priceText.isNotBlank() ||
+    private fun hasContent(h: Hisab) = h.party.isNotBlank() || h.mudiName.isNotBlank() || h.khedName.isNotBlank() || h.vehicle.isNotBlank() || h.priceText.isNotBlank() ||
         h.kharch.isNotEmpty() || h.maal.isNotEmpty() || h.saleText.isNotBlank() || h.partners.isNotEmpty()
 
     private fun autoSave() {
@@ -371,24 +371,46 @@ class MainActivity : Activity() {
         }
     }
 
+    /** screen / list title: mudi malik & khedut (old hisab: party name) */
+    private fun hTitle(h: Hisab) = h.party.ifBlank { listOf(h.mudiName, h.khedName).filter { it.isNotBlank() }.joinToString(" / ") }
+        .ifBlank { h.vehicleInfo().ifBlank { L.t("hisab") } }
+
     private fun showEditor(h: Hisab) {
         editing = h
-        val body = setScreen("edit", h.party.ifBlank { L.t("hisab") }, { autoSave(); Store.save(this); showHome() })
+        val body = setScreen("edit", hTitle(h), { autoSave(); Store.save(this); showHome() })
 
-        // header
-        val head = card()
-        head.addView(labeled(L.t("party"), input(L.t("party"), h.party, false) { h.party = it; titleTv.text = it.ifBlank { L.t("hisab") } }))
-        head.addView(labeled(L.t("vehicle"), input("GJ-23-XX-0000", h.vehicle, false) { h.vehicle = it }))
-        head.addView(labeled(L.t("note"), input(L.t("note"), h.note, false) { h.note = it }))
+        // top: Mudi malik | %   Khedut | %  (their profit / loss share)
+        val top = card()
+        top.addView(heading(L.t("split"), 0xFF00695C.toInt()))
+        val cols = LinearLayout(this)
+        fun col(label: String, name: String, pct: String, mob: String, setN: (String) -> Unit, setP: (String) -> Unit, setM: (String) -> Unit): View {
+            val c = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            val hd = LinearLayout(this)
+            hd.addView(small(label).apply { typeface = Typeface.DEFAULT_BOLD }, llp(0, WRAP_CONTENT, 1f))
+            hd.addView(small("%").apply { typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.END }, llp(dpi(52f), WRAP_CONTENT))
+            c.addView(hd)
+            val r = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            r.addView(input(L.t("name_q"), name, false) { setN(it); titleTv.text = hTitle(editing ?: return@input) }.apply { textSize = 15f }, llp(0, WRAP_CONTENT, 1f))
+            r.addView(input("%", pct, true) { setP(it); refreshTotals() }.apply { gravity = Gravity.CENTER; textSize = 15f },
+                llp(dpi(52f), WRAP_CONTENT).apply { leftMargin = dpi(4f) })
+            c.addView(r)
+            c.addView(input(L.t("cmobile"), mob, true, setM).apply { textSize = 13f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(4f) })
+            return c
+        }
+        cols.addView(col(L.t("mudi_h"), h.mudiName, h.mudiPctText, h.mudiMobile, { h.mudiName = it }, { h.mudiPctText = it }, { h.mudiMobile = it }), llp(0, WRAP_CONTENT, 1f))
+        cols.addView(col(L.t("khed_h"), h.khedName, h.khedPctText, h.khedMobile, { h.khedName = it }, { h.khedPctText = it }, { h.khedMobile = it }),
+            llp(0, WRAP_CONTENT, 1f).apply { leftMargin = dpi(10f) })
+        top.addView(cols)
         val dt = TextView(this).apply {
             text = "🕒  " + Bill.dateText(h.time); textSize = 16f; setTextColor(BLUE); setPadding(0, dpi(8f), 0, dpi(2f))
         }
         dt.setOnClickListener { pickDate(h) { dt.text = "🕒  " + Bill.dateText(h.time) } }
-        head.addView(labeled(L.t("date"), dt))
-        head.addView(toggle(listOf(L.t("seller_s"), L.t("buyer_s")), if (h.role == "buyer") 1 else 0, BLUE) { i ->
+        top.addView(labeled(L.t("date"), dt))
+        top.addView(toggle(listOf(L.t("seller_s"), L.t("buyer_s")), if (h.role == "buyer") 1 else 0, BLUE) { i ->
             h.role = if (i == 1) "buyer" else "seller"; showEditor(h)
         }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
-        body.addView(head, cardLp())
+        top.addView(labeled(L.t("note"), input(L.t("note"), h.note, false) { h.note = it }))
+        body.addView(top, cardLp())
 
         // B. vehicle details
         val vc = card()
@@ -398,7 +420,6 @@ class MainActivity : Activity() {
         vc.addView(chips(BRANDS, 0xFF455A64.toInt()) { i -> brandIn.setText(BRANDS[i]) })
         val varIn = input("1612", h.variant, false) { h.variant = it }
         vc.addView(labeled(L.t("variant"), varIn))
-        vc.addView(chips(Store.variants.take(9), 0xFF455A64.toInt()) { i -> varIn.setText(Store.variants[i]) })
         vc.addView(small(L.t("tyres")).apply { setPadding(0, dpi(6f), 0, dpi(2f)) })
         vc.addView(toggle(TYRES, TYRES.indexOf(h.tyres), 0xFF455A64.toInt()) { i -> h.tyres = TYRES[i] })
         val row2 = LinearLayout(this)
@@ -406,22 +427,8 @@ class MainActivity : Activity() {
         row2.addView(labeled(L.t("place"), input(L.t("place").substringBefore(" ("), h.place, false) { h.place = it }),
             llp(0, WRAP_CONTENT, 2f).apply { leftMargin = dpi(8f) })
         vc.addView(row2)
+        vc.addView(labeled(L.t("vehicle"), input("GJ-23-XX-0000", h.vehicle, false) { h.vehicle = it }))
         body.addView(vc, cardLp())
-
-        // A. mudiwala / khedut
-        val sc0 = card()
-        sc0.addView(heading(L.t("split"), 0xFF00695C.toInt()))
-        fun person(label: String, name: String, mob: String, pct: String, setN: (String) -> Unit, setM: (String) -> Unit, setP: (String) -> Unit) {
-            val r = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dpi(4f), 0, dpi(2f)) }
-            r.addView(input(label, name, false, setN).apply { textSize = 15f }, llp(0, WRAP_CONTENT, 1.6f))
-            r.addView(input(L.t("pct_hint"), pct, true) { setP(it); refreshTotals() }.apply { gravity = Gravity.END },
-                llp(0, WRAP_CONTENT, 0.8f).apply { leftMargin = dpi(6f) })
-            sc0.addView(r)
-            sc0.addView(input(L.t("cmobile"), mob, true, setM).apply { textSize = 14f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(4f) })
-        }
-        person(L.t("mudi"), h.mudiName, h.mudiMobile, h.mudiPctText, { h.mudiName = it }, { h.mudiMobile = it }, { h.mudiPctText = it })
-        person(L.t("khed"), h.khedName, h.khedMobile, h.khedPctText, { h.khedName = it }, { h.khedMobile = it }, { h.khedPctText = it })
-        body.addView(sc0, cardLp())
 
         // 1. vehicle price
         val pc = card()
@@ -709,7 +716,7 @@ class MainActivity : Activity() {
             val c = card()
             val top = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
             top.addView(TextView(this).apply {
-                text = (if (d.lena) "⬇ " else "⬆ ") + (if (d.lena) d.l.cName.ifBlank { d.h.party } else d.l.name).ifBlank { "—" }
+                text = (if (d.lena) "⬇ " else "⬆ ") + (if (d.lena) d.l.cName.ifBlank { hTitle(d.h) } else d.l.name).ifBlank { "—" }
                 textSize = 17f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD; maxLines = 1
             }, llp(0, WRAP_CONTENT, 1f))
             top.addView(TextView(this).apply { text = money(d.left); textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (d.lena) GREEN else RED) })
@@ -720,7 +727,7 @@ class MainActivity : Activity() {
                 d.due <= today -> "⚠ " + L.t("today")
                 else -> L.t("due") + ": " + Bill.dateText(d.due).substringBefore("  ")
             }
-            c.addView(small(listOf(d.l.name, d.h.party, d.h.vehicleInfo(), status).filter { it.isNotBlank() }.joinToString("  •  "),
+            c.addView(small(listOf(d.l.name, hTitle(d.h), status).filter { it.isNotBlank() }.joinToString("  •  "),
                 if (status.startsWith("⚠")) RED else MUTED))
             val acts = LinearLayout(this).apply { setPadding(0, dpi(6f), 0, 0) }
             fun act(t: String, color: Int, a: () -> Unit) = acts.addView(TextView(this).apply {
