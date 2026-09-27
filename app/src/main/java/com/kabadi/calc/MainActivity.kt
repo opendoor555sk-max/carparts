@@ -91,21 +91,47 @@ class MainActivity : Activity() {
                 requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 9)
             if (toKhata) showKhata()
         }
-        if (!Account.exists(this)) showSignup { start() }
-        else if (Account.locked(this)) showPin { start() }
-        else start()
+        Account.refreshAdminNumber(this)
+        startApp = { start() }
+        route()
     }
 
-    // ================= ACCOUNT (mobile + PIN) =================
-    private fun loginScreen(title: String): LinearLayout {
+    // ================= ACCOUNT: sign up (OTP from admin on WhatsApp) / sign in / sign out =================
+    private var startApp: () -> Unit = {}
+
+    /** which screen to show when the app opens */
+    private fun route() {
+        when {
+            !Account.exists(this) -> showSignup()
+            !Account.verified(this) -> showOtp()
+            !Account.signedIn(this) -> showSignin()
+            Account.locked(this) -> showPin()
+            else -> startApp()
+        }
+    }
+
+    private fun loginScreen(title: String, onAdmin: (() -> Unit)? = null): LinearLayout {
         bar.visibility = View.GONE
         val body = setScreen("login", title, null)
         body.gravity = Gravity.CENTER_HORIZONTAL
-        body.setPadding(dpi(24f), dpi(40f), dpi(24f), dpi(24f))
-        body.addView(TextView(this).apply { text = "♻"; textSize = 54f; gravity = Gravity.CENTER; setTextColor(GREEN) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.setPadding(dpi(24f), dpi(32f), dpi(24f), dpi(24f))
+        body.addView(TextView(this).apply {
+            text = "♻"; textSize = 54f; gravity = Gravity.CENTER; setTextColor(GREEN)
+            // hidden: long press = admin code
+            if (onAdmin != null) setOnLongClickListener { askAdminCode(onAdmin); true }
+        }, llp(MATCH_PARENT, WRAP_CONTENT))
         body.addView(TextView(this).apply { text = L.t("app"); textSize = 22f; gravity = Gravity.CENTER; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD }, llp(MATCH_PARENT, WRAP_CONTENT))
-        body.addView(small(title).apply { gravity = Gravity.CENTER; textSize = 15f; setPadding(0, dpi(4f), 0, dpi(20f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(small(title).apply { gravity = Gravity.CENTER; textSize = 15f; setPadding(0, dpi(4f), 0, dpi(18f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
         return body
+    }
+
+    private fun askAdminCode(ok: () -> Unit) {
+        val e = pinInput("• • • • • •").apply { filters = arrayOf(android.text.InputFilter.LengthFilter(6)) }
+        val box = LinearLayout(this).apply { setPadding(dpi(20f), dpi(8f), dpi(20f), 0); addView(e, llp(MATCH_PARENT, WRAP_CONTENT)) }
+        AlertDialog.Builder(this).setTitle("👑 Admin").setView(box)
+            .setPositiveButton(L.t("acc_open")) { _, _ ->
+                if (Otp.isAdminCode(e.text.toString())) { Account.makeAdmin(this); toast("👑 Admin ✓"); ok() } else toast(L.t("acc_wrong"))
+            }.setNegativeButton(L.t("back"), null).show()
     }
 
     private fun pinInput(hint: String) = input(hint, "", true) {}.apply {
@@ -118,36 +144,94 @@ class MainActivity : Activity() {
     private fun langRow(again: () -> Unit) = row(*listOf("English", "हिंदी", "ગુજરાતી").mapIndexed { i, t ->
         pill(t, L.lang == i, BLUE) { L.lang = i; Store.save(this); again() } to 1f }.toTypedArray())
 
-    private fun showSignup(done: () -> Unit) {
-        val body = loginScreen(L.t("acc_new"))
-        body.addView(langRow { showSignup(done) }, gap())
-        var name = Store.owner; var mob = Store.mobile.filter { it.isDigit() }.takeLast(10)
-        body.addView(input(L.t("acc_name"), name, false) { name = it }, gap())
-        body.addView(mobileInput("📞 " + L.t("acc_mobile"), mob) { mob = it }.apply { textSize = 18f }, gap())
+    private fun link(t: String, act: () -> Unit) = small(t, BLUE).apply {
+        gravity = Gravity.CENTER; textSize = 15f; setPadding(0, dpi(14f), 0, 0); setOnClickListener { act() }
+    }
+
+    /** 1) first time: name + mobile + PIN → ask OTP */
+    private fun showSignup() {
+        var name = Account.name(this).ifBlank { Store.owner }
+        var mob = Account.mobile(this).ifBlank { Store.mobile.filter { it.isDigit() }.takeLast(10) }
         val p1 = pinInput(L.t("acc_pin")); val p2 = pinInput(L.t("acc_pin2"))
-        body.addView(p1, gap()); body.addView(p2, gap())
-        body.addView(bigButton(L.t("acc_open"), GREEN) {
-            val a = p1.text.toString(); val b = p2.text.toString()
-            when {
-                mob.length != 10 -> toast(L.t("acc_bad_mobile"))
-                a.length != 4 || a != b -> toast(L.t("acc_bad_pin"))
+        fun save(): Boolean {
+            val a = p1.text.toString()
+            return when {
+                name.isBlank() -> { toast(L.t("acc_name")); false }
+                mob.length != 10 -> { toast(L.t("acc_bad_mobile")); false }
+                a.length != 4 || a != p2.text.toString() -> { toast(L.t("acc_bad_pin")); false }
                 else -> {
                     Account.create(this, name.trim(), mob, a)
                     if (Store.owner.isBlank()) Store.owner = name.trim()
                     if (Store.mobile.isBlank()) Store.mobile = mob
-                    Store.save(this); hideKeyboard(); done()
+                    Store.save(this); hideKeyboard(); true
                 }
             }
-        }, gap())
-        body.addView(small(L.t("acc_note")).apply { gravity = Gravity.CENTER }, llp(MATCH_PARENT, WRAP_CONTENT))
+        }
+        val body = loginScreen(L.t("acc_new")) { if (save()) { Account.approveAsAdmin(this); startApp() } }
+        body.addView(langRow { showSignup() }, gap())
+        body.addView(input(L.t("acc_name"), name, false) { name = it }, gap())
+        body.addView(mobileInput("📞 " + L.t("acc_mobile"), mob) { mob = it }.apply { textSize = 18f }, gap())
+        body.addView(p1, gap()); body.addView(p2, gap())
+        body.addView(bigButton(L.t("otp_ask"), GREEN) { if (save()) { sendOtpRequest(); showOtp() } }, gap())
+        body.addView(small(L.t("otp_why")).apply { gravity = Gravity.CENTER }, llp(MATCH_PARENT, WRAP_CONTENT))
     }
 
-    private fun showPin(done: () -> Unit) {
+    private fun otpRequestText() = "🔐 " + L.t("app") + " – OTP request\nName: " + Account.name(this) +
+        "\nMobile: " + Account.mobile(this) + "\nCode: #" + Account.device(this)
+
+    private fun sendOtpRequest() {
+        val admin = Account.adminNumber(this)
+        if (admin.isNotEmpty()) whatsapp(admin, otpRequestText())
+        else {
+            val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, otpRequestText())
+            try { startActivity(Intent.createChooser(i, "WhatsApp")) } catch (_: Exception) {}
+        }
+    }
+
+    /** 2) waiting for the OTP that admin sends */
+    private fun showOtp() {
+        val body = loginScreen(L.t("otp_title")) { Account.approveAsAdmin(this); startApp() }
+        val info = card()
+        info.addView(small(Account.name(this), INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD })
+        info.addView(small("📞 " + Account.mobile(this) + "     " + L.t("otp_code") + ": #" + Account.device(this), INK).apply { textSize = 15f })
+        body.addView(info, gap())
+        body.addView(small(L.t("otp_help")).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(bigButton(L.t("otp_send"), 0xFF25D366.toInt()) { sendOtpRequest() }, gap())
+        val e = pinInput(L.t("otp_enter")).apply { filters = arrayOf(android.text.InputFilter.LengthFilter(6)); textSize = 24f }
+        fun tryOtp() {
+            if (Account.approve(this, e.text.toString())) { hideKeyboard(); toast(L.t("otp_ok")); startApp() }
+            else { toast(L.t("otp_bad")); e.setText("") }
+        }
+        e.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: Editable?) { if (s?.length == 6) tryOtp() }
+        })
+        body.addView(e, gap())
+        body.addView(bigButton(L.t("acc_open"), GREEN) { tryOtp() }, gap())
+        body.addView(link(L.t("otp_change")) { showSignup() }, llp(MATCH_PARENT, WRAP_CONTENT))
+    }
+
+    /** 3) approved before but signed out → PIN to sign in */
+    private fun showSignin() {
+        val body = loginScreen(L.t("signin"))
+        body.addView(small(Account.name(this) + "\n📞 " + Account.mobile(this), INK).apply { gravity = Gravity.CENTER; textSize = 16f; setPadding(0, 0, 0, dpi(12f)) },
+            llp(MATCH_PARENT, WRAP_CONTENT))
+        pinBox(body) { Account.signIn(this); startApp() }
+        body.addView(link(L.t("other_acc")) { showSignup() }, llp(MATCH_PARENT, WRAP_CONTENT))
+    }
+
+    /** 4) signed in, PIN lock on */
+    private fun showPin() {
         val body = loginScreen(Account.name(this).ifBlank { L.t("acc_enter") } + "\n📞 " + Account.mobile(this))
+        pinBox(body) { startApp() }
+    }
+
+    private fun pinBox(body: LinearLayout, ok: () -> Unit) {
         val p = pinInput(L.t("acc_enter"))
         body.addView(p, gap())
         fun tryOpen() {
-            if (Account.check(this, p.text.toString())) { hideKeyboard(); done() }
+            if (Account.check(this, p.text.toString())) { hideKeyboard(); ok() }
             else { toast(L.t("acc_wrong")); p.setText("") }
         }
         p.addTextChangedListener(object : TextWatcher {
@@ -155,21 +239,13 @@ class MainActivity : Activity() {
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
             override fun afterTextChanged(s: Editable?) { if (s?.length == 4) tryOpen() }
         })
-        body.addView(bigButton(L.t("acc_open"), GREEN) { tryOpen() }, gap())
-        body.addView(small(L.t("acc_forgot"), BLUE).apply {
-            gravity = Gravity.CENTER; textSize = 15f; setPadding(0, dpi(12f), 0, 0)
-            setOnClickListener {
-                val m = mobileInput(L.t("acc_mobile"), "") {}
-                AlertDialog.Builder(this@MainActivity).setMessage(L.t("acc_forgot_q")).setView(m)
-                    .setPositiveButton(L.t("acc_open")) { _, _ ->
-                        if (m.text.toString() == Account.mobile(this@MainActivity)) askNewPin { done() } else toast(L.t("acc_bad_mobile"))
-                    }.setNegativeButton(L.t("back"), null).show()
-            }
-        }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(bigButton(L.t("signin_btn"), GREEN) { tryOpen() }, gap())
+        // forgot PIN → new PIN needs a new OTP from admin
+        body.addView(link(L.t("acc_forgot")) { showSignup() }, llp(MATCH_PARENT, WRAP_CONTENT))
         p.requestFocus()
     }
 
-    /** set a new PIN (forgot / change) */
+    /** set a new PIN (change, from settings) */
     private fun askNewPin(done: () -> Unit) {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(20f), dpi(8f), dpi(20f), 0) }
         val p1 = pinInput(L.t("acc_pin")); val p2 = pinInput(L.t("acc_pin2"))
@@ -179,6 +255,68 @@ class MainActivity : Activity() {
                 val a = p1.text.toString()
                 if (a.length == 4 && a == p2.text.toString()) { Account.setPin(this, a); toast(L.t("saved_ok")); done() } else toast(L.t("acc_bad_pin"))
             }.setNegativeButton(L.t("back"), null).show()
+    }
+
+    private fun signOut() {
+        AlertDialog.Builder(this).setMessage(L.t("signout_q"))
+            .setPositiveButton(L.t("yes")) { _, _ -> autoSave(); Store.save(this); Account.signOut(this); editing = null; showSignin() }
+            .setNegativeButton(L.t("no"), null).show()
+    }
+
+    // ================= ADMIN: make OTP / reject =================
+    private fun showAdmin() {
+        val body = setScreen("admin", "👑 Admin – OTP", { showSettings() })
+        var mob = ""; var dev = ""; var name = ""
+        val otpTv = TextView(this).apply { textSize = 40f; gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; setTextColor(GREEN); letterSpacing = 0.2f }
+        lateinit var mobIn: EditText; lateinit var devIn: EditText
+        fun show() {
+            val ok = mob.length == 10 && dev.length == 6
+            otpTv.text = if (ok) Otp.code(mob, dev) else "— — —"
+        }
+        val c = card()
+        c.addView(heading(L.t("adm_paste")))
+        c.addView(input(L.t("adm_paste_h"), "", false) { t ->
+            Otp.parse(t)?.let { (m, d) -> mob = m; dev = d; mobIn.setText(m); devIn.setText(d) }
+            name = Regex("Name:\\s*(.+)").find(t)?.groupValues?.get(1)?.trim().orEmpty()
+            show()
+        }.apply { setSingleLine(false); minLines = 3; gravity = Gravity.TOP; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE }, gap())
+        mobIn = mobileInput("📞 " + L.t("acc_mobile"), "") { mob = it; show() }
+        devIn = input(L.t("otp_code") + " (#ABC123)", "", false) { dev = it.trim().removePrefix("#").uppercase(); show() }.apply {
+            filters = arrayOf(android.text.InputFilter.LengthFilter(7), android.text.InputFilter.AllCaps())
+        }
+        c.addView(row(mobIn to 1.3f, devIn to 1f))
+        c.addView(small("OTP").apply { gravity = Gravity.CENTER; setPadding(0, dpi(10f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        c.addView(otpTv, llp(MATCH_PARENT, WRAP_CONTENT))
+        c.addView(bigButton(L.t("adm_ok"), GREEN) {
+            if (mob.length != 10 || dev.length != 6) return@bigButton toast(L.t("adm_fill"))
+            Account.log(this, true, name, mob)
+            whatsapp(mob, "✅ " + L.t("app") + "\nOTP: " + Otp.code(mob, dev) + "\n" + L.t("adm_ok_msg"))
+        }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(10f) })
+        c.addView(bigButton(L.t("adm_no"), RED) {
+            if (mob.length != 10) return@bigButton toast(L.t("acc_bad_mobile"))
+            Account.log(this, false, name, mob)
+            whatsapp(mob, "❌ " + L.t("app") + "\n" + L.t("adm_no_msg"))
+        }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
+        body.addView(c, cardLp())
+        show()
+
+        val n = card()
+        n.addView(heading(L.t("adm_no_title")))
+        val an = Account.adminNumber(this)
+        n.addView(small(if (an.isNotEmpty()) "📞 $an" else L.t("adm_no_set"), if (an.isNotEmpty()) INK else RED).apply { textSize = 15f })
+        body.addView(n, cardLp())
+
+        val logs = Account.logs(this)
+        if (logs.isNotEmpty()) {
+            val lc = card()
+            lc.addView(heading(L.t("adm_log")))
+            logs.take(100).forEach { o ->
+                val ok = o.optBoolean("ok")
+                lc.addView(small((if (ok) "✅ " else "❌ ") + (o.optString("n").ifBlank { "—" }) + "  📞 " + o.optString("m") + "  •  " + Bill.dateText(o.optLong("t")),
+                    if (ok) GREEN else RED).apply { textSize = 14f; setPadding(0, dpi(3f), 0, dpi(3f)) })
+            }
+            body.addView(lc, cardLp())
+        }
     }
 
     override fun onNewIntent(i: Intent?) {
@@ -1195,12 +1333,14 @@ class MainActivity : Activity() {
         if (Account.exists(this)) {
             val ac = card()
             ac.addView(heading(L.t("acc_sec")))
-            ac.addView(small(Account.name(this) + "   📞 " + Account.mobile(this), INK).apply { textSize = 15f; setPadding(0, 0, 0, dpi(8f)) })
+            ac.addView(small(Account.name(this) + "   📞 " + Account.mobile(this) + (if (Account.isAdmin(this)) "   👑" else ""), INK).apply { textSize = 15f; setPadding(0, 0, 0, dpi(8f)) })
+            fun sp(t: String, on: Boolean, col: Int, top: Boolean, a: () -> Unit) = ac.addView(pill(t, on, col, a).apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) },
+                llp(MATCH_PARENT, WRAP_CONTENT).apply { if (top) topMargin = dpi(8f) })
+            if (Account.isAdmin(this)) sp("👑 " + L.t("adm_btn"), true, 0xFF6A1B9A.toInt(), false) { showAdmin() }
             val on = Account.locked(this)
-            ac.addView(pill(L.t(if (on) "acc_lock_on" else "acc_lock_off"), on, GREEN) { Account.setLock(this, !on); showSettings() }
-                .apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
-            ac.addView(pill(L.t("acc_change"), false, BLUE) { askNewPin {} }
-                .apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
+            sp(L.t(if (on) "acc_lock_on" else "acc_lock_off"), on, GREEN, Account.isAdmin(this)) { Account.setLock(this, !on); showSettings() }
+            sp(L.t("acc_change"), false, BLUE, true) { askNewPin {} }
+            sp(L.t("signout"), false, RED, true) { signOut() }
             body.addView(ac, cardLp())
         }
 

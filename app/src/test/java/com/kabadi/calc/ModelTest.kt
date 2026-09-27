@@ -2,6 +2,7 @@ package com.kabadi.calc
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class ModelTest {
@@ -128,5 +129,20 @@ class ModelTest {
         assertEquals(listOf("Asif", "Rafik", "Salam"), peopleNames(all))
         assertEquals(listOf(2026, 2025), years(all))
         assertEquals(1, monthly(all, RFilter(brand = "Mahindra")).size)
+    }
+
+    @Test fun otp() {
+        val dev = Otp.deviceCode("a1b2c3d4e5f60708")
+        assertEquals(6, dev.length)
+        assertEquals(dev, Otp.deviceCode("a1b2c3d4e5f60708"))
+        val o = Otp.code("9876543210", dev)
+        assertEquals(6, o.length)
+        assertTrue(Otp.check("+91 98765 43210".replace(" ", ""), dev, o))
+        assertFalse(Otp.check("9876543211", dev, o))
+        assertFalse(Otp.check("9876543210", Otp.deviceCode("other"), o))
+        val msg = "OTP request\nName: Rafik\nMobile: 9876543210\nCode: #" + dev
+        assertEquals("9876543210" to dev, Otp.parse(msg))
+        assertEquals(null, Otp.parse("hello 12345"))
+        assertTrue(Otp.isAdminCode("219977")); assertFalse(Otp.isAdminCode("123456"))
     }
 }
