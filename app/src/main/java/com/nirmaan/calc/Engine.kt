@@ -34,6 +34,7 @@ const val CFT = 0.028316846592      // 1 cubic foot in m³
 const val BAG = 0.0347              // 50 kg cement bag in m³
 const val BDFT = 0.002359737216     // 1 board foot in m³
 const val YD3 = 0.764554857984      // 1 cubic yard in m³
+const val LTR = 0.001               // 1 litre in m³
 const val LB = 0.45359237
 
 /**
@@ -254,7 +255,7 @@ class Engine(val ui: Ui) {
     }
 
     /** size of one unit of q (m, m², m³ or one board foot) */
-    fun scale(u: String, d: Int): Double = if (u == "bf") BDFT else UF.getValue(baseU(u)).pow(d)
+    fun scale(u: String, d: Int): Double = if (u == "bf") BDFT else if (u == "ltr") LTR else UF.getValue(baseU(u)).pow(d)
 
     fun f2(x: Double) = String.format(Locale.US, "%.2f", x)
 
@@ -291,6 +292,7 @@ class Engine(val ui: Ui) {
         val d = q.d
         if (u == "acre") return num(q.v / ACRE) + "acre"
         if (u == "bf") return num(rnd(q.v / BDFT, 4)) + "bf"
+        if (u == "ltr") return num(rnd(q.v / LTR, if (decPlaces >= 0) decPlaces else 3)) + " L"
         if (d == 1 && q.f != "dec" && (u == "ftin" || u == "in")) {
             val neg = q.v < 0
             val n = Math.round(abs(q.v) / IN * res).toDouble() / res
@@ -492,6 +494,19 @@ class Engine(val ui: Ui) {
         fresh = true; label = "Board feet"
     }
 
+    /** Litre: number → litre, or any volume (m³ / cft / yd³ / wt-vol weight) shown in litre. */
+    private fun litreKey() {
+        commit()
+        val q = cur
+        cur = when {
+            q.t == 'n' -> Q('L', q.v * LTR, 3, "ltr", "dec")
+            q.t == 'L' && q.d == 3 -> q.copy(u = "ltr", f = "dec")
+            q.t == 'W' -> Q('L', q.v / dens, 3, "ltr", "dec")
+            else -> return ui.toast("Pehle number ya volume (jaise 2 m m m) daaliye, phir Litre")
+        }
+        fresh = true; label = if (q.t == 'W') "Litre (wt/vol se)" else "Litre"
+    }
+
     /** qty × price [Conv][Cost]  →  money.  A plain number + Cost marks it as ₹. */
     private fun costKey() {
         val p = pend
@@ -501,6 +516,7 @@ class Engine(val ui: Ui) {
             val a = p.a
             val (qty, per) = when {
                 a.t == 'L' && a.u == "bf" -> a.v / BDFT / 1000 to "1000bf"
+                a.t == 'L' && a.u == "ltr" -> a.v / LTR to "litre"
                 a.t == 'L' -> {
                     val uu = baseU(a.u)
                     a.v / scale(a.u, a.d) to (if (a.u == "acre") "acre" else uu + SUP[a.d.coerceIn(0, 3)])
@@ -1361,7 +1377,7 @@ class Engine(val ui: Ui) {
     private val ROWS = arrayOf(
         arrayOf(k("Rise", "R/Wall", "fn"), k("Run", "Roof", "fn"), k("Pitch", "Slope", "fn"), k("Diag", "Polygon", "fn"), k("Stair", "Baluster", "fn")),
         arrayOf(k("Hip/V", "IrPitch", "fn"), k("Jack", "IrJack", "fn"), k("Arc", "Radius", "fn"), k("Circle", "ColCon", "fn"), k("CmpMtr", "Fence", "fn")),
-        arrayOf(k("m", "", "unit"), k("Length", "Masonry", "green"), k("Width", "Footing", "green"), k("Height", "Drywall", "green"), k("⌫", "√x", "red")),
+        arrayOf(k("m", "Litre", "unit"), k("Length", "Masonry", "green"), k("Width", "Footing", "green"), k("Height", "Drywall", "green"), k("⌫", "√x", "red")),
         arrayOf(k("Yards", "", "unit"), k("Feet", "", "unit"), k("Inches", "", "unit"), k("/", "Frac", "unit"), k("%", "x²", "op")),
         arrayOf(k("Conv", "", "conv"), k("7", "cm", "num", "Rails"), k("8", "BdFt", "num"), k("9", "mm", "num"), k("÷", "1/x", "op")),
         arrayOf(k("Store", "Prefs", "st"), k("4", "lbs", "num"), k("5", "qty@oc", "num", "o.c."), k("6", "Tons", "num"), k("×", "ClrAll", "op")),
@@ -1476,6 +1492,7 @@ class Engine(val ui: Ui) {
             "SIN", "COS", "TAN", "ASIN", "ACOS", "ATAN" -> trigKey(n)
             "dms⇄deg" -> { dmsKey(); lastKey = "dms⇄deg" }
             "Acre" -> acreKey()
+            "Litre" -> litreKey()
             "Pitch" -> triKey("pitch", md)
             "Slope" -> triKey("pitch", md, true)
             "Rise" -> triKey("rise", md)

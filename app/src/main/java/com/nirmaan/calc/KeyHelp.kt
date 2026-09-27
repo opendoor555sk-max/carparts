@@ -39,6 +39,7 @@ object KeyHelp {
         "%" to "Percent. 200 + 10 % = 220.", "x²" to "Square.",
         "Conv" to "Conv: keys ke upar likha peela kaam chalata hai.",
         "7" to "7", "cm" to "Centimetre (dobara = cm², cm³).", "8" to "8",
+        "Litre" to "Litre: number daal kar Conv + m = litre. Koi bhi volume (m³ / cft / yd³) par dabayein to litre mein. 1000 litre = 1 m³. Litre ke baad Feet/m dabane se wapas cft/m³.",
         "BdFt" to "Board feet: number ya volume ko BF mein. Bina value: lakdi ka cft / rate hisaab.",
         "9" to "9", "mm" to "Millimetre.", "÷" to "Bhaag.", "1/x" to "1 ÷ x.",
         "Store" to "Store: phir M1/M2/M3 (1,2,3), o.c. (5), Rails (7), wt/vol (0), ya Rise/Run/... dabayein.",

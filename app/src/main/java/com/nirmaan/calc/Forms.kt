@@ -792,6 +792,7 @@ fun Engine.costForm() {
     val (qty, unit) = when (q.t) {
         'L' -> {
             if (q.u == "bf") rnd(q.v / BDFT, 4) to "bf"
+            else if (q.u == "ltr") rnd(q.v / LTR, 4) to "litre"
             else {
                 val uu = baseU(q.u)
                 rnd(q.v / scale(q.u, q.d), 4) to (uu + SUP[q.d.coerceIn(0, 3)])

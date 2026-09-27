@@ -1,3 +1,5 @@
+Naya: Litre button — Conv + m = Litre. Number ya koi bhi volume (m³ / cft / yd³) litre mein.
+
 BuildCalc ke baaki saare kaam:
 - Hip/V: Regular/Irregular switch screen ke andar, purlin angles (face + edge), vertical purlin, hip roof ke har hisse ka area
 - Stair: teesri drawing – Installation (header, floor, hanger ki zaroorat), stringers ki ginti
