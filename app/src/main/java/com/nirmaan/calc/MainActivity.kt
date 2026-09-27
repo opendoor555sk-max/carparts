@@ -52,6 +52,50 @@ class MainActivity : Activity(), Ui {
     private class KeyView(val r: Int, val c: Int, val btn: TextView, val top: TextView, val blue: TextView)
 
     private val keys = ArrayList<KeyView>()
+    private var touchX = 0f
+    private var touchY = 0f
+
+    /** The Conv key cut at 45°: top-left = Conv, bottom-right = Switch (other calculator). */
+    private inner class SplitKey(val a: IntArray, val b: IntArray, val lit: Boolean) : Drawable() {
+        private val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        private val tp = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD_ITALIC); textAlign = android.graphics.Paint.Align.CENTER
+        }
+
+        override fun draw(cv: android.graphics.Canvas) {
+            val w = bounds.width().toFloat()
+            val h = bounds.height().toFloat() - dp(2f)
+            val r = dp(9f)
+            p.shader = null; p.style = android.graphics.Paint.Style.FILL
+            p.color = if (eng.light) c(0xFF9AA7AE) else Color.BLACK
+            cv.drawRoundRect(android.graphics.RectF(0f, dp(2f), w, h + dp(2f)), r, r, p)
+            cv.save()
+            cv.clipPath(android.graphics.Path().apply { addRoundRect(android.graphics.RectF(0f, 0f, w, h), r, r, android.graphics.Path.Direction.CW) })
+            val t1 = android.graphics.Path().apply { moveTo(0f, 0f); lineTo(w, 0f); lineTo(0f, h); close() }
+            p.shader = android.graphics.LinearGradient(0f, 0f, 0f, h, a[0], a[1], android.graphics.Shader.TileMode.CLAMP)
+            cv.drawPath(t1, p)
+            val t2 = android.graphics.Path().apply { moveTo(w, 0f); lineTo(w, h); lineTo(0f, h); close() }
+            p.shader = android.graphics.LinearGradient(0f, 0f, 0f, h, b[0], b[1], android.graphics.Shader.TileMode.CLAMP)
+            cv.drawPath(t2, p)
+            p.shader = null; p.color = if (eng.light) Color.WHITE else Color.BLACK; p.strokeWidth = dp(2f); p.style = android.graphics.Paint.Style.STROKE
+            cv.drawLine(w, 0f, 0f, h, p)
+            cv.restore()
+            if (lit) {
+                p.color = if (eng.light) c(0xFF0D47A1) else Color.WHITE; p.strokeWidth = dp(2f)
+                cv.drawRoundRect(android.graphics.RectF(dp(1f), dp(1f), w - dp(1f), h - dp(1f)), r, r, p)
+            }
+            p.style = android.graphics.Paint.Style.FILL
+            tp.textSize = h * 0.24f; tp.color = c(0xFF222222)
+            cv.drawText("Conv", w * 0.30f, h * 0.40f, tp)
+            tp.textSize = h * 0.19f; tp.color = Color.WHITE
+            cv.drawText("Switch", w * 0.70f, h * 0.88f, tp)
+        }
+
+        override fun setAlpha(alpha: Int) {}
+        override fun setColorFilter(cf: android.graphics.ColorFilter?) {}
+        @Deprecated("Deprecated in Java")
+        override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
+    }
     private val bgCache = HashMap<String, Drawable.ConstantState>()
 
     private fun dp(x: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, x, resources.displayMetrics)
@@ -217,8 +261,25 @@ class MainActivity : Activity(), Ui {
                 row.addView(cell, llp(0, MATCH_PARENT, 1f).apply { leftMargin = dpi(3f); rightMargin = dpi(3f) })
                 val kv = KeyView(r, col, btn, top, blue)
                 keys.add(kv)
+                if (r == 4 && col == 0) btn.setOnTouchListener { _, ev ->
+                    if (ev.actionMasked == MotionEvent.ACTION_DOWN || ev.actionMasked == MotionEvent.ACTION_UP) { touchX = ev.x; touchY = ev.y }
+                    false
+                }
                 btn.setOnClickListener { v ->
                     if (swiped) return@setOnClickListener
+                    if (eng.keyDef(r, col).cls == "conv" && v.width > 0 && v.height > 0 &&
+                        touchX / v.width + touchY / v.height > 1f
+                    ) {
+                        // bottom-right half = Switch to the other calculator
+                        if (eng.haptic) v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        eng.mach = !eng.mach
+                        eng.conv = false
+                        eng.mode = null
+                        toast(if (eng.mach) "Machinist Calculator" else "Nirmaan Calc (Construction)")
+                        Store.save(this, eng)
+                        render()
+                        return@setOnClickListener
+                    }
                     if (eng.haptic) v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     if (eng.clickSound) (getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager)
                         .playSoundEffect(android.media.AudioManager.FX_KEY_CLICK, 0.6f)
@@ -247,6 +308,7 @@ class MainActivity : Activity(), Ui {
     /** Swipe left/right on the green row -> SIN/COS/TAN, on the unit row -> metric. */
     private fun attachSwipe(v: View, r: Int) {
         if (r != 2 && r != 3) return
+        // (Machinist keypad: the green-row swipe is off, see ACTION_UP below)
         var sx = 0f
         var sy = 0f
         v.setOnTouchListener { view, ev ->
@@ -255,7 +317,7 @@ class MainActivity : Activity(), Ui {
                 MotionEvent.ACTION_UP -> {
                     val dx = ev.rawX - sx
                     val dy = ev.rawY - sy
-                    if (abs(dx) > dp(45f) && abs(dy) < dp(35f)) {
+                    if (abs(dx) > dp(45f) && abs(dy) < dp(35f) && !(eng.mach && r == 2)) {
                         if (r == 2) {
                             eng.trig = !eng.trig
                             toast(if (eng.trig) "SIN / COS / TAN (ek vaar, pachhi Length / Width / Height)" else "Length / Width / Height")
@@ -281,7 +343,15 @@ class MainActivity : Activity(), Ui {
             val d = eng.keyDef(k.r, k.c)
             val showConv = eng.conv && d.conv.isNotEmpty()
             val txt = eng.keyText(k.r, k.c)
+            if (d.cls == "conv") {
+                k.btn.text = ""
+                k.btn.background = SplitKey(colors("conv"), if (eng.light) intArrayOf(c(0xFF9575CD), c(0xFF5E35B1)) else intArrayOf(c(0xFF7E57C2), c(0xFF3F1F8C)), eng.conv)
+                k.top.text = ""
+                k.blue.text = ""
+                continue
+            }
             k.btn.text = txt
+            k.btn.maxLines = if (txt.length > 7 && txt.contains(' ')) 2 else 1
             k.btn.background = keyBg(d.cls, eng.keyLit(k.r, k.c))
             when (d.cls) {
                 "num" -> {

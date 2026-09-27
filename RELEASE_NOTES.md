@@ -1,3 +1,5 @@
+Naya: Machinist Calculator! Conv button ke neeche-daayein hisse (SWITCH) ko dabayein. Cut Speed, RPM, Feed Rate, #Teeth, Feed/Tooth, Cut Feed, Diam, Drill Size/Point, Bolt Pattern, Thread Size (UNC/UNF/Metric), %Thread, Wire Size, 3-Wire, RCT, Right triangle.
+
 Naya keypad: m/cm/mm sirf Conv + Yards/Feet/Inches par (double button hataye). Litre seedha button, Conv+Litre = Frac, Conv+/ = x10ⁿ, Conv+7 = Trig (SIN/COS/TAN), Conv+9 = Metric.
 Naya: Length / Width / Height (Conv: Masonry / Footing / Drywall) hamesha green button par. SIN/COS/TAN sirf swipe se ek vaar.
 Naya: Conv dabavo to Yards → m, Feet → cm, Inches → mm (ek vaar dabavya pachhi aapmele pachhu).

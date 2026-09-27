@@ -27,8 +27,8 @@ const val ACRE = 4046.8564224
 const val D2R = PI / 180
 val UF = mapOf("in" to IN, "ft" to FT, "ftin" to FT, "yd" to YD, "m" to 1.0, "cm" to 0.01, "mm" to 0.001)
 val SUP = arrayOf("", "", "²", "³")
-val WF = mapOf("kg" to 1.0, "lbs" to 0.45359237, "tons" to 907.18474, "mt" to 1000.0)
-val WN = mapOf("kg" to "kg", "lbs" to "lbs", "tons" to "tons", "mt" to "mt")
+val WF = mapOf("kg" to 1.0, "lbs" to 0.45359237, "tons" to 907.18474, "mt" to 1000.0, "g" to 0.001)
+val WN = mapOf("kg" to "kg", "lbs" to "lbs", "tons" to "tons", "mt" to "mt", "g" to "g")
 const val SOON = "Ye function agle phase mein aayega"
 const val CFT = 0.028316846592      // 1 cubic foot in m³
 const val BAG = 0.0347              // 50 kg cement bag in m³
@@ -150,6 +150,9 @@ class Engine(val ui: Ui) {
     var clickSound = false
     var advanced = true                       // false = BuildCalc 1.x memory keys (MsnSz, SprAng, TreadW ...)
     var archInside = false                    // arched wall studs: outside (default) / inside
+    var mach = false                          // true = Machinist calculator keypad (Switch key)
+    val mv = mutableMapOf<String, Double>()   // machinist memories (SI units: m, m/min, m/rev ...)
+    val triOrder = mutableListOf<String>()    // machinist triangle: order values were entered
     val sizes = mutableMapOf<String, MutableList<Pair<Double, Double>>>()
     var dens = 1.5 * 2000 * LB / YD3          // wt/vol memory, kg/m³ (1.5 T/yd³)
 
@@ -472,7 +475,7 @@ class Engine(val ui: Ui) {
         }
     }
 
-    private fun weightKey(u: String) {
+    fun weightKey(u: String) {
         commit()
         val q = cur
         cur = when {
@@ -545,7 +548,7 @@ class Engine(val ui: Ui) {
     }
 
     /** Store+0: save density (repeat to change its unit); Recall+0: show it (repeat to cycle units). */
-    private fun wtVolKey(md: String) {
+    fun wtVolKey(md: String) {
         if (md == "store") {
             if (lastKey == "wvS") {
                 densStep = (densStep + 1) % 5
@@ -1394,6 +1397,7 @@ class Engine(val ui: Ui) {
     private fun k(a: String, b: String, c: String, d: String = "") = KeyDef(a, b, c, d)
 
     fun keyDef(r: Int, c: Int): KeyDef {
+        if (mach) return machKeyDef(r, c)
         val o = ROWS[r][c]
         val d = KeyDef(o.main, o.conv, o.cls, o.blue)
         if (trig && r == 2 && c in 1..3) { d.main = listOf("SIN", "COS", "TAN")[c - 1]; d.conv = listOf("ASIN", "ACOS", "ATAN")[c - 1] }
@@ -1429,6 +1433,7 @@ class Engine(val ui: Ui) {
         mode == "store" -> "STO"
         mode == "recall" -> "RCL"
         conv -> "CONV"
+        mach -> "MACHINIST"
         else -> ""
     }
 
@@ -1439,7 +1444,8 @@ class Engine(val ui: Ui) {
         if (d.main == "Conv") { conv = !conv; return }
         val wasConv = conv
         conv = false
-        val n = if (wasConv && d.conv.isNotEmpty()) d.conv else d.main
+        val n0 = if (wasConv && d.conv.isNotEmpty()) d.conv else d.main
+        val n = if (mach) MACH_ALIAS[n0] ?: n0 else n0
         val md0 = mode
         if (md0 != null && !wasConv && d.blue == "wt/vol") {
             mode = null
@@ -1475,6 +1481,7 @@ class Engine(val ui: Ui) {
     }
 
     private fun handle(n: String, md: String?) {
+        if (mach && machHandle(n)) return
         if (n.length == 1 && (n[0].isDigit() || n == ".")) return digit(n)
         val units = mapOf("Yards" to "yd", "Feet" to "ft", "Inches" to "in", "m" to "m", "cm" to "cm", "mm" to "mm")
         units[n]?.let { return unitKey(it) }

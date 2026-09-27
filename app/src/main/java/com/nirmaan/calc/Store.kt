@@ -46,6 +46,9 @@ object Store {
                 .put("fracConst", e.fracConst).put("dens", e.dens)
                 .put("decPlaces", e.decPlaces).put("clickSound", e.clickSound).put("advanced", e.advanced).put("archInside", e.archInside)
             val sz = JSONObject(); e.sizes.forEach { (k, l) -> val a = JSONArray(); l.forEach { a.put(JSONArray().put(it.first).put(it.second)) }; sz.put(k, a) }; o.put("sizes", sz)
+            o.put("mach", e.mach)
+            val mvj = JSONObject(); e.mv.forEach { (k, v) -> if (v.isFinite()) mvj.put(k, v) }; o.put("mv", mvj)
+            o.put("triOrder", JSONArray(e.triOrder))
             val sv = JSONArray(); e.saved.forEach { (l, t) -> sv.put(JSONObject().put("l", l).put("t", t)) }; o.put("saved", sv)
             ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY, o.toString()).apply()
         } catch (_: Exception) {
@@ -81,6 +84,9 @@ object Store {
                     e.sizes[k] = MutableList(a.length()) { i -> a.getJSONArray(i).let { p -> p.getDouble(0) to p.getDouble(1) } }
                 }
             }
+            e.mach = o.optBoolean("mach", false)
+            o.optJSONObject("mv")?.let { m -> m.keys().forEach { k -> e.mv[k] = m.optDouble(k) } }
+            o.optJSONArray("triOrder")?.let { a -> for (i in 0 until a.length()) e.triOrder.add(a.getString(i)) }
             o.optJSONArray("saved")?.let { a ->
                 for (i in 0 until a.length()) a.getJSONObject(i).let { x -> e.saved.add(x.optString("l") to x.optString("t")) }
             }
