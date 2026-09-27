@@ -258,7 +258,7 @@ class MainActivity : Activity(), Ui {
                     if (abs(dx) > dp(45f) && abs(dy) < dp(35f)) {
                         if (r == 2) {
                             eng.trig = !eng.trig
-                            toast(if (eng.trig) "SIN / COS / TAN" else "Length / Width / Height")
+                            toast(if (eng.trig) "SIN / COS / TAN (ek vaar, pachhi Length / Width / Height)" else "Length / Width / Height")
                         } else {
                             eng.metric = !eng.metric
                             toast(if (eng.metric) "Metric (m / cm / mm)" else "Feet / Inch")
@@ -788,7 +788,6 @@ class MainActivity : Activity(), Ui {
         val resList = listOf(2, 4, 8, 16, 32, 64)
         add("Fraction Resolution", resList.map { "1/$it" }, resList.indexOf(eng.res)) { eng.res = resList[it] }
         add("Fraction mode", listOf("Standard (7/8)", "Constant (14/16)"), if (eng.fracConst) 1 else 0) { eng.fracConst = it == 1 }
-        add("Green keys", listOf("Length/W/H", "SIN/COS/TAN"), if (eng.trig) 1 else 0) { eng.trig = it == 1 }
         add("Pounds per ton", listOf("2000 (short)", "2240 (long)"), if (eng.lbsPerTon > 2100) 1 else 0) {
             val old = eng.lbsPerTon; eng.lbsPerTon = if (it == 1) 2240.0 else 2000.0
             if (old != eng.lbsPerTon && abs(eng.dens - 1.5 * old * LB / YD3) < 1e-6) eng.dens = 1.5 * eng.lbsPerTon * LB / YD3
@@ -829,7 +828,7 @@ class MainActivity : Activity(), Ui {
         }, llp(MATCH_PARENT, WRAP_CONTENT))
         panelBody.addView(upd)
         panelBody.addView(TextView(this).apply {
-            text = "Tip: green keys par ungli left-right sarkayein to SIN/COS/TAN aa jayenge. " +
+            text = "Tip: green keys (Length/Width/Height) par ungli left-right sarkayein to ek vaar SIN/COS/TAN aayenge, use karte hi wapas Length/Width/Height. " +
                 "Yards/Feet/Inches wali line par sarkayein to metric (m/cm/mm) ho jayega."
             textSize = 15f; setTextColor(c(0xFF222222))
             setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(8f))

@@ -58,7 +58,7 @@ object Store {
             val o = JSONObject(s)
             e.res = o.optInt("res", 16)
             e.metric = o.optBoolean("metric")
-            e.trig = o.optBoolean("trig")
+            e.trig = false // always open with Length / Width / Height
             e.light = o.optBoolean("light")
             e.TS = o.optInt("TS")
             e.triU = if (o.has("triU")) o.getString("triU") else null

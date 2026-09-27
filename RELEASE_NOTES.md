@@ -1,3 +1,4 @@
+Naya: Length / Width / Height (Conv: Masonry / Footing / Drywall) hamesha green button par. SIN/COS/TAN sirf swipe se ek vaar.
 Naya: Conv dabavo to Yards → m, Feet → cm, Inches → mm (ek vaar dabavya pachhi aapmele pachhu).
 Naya: Litre button — Conv + m = Litre. Number ya koi bhi volume (m³ / cft / yd³) litre mein.
 

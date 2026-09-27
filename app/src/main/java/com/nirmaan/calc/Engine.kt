@@ -1490,7 +1490,7 @@ class Engine(val ui: Ui) {
             "M-R/C" -> mClear()
             "M+" -> if (md == "recall") mRecall() else mPlus(false)
             "M-" -> mPlus(true)
-            "SIN", "COS", "TAN", "ASIN", "ACOS", "ATAN" -> trigKey(n)
+            "SIN", "COS", "TAN", "ASIN", "ACOS", "ATAN" -> { trig = false; trigKey(n) } // one use, then Length/Width/Height come back
             "dms⇄deg" -> { dmsKey(); lastKey = "dms⇄deg" }
             "Acre" -> acreKey()
             "Litre" -> litreKey()
