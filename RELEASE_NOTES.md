@@ -1,4 +1,4 @@
-Sudhaar:
-- Sabse upar party ka naam hataya; ab upar: Mudi malik | %  aur  Khedut | %  (munafa/nuksan ka bhag)
-- Gaadi number / model ab gaadi ki vigat ke neeche
-- Variant ke neeche ke button (407, 709, 1612…) hataye
+Naya:
+- 💾 Backup / Restore (⚙ Setting): poora hisab ek file mein, Downloads/KabadiCalc mein save + WhatsApp/Drive par bhejo; naye phone mein wapas lao (double nahi hoga)
+- 📊 Mahine ki report: hisab ki ginti, kharidi, kharch, bikri, commission, wazan, munafa/nuksan; Mudi malik / Khedut ke naam se filter; WhatsApp par bhejo
+- 📒 Udhaar khata ki poori list WhatsApp par ek tap mein

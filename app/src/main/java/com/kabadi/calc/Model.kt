@@ -284,3 +284,22 @@ fun openDues(all: List<Hisab>): List<Due> {
     }
     return out.sortedWith(compareBy({ it.due ?: Long.MAX_VALUE }, { -it.left }))
 }
+
+/** one month in the report */
+class MonthSum(val key: String, var count: Int = 0, var kharidi: Double = 0.0, var kharch: Double = 0.0,
+               var bikri: Double = 0.0, var commission: Double = 0.0, var munafa: Double = 0.0, var kg: Double = 0.0)
+
+/** month-wise totals (newest month first); [who] filters by mudi malik / khedut / party name */
+fun monthly(all: List<Hisab>, who: String = ""): List<MonthSum> {
+    val q = norm(who)
+    val map = linkedMapOf<String, MonthSum>()
+    all.filter { q.isEmpty() || norm(it.mudiName).contains(q) || norm(it.khedName).contains(q) || norm(it.party).contains(q) }
+        .sortedByDescending { it.time }.forEach { h ->
+            val c = java.util.Calendar.getInstance().apply { timeInMillis = h.time }
+            val key = String.format(java.util.Locale.US, "%04d-%02d", c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH) + 1)
+            val m = map.getOrPut(key) { MonthSum(key) }
+            m.count++; m.kharidi += h.price; m.kharch += h.kharchTotal(); m.bikri += h.bikri()
+            m.commission += h.commission(); m.munafa += h.munafa(); m.kg += h.kg()
+        }
+    return map.values.toList()
+}

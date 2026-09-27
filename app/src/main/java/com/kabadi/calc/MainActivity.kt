@@ -211,6 +211,8 @@ class MainActivity : Activity() {
         val late = dues.count { it.due != null && it.due <= Reminders.endOfToday() }
         body.addView(bigButton(L.t("khata_btn") + "   ⬇ " + money(dues.filter { it.lena }.sumOf { it.left }) + "   ⬆ " + money(dues.filter { !it.lena }.sumOf { it.left }) +
             (if (late > 0) "   ⚠ $late" else ""), if (late > 0) RED else 0xFF455A64.toInt()) { showKhata() }.apply { textSize = 15f },
+            llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+        body.addView(bigButton(L.t("report_btn"), 0xFF00695C.toInt()) { showReport() }.apply { textSize = 15f },
             llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
 
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -710,6 +712,19 @@ class MainActivity : Activity() {
         tot.addView(TextView(this).apply { text = "⬇ " + L.t("lena") + ": " + money(dues.filter { it.lena }.sumOf { it.left }); textSize = 18f; setTextColor(GREEN); typeface = Typeface.DEFAULT_BOLD })
         tot.addView(TextView(this).apply { text = "⬆ " + L.t("dena") + ": " + money(dues.filter { !it.lena }.sumOf { it.left }); textSize = 18f; setTextColor(RED); typeface = Typeface.DEFAULT_BOLD })
         body.addView(tot, cardLp())
+        if (dues.isNotEmpty()) body.addView(bigButton(L.t("send_list"), GREEN) {
+            val sb = StringBuilder(Store.owner.ifBlank { L.t("app") }).append("\n").append(L.t("khata")).append("\n\n")
+            dues.forEach { d ->
+                sb.append(if (d.lena) "⬇ " else "⬆ ").append(if (d.lena) d.l.cName.ifBlank { hTitle(d.h) } else d.l.name)
+                    .append(" • ").append(d.l.name).append(" • ").append(money(d.left))
+                d.due?.let { sb.append(" • ").append(L.t("due")).append(" ").append(Bill.dateText(it).substringBefore("  ")) }
+                sb.append("\n")
+            }
+            sb.append("\n⬇ ").append(L.t("lena")).append(": ").append(money(dues.filter { it.lena }.sumOf { it.left }))
+            sb.append("\n⬆ ").append(L.t("dena")).append(": ").append(money(dues.filter { !it.lena }.sumOf { it.left }))
+            val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, sb.toString())
+            try { startActivity(Intent.createChooser(i, L.t("share"))) } catch (_: Exception) {}
+        }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
         if (dues.isEmpty()) body.addView(small(L.t("no_due")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) })
         val today = Reminders.endOfToday()
         dues.forEach { d ->
@@ -909,6 +924,102 @@ class MainActivity : Activity() {
     }
 
     // ================= SETTINGS =================
+    // ================= REPORT =================
+    private fun showReport() {
+        autoSave()
+        editing = null
+        val body = setScreen("report", L.t("report"), null)
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        var text = ""
+        fun fill(q: String) {
+            list.removeAllViews()
+            val months = monthly(Store.hisabs, q)
+            val sb = StringBuilder(Store.owner.ifBlank { L.t("app") }).append("\n").append(L.t("report")).append(if (q.isNotBlank()) " – $q" else "").append("\n")
+            fun monthCard(title: String, m: MonthSum, strong: Boolean) {
+                val c = card()
+                val top = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+                top.addView(TextView(this).apply { text = title; textSize = if (strong) 18f else 17f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD }, llp(0, WRAP_CONTENT, 1f))
+                top.addView(TextView(this).apply {
+                    text = (if (m.munafa >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(m.munafa)); textSize = 16f; typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(if (m.munafa >= 0) GREEN else RED)
+                })
+                c.addView(top)
+                val lines = listOf(
+                    L.t("vehicles") + ": " + m.count, L.t("kharidi") + ": " + money(m.kharidi), L.t("sum_kharch") + ": " + money(m.kharch),
+                    L.t("bikri") + ": " + money(m.bikri) + (if (m.commission > 0) "   (" + L.t("comm_s") + " " + money(m.commission) + ")" else ""),
+                    L.t("sum_kg") + ": " + plain(m.kg) + " " + L.t("kg")
+                )
+                lines.forEach { c.addView(small(it)) }
+                list.addView(c, cardLp())
+                sb.append("\n*").append(title).append("*  ").append(L.t("vehicles")).append(" ").append(m.count).append("\n")
+                lines.drop(1).forEach { sb.append(it).append("\n") }
+                sb.append(if (m.munafa >= 0) L.t("profit") else L.t("loss")).append(": ").append(money(Math.abs(m.munafa))).append("\n")
+            }
+            if (months.isEmpty()) list.addView(small(L.t("none")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) })
+            else {
+                val all = MonthSum(L.t("all_months"))
+                months.forEach { all.count += it.count; all.kharidi += it.kharidi; all.kharch += it.kharch; all.bikri += it.bikri; all.commission += it.commission; all.munafa += it.munafa; all.kg += it.kg }
+                monthCard(L.t("all_months"), all, true)
+                val names = java.text.DateFormatSymbols(java.util.Locale.US).months
+                months.forEach { m -> monthCard(names[m.key.substring(5).toInt() - 1] + " " + m.key.substring(0, 4), m, false) }
+            }
+            text = sb.toString()
+        }
+        body.addView(input(L.t("filter_name"), "", false) { fill(it) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+        body.addView(bigButton(L.t("share"), GREEN) {
+            val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+            try { startActivity(Intent.createChooser(i, L.t("share"))) } catch (_: Exception) {}
+        }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
+        body.addView(list)
+        fill("")
+    }
+
+    // ================= BACKUP =================
+    private fun makeBackup() {
+        autoSave(); Store.save(this)
+        if (needsStoragePermission()) return
+        val name = "KabadiCalc_backup_" + java.text.SimpleDateFormat("yyyyMMdd_HHmm", java.util.Locale.US).format(java.util.Date()) + ".json"
+        val data = Store.toJson().toString(1).toByteArray()
+        try {
+            val uri: Uri? = if (Build.VERSION.SDK_INT >= 29) {
+                val cv = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json")
+                    put(android.provider.MediaStore.Downloads.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/KabadiCalc")
+                }
+                contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv)?.also { u ->
+                    contentResolver.openOutputStream(u)?.use { it.write(data) }
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                val dir = java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "KabadiCalc")
+                dir.mkdirs(); java.io.File(dir, name).writeBytes(data); null
+            }
+            getSharedPreferences("kabadi_calc", MODE_PRIVATE).edit().putLong("lastBackup", System.currentTimeMillis()).apply()
+            toast(L.t("backup_ok"))
+            if (uri != null) shareUri(uri, "application/json")
+        } catch (e: Exception) { toast("Backup ✕ " + e.message) }
+    }
+
+    private fun pickBackup() {
+        val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+        try { startActivityForResult(i, 21) } catch (_: Exception) {}
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(req: Int, res: Int, data: Intent?) {
+        @Suppress("DEPRECATION") super.onActivityResult(req, res, data)
+        if (req != 21 || res != RESULT_OK) return
+        val uri = data?.data ?: return
+        try {
+            val txt = contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: return
+            val n = Store.restore(txt)
+            Store.save(this)
+            toast(L.t("restored") + ": " + n)
+            showHome()
+        } catch (e: Exception) { toast(L.t("bad_file")) }
+    }
+
     private fun showSettings() {
         val from = editing
         autoSave()
@@ -942,6 +1053,13 @@ class MainActivity : Activity() {
 
         val u = card()
         u.addView(bigButton(L.t("update") + "  (v" + Updater.myVersionName(this) + ")", BLUE) { Updater.check(this, manual = true) })
+        val bk = card()
+        bk.addView(heading(L.t("backup"), 0xFF455A64.toInt()))
+        val last = getSharedPreferences("kabadi_calc", MODE_PRIVATE).getLong("lastBackup", 0)
+        bk.addView(small(L.t("last_backup") + ": " + (if (last > 0) Bill.dateText(last) else "—"), if (last > 0) MUTED else RED))
+        bk.addView(bigButton(L.t("backup_make"), GREEN) { makeBackup() }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
+        bk.addView(bigButton(L.t("backup_load"), 0xFF78909C.toInt()) { pickBackup() }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
+        body.addView(bk, cardLp())
         body.addView(u, cardLp())
     }
 

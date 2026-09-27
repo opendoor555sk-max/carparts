@@ -139,13 +139,37 @@ object Store {
     private fun bj(l: List<Btn>) = JSONArray().also { a -> l.forEach { a.put(JSONObject().put("k", it.key).put("n", it.name).put("f", it.fixed).put("l", it.litre)) } }
     private fun jb(a: JSONArray) = MutableList(a.length()) { i -> a.getJSONObject(i).let { Btn(it.optString("k"), it.optString("n"), it.optBoolean("f"), it.optBoolean("l")) } }
 
+    /** everything the app keeps, as one JSON (also the backup file) */
+    fun toJson(): JSONObject {
+        val o = JSONObject().put("owner", owner).put("mobile", mobile).put("address", address).put("lang", L.lang).put("litreV1", true).put("ver", 2)
+        o.put("variants", JSONArray(variants))
+        o.put("h", JSONArray().also { a -> hisabs.forEach { a.put(hj(it)) } })
+        o.put("rates", JSONObject(lastRate as Map<*, *>))
+        o.put("parts", bj(parts)).put("exp", bj(expenses)).put("tp", bj(trashParts)).put("te", bj(trashExp))
+        return o
+    }
+
+    /** Backup restore: adds hisab that are not on this phone (same id = already here, kept as is). Returns how many were added. */
+    fun restore(json: String): Int {
+        val o = JSONObject(json)
+        val a = o.optJSONArray("h") ?: throw IllegalArgumentException("no hisab")
+        var added = 0
+        for (i in 0 until a.length()) {
+            val h = jh(a.getJSONObject(i))
+            if (hisabs.none { it.id == h.id }) { hisabs.add(h); added++ }
+        }
+        if (owner.isBlank()) owner = o.optString("owner")
+        if (mobile.isBlank()) mobile = o.optString("mobile")
+        if (address.isBlank()) address = o.optString("address")
+        o.optJSONObject("rates")?.let { r -> r.keys().forEach { k -> if (!lastRate.containsKey(k)) lastRate[k] = r.optString(k) } }
+        o.optJSONArray("parts")?.let { jb(it).forEach { b -> if (parts.none { x -> same(x, b) }) parts.add(b) } }
+        o.optJSONArray("exp")?.let { jb(it).forEach { b -> if (expenses.none { x -> same(x, b) }) expenses.add(b) } }
+        return added
+    }
+
     fun save(ctx: Context) {
         try {
-            val o = JSONObject().put("owner", owner).put("mobile", mobile).put("address", address).put("lang", L.lang).put("litreV1", true).put("ver", 2)
-            o.put("variants", JSONArray(variants))
-            o.put("h", JSONArray().also { a -> hisabs.forEach { a.put(hj(it)) } })
-            o.put("rates", JSONObject(lastRate as Map<*, *>))
-            o.put("parts", bj(parts)).put("exp", bj(expenses)).put("tp", bj(trashParts)).put("te", bj(trashExp))
+            val o = toJson()
             ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString("state", o.toString()).apply()
         } catch (_: Exception) {
         }

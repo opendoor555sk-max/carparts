@@ -149,6 +149,20 @@ object L {
         "role_s" to arrayOf("Type", "प्रकार", "પ્રકાર"),
         "mudi_h" to arrayOf("Mudi malik", "मुडी मालिक", "મૂડી માલિક"),
         "khed_h" to arrayOf("Khedut", "खेडूत", "ખેડૂત"),
+        "report_btn" to arrayOf("📊 Report", "📊 रिपोर्ट", "📊 રિપોર્ટ"),
+        "report" to arrayOf("Monthly report", "महीने की रिपोर्ट", "મહિનાનો રિપોર્ટ"),
+        "filter_name" to arrayOf("Mudi malik / Khedut name (optional)", "मुडी मालिक / खेडूत का नाम (ज़रूरी नहीं)", "મૂડી માલિક / ખેડૂતનું નામ (જરૂરી નથી)"),
+        "vehicles" to arrayOf("Hisab", "हिसाब", "હિસાબ"),
+        "kharidi" to arrayOf("Bought (vehicle)", "खरीदी (गाड़ी)", "ખરીદી (ગાડી)"),
+        "all_months" to arrayOf("All months", "सब महीने", "બધા મહિના"),
+        "backup" to arrayOf("Backup (phone kho jaye to bhi hisab safe)", "बैकअप (फ़ोन खो जाए तो भी हिसाब सुरक्षित)", "બેકઅપ (ફોન ખોવાય તો પણ હિસાબ સલામત)"),
+        "backup_make" to arrayOf("💾 Make backup & send", "💾 बैकअप बनाएँ और भेजें", "💾 બેકઅપ બનાવો અને મોકલો"),
+        "backup_load" to arrayOf("📂 Restore from backup file", "📂 बैकअप फ़ाइल से वापस लाएँ", "📂 બેકઅપ ફાઇલથી પાછું લાવો"),
+        "backup_ok" to arrayOf("Backup saved in Downloads/KabadiCalc", "बैकअप Downloads/KabadiCalc में सेव", "બેકઅપ Downloads/KabadiCalc માં સેવ"),
+        "restored" to arrayOf("Hisab restored", "हिसाब वापस आए", "હિસાબ પાછા આવ્યા"),
+        "bad_file" to arrayOf("This is not a Kabadi Calculator backup", "यह कबाड़ी कैलकुलेटर का बैकअप नहीं है", "આ કબાડી કેલ્ક્યુલેટરનો બેકઅપ નથી"),
+        "last_backup" to arrayOf("Last backup", "आखिरी बैकअप", "છેલ્લો બેકઅપ"),
+        "send_list" to arrayOf("💬 Send list on WhatsApp", "💬 लिस्ट WhatsApp पर भेजें", "💬 યાદી WhatsApp પર મોકલો"),
         "made" to arrayOf("Made with Kabadi Calculator", "कबाड़ी कैलकुलेटर से बना", "કબાડી કેલ્ક્યુલેટરથી બનાવ્યું")
     )
 

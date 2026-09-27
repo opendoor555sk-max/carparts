@@ -97,4 +97,18 @@ class ModelTest {
         assertEquals(2, d.size)
         assertEquals(30L * 86400000L, d.first().due)
     }
+
+    @Test fun monthlyReport() {
+        val jan = java.util.Calendar.getInstance().apply { set(2026, 0, 10) }.timeInMillis
+        val feb = java.util.Calendar.getInstance().apply { set(2026, 1, 5) }.timeInMillis
+        val a = Hisab(1, jan, priceText = "1000", mudiName = "Salam")
+        a.maal.add(Line("body", "Body", true, amountText = "1500"))
+        val b = Hisab(2, feb, priceText = "2000", mudiName = "Asif")
+        b.maal.add(Line("body", "Body", true, amountText = "1800"))
+        val m = monthly(listOf(a, b))
+        assertEquals("2026-02", m[0].key)
+        assertEquals(-200.0, m[0].munafa, 1e-9)
+        assertEquals(500.0, m[1].munafa, 1e-9)
+        assertEquals(1, monthly(listOf(a, b), "sal").size)
+    }
 }
