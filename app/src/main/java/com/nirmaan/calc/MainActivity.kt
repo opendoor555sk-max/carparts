@@ -79,7 +79,11 @@ class MainActivity : Activity(), Ui {
         root.addView(buildPanel(), FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         setContentView(root)
         render()
-        Updater.autoCheck(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Updater.autoCheck(this) // on every open (at most every 30 min)
     }
 
     override fun onPause() {

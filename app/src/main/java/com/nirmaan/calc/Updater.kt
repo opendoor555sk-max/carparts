@@ -21,9 +21,12 @@ import java.net.URL
  * and if N is bigger than this app's versionCode, downloads NirmaanCalc.apk and opens the installer.
  */
 object Updater {
-    private const val API = "https://api.github.com/repos/opendoor555sk-max/carparts/releases?per_page=30"
+    private const val API = "https://api.github.com/repos/opendoor555sk-max/carparts/releases?per_page=100"
+    private const val REPO = "https://github.com/opendoor555sk-max/carparts"
+    // Tiny file updated by every build; plain download, so no GitHub API limit and no "top 30" problem.
+    private const val VERSION_TXT = "$REPO/releases/download/calc-latest/version.txt"
     private const val PREFIX = "calc-v1.0."
-    private const val CHECK_EVERY_MS = 6 * 60 * 60 * 1000L
+    private const val CHECK_EVERY_MS = 30 * 60 * 1000L
 
     private class Rel(val code: Int, val name: String, val url: String, val notes: String)
 
@@ -50,7 +53,8 @@ object Updater {
     fun check(act: Activity, manual: Boolean) {
         if (manual) Toast.makeText(act, "Update check ho raha hai…", Toast.LENGTH_SHORT).show()
         Thread {
-            val rel = try { fetchLatest() } catch (e: Exception) { null }
+            val rel = try { fetchVersionTxt() } catch (e: Exception) { null }
+                ?: try { fetchLatest() } catch (e: Exception) { null }
             main.post {
                 if (act.isFinishing) return@post
                 when {
@@ -60,6 +64,21 @@ object Updater {
                 }
             }
         }.start()
+    }
+
+    private fun fetchVersionTxt(): Rel? {
+        val c = URL(VERSION_TXT).openConnection() as HttpURLConnection
+        c.connectTimeout = 10000
+        c.readTimeout = 15000
+        c.instanceFollowRedirects = true
+        c.setRequestProperty("User-Agent", "NirmaanCalc")
+        try {
+            if (c.responseCode != 200) return null
+            val code = c.inputStream.bufferedReader().readText().trim().toIntOrNull() ?: return null
+            return Rel(code, "1.0.$code", "$REPO/releases/download/$PREFIX$code/NirmaanCalc.apk", "")
+        } finally {
+            c.disconnect()
+        }
     }
 
     private fun fetchLatest(): Rel? {
@@ -95,7 +114,7 @@ object Updater {
 
     private fun ask(act: Activity, rel: Rel) {
         val msg = "Naya version " + rel.name + " aaya hai (aapke paas " + myVersionName(act) + ").\n\n" +
-            rel.notes.take(600) + "\n\nAbhi update karein?"
+            (if (rel.notes.isNotBlank()) rel.notes.take(600) + "\n\n" else "") + "Abhi update karein? Aapka data safe rahega."
         AlertDialog.Builder(act)
             .setTitle("Update available")
             .setMessage(msg)

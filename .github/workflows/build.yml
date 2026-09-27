@@ -44,3 +44,17 @@ jobs:
           body_path: RELEASE_NOTES.md
           files: NirmaanCalc.apk
           make_latest: false
+
+      - name: Write version file
+        run: echo "${{ github.run_number }}" > version.txt
+
+      - name: Update rolling OTA release (calc-latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: calc-latest
+          name: Nirmaan Calc (latest - OTA)
+          body: "OTA helper for Nirmaan Calc. Latest build: 1.0.${{ github.run_number }}"
+          files: |
+            version.txt
+            NirmaanCalc.apk
+          make_latest: false
