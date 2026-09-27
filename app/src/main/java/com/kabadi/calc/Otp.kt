@@ -23,6 +23,9 @@ object Otp {
         return (0 until 6).joinToString("") { abc[(b[it].toInt() and 0xFF) % abc.length].toString() }
     }
 
+    /** hard-to-guess topic name for the online relay */
+    fun topic(s: String): String = hmac("topic:" + s).take(10).joinToString("") { "%02x".format(it) }
+
     fun mobile10(m: String) = m.filter { it.isDigit() }.takeLast(10)
 
     /** the 6-digit OTP for this mobile + phone code */

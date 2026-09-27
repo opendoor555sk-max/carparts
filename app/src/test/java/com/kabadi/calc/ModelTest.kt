@@ -143,6 +143,7 @@ class ModelTest {
         val msg = "OTP request\nName: Rafik\nMobile: 9876543210\nCode: #" + dev
         assertEquals("9876543210" to dev, Otp.parse(msg))
         assertEquals(null, Otp.parse("hello 12345"))
+        assertEquals(20, Otp.topic("requests").length); assertTrue(Otp.topic("a") != Otp.topic("b"))
         assertTrue(Otp.isAdminCode("219977")); assertFalse(Otp.isAdminCode("123456"))
     }
 }

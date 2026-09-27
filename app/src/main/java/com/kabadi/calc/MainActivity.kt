@@ -90,6 +90,7 @@ class MainActivity : Activity() {
             if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
                 requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 9)
             if (toKhata) showKhata()
+            else if (intent?.getBooleanExtra("admin", false) == true && Account.isAdmin(this)) showAdmin()
         }
         Account.refreshAdminNumber(this)
         startApp = { start() }
@@ -167,12 +168,12 @@ class MainActivity : Activity() {
                 }
             }
         }
-        val body = loginScreen(L.t("acc_new")) { if (save()) { Account.approveAsAdmin(this); startApp() } }
+        val body = loginScreen(L.t("acc_new")) { if (save()) { Account.approveAsAdmin(this); Reminders.schedule(this); startApp() } }
         body.addView(langRow { showSignup() }, gap())
         body.addView(input(L.t("acc_name"), name, false) { name = it }, gap())
         body.addView(mobileInput("📞 " + L.t("acc_mobile"), mob) { mob = it }.apply { textSize = 18f }, gap())
         body.addView(p1, gap()); body.addView(p2, gap())
-        body.addView(bigButton(L.t("otp_ask"), GREEN) { if (save()) { sendOtpRequest(); showOtp() } }, gap())
+        body.addView(bigButton(L.t("otp_ask"), GREEN) { if (save()) showOtp(true) }, gap())
         body.addView(small(L.t("otp_why")).apply { gravity = Gravity.CENTER }, llp(MATCH_PARENT, WRAP_CONTENT))
     }
 
@@ -188,27 +189,48 @@ class MainActivity : Activity() {
         }
     }
 
-    /** 2) waiting for the OTP that admin sends */
-    private fun showOtp() {
-        val body = loginScreen(L.t("otp_title")) { Account.approveAsAdmin(this); startApp() }
+    /** 2) request goes to admin online; admin accepts → OTP comes here by itself → "Open app" */
+    private fun showOtp(send: Boolean = false) {
+        val body = loginScreen(L.t("otp_title")) { Account.approveAsAdmin(this); Reminders.schedule(this); startApp() }
         val info = card()
         info.addView(small(Account.name(this), INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD })
         info.addView(small("📞 " + Account.mobile(this) + "     " + L.t("otp_code") + ": #" + Account.device(this), INK).apply { textSize = 15f })
         body.addView(info, gap())
-        body.addView(small(L.t("otp_help")).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
-        body.addView(bigButton(L.t("otp_send"), 0xFF25D366.toInt()) { sendOtpRequest() }, gap())
+        val status = small("⏳ " + L.t("otp_wait"), ORANGE).apply { gravity = Gravity.CENTER; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(4f), 0, dpi(12f)) }
+        body.addView(status, llp(MATCH_PARENT, WRAP_CONTENT))
         val e = pinInput(L.t("otp_enter")).apply { filters = arrayOf(android.text.InputFilter.LengthFilter(6)); textSize = 24f }
-        fun tryOtp() {
-            if (Account.approve(this, e.text.toString())) { hideKeyboard(); toast(L.t("otp_ok")); startApp() }
-            else { toast(L.t("otp_bad")); e.setText("") }
-        }
-        e.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-            override fun afterTextChanged(s: Editable?) { if (s?.length == 6) tryOtp() }
-        })
         body.addView(e, gap())
-        body.addView(bigButton(L.t("acc_open"), GREEN) { tryOtp() }, gap())
+        val open = bigButton(L.t("otp_open"), GREEN) {
+            if (Account.approve(this, e.text.toString())) { hideKeyboard(); toast(L.t("otp_ok")); startApp() }
+            else toast(if (e.text.isEmpty()) L.t("otp_wait") else L.t("otp_bad"))
+        }
+        body.addView(open, gap())
+        val mob = Account.mobile(this); val dev = Account.device(this); val nm = Account.name(this)
+        fun listen() = every(5000L, { Relay.answer(mob, dev) }) { ans ->
+            when {
+                ans == null -> { status.text = "📶 " + L.t("otp_net"); status.setTextColor(RED); true }
+                ans.isEmpty() -> { status.text = "❌ " + L.t("otp_rejected"); status.setTextColor(RED); false }
+                ans.length == 6 -> {
+                    e.setText(ans); status.text = "✅ " + L.t("otp_got"); status.setTextColor(GREEN)
+                    open.background = round(GREEN, 10f); false
+                }
+                else -> { status.text = "⏳ " + L.t("otp_wait"); status.setTextColor(ORANGE); true }
+            }
+        }
+        fun sendNow() {
+            status.text = "⏳ " + L.t("otp_sending"); status.setTextColor(ORANGE)
+            val g = gen
+            Thread {
+                val ok = Relay.sendRequest(nm, mob, dev)
+                ui.post {
+                    if (g != gen) return@post
+                    if (ok) { status.text = "⏳ " + L.t("otp_wait"); listen() } else { status.text = "📶 " + L.t("otp_net"); status.setTextColor(RED) }
+                }
+            }.start()
+        }
+        if (send) sendNow() else listen()
+        body.addView(link("🔄 " + L.t("otp_again")) { showOtp(true) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(link("💬 " + L.t("otp_send")) { sendOtpRequest() }, llp(MATCH_PARENT, WRAP_CONTENT))
         body.addView(link(L.t("otp_change")) { showSignup() }, llp(MATCH_PARENT, WRAP_CONTENT))
     }
 
@@ -266,6 +288,31 @@ class MainActivity : Activity() {
     // ================= ADMIN: make OTP / reject =================
     private fun showAdmin() {
         val body = setScreen("admin", "👑 Admin – OTP", { showSettings() })
+        val rc = card()
+        rc.addView(heading("📥 " + L.t("adm_req")))
+        val reqList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        rc.addView(reqList)
+        body.addView(rc, cardLp())
+        fun drawReqs(list: List<Relay.Req>?) {
+            reqList.removeAllViews()
+            if (list == null) { reqList.addView(small("📶 " + L.t("otp_net"), RED)); return }
+            if (list.isEmpty()) { reqList.addView(small(L.t("adm_req_none"))); return }
+            list.forEach { r ->
+                val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = round(0xFFF3E5F5.toInt(), 10f); setPadding(dpi(10f), dpi(8f), dpi(10f), dpi(8f)) }
+                box.addView(small(r.name.ifBlank { "—" }, INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD })
+                box.addView(small("📞 " + r.mobile + "   #" + r.dev + "   •  " + Bill.dateText(r.time)))
+                fun act(ok: Boolean) {
+                    box.alpha = 0.4f
+                    Thread { val sent = Relay.decide(this, r, ok); ui.post { toast(if (sent) (if (ok) "✅ " + r.name else "❌ " + r.name) else L.t("otp_net")); if (sent) showAdmin() else box.alpha = 1f } }.start()
+                }
+                box.addView(row(bigButton(L.t("adm_accept"), GREEN) { act(true) }.apply { textSize = 15f; setPadding(0, dpi(10f), 0, dpi(10f)) } to 1f,
+                    bigButton(L.t("adm_no"), RED) { act(false) }.apply { textSize = 15f; setPadding(0, dpi(10f), 0, dpi(10f)) } to 1f))
+                reqList.addView(box, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+            }
+        }
+        reqList.addView(small("⏳ …"))
+        every(10000L, { Relay.pending(this) }) { drawReqs(it); true }
+        body.addView(small(L.t("adm_manual")).apply { setPadding(dpi(4f), dpi(4f), 0, dpi(6f)) })
         var mob = ""; var dev = ""; var name = ""
         val otpTv = TextView(this).apply { textSize = 40f; gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; setTextColor(GREEN); letterSpacing = 0.2f }
         lateinit var mobIn: EditText; lateinit var devIn: EditText
@@ -289,12 +336,12 @@ class MainActivity : Activity() {
         c.addView(otpTv, llp(MATCH_PARENT, WRAP_CONTENT))
         c.addView(bigButton(L.t("adm_ok"), GREEN) {
             if (mob.length != 10 || dev.length != 6) return@bigButton toast(L.t("adm_fill"))
-            Account.log(this, true, name, mob)
+            Account.log(this, true, name, mob, dev)
             whatsapp(mob, "✅ " + L.t("app") + "\nOTP: " + Otp.code(mob, dev) + "\n" + L.t("adm_ok_msg"))
         }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(10f) })
         c.addView(bigButton(L.t("adm_no"), RED) {
             if (mob.length != 10) return@bigButton toast(L.t("acc_bad_mobile"))
-            Account.log(this, false, name, mob)
+            Account.log(this, false, name, mob, dev)
             whatsapp(mob, "❌ " + L.t("app") + "\n" + L.t("adm_no_msg"))
         }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
         body.addView(c, cardLp())
@@ -321,7 +368,9 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(i: Intent?) {
         super.onNewIntent(i)
+        if (screen == "login") return
         if (i?.getBooleanExtra("khata", false) == true) { autoSave(); showKhata() }
+        else if (i?.getBooleanExtra("admin", false) == true && Account.isAdmin(this)) { autoSave(); showAdmin() }
     }
 
     override fun onResume() {
@@ -355,7 +404,27 @@ class MainActivity : Activity() {
         setPadding(dpi(12f), dpi(2f), dpi(12f), dpi(2f)); setOnClickListener { act() }
     }
 
+    private var gen = 0
+    private val ui = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /** repeat [work] in background every [ms] while this screen is open; [show] runs on screen */
+    private fun <T> every(ms: Long, work: () -> T, show: (T) -> Boolean) {
+        val g = gen
+        fun tick() {
+            Thread {
+                val r = try { work() } catch (_: Exception) { null }
+                ui.post {
+                    if (g != gen || isFinishing) return@post
+                    @Suppress("UNCHECKED_CAST") val again = show(r as T)
+                    if (again) ui.postDelayed({ if (g == gen) tick() }, ms)
+                }
+            }.start()
+        }
+        tick()
+    }
+
     private fun setScreen(name: String, title: String, back: (() -> Unit)?): LinearLayout {
+        gen++
         screen = name
         onBack = back
         titleTv.text = title
@@ -473,6 +542,15 @@ class MainActivity : Activity() {
             "     ⬆ " + L.t("dena") + " " + money(dues.filter { !it.lena }.sumOf { it.left })).apply {
             gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(4f), 0, dpi(8f))
         }, llp(MATCH_PARENT, WRAP_CONTENT))
+
+        if (Account.isAdmin(this)) {
+            val banner = bigButton("", 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
+            body.addView(banner, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+            every(30000L, { Relay.pending(this) }) { p ->
+                banner.visibility = if (p.isNullOrEmpty()) View.GONE else View.VISIBLE
+                banner.text = "🔔 " + (p?.size ?: 0) + " " + L.t("adm_req_new"); true
+            }
+        }
 
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun fill(q: String) {

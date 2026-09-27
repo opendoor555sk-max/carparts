@@ -77,9 +77,9 @@ object Account {
     }
 
     // ---- admin: list of approved / rejected requests ----
-    fun log(c: Context, ok: Boolean, name: String, mobile: String) {
+    fun log(c: Context, ok: Boolean, name: String, mobile: String, dev: String = "") {
         val a = try { JSONArray(p(c).getString("log", "[]")) } catch (_: Exception) { JSONArray() }
-        a.put(JSONObject().put("t", System.currentTimeMillis()).put("ok", ok).put("n", name).put("m", mobile))
+        a.put(JSONObject().put("t", System.currentTimeMillis()).put("ok", ok).put("n", name).put("m", mobile).put("d", dev))
         while (a.length() > 300) a.remove(0)
         p(c).edit().putString("log", a.toString()).apply()
     }

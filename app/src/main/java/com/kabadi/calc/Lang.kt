@@ -219,6 +219,18 @@ object L {
         "adm_no_title" to arrayOf("Admin WhatsApp number (requests come here)", "एडमिन WhatsApp नंबर (रिक्वेस्ट यहाँ आती है)", "એડમિન WhatsApp નંબર (રિક્વેસ્ટ અહીં આવે છે)"),
         "adm_no_set" to arrayOf("Not set yet – users choose the contact in WhatsApp", "अभी सेट नहीं – यूज़र WhatsApp में कॉन्टैक्ट चुनेंगे", "હજી સેટ નથી – યુઝર WhatsApp માં કોન્ટેક્ટ પસંદ કરશે"),
         "adm_log" to arrayOf("Approved / rejected", "मंज़ूर / रिजेक्ट", "મંજૂર / રિજેક્ટ"),
+        "otp_wait" to arrayOf("Request sent. Waiting for admin…", "रिक्वेस्ट गई। एडमिन की मंज़ूरी का इंतज़ार…", "રિક્વેસ્ટ ગઈ. એડમિનની મંજૂરીની રાહ…"),
+        "otp_sending" to arrayOf("Sending request…", "रिक्वेस्ट भेज रहे हैं…", "રિક્વેસ્ટ મોકલીએ છીએ…"),
+        "otp_got" to arrayOf("Approved! OTP received – tap Open app", "मंज़ूर! OTP आ गया – ऐप खोलें दबाएँ", "મંજૂર! OTP આવી ગયો – એપ ખોલો દબાવો"),
+        "otp_rejected" to arrayOf("Admin rejected the request", "एडमिन ने रिक्वेस्ट रिजेक्ट की", "એડમિને રિક્વેસ્ટ રિજેક્ટ કરી"),
+        "otp_net" to arrayOf("No internet – will try again", "इंटरनेट नहीं – फिर से कोशिश होगी", "ઇન્ટરનેટ નથી – ફરી પ્રયત્ન થશે"),
+        "otp_open" to arrayOf("🔓 Open app", "🔓 ऐप खोलें", "🔓 એપ ખોલો"),
+        "otp_again" to arrayOf("Send request again", "रिक्वेस्ट फिर भेजें", "રિક્વેસ્ટ ફરી મોકલો"),
+        "adm_req" to arrayOf("OTP requests", "OTP रिक्वेस्ट", "OTP રિક્વેસ્ટ"),
+        "adm_req_none" to arrayOf("No new request", "कोई नई रिक्वेस्ट नहीं", "કોઈ નવી રિક્વેસ્ટ નથી"),
+        "adm_req_new" to arrayOf("new OTP request – open", "नई OTP रिक्वेस्ट – देखें", "નવી OTP રિક્વેસ્ટ – જુઓ"),
+        "adm_accept" to arrayOf("✅ Accept", "✅ मंज़ूर", "✅ મંજૂર"),
+        "adm_manual" to arrayOf("Request came on WhatsApp? Paste it below:", "रिक्वेस्ट WhatsApp पर आई? नीचे पेस्ट करें:", "રિક્વેસ્ટ WhatsApp પર આવી? નીચે પેસ્ટ કરો:"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 

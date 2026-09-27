@@ -24,6 +24,11 @@ object Reminders {
             if (timeInMillis <= System.currentTimeMillis()) add(Calendar.DAY_OF_MONTH, 1)
         }
         am.setInexactRepeating(AlarmManager.RTC_WAKEUP, c.timeInMillis, AlarmManager.INTERVAL_DAY, pi)
+        // admin phone: look for new OTP requests about every 15 minutes
+        val rq = PendingIntent.getBroadcast(ctx, 13, Intent(ctx, DueReceiver::class.java).setAction("com.kabadi.calc.REQ"),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        if (Account.isAdmin(ctx)) am.setInexactRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 60_000, AlarmManager.INTERVAL_FIFTEEN_MINUTES, rq)
+        else am.cancel(rq)
     }
 
     fun endOfToday(): Long = Calendar.getInstance().apply {
@@ -54,6 +59,10 @@ object Reminders {
 
 class DueReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, i: Intent) {
-        if (i.action == Intent.ACTION_BOOT_COMPLETED) Reminders.schedule(ctx) else Reminders.check(ctx)
+        when (i.action) {
+            Intent.ACTION_BOOT_COMPLETED -> Reminders.schedule(ctx)
+            "com.kabadi.calc.REQ" -> { val r = goAsync(); Thread { try { Relay.notifyAdmin(ctx) } finally { r.finish() } }.start() }
+            else -> Reminders.check(ctx)
+        }
     }
 }
