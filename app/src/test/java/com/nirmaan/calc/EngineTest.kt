@@ -71,7 +71,7 @@ class EngineTest {
     }
 
     @Test fun arcAngle() = assertEquals("141.78°", k("9 Feet 1 0 Inches Run 3 Feet 6 Inches Rise Arc"))
-    @Test fun arcRadiusMetric() = assertEquals("3.25m", k("6 m Run 2 m Rise ^Radius"))
+    @Test fun arcRadiusMetric() = assertEquals("3.25m", k("6 ^m Run 2 ^m Rise ^Radius"))
 
     @Test fun qtyOnCenter() {
         k("2 2 Feet 8 Inches 3 / 4 ^qty@oc")
@@ -235,7 +235,7 @@ class EngineTest {
         assertEquals("14968.5482kg", k("1 1 Yards Yards Yards ^kg"))
         assertEquals("22.5ft³", k("C 1 . 2 5 ^Tons Feet"))
         assertEquals("16.5tons", k("C 1 1 Yards Yards Yards ^Tons"))
-        assertEquals("50.1751bf", k("C 4 m × 3 7 ^cm × 8 ^cm = ^BdFt"))
+        assertEquals("50.1751bf", k("C 4 ^m × 3 7 ^cm × 8 ^cm = ^BdFt"))
     }
 
     @Test fun wtVolMemory() {
@@ -255,13 +255,13 @@ class EngineTest {
     }
 
     @Test fun meterCycle() {
-        assertEquals("1.4224m", k("5 6 Inches m"))
-        assertEquals("142.24cm", k("m"))
-        assertEquals("1422.4mm", k("m"))
+        assertEquals("1.4224m", k("5 6 Inches ^m"))
+        assertEquals("142.24cm", k("^m"))
+        assertEquals("1422.4mm", k("^m"))
     }
 
     @Test fun arcRiseRun() {
-        k("2 m Circle 2 0 Arc")
+        k("2 ^m Circle 2 0 Arc")
         assertEquals("0.3473m", k("Run"))
         assertEquals("0.0152m", k("Rise"))
     }
@@ -319,7 +319,7 @@ class EngineTest {
     @Test fun editableSizes() {
         e.metric = true
         e.sizes["oc"] = mutableListOf(0.5 to 0.0)
-        k("1 0 m ^qty@oc")
+        k("1 0 ^m ^qty@oc")
         val r = formRows()
         assertTrue(r.any { it.label.contains("500mm") })
     }
