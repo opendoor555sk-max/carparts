@@ -42,6 +42,7 @@ class MainActivity : Activity() {
     private val BLUE = 0xFF1565C0.toInt()
 
     private lateinit var root: LinearLayout
+    private lateinit var bar: LinearLayout
     private lateinit var titleTv: TextView
     private lateinit var backBtn: TextView
     private lateinit var content: FrameLayout
@@ -63,7 +64,7 @@ class MainActivity : Activity() {
         Store.load(this)
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(BG); fitsSystemWindows = true }
 
-        val bar = LinearLayout(this).apply {
+        bar = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(0xFF263238.toInt())
             setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f))
@@ -81,11 +82,103 @@ class MainActivity : Activity() {
         bottom = LinearLayout(this).apply { setBackgroundColor(Color.WHITE); setPadding(dpi(6f), dpi(6f), dpi(6f), dpi(6f)) }
         root.addView(bottom, llp(MATCH_PARENT, WRAP_CONTENT))
         setContentView(root)
-        showHome()
         Reminders.schedule(this)
-        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
-            requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 9)
-        if (intent?.getBooleanExtra("khata", false) == true) showKhata()
+        val toKhata = intent?.getBooleanExtra("khata", false) == true
+        fun start() {
+            bar.visibility = View.VISIBLE
+            showHome()
+            if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
+                requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 9)
+            if (toKhata) showKhata()
+        }
+        if (!Account.exists(this)) showSignup { start() }
+        else if (Account.locked(this)) showPin { start() }
+        else start()
+    }
+
+    // ================= ACCOUNT (mobile + PIN) =================
+    private fun loginScreen(title: String): LinearLayout {
+        bar.visibility = View.GONE
+        val body = setScreen("login", title, null)
+        body.gravity = Gravity.CENTER_HORIZONTAL
+        body.setPadding(dpi(24f), dpi(40f), dpi(24f), dpi(24f))
+        body.addView(TextView(this).apply { text = "♻"; textSize = 54f; gravity = Gravity.CENTER; setTextColor(GREEN) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(TextView(this).apply { text = L.t("app"); textSize = 22f; gravity = Gravity.CENTER; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(small(title).apply { gravity = Gravity.CENTER; textSize = 15f; setPadding(0, dpi(4f), 0, dpi(20f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        return body
+    }
+
+    private fun pinInput(hint: String) = input(hint, "", true) {}.apply {
+        inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        filters = arrayOf(android.text.InputFilter.LengthFilter(4)); textSize = 20f; gravity = Gravity.CENTER
+    }
+
+    private fun gap() = llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) }
+
+    private fun langRow(again: () -> Unit) = row(*listOf("English", "हिंदी", "ગુજરાતી").mapIndexed { i, t ->
+        pill(t, L.lang == i, BLUE) { L.lang = i; Store.save(this); again() } to 1f }.toTypedArray())
+
+    private fun showSignup(done: () -> Unit) {
+        val body = loginScreen(L.t("acc_new"))
+        body.addView(langRow { showSignup(done) }, gap())
+        var name = Store.owner; var mob = Store.mobile.filter { it.isDigit() }.takeLast(10)
+        body.addView(input(L.t("acc_name"), name, false) { name = it }, gap())
+        body.addView(mobileInput("📞 " + L.t("acc_mobile"), mob) { mob = it }.apply { textSize = 18f }, gap())
+        val p1 = pinInput(L.t("acc_pin")); val p2 = pinInput(L.t("acc_pin2"))
+        body.addView(p1, gap()); body.addView(p2, gap())
+        body.addView(bigButton(L.t("acc_open"), GREEN) {
+            val a = p1.text.toString(); val b = p2.text.toString()
+            when {
+                mob.length != 10 -> toast(L.t("acc_bad_mobile"))
+                a.length != 4 || a != b -> toast(L.t("acc_bad_pin"))
+                else -> {
+                    Account.create(this, name.trim(), mob, a)
+                    if (Store.owner.isBlank()) Store.owner = name.trim()
+                    if (Store.mobile.isBlank()) Store.mobile = mob
+                    Store.save(this); hideKeyboard(); done()
+                }
+            }
+        }, gap())
+        body.addView(small(L.t("acc_note")).apply { gravity = Gravity.CENTER }, llp(MATCH_PARENT, WRAP_CONTENT))
+    }
+
+    private fun showPin(done: () -> Unit) {
+        val body = loginScreen(Account.name(this).ifBlank { L.t("acc_enter") } + "\n📞 " + Account.mobile(this))
+        val p = pinInput(L.t("acc_enter"))
+        body.addView(p, gap())
+        fun tryOpen() {
+            if (Account.check(this, p.text.toString())) { hideKeyboard(); done() }
+            else { toast(L.t("acc_wrong")); p.setText("") }
+        }
+        p.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: Editable?) { if (s?.length == 4) tryOpen() }
+        })
+        body.addView(bigButton(L.t("acc_open"), GREEN) { tryOpen() }, gap())
+        body.addView(small(L.t("acc_forgot"), BLUE).apply {
+            gravity = Gravity.CENTER; textSize = 15f; setPadding(0, dpi(12f), 0, 0)
+            setOnClickListener {
+                val m = mobileInput(L.t("acc_mobile"), "") {}
+                AlertDialog.Builder(this@MainActivity).setMessage(L.t("acc_forgot_q")).setView(m)
+                    .setPositiveButton(L.t("acc_open")) { _, _ ->
+                        if (m.text.toString() == Account.mobile(this@MainActivity)) askNewPin { done() } else toast(L.t("acc_bad_mobile"))
+                    }.setNegativeButton(L.t("back"), null).show()
+            }
+        }, llp(MATCH_PARENT, WRAP_CONTENT))
+        p.requestFocus()
+    }
+
+    /** set a new PIN (forgot / change) */
+    private fun askNewPin(done: () -> Unit) {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(20f), dpi(8f), dpi(20f), 0) }
+        val p1 = pinInput(L.t("acc_pin")); val p2 = pinInput(L.t("acc_pin2"))
+        box.addView(p1, gap()); box.addView(p2, gap())
+        AlertDialog.Builder(this).setTitle(L.t("acc_change")).setView(box)
+            .setPositiveButton(L.t("save")) { _, _ ->
+                val a = p1.text.toString()
+                if (a.length == 4 && a == p2.text.toString()) { Account.setPin(this, a); toast(L.t("saved_ok")); done() } else toast(L.t("acc_bad_pin"))
+            }.setNegativeButton(L.t("back"), null).show()
     }
 
     override fun onNewIntent(i: Intent?) {
@@ -106,7 +199,7 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (screen == "home") @Suppress("DEPRECATION") super.onBackPressed() else goBack()
+        if (screen == "home" || screen == "login") @Suppress("DEPRECATION") super.onBackPressed() else goBack()
     }
 
     private fun goBack() {
@@ -225,8 +318,12 @@ class MainActivity : Activity() {
     }
 
     // ================= HOME =================
+    /** where "back" from a hisab goes (report keeps its filter) */
+    private var editorBack: (() -> Unit)? = null
+
     private fun showHome() {
         editing = null
+        editorBack = null
         val body = setScreen("home", L.t("app"), null)
         val dues = openDues(Store.hisabs)
         val late = dues.count { it.due != null && it.due <= Reminders.endOfToday() }
@@ -390,7 +487,7 @@ class MainActivity : Activity() {
                     (if (h.ownerShare() > 0) listOf(Triple(L.t("owner_share"), h.ownerShare(), h.lagat() * h.ownerShare() / 100 to m * h.ownerShare() / 100)) else emptyList())
                 rows.forEach { (n, sh, v) ->
                     val r = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dpi(4f), 0, dpi(4f)) }
-                    r.addView(TextView(this).apply { text = n + "  (" + plain(sh) + " " + L.t("share").substringBefore(" (") + ")"; textSize = 15f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD })
+                    r.addView(TextView(this).apply { text = n + "  (" + plain(sh) + " " + L.t("pshare").substringBefore(" (") + ")"; textSize = 15f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD })
                     r.addView(small(L.t("invest") + ": " + money(v.first) + "   •   " + (if (v.second >= 0) L.t("profit") else L.t("loss")) + ": " + money(Math.abs(v.second)) +
                         "   •   " + L.t("gets") + ": " + money(v.first + v.second), if (v.second >= 0) GREEN else RED))
                     partnerBox.addView(r)
@@ -406,7 +503,7 @@ class MainActivity : Activity() {
 
     private fun showEditor(h: Hisab) {
         editing = h
-        val body = setScreen("edit", hTitle(h), { autoSave(); Store.save(this); showHome() })
+        val body = setScreen("edit", hTitle(h), { autoSave(); Store.save(this); editorBack?.invoke() ?: showHome() })
 
         // ---- top: Mudi malik | %   Khedut | %  (profit / loss share) ----
         val top = card()
@@ -542,7 +639,7 @@ class MainActivity : Activity() {
                 h.partners.forEach { p ->
                     val r = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dpi(3f), 0, dpi(3f)) }
                     r.addView(input(L.t("partner"), p.name, false) { p.name = it; refreshTotals() }.apply { textSize = 15f; tag = "focus" }, llp(0, WRAP_CONTENT, 1.6f))
-                    r.addView(input(L.t("share"), p.shareText, true) { p.shareText = it; refreshTotals() }.apply { gravity = Gravity.END },
+                    r.addView(input(L.t("pshare"), p.shareText, true) { p.shareText = it; refreshTotals() }.apply { gravity = Gravity.END },
                         llp(0, WRAP_CONTENT, 1f).apply { leftMargin = dpi(6f) })
                     r.addView(xBtn { confirmRemove { h.partners.remove(p); drawP(); refreshTotals() } })
                     pLines.addView(r)
@@ -552,7 +649,7 @@ class MainActivity : Activity() {
             pcd.addView(bigButton(L.t("add_partner"), 0xFF6A1B9A.toInt()) {
                 h.partners.add(Partner("")); drawP(); refreshTotals(); focusLast(pLines)
             }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
-            pcd.addView(small("1 " + L.t("share").substringBefore(" (") + " = 1%"))
+            pcd.addView(small("1 " + L.t("pshare").substringBefore(" (") + " = 1%"))
             drawP()
             body.addView(pcd, cardLp())
         }
@@ -916,53 +1013,112 @@ class MainActivity : Activity() {
 
     // ================= SETTINGS =================
     // ================= REPORT =================
+    /** report filter stays while the app is open (so back from a hisab keeps it) */
+    private val rf = RFilter()
+
     private fun showReport() {
         autoSave()
         editing = null
-        val body = setScreen("report", L.t("report"), null)
+        editorBack = { showReport() }
+        val body = setScreen("report", L.t("report"), { editorBack = null; showHome() })
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         var text = ""
-        fun fill(q: String) {
+        val monthNames = java.text.DateFormatSymbols(java.util.Locale.US).months.take(12)
+
+        // ---- filter card ----
+        val fc = card()
+        val pills = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        lateinit var fill: () -> Unit
+        fun choose(title: String, items: List<String>, pick: (Int) -> Unit) {
+            AlertDialog.Builder(this).setTitle(title).setItems((listOf(L.t("f_all")) + items).toTypedArray()) { _, w -> pick(w - 1); fill() }.show()
+        }
+        fun fbtn(label: String, value: String, act: () -> Unit) = pill(label + ": " + value.ifBlank { L.t("f_all") } + " ▾", value.isNotBlank(), 0xFF00695C.toInt(), act)
+            .apply { textSize = 13.5f; setPadding(dpi(6f), dpi(9f), dpi(6f), dpi(9f)) }
+        fun drawPills() {
+            pills.removeAllViews()
+            val people = peopleNames(Store.hisabs)
+            val ys = years(Store.hisabs)
+            val brands = (Store.hisabs.map { it.brand.trim() }.filter { it.isNotEmpty() } + BRANDS).distinctBy { norm(it) }
+            val tyres = (TYRES + Store.hisabs.map { it.tyres.trim() }.filter { it.isNotEmpty() }).distinct()
+            val types = listOf("gaadi", "haraji")
+            pills.addView(row(
+                fbtn(L.t("f_mudi"), rf.mudi) { choose(L.t("f_mudi"), people) { rf.mudi = if (it < 0) "" else people[it] } } to 1f,
+                fbtn(L.t("f_brand"), rf.brand) { choose(L.t("f_brand"), brands) { rf.brand = if (it < 0) "" else brands[it] } } to 1f))
+            pills.addView(row(
+                fbtn(L.t("f_year"), if (rf.year == 0) "" else rf.year.toString()) { choose(L.t("f_year"), ys.map { it.toString() }) { rf.year = if (it < 0) 0 else ys[it] } } to 1f,
+                fbtn(L.t("f_month"), if (rf.month == 0) "" else monthNames[rf.month - 1].take(3)) { choose(L.t("f_month"), monthNames) { rf.month = it + 1 } } to 1f))
+            pills.addView(row(
+                fbtn(L.t("f_tyre"), rf.tyres) { choose(L.t("f_tyre"), tyres.map { it + " " + L.t("tyre_s") }) { rf.tyres = if (it < 0) "" else tyres[it] } } to 1f,
+                fbtn(L.t("f_type"), when (rf.type) { "gaadi" -> L.t("gaadi_s"); "haraji" -> L.t("haraji"); else -> "" }) {
+                    choose(L.t("f_type"), listOf(L.t("gaadi_s"), L.t("haraji"))) { rf.type = if (it < 0) "" else types[it] } } to 1f))
+            if (rf.active()) pills.addView(small(L.t("f_clear"), RED).apply {
+                textSize = 14f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setPadding(0, dpi(8f), 0, dpi(2f))
+                setOnClickListener { rf.who = ""; rf.mudi = ""; rf.year = 0; rf.month = 0; rf.brand = ""; rf.tyres = ""; rf.type = ""; showReport() }
+            }, llp(MATCH_PARENT, WRAP_CONTENT))
+        }
+        fc.addView(input("🔍 " + L.t("f_search"), rf.who, false) { rf.who = it; fill() }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(4f) })
+        fc.addView(pills)
+        body.addView(fc, cardLp())
+
+        fill = {
+            drawPills()
             list.removeAllViews()
-            val months = monthly(Store.hisabs, q)
-            val sb = StringBuilder(Store.owner.ifBlank { L.t("app") }).append("\n").append(L.t("report")).append(if (q.isNotBlank()) " – $q" else "").append("\n")
+            val items = Store.hisabs.filter { rf.matches(it) }.sortedByDescending { it.time }
+            val months = monthly(Store.hisabs, rf)
+            val fdesc = listOf(rf.mudi, rf.brand, if (rf.tyres.isNotBlank()) rf.tyres + " " + L.t("tyre_s") else "",
+                if (rf.month != 0) monthNames[rf.month - 1] else "", if (rf.year != 0) rf.year.toString() else "", rf.who).filter { it.isNotBlank() }.joinToString(" • ")
+            val sb = StringBuilder(Store.owner.ifBlank { L.t("app") }).append("\n").append(L.t("report")).append(if (fdesc.isNotBlank()) " – $fdesc" else "").append("\n")
             fun monthCard(title: String, m: MonthSum, strong: Boolean) {
                 val c = card()
+                if (strong) c.background = round(0xFFE0F2F1.toInt(), 12f, 0xFF80CBC4.toInt())
                 val top = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-                top.addView(TextView(this).apply { text = title; textSize = if (strong) 18f else 17f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD }, llp(0, WRAP_CONTENT, 1f))
+                top.addView(TextView(this).apply { text = title; textSize = if (strong) 18f else 16f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD }, llp(0, WRAP_CONTENT, 1f))
                 top.addView(TextView(this).apply {
-                    text = (if (m.munafa >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(m.munafa)); textSize = 16f; typeface = Typeface.DEFAULT_BOLD
+                    text = (if (m.munafa >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(m.munafa)); textSize = if (strong) 17f else 15f; typeface = Typeface.DEFAULT_BOLD
                     setTextColor(if (m.munafa >= 0) GREEN else RED)
                 })
                 c.addView(top)
-                val lines = listOf(
+                val lines = listOfNotNull(
                     L.t("vehicles") + ": " + m.count, L.t("kharidi") + ": " + money(m.kharidi), L.t("sum_kharch") + ": " + money(m.kharch),
                     L.t("bikri") + ": " + money(m.bikri) + (if (m.commission > 0) "   (" + L.t("comm_s") + " " + money(m.commission) + ")" else ""),
-                    L.t("sum_kg") + ": " + plain(m.kg) + " " + L.t("kg")
+                    if (m.kg > 0) L.t("sum_kg") + ": " + plain(m.kg) + " " + L.t("kg") else null
                 )
                 lines.forEach { c.addView(small(it)) }
                 list.addView(c, cardLp())
-                sb.append("\n*").append(title).append("*  ").append(L.t("vehicles")).append(" ").append(m.count).append("\n")
-                lines.drop(1).forEach { sb.append(it).append("\n") }
+                sb.append("\n*").append(title).append("*\n")
+                lines.forEach { sb.append(it).append("\n") }
                 sb.append(if (m.munafa >= 0) L.t("profit") else L.t("loss")).append(": ").append(money(Math.abs(m.munafa))).append("\n")
             }
-            if (months.isEmpty()) list.addView(small(L.t("none")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) })
+            if (items.isEmpty()) list.addView(small(L.t("none")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
             else {
                 val all = MonthSum(L.t("all_months"))
                 months.forEach { all.count += it.count; all.kharidi += it.kharidi; all.kharch += it.kharch; all.bikri += it.bikri; all.commission += it.commission; all.munafa += it.munafa; all.kg += it.kg }
-                monthCard(L.t("all_months"), all, true)
-                val names = java.text.DateFormatSymbols(java.util.Locale.US).months
-                months.forEach { m -> monthCard(names[m.key.substring(5).toInt() - 1] + " " + m.key.substring(0, 4), m, false) }
+                monthCard(if (fdesc.isNotBlank()) fdesc else L.t("all_months"), all, true)
+                if (months.size > 1) months.forEach { m -> monthCard(monthNames[m.key.substring(5).toInt() - 1] + " " + m.key.substring(0, 4), m, false) }
+                // every vehicle that matches — tap to open
+                list.addView(heading(L.t("f_list") + " (" + items.size + ")").apply { setPadding(dpi(4f), dpi(6f), 0, dpi(6f)) })
+                sb.append("\n*").append(L.t("f_list")).append("*\n")
+                items.forEach { h ->
+                    val c = card().apply { setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(8f)) }
+                    val m = h.munafa()
+                    val name = listOf(h.vehicleInfo(), h.vehicle).filter { it.isNotBlank() }.joinToString(" • ").ifBlank { hTitle(h).ifBlank { L.t("gaadi_s") } }
+                    c.addView(row(TextView(this).apply { text = name; textSize = 15f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD; maxLines = 2 } to 1f,
+                        TextView(this).apply { text = money(m); textSize = 15f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (m >= 0) GREEN else RED) } to 0f))
+                    val sub = listOf(listOf(h.mudiName, h.khedName).filter { it.isNotBlank() }.joinToString(" / "), h.place, Bill.dateText(h.time)).filter { it.isNotBlank() }.joinToString("  •  ")
+                    c.addView(small(sub))
+                    c.setOnClickListener { showEditor(h) }
+                    list.addView(c, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
+                    sb.append("• ").append(name).append(" (").append(Bill.dateText(h.time)).append("): ").append(money(m)).append("\n")
+                }
             }
             text = sb.toString()
         }
-        body.addView(input(L.t("filter_name"), "", false) { fill(it) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
         body.addView(bigButton(L.t("share"), GREEN) {
             val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
             try { startActivity(Intent.createChooser(i, L.t("share"))) } catch (_: Exception) {}
         }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
         body.addView(list)
-        fill("")
+        fill()
     }
 
     // ================= BACKUP =================
@@ -1035,6 +1191,18 @@ class MainActivity : Activity() {
         o.addView(labeled(L.t("mobile"), input("98xxxxxxxx", Store.mobile, true) { Store.mobile = it; Store.save(this) }))
         o.addView(labeled(L.t("address"), input(L.t("address"), Store.address, false) { Store.address = it; Store.save(this) }))
         body.addView(o, cardLp())
+
+        if (Account.exists(this)) {
+            val ac = card()
+            ac.addView(heading(L.t("acc_sec")))
+            ac.addView(small(Account.name(this) + "   📞 " + Account.mobile(this), INK).apply { textSize = 15f; setPadding(0, 0, 0, dpi(8f)) })
+            val on = Account.locked(this)
+            ac.addView(pill(L.t(if (on) "acc_lock_on" else "acc_lock_off"), on, GREEN) { Account.setLock(this, !on); showSettings() }
+                .apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+            ac.addView(pill(L.t("acc_change"), false, BLUE) { askNewPin {} }
+                .apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
+            body.addView(ac, cardLp())
+        }
 
         val lc = card()
         lc.addView(heading(L.t("lists")))

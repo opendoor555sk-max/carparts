@@ -111,4 +111,22 @@ class ModelTest {
         assertEquals(500.0, m[1].munafa, 1e-9)
         assertEquals(1, monthly(listOf(a, b), "sal").size)
     }
+
+    @Test fun reportFilter() {
+        val jan = java.util.Calendar.getInstance().apply { set(2025, 0, 10) }.timeInMillis
+        val feb = java.util.Calendar.getInstance().apply { set(2026, 1, 5) }.timeInMillis
+        val a = Hisab(1, jan, priceText = "1000", mudiName = "Salam", brand = "Tata", tyres = "6")
+        val b = Hisab(2, feb, priceText = "2000", mudiName = "Asif", khedName = "Salam", brand = "Mahindra", tyres = "4")
+        val c = Hisab(3, feb, priceText = "3000", mudiName = "Rafik", brand = "Tata", tyres = "10", type = "haraji")
+        val all = listOf(a, b, c)
+        assertEquals(2, all.count { RFilter(mudi = "salam").matches(it) })
+        assertEquals(2, all.count { RFilter(year = 2026).matches(it) })
+        assertEquals(1, all.count { RFilter(year = 2025, month = 1).matches(it) })
+        assertEquals(2, all.count { RFilter(brand = "TATA").matches(it) })
+        assertEquals(1, all.count { RFilter(brand = "Tata", tyres = "10").matches(it) })
+        assertEquals(1, all.count { RFilter(type = "haraji").matches(it) })
+        assertEquals(listOf("Asif", "Rafik", "Salam"), peopleNames(all))
+        assertEquals(listOf(2026, 2025), years(all))
+        assertEquals(1, monthly(all, RFilter(brand = "Mahindra")).size)
+    }
 }

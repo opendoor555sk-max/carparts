@@ -289,11 +289,36 @@ fun openDues(all: List<Hisab>): List<Due> {
 class MonthSum(val key: String, var count: Int = 0, var kharidi: Double = 0.0, var kharch: Double = 0.0,
                var bikri: Double = 0.0, var commission: Double = 0.0, var munafa: Double = 0.0, var kg: Double = 0.0)
 
+/** report filter: every empty/0 field means "all" */
+class RFilter(var who: String = "", var mudi: String = "", var year: Int = 0, var month: Int = 0,
+              var brand: String = "", var tyres: String = "", var type: String = "") {
+    fun active() = who.isNotBlank() || mudi.isNotBlank() || year != 0 || month != 0 || brand.isNotBlank() || tyres.isNotBlank() || type.isNotBlank()
+    fun matches(h: Hisab): Boolean {
+        val c = java.util.Calendar.getInstance().apply { timeInMillis = h.time }
+        val q = norm(who)
+        return (q.isEmpty() || listOf(h.mudiName, h.khedName, h.party, h.vehicle, h.brand, h.variant, h.place, h.note).any { norm(it).contains(q) }) &&
+            (mudi.isBlank() || norm(h.mudiName) == norm(mudi) || norm(h.khedName) == norm(mudi)) &&
+            (year == 0 || c.get(java.util.Calendar.YEAR) == year) &&
+            (month == 0 || c.get(java.util.Calendar.MONTH) + 1 == month) &&
+            (brand.isBlank() || norm(h.brand) == norm(brand)) &&
+            (tyres.isBlank() || h.tyres.trim() == tyres.trim()) &&
+            (type.isBlank() || h.type == type)
+    }
+}
+
+/** names of all mudi malik / khedut ever written (for the filter list) */
+fun peopleNames(all: List<Hisab>): List<String> =
+    all.flatMap { listOf(it.mudiName, it.khedName) }.map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { norm(it) }.sortedBy { norm(it) }
+
+fun years(all: List<Hisab>): List<Int> =
+    all.map { java.util.Calendar.getInstance().apply { timeInMillis = it.time }.get(java.util.Calendar.YEAR) }.distinct().sortedDescending()
+
 /** month-wise totals (newest month first); [who] filters by mudi malik / khedut / party name */
-fun monthly(all: List<Hisab>, who: String = ""): List<MonthSum> {
-    val q = norm(who)
+fun monthly(all: List<Hisab>, who: String = ""): List<MonthSum> = monthly(all, RFilter(who = who))
+
+fun monthly(all: List<Hisab>, f: RFilter): List<MonthSum> {
     val map = linkedMapOf<String, MonthSum>()
-    all.filter { q.isEmpty() || norm(it.mudiName).contains(q) || norm(it.khedName).contains(q) || norm(it.party).contains(q) }
+    all.filter { f.matches(it) }
         .sortedByDescending { it.time }.forEach { h ->
             val c = java.util.Calendar.getInstance().apply { timeInMillis = h.time }
             val key = String.format(java.util.Locale.US, "%04d-%02d", c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH) + 1)
