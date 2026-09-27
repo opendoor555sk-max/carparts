@@ -82,6 +82,10 @@ object Api {
                 throw e
             } catch (e: IOException) {
                 throw networkError(e)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                throw ApiException(0, I18n.x("err.500"))
             }
         }
 
@@ -145,6 +149,11 @@ object Api {
             throw e
         } catch (e: IOException) {
             throw networkError(e)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Broken / cut-off reply (e.g. server waking up): show a message instead of crashing.
+            throw ApiException(0, I18n.x("err.500"))
         }
     }
 

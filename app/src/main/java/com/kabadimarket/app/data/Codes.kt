@@ -64,7 +64,7 @@ object Codes {
     /** QR code modules (true = dark), error correction M like the old app. */
     fun qrMatrix(value: String): Array<BooleanArray> {
         val v = value.ifEmpty { " " }
-        val qr = Encoder.encode(v, ErrorCorrectionLevel.M, mapOf(EncodeHintType.CHARACTER_SET to "UTF-8"))
+        val qr = Encoder.encode(v, ErrorCorrectionLevel.M, if (v.any { it.code > 127 }) mapOf(EncodeHintType.CHARACTER_SET to "UTF-8") else emptyMap())
         val m = qr.matrix
         return Array(m.height) { r -> BooleanArray(m.width) { c -> m.get(c, r).toInt() == 1 } }
     }

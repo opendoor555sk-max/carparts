@@ -120,16 +120,34 @@ private class DraftLine(val pn: String, company: String) {
 }
 
 /** Shrinks a photo like the old app (quality 0.6) before upload. */
-private suspend fun compressPhoto(bytes: ByteArray): ByteArray = withContext(Dispatchers.Default) {
-    val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
-    var sample = 1
-    while (opts.outWidth / (sample * 2) >= 1600 && opts.outHeight / (sample * 2) >= 1200) sample *= 2
-    val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
-        ?: return@withContext bytes
-    val out = ByteArrayOutputStream()
-    bmp.compress(Bitmap.CompressFormat.JPEG, 60, out)
-    out.toByteArray()
+internal suspend fun compressPhoto(bytes: ByteArray): ByteArray = withContext(Dispatchers.Default) {
+    try {
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+        var sample = 1
+        while (maxOf(opts.outWidth, opts.outHeight) / (sample * 2) >= 1600) sample *= 2
+        var bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
+            ?: return@withContext bytes
+        // Camera photos are often stored sideways with an "orientation" tag: turn them upright.
+        val deg = try {
+            when (android.media.ExifInterface(bytes.inputStream()).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) {
+                android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> 0f
+            }
+        } catch (_: Exception) {
+            0f
+        }
+        if (deg != 0f) {
+            bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, android.graphics.Matrix().apply { postRotate(deg) }, true)
+        }
+        val out = ByteArrayOutputStream()
+        bmp.compress(Bitmap.CompressFormat.JPEG, 60, out)
+        out.toByteArray()
+    } catch (_: Throwable) {
+        bytes
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -141,6 +159,8 @@ fun BuyScreen(user: User, nav: Nav, routePn: String) {
     val lines = remember { mutableStateListOf<DraftLine>() }
     var manual by rememberSaveable { mutableStateOf("") }
     var confirming by remember { mutableStateOf(false) }
+    // While stock is being added, back must not stop it halfway.
+    androidx.activity.compose.BackHandler(enabled = confirming) { Toast.show(t("buy.addingToStock")) }
     var busy by remember { mutableStateOf(false) }
     var lastScan by remember { mutableStateOf("" to 0L) }
     var stopMessage by remember { mutableStateOf<String?>(null) }
@@ -183,16 +203,29 @@ fun BuyScreen(user: User, nav: Nav, routePn: String) {
         }
     }
 
+    fun launchCamera() {
+        try {
+            val dir = File(context.cacheDir, "photos").apply { mkdirs() }
+            val f = File(dir, "p_${System.currentTimeMillis()}.jpg")
+            cameraFile = f
+            takePicture.launch(FileProvider.getUriForFile(context, context.packageName + ".files", f))
+        } catch (e: Exception) {
+            Toast.error(e.message ?: "Camera")
+        }
+    }
+    val cameraPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) launchCamera() else Toast.error(t("scanSticker.cameraPermissionNeeded"))
+    }
+
     fun takePhotoFor(pn: String) {
         val line = lines.firstOrNull { it.pn == pn } ?: return
         if (line.photos.size >= 6) {
             Toast.show(t("buy.maxPhotos")); return
         }
         photoTarget = pn
-        val dir = File(context.cacheDir, "photos").apply { mkdirs() }
-        val f = File(dir, "p_${System.currentTimeMillis()}.jpg")
-        cameraFile = f
-        takePicture.launch(FileProvider.getUriForFile(context, context.packageName + ".files", f))
+        // Android refuses to open the camera when the app's camera permission is off.
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED) launchCamera()
+        else cameraPerm.launch(android.Manifest.permission.CAMERA)
     }
 
     fun pickGalleryFor(pn: String) {
@@ -273,9 +306,9 @@ fun BuyScreen(user: User, nav: Nav, routePn: String) {
         }
     }
 
-    fun addOne(raw: String, expand: Boolean = false) {
+    fun addOne(raw: String, expand: Boolean = false): Boolean {
         val pn = extractPartNumber(raw)
-        if (pn.isBlank() || busy) return
+        if (pn.isBlank() || busy) return false
         busy = true
         scope.launch {
             val existing = lines.firstOrNull { it.pn == pn }
@@ -293,6 +326,7 @@ fun BuyScreen(user: User, nav: Nav, routePn: String) {
             delay(350)
             busy = false
         }
+        return true
     }
 
     var initialDone by rememberSaveable { mutableStateOf(false) }
@@ -355,7 +389,7 @@ fun BuyScreen(user: User, nav: Nav, routePn: String) {
     Screen {
         Box(Modifier.fillMaxSize().then(if (dangerBorder) Modifier.border(6.dp, C.Red) else Modifier)) {
             Column(Modifier.fillMaxSize()) {
-                TopBar(t("buy.title"), if (user.isSuperAdmin) (if (gps.isNotBlank()) "📍 ${t("buy.gpsOk")}" else t("buy.gpsEllipsis")) else null, onBack = { nav.back() })
+                TopBar(t("buy.title"), if (user.isSuperAdmin) (if (gps.isNotBlank()) "📍 ${t("buy.gpsOk")}" else t("buy.gpsEllipsis")) else null, onBack = { if (!confirming) nav.back() })
                 AnimatedVisibility(stopMessage != null, enter = slideInVertically() + fadeIn(), exit = slideOutVertically() + fadeOut()) {
                     DangerBanner(stopMessage ?: "")
                 }
@@ -392,9 +426,9 @@ fun BuyScreen(user: User, nav: Nav, routePn: String) {
 
                 Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.Top) {
                     Field(manual, { manual = it }, t("buy.manualPlaceholder"), caps = true, modifier = Modifier.weight(1f),
-                        imeAction = androidx.compose.ui.text.input.ImeAction.Done, onIme = { addOne(manual); manual = "" })
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done, onIme = { if (addOne(manual)) manual = "" })
                     Spacer(Modifier.width(8.dp))
-                    SquareIconButton(Icons.Filled.Add) { addOne(manual); manual = "" }
+                    SquareIconButton(Icons.Filled.Add) { if (addOne(manual)) manual = "" }
                 }
                 if (user.isSuperAdmin) {
                     Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -418,15 +452,15 @@ fun BuyScreen(user: User, nav: Nav, routePn: String) {
                                 line.searching = true
                                 scope.launch {
                                     try {
-                                        val r = Api.post("/search/web", JSONObject().put("part_number", line.pn).put("company", line.company)) as JSONObject
+                                        val r = Api.post("/search/web", JSONObject().put("part_number", line.pn).put("company", line.company)) as? JSONObject ?: JSONObject()
                                         if (r.str("name").isNotBlank()) line.name = r.str("name")
                                         r.arr("models").strings().takeIf { it.isNotEmpty() }?.let { line.vehicles = it.joinToString(", ") }
                                         r.arr("variants").strings().takeIf { it.isNotEmpty() }?.let { line.variant = it.joinToString(", ") }
                                         Toast.success(if (r.optBoolean("cached")) t("buy.autofilledLibrary") else "${t("buy.autofilledWeb")} — ${r.int("result_count")} ${t("buy.webResults")}")
                                     } catch (e: ApiException) {
                                         if (e.code == "NO_KEY") {
-                                            Toast.error(t("buy.noGoogleKey"))
-                                            nav.open(Route.SearchSetup)
+                                            // Don't leave this screen: the scanned list would be lost.
+                                            Toast.error(t("buy.noGoogleKey") + " → Admin → " + t("admin.toolSearchSetup"))
                                         } else Toast.error(e.message ?: t("buy.searchFailed"))
                                     } finally {
                                         line.searching = false

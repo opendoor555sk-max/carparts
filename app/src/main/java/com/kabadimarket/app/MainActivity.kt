@@ -64,6 +64,8 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Must run before the first WebView, so PDF export draws every page.
+        runCatching { android.webkit.WebView.enableSlowWholeDocumentDraw() }
         Session.init(applicationContext)
         I18n.init(applicationContext)
         setContent {
@@ -106,7 +108,7 @@ sealed interface Route {
     data object StockTransfer : Route
     data object StockVerify : Route
     data object StoreArrangement : Route
-    data class RequirementNew(val partNumber: String = "", val gps: String = "") : Route
+    data class RequirementNew(val partNumber: String = "", val gps: String = "", val company: String = "All") : Route
     data object Limits : Route
     data object Tools : Route
     data object Customers : Route
@@ -142,6 +144,14 @@ class Entry(val id: Int, val route: Route)
 /** Screen history. open() goes forward (slides in from the right), back() goes back. */
 class Nav {
     private var nextId = 1
+
+    /** Called with the id of every screen that is closed (so its saved state can be dropped). */
+    var onRemoved: ((Int) -> Unit)? = null
+
+    private fun pop() {
+        val e = stack.removeAt(stack.lastIndex)
+        onRemoved?.invoke(e.id)
+    }
     val stack = mutableStateListOf(Entry(0, Route.Tabs))
     var forward by mutableStateOf(true)
         private set
@@ -159,30 +169,32 @@ class Nav {
     /** Replace the current screen (e.g. after saving a new customer, open its page). */
     fun replace(route: Route) {
         forward = true
+        val old = stack[stack.lastIndex]
         stack[stack.lastIndex] = Entry(nextId++, route)
+        onRemoved?.invoke(old.id)
     }
 
     fun back() {
         forward = false
-        if (stack.size > 1) stack.removeAt(stack.lastIndex)
+        if (stack.size > 1) pop()
     }
 
     /** Go back to a screen of the given kind, if it is in the history. */
     fun backTo(match: (Route) -> Boolean) {
         forward = false
-        while (stack.size > 1 && !match(top.route)) stack.removeAt(stack.lastIndex)
+        while (stack.size > 1 && !match(top.route)) pop()
     }
 
     fun home() {
         forward = false
-        while (stack.size > 1) stack.removeAt(stack.lastIndex)
+        while (stack.size > 1) pop()
         tab = 0
     }
 }
 
 @Composable
 fun App() {
-    var user by remember { mutableStateOf(Session.user) }
+    val user = Session.current
     var splash by rememberSaveable { mutableStateOf(true) }
     val nav = remember { Nav() }
     var signUp by rememberSaveable { mutableStateOf(false) }
@@ -196,7 +208,6 @@ fun App() {
     DisposableEffect(Unit) {
         Api.onUnauthorized = {
             Session.clear()
-            user = null
         }
         Api.onStoreLocked = { m, c -> locked = m to c }
         onDispose {
@@ -208,7 +219,6 @@ fun App() {
     val logout = {
         Session.clear()
         nav.home()
-        user = null
     }
 
     val stage = when {
@@ -221,22 +231,21 @@ fun App() {
     Crossfade(targetState = stage, animationSpec = tween(450), label = "stage") { s ->
         when (s) {
             0 -> SplashScreen()
-            1 -> LoginScreen(onLoggedIn = {
+            1 -> com.kabadimarket.app.ui.LocationGate { LoginScreen(onLoggedIn = {
                 nav.home()
-                user = it
-            }, onSignUp = { signUp = true })
+                if (Session.current == null) Session.current = it
+            }, onSignUp = { signUp = true }) }
             3 -> com.kabadimarket.app.ui.SignUpScreen(onBackToLogin = { signUp = false }, onDone = {
                 signUp = false
                 nav.home()
-                user = it
+                if (Session.current == null) Session.current = it
             })
             4 -> com.kabadimarket.app.ui.StoreLockedScreen(locked?.first ?: "", locked?.second ?: "", onBackToLogin = {
                 locked = null
                 Session.clear()
                 nav.home()
-                user = null
             })
-            else -> user?.let { u -> MainArea(u, nav, logout) }
+            else -> user?.let { u -> com.kabadimarket.app.ui.LocationGate { MainArea(u, nav, logout) } }
         }
     }
 }
@@ -256,6 +265,11 @@ private fun MainArea(u: User, nav: Nav, logout: () -> Unit) {
 
     // Keeps each screen's typed text / filters when you come back to it.
     val holder = rememberSaveableStateHolder()
+    DisposableEffect(nav) {
+        // Drop a closed screen's state a moment later (after its exit animation).
+        nav.onRemoved = { id -> android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ runCatching { holder.removeState(id) } }, 600) }
+        onDispose { nav.onRemoved = null }
+    }
     AnimatedContent(
         targetState = nav.top,
         contentKey = { it.id },
@@ -297,7 +311,7 @@ private fun Screen(u: User, nav: Nav, r: Route, logout: () -> Unit) {
         Route.StockTransfer -> com.kabadimarket.app.ui.StockTransferScreen(nav)
         Route.StockVerify -> com.kabadimarket.app.ui.StockVerifyScreen(nav)
         Route.StoreArrangement -> com.kabadimarket.app.ui.StoreArrangementScreen(u, nav)
-        is Route.RequirementNew -> RequirementNewScreen(nav, r.partNumber, r.gps)
+        is Route.RequirementNew -> RequirementNewScreen(nav, r.partNumber, r.gps, r.company)
         Route.Limits -> LimitsScreen(nav)
         Route.Tools -> ToolsScreen(u, nav)
         Route.Customers -> CustomersScreen(nav)

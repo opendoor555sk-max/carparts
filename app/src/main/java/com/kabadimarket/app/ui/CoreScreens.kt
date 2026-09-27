@@ -160,7 +160,10 @@ fun ScanScreen(user: User, nav: Nav, mode: String) {
 
     fun proceed(raw: String) {
         val pn = extractPartNumber(raw)
-        if (pn.isBlank()) return
+        if (pn.isBlank()) {
+            scanning = true // keep the camera scanning
+            return
+        }
         when (mode) {
             "sell" -> nav.replace(Route.Sell(pn))
             "requirement" -> nav.replace(Route.RequirementNew(pn, gps))
@@ -246,10 +249,13 @@ fun PartScreen(user: User, nav: Nav, partNumber: String, gps: String) {
         }
     }
 
+    var adjusting by remember { mutableStateOf(false) }
     fun adjust(delta: Int) {
+        if (adjusting) return // a quick double tap must not add twice
+        adjusting = true
         scope.launch {
             try {
-                val res = Api.post("/stock/adjust", JSONObject().put("part_number", partNumber).put("delta", delta)) as JSONObject
+                val res = Api.post("/stock/adjust", JSONObject().put("part_number", partNumber).put("delta", delta)) as? JSONObject ?: JSONObject()
                 if (res.optBoolean("limit_reached")) {
                     Feedback.error(context)
                     Toast.error("${t("buy.stopBuying")} $partNumber — ${t("buy.limitReached")}")
@@ -257,6 +263,8 @@ fun PartScreen(user: User, nav: Nav, partNumber: String, gps: String) {
                 reload++
             } catch (e: ApiException) {
                 Toast.error(e.message ?: t("common.failed"))
+            } finally {
+                adjusting = false
             }
         }
     }
@@ -266,7 +274,7 @@ fun PartScreen(user: User, nav: Nav, partNumber: String, gps: String) {
         scope.launch {
             try {
                 val company = data?.obj("part")?.str("company")?.ifBlank { null } ?: "All"
-                ai = Api.post("/ai/research", JSONObject().put("part_number", partNumber).put("company", company)) as JSONObject
+                ai = Api.post("/ai/research", JSONObject().put("part_number", partNumber).put("company", company)) as? JSONObject ?: JSONObject()
                 Toast.success(t("partDetail.aiComplete"))
             } catch (e: ApiException) {
                 Toast.error(e.message ?: t("partDetail.aiFailed"))
@@ -530,7 +538,7 @@ fun PartScreen(user: User, nav: Nav, partNumber: String, gps: String) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (user.can("requirement")) {
-                    Box(Modifier.weight(1f)) { GhostButton(t("module.requirement"), Icons.Filled.AddCircle) { nav.open(Route.RequirementNew(partNumber, gps)) } }
+                    Box(Modifier.weight(1f)) { GhostButton(t("module.requirement"), Icons.Filled.AddCircle) { nav.open(Route.RequirementNew(partNumber, gps, p?.str("company")?.ifBlank { null } ?: "All")) } }
                 }
                 if (p != null) {
                     Box(Modifier.weight(1f)) {
@@ -865,7 +873,7 @@ fun SellScreen(user: User, nav: Nav, partNumber: String) {
                             .put("price", price.trim().toDoubleOrNull() ?: JSONObject.NULL)
                             .put("buyer", buyer)
                             .put("customer_id", c?.str("id") ?: JSONObject.NULL)
-                        val res = Api.post("/sell", body) as JSONObject
+                        val res = Api.post("/sell", body) as? JSONObject ?: JSONObject()
                         Feedback.success(context)
                         Toast.success(
                             if (c != null) "${t("sell.soldOnCredit")} — ${c.str("name")}${t("sell.balanceIsNow")} ${money(res.num("credit_balance"))}"
@@ -1013,7 +1021,7 @@ fun RequirementsScreen(user: User, nav: Nav) {
             loading -> Loading()
             reqs.isEmpty() -> EmptyState(Icons.Outlined.Checklist, t("requirements.empty"), t("requirements.emptySub"))
             else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                itemsIndexed(reqs, key = { _, r -> r.str("id") }) { i, r ->
+                itemsIndexed(reqs, key = { idx, r -> r.str("id") + "#" + idx }) { i, r ->
                     Row(
                         Modifier.fillMaxWidth().entrance(i).background(C.Card, RoundedCornerShape(12.dp)).border(1.dp, C.Line, RoundedCornerShape(12.dp)).padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -1076,7 +1084,7 @@ private fun TrackChip(icon: androidx.compose.ui.graphics.vector.ImageVector, tex
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RequirementNewScreen(nav: Nav, initialPn: String, gpsParam: String) {
+fun RequirementNewScreen(nav: Nav, initialPn: String, gpsParam: String, company: String = "All") {
     val scope = rememberCoroutineScope()
     val liveGps = if (gpsParam.isBlank()) rememberGps() else gpsParam
     var pn by rememberSaveable { mutableStateOf(initialPn) }
@@ -1119,7 +1127,7 @@ fun RequirementNewScreen(nav: Nav, initialPn: String, gpsParam: String) {
                     try {
                         Api.post(
                             "/requirements",
-                            JSONObject().put("part_number", pn.trim()).put("company", "All").put("name", name).put("category", category)
+                            JSONObject().put("part_number", pn.trim()).put("company", company.ifBlank { "All" }).put("name", name).put("category", category)
                                 .put("priority", priority).put("quantity", quantity.toIntOrNull() ?: 1).put("note", note).put("gps", liveGps),
                         )
                         Toast.success(t("reqNew.added"))

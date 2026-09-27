@@ -170,7 +170,7 @@ fun AuditLogScreen(nav: Nav) {
             loading -> Loading()
             rows.isEmpty() -> EmptyState(Icons.Outlined.History, t("auditLog.noEntries"))
             else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                itemsIndexed(rows, key = { _, r -> r.str("id") }) { i, r ->
+                itemsIndexed(rows, key = { idx, r -> r.str("id") + "#" + idx }) { i, r ->
                     val a = r.str("action")
                     val icon = when {
                         a.startsWith("cash_book") -> Icons.Filled.Inventory2
@@ -230,7 +230,7 @@ fun AiApprovalsScreen(user: User, nav: Nav) {
             loading -> Loading()
             items.isEmpty() -> EmptyState(Icons.Outlined.AutoAwesome, t("aiApprovals.empty"), t("aiApprovals.emptySub"))
             else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                itemsIndexed(items, key = { _, it -> it.str("id") }) { i, it ->
+                itemsIndexed(items, key = { idx, it -> it.str("id") + "#" + idx }) { i, it ->
                     val r = it.obj("result") ?: JSONObject()
                     val conf = it.int("confidence")
                     Card(Modifier.entrance(i)) {
@@ -281,7 +281,7 @@ fun StoresScreen(nav: Nav) {
             loading -> Loading()
             stores.isEmpty() -> EmptyState(Icons.Outlined.Storefront, t("stores.empty"), t("stores.emptySub"))
             else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                itemsIndexed(stores, key = { _, s -> s.str("id") }) { i, s ->
+                itemsIndexed(stores, key = { idx, s -> s.str("id") + "#" + idx }) { i, s ->
                     RowCard(Modifier.entrance(i).pressable { nav.open(Route.StoreDetail(s.str("id"), s.str("name"))) }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(42.dp).background(C.BrandFaint, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
@@ -363,7 +363,7 @@ fun StoreDetailScreen(nav: Nav, storeId: String, storeName: String) {
             tab == "staff" && rows.isEmpty() -> EmptyState(Icons.Outlined.People, t("ownerPanel.noStaff"))
             rows.isEmpty() -> EmptyState(Icons.Outlined.Description, t("storeDetail.nothingHere"), t("storeDetail.nothingHereSub"))
             tab == "staff" -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                itemsIndexed(rows, key = { _, u -> u.str("id") }) { i, u ->
+                itemsIndexed(rows, key = { idx, u -> u.str("id") + "#" + idx }) { i, u ->
                     StaffCard(u, i, busyId == u.str("id"), showStore = false) {
                         busyId = u.str("id")
                         scope.launch {
@@ -457,7 +457,7 @@ fun SearchSetupScreen(nav: Nav) {
                         try {
                             val body = JSONObject().put("google_cx", cx.trim())
                             if (apiKey.isNotBlank()) body.put("google_api_key", apiKey.trim())
-                            val r = Api.post("/auth/settings", body) as JSONObject
+                            val r = Api.post("/auth/settings", body) as? JSONObject ?: JSONObject()
                             hasKey = r.optBoolean("has_google_key")
                             apiKey = ""
                             try { Session.updateUser(Api.getObj("/auth/me")) } catch (_: Exception) {}
@@ -527,7 +527,7 @@ fun UnlinkedStockScreen(nav: Nav) {
                         Text("${units.size} ${t("unlinkedStock.foundNoTrace")}", color = C.OnAmberFaint, fontWeight = FontWeight.Bold)
                     }
                 }
-                itemsIndexed(units, key = { _, u -> u.str("id") }) { i, u ->
+                itemsIndexed(units, key = { idx, u -> u.str("id") + "#" + idx }) { i, u ->
                     RowCard(Modifier.entrance(i)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
@@ -584,7 +584,7 @@ private fun SearchLogList(endpoint: String, showStore: Boolean) {
         loading -> Loading()
         logs.isEmpty() -> EmptyState(Icons.Outlined.History, t("searchLogs.empty"))
         else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            itemsIndexed(logs, key = { _, l -> l.str("id") }) { i, l ->
+            itemsIndexed(logs, key = { idx, l -> l.str("id") + "#" + idx }) { i, l ->
                 RowCard(Modifier.entrance(i.coerceAtMost(12))) {
                     Row {
                         Text(l.str("user_name"), color = C.Text, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1)
@@ -615,7 +615,7 @@ private fun SearchLogList(endpoint: String, showStore: Boolean) {
                             try {
                                 val next = page + 1
                                 val res = Api.getObj(endpoint, mapOf("page" to "$next", "page_size" to "50"))
-                                logs = logs + res.arr("items").objects()
+                                logs = (logs + res.arr("items").objects()).distinctBy { it.str("id") }
                                 total = res.int("total")
                                 page = next
                             } catch (e: ApiException) {
@@ -785,7 +785,7 @@ fun HistoryScreen(user: User, nav: Nav) {
             loading -> Loading()
             txns.isEmpty() -> EmptyState(Icons.Outlined.Receipt, t("history.noEntries"), if (tab == "buy") t("history.noPurchases") else t("history.noSales"))
             else -> LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                itemsIndexed(txns, key = { _, x -> x.str("id") }) { i, x ->
+                itemsIndexed(txns, key = { idx, x -> x.str("id") + "#" + idx }) { i, x ->
                     val on = selected[x.str("id")] == true
                     Row(
                         Modifier.fillMaxWidth().entrance(i.coerceAtMost(12))
@@ -831,7 +831,7 @@ fun HistoryScreen(user: User, nav: Nav) {
                 deleting = true
                 scope.launch {
                     try {
-                        val res = Api.post("/transactions/delete", JSONObject().put("ids", JSONArray(ids)).put("remove_stock", true)) as JSONObject
+                        val res = Api.post("/transactions/delete", JSONObject().put("ids", JSONArray(ids)).put("remove_stock", true)) as? JSONObject ?: JSONObject()
                         Feedback.error(context)
                         Toast.success("${res.int("deleted")} ${t("history.entriesPlusStock")} ${res.int("removed_units")} ${t("history.stockDeleted")}")
                         confirmOpen = false
@@ -862,12 +862,20 @@ fun BackupScreen(nav: Nav) {
 
     val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        try {
-            val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
-            val parsed = JSONObject(text)
-            pending = parsed.optJSONObject("collections") ?: parsed
-        } catch (e: Exception) {
-            Toast.error(t("backup.errorReadingFile"))
+        busy = "read"
+        scope.launch {
+            // Big backups are read in the background so the screen doesn't freeze.
+            val parsed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
+                    val o = JSONObject(text)
+                    o.optJSONObject("collections") ?: o
+                } catch (e: Throwable) {
+                    null
+                }
+            }
+            busy = null
+            if (parsed == null) Toast.error(t("backup.errorReadingFile")) else pending = parsed
         }
     }
 
@@ -885,7 +893,7 @@ fun BackupScreen(nav: Nav) {
                         try {
                             Share.file(context, Api.download("/backup/excel"), "kabadi_backup_$stamp.xlsx", Share.XLSX)
                             Toast.success(t("backup.excelReady"))
-                        } catch (e: ApiException) {
+                        } catch (e: Exception) {
                             Toast.error(e.message ?: t("backup.excelExportFailed"))
                         } finally {
                             busy = null
@@ -898,10 +906,13 @@ fun BackupScreen(nav: Nav) {
                     scope.launch {
                         try {
                             val data = Api.get("/backup/export")
-                            val str = if (data is JSONObject) data.toString(2) else data.toString()
-                            Share.file(context, str.toByteArray(), "kabadi_backup_$stamp.json", "application/json")
+                            val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                (if (data is JSONObject) data.toString(2) else data.toString()).toByteArray()
+                            }
+                            Share.file(context, bytes, "kabadi_backup_$stamp.json", "application/json")
                             Toast.success(t("backup.jsonReady"))
-                        } catch (e: ApiException) {
+                        } catch (e: Throwable) {
+                            if (e is kotlinx.coroutines.CancellationException) throw e
                             Toast.error(e.message ?: t("common.exportFailed"))
                         } finally {
                             busy = null
@@ -913,8 +924,9 @@ fun BackupScreen(nav: Nav) {
                 SectionTitle(t("backup.importRestore"))
                 Text(t("backup.importSub"), color = C.Muted, fontSize = 13.sp)
                 Spacer(Modifier.height(10.dp))
-                BigButton(t("backup.pickAndRestore"), icon = Icons.Filled.CloudUpload, outlined = true, loading = busy == "import", onClick = {
-                    pickFile.launch("application/json")
+                BigButton(t("backup.pickAndRestore"), icon = Icons.Filled.CloudUpload, outlined = true, loading = busy == "import" || busy == "read", onClick = {
+                    // Any file type: backups shared via WhatsApp / Drive often lose the ".json" type.
+                    pickFile.launch("*/*")
                 })
             }
         }
@@ -927,7 +939,7 @@ fun BackupScreen(nav: Nav) {
                 busy = "import"
                 scope.launch {
                     try {
-                        val res = Api.post("/backup/import", JSONObject().put("collections", cols)) as JSONObject
+                        val res = Api.post("/backup/import", JSONObject().put("collections", cols)) as? JSONObject ?: JSONObject()
                         val imp = res.optJSONObject("imported") ?: JSONObject()
                         var total = 0
                         imp.keys().forEach { k -> total += imp.optInt(k) }
@@ -1049,7 +1061,7 @@ fun DemandScreen(nav: Nav) {
                         }
                     }
                 }
-                itemsIndexed(history, key = { _, h -> h.str("part_number") }) { i, h ->
+                itemsIndexed(history, key = { i, h -> "${h.str("store_id")}|${h.str("part_number")}|$i" }) { i, h ->
                     Row(Modifier.fillMaxWidth().entrance(i.coerceAtMost(12)).background(C.Card, RoundedCornerShape(12.dp)).border(1.dp, C.Line, RoundedCornerShape(12.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(h.str("part_number"), color = C.Text, fontWeight = FontWeight.ExtraBold)
@@ -1145,7 +1157,7 @@ fun AdminGpsScreen(nav: Nav) {
             loading -> Loading(t("adminGps.loadingPoints"))
             mode == "live" -> if (devices.isEmpty()) EmptyState(Icons.Outlined.PhoneAndroid, t("adminGps.liveEmpty")) else
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    itemsIndexed(devices, key = { _, d -> d.str("user_id") }) { i, d ->
+                    itemsIndexed(devices, key = { idx, d -> d.str("user_id") + "#" + idx }) { i, d ->
                         GpsRow(Icons.Filled.PhoneAndroid, C.Brand, d.str("name"), "@${d.str("username")} · ${d.str("store_name")}",
                             String.format(Locale.US, "%.5f, %.5f", d.optDouble("lat"), d.optDouble("lng")), ago(d.str("at")), i) {
                             openMap(d.optDouble("lat"), d.optDouble("lng"), "${d.str("name")} (${d.str("store_name")})")
@@ -1532,7 +1544,7 @@ fun OwnerPanelScreen(user: User, nav: Nav) {
             loading -> Loading()
             tab == "stores" -> if (stores.isEmpty()) EmptyState(Icons.Outlined.Business, t("ownerPanel.noStores")) else
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    itemsIndexed(stores, key = { _, s -> s.str("id") }) { i, s ->
+                    itemsIndexed(stores, key = { idx, s -> s.str("id") + "#" + idx }) { i, s ->
                         val locked = s.str("status") == "locked"
                         RowCard(Modifier.entrance(i).pressable { nav.open(Route.StoreDetail(s.str("id"), s.str("name"))) }) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1559,7 +1571,7 @@ fun OwnerPanelScreen(user: User, nav: Nav) {
                 }
             tab == "requests" -> if (requests.isEmpty()) EmptyState(Icons.Outlined.MailOutline, t("ownerPanel.noRequests")) else
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    itemsIndexed(requests, key = { _, r -> r.str("id") }) { i, r ->
+                    itemsIndexed(requests, key = { idx, r -> r.str("id") + "#" + idx }) { i, r ->
                         val st = r.str("status")
                         val (fg, bg, label) = when (st) {
                             "otp_generated" -> Triple(C.Brand, C.BrandFaint, t("ownerPanel.reqOtpGenerated"))
@@ -1590,7 +1602,7 @@ fun OwnerPanelScreen(user: User, nav: Nav) {
                                         loading = busyId == r.str("id") + "otp", modifier = Modifier.weight(1f),
                                         onClick = {
                                             run(r.str("id") + "otp") {
-                                                val res = Api.post("/owner/store-requests/${Api.seg(r.str("id"))}/generate-otp") as JSONObject
+                                                val res = Api.post("/owner/store-requests/${Api.seg(r.str("id"))}/generate-otp") as? JSONObject ?: JSONObject()
                                                 otps[r.str("id")] = res.str("otp") to res.str("expires_at")
                                             }
                                         },
@@ -1612,7 +1624,7 @@ fun OwnerPanelScreen(user: User, nav: Nav) {
             else -> if (staff.isEmpty()) EmptyState(Icons.Outlined.People, t("ownerPanel.noStaff")) else
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     item { Text("ℹ ${t("ownerPanel.staffHint")}", color = C.Muted, fontSize = 12.sp) }
-                    itemsIndexed(staff, key = { _, u -> u.str("id") }) { i, u ->
+                    itemsIndexed(staff, key = { idx, u -> u.str("id") + "#" + idx }) { i, u ->
                         StaffCard(u, i, busyId == u.str("id"), showStore = true) {
                             run(u.str("id")) {
                                 val dis = u.optBoolean("disabled")
@@ -1673,9 +1685,11 @@ fun SignUpScreen(onBackToLogin: () -> Unit, onDone: (User) -> Unit) {
     var mobile by rememberSaveable { mutableStateOf("") }
     var requestId by rememberSaveable { mutableStateOf("") }
     var otp by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
-    var tempPassword by remember { mutableStateOf("") }
-    var newUser by remember { mutableStateOf<User?>(null) }
+    var username by rememberSaveable { mutableStateOf("") }
+    var tempPassword by rememberSaveable { mutableStateOf("") }
+    // Login is kept here and saved only on "Continue", so the one-time password stays on screen.
+    var pendingToken by rememberSaveable { mutableStateOf("") }
+    var pendingUser by rememberSaveable { mutableStateOf("") }
     var err by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
 
@@ -1706,7 +1720,7 @@ fun SignUpScreen(onBackToLogin: () -> Unit, onDone: (User) -> Unit) {
                         loading = true
                         scope.launch {
                             try {
-                                val req = Api.post("/store-requests", JSONObject().put("name", storeName.trim()).put("mobile", mobile.trim())) as JSONObject
+                                val req = Api.post("/store-requests", JSONObject().put("name", storeName.trim()).put("mobile", mobile.trim())) as? JSONObject ?: JSONObject()
                                 requestId = req.str("id")
                                 whatsapp()
                                 step = "otp"
@@ -1729,14 +1743,16 @@ fun SignUpScreen(onBackToLogin: () -> Unit, onDone: (User) -> Unit) {
                         loading = true
                         scope.launch {
                             try {
-                                val res = Api.post("/store-requests/${Api.seg(requestId)}/verify-otp", JSONObject().put("otp", otp.trim())) as JSONObject
-                                val uj = res.getJSONObject("user")
-                                Session.save(res.getString("access_token"), uj)
-                                newUser = User.from(uj)
+                                val res = Api.post("/store-requests/${Api.seg(requestId)}/verify-otp", JSONObject().put("otp", otp.trim())) as? JSONObject ?: JSONObject()
+                                val uj = res.optJSONObject("user")
+                                val token = res.str("access_token")
+                                if (uj == null || token.isBlank()) throw ApiException(0, t("signup.errOtpFailed"))
+                                pendingToken = token
+                                pendingUser = uj.toString()
                                 username = uj.str("username")
                                 tempPassword = res.str("temp_password")
                                 step = "done"
-                            } catch (e: ApiException) {
+                            } catch (e: Exception) {
                                 err = e.message ?: t("signup.errOtpFailed")
                             } finally {
                                 loading = false
@@ -1759,7 +1775,12 @@ fun SignUpScreen(onBackToLogin: () -> Unit, onDone: (User) -> Unit) {
                     }
                     Text(t("signup.copyHint"), color = C.Amber, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                     Spacer(Modifier.height(14.dp))
-                    BigButton(t("signup.continueToApp"), icon = Icons.AutoMirrored.Filled.ArrowForward, onClick = { newUser?.let(onDone) })
+                    BigButton(t("signup.continueToApp"), icon = Icons.AutoMirrored.Filled.ArrowForward, onClick = {
+                        runCatching { JSONObject(pendingUser) }.getOrNull()?.let { uj ->
+                            Session.save(pendingToken, uj)
+                            onDone(User.from(uj))
+                        }
+                    })
                 }
             }
             if (step != "done") {

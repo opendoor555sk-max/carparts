@@ -118,7 +118,7 @@ fun LoginScreen(onLoggedIn: (User) -> Unit, onSignUp: () -> Unit = {}) {
                 val res = Api.post(
                     "/auth/login",
                     JSONObject().put("username", username.trim()).put("password", password),
-                ) as JSONObject
+                ) as? JSONObject ?: JSONObject()
                 val userJson = res.getJSONObject("user")
                 Session.save(res.getString("access_token"), userJson)
                 onLoggedIn(User.from(userJson))

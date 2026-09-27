@@ -99,12 +99,14 @@ object Stickers {
 
     fun codeMatrix(type: String, value: String): CodeMatrix {
         val v = value.ifEmpty { " " }
-        val hints = mutableMapOf<EncodeHintType, Any>(EncodeHintType.CHARACTER_SET to "UTF-8", EncodeHintType.MARGIN to 0)
+        // Plain part numbers get no UTF-8 marker (ECI), like the old app — some scanners print it.
+        val hints = mutableMapOf<EncodeHintType, Any>(EncodeHintType.MARGIN to 0)
+        if (v.any { it.code > 127 }) hints[EncodeHintType.CHARACTER_SET] = "UTF-8"
         try {
             when (type) {
                 "qr" -> return qr(v)
                 "barcode" -> return barcode(v)
-                "datamatrix" -> return fromBitMatrix(MultiFormatWriter().encode(v, BarcodeFormat.DATA_MATRIX, 0, 0))
+                "datamatrix" -> return fromBitMatrix(MultiFormatWriter().encode(v, BarcodeFormat.DATA_MATRIX, 0, 0, mapOf(EncodeHintType.DATA_MATRIX_SHAPE to com.google.zxing.datamatrix.encoder.SymbolShapeHint.FORCE_SQUARE)))
                 "azteccode" -> return fromBitMatrix(MultiFormatWriter().encode(v, BarcodeFormat.AZTEC, 0, 0, hints))
                 "azteccodecompact" -> {
                     for (layers in -1 downTo -4) {
@@ -121,7 +123,7 @@ object Stickers {
         } catch (_: Exception) {
         }
         // Unsupported type (e.g. Han Xin from an old template) → QR, same as the old app.
-        return qr(v)
+        return try { qr(v) } catch (_: Exception) { qr(v.take(200)) }
     }
 
     fun codeSvg(type: String, value: String): String {

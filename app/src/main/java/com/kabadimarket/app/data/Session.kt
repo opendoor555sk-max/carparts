@@ -149,9 +149,13 @@ data class User(
 object Session {
     private lateinit var prefs: SharedPreferences
 
+    /** The logged-in user, observed by the whole app (store name / permissions update live). */
+    var current by androidx.compose.runtime.mutableStateOf<User?>(null)
+
     fun init(context: Context) {
         prefs = context.getSharedPreferences("session", Context.MODE_PRIVATE)
         Api.token = prefs.getString("token", null)
+        current = user
     }
 
     val user: User?
@@ -168,14 +172,18 @@ object Session {
     fun save(token: String, user: JSONObject) {
         Api.token = token
         prefs.edit().putString("token", token).putString("user", user.toString()).apply()
+        current = runCatching { User.from(user) }.getOrNull()
     }
 
     fun updateUser(user: JSONObject) {
+        if (Api.token == null) return
         prefs.edit().putString("user", user.toString()).apply()
+        current = runCatching { User.from(user) }.getOrNull() ?: current
     }
 
     fun clear() {
         Api.token = null
         prefs.edit().clear().apply()
+        current = null
     }
 }

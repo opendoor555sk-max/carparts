@@ -19,7 +19,10 @@ object Share {
             context.startActivity(intent)
         } catch (e: ActivityNotFoundException) {
             intent.setPackage(null)
-            context.startActivity(Intent.createChooser(intent, "Share"))
+            try {
+                context.startActivity(Intent.createChooser(intent, "Share"))
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -31,16 +34,22 @@ object Share {
 
     /** Saves a downloaded file (e.g. Excel) and opens the share menu for it. */
     fun file(context: Context, bytes: ByteArray, fileName: String, mime: String) {
-        val dir = File(context.cacheDir, "exports").apply { mkdirs() }
-        val file = File(dir, fileName)
-        file.writeBytes(bytes)
-        val uri: Uri = FileProvider.getUriForFile(context, context.packageName + ".files", file)
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = mime
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        try {
+            // Names like "Shree Auto/Garage" must not break the file path.
+            val safe = fileName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+            val file = File(dir, safe)
+            file.writeBytes(bytes)
+            val uri: Uri = FileProvider.getUriForFile(context, context.packageName + ".files", file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = mime
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, safe))
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(context, e.message ?: "Share failed", android.widget.Toast.LENGTH_LONG).show()
         }
-        context.startActivity(Intent.createChooser(intent, fileName))
     }
 
     fun openUrl(context: Context, url: String) {

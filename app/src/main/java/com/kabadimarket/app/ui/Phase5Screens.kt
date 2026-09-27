@@ -556,7 +556,7 @@ fun StockVerifyScreen(nav: Nav) {
                             scope.launch {
                                 try {
                                     val arr = JSONArray(items.map { JSONObject().put("part_number", it.str("part_number")).put("counted", counts[it.str("part_number")] ?: 0) })
-                                    report = Api.post("/stock/verify", JSONObject().put("counts", arr)) as JSONObject
+                                    report = Api.post("/stock/verify", JSONObject().put("counts", arr)) as? JSONObject ?: JSONObject()
                                     Feedback.success(context)
                                 } catch (e: ApiException) {
                                     Toast.error(e.message ?: t("common.failed"))

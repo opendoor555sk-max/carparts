@@ -351,7 +351,8 @@ fun StickerScannerScreen(user: User, nav: Nav) {
         scope.launch {
             try {
                 val b64 = withContext(Dispatchers.Default) {
-                    loadUpright(bytes, 800)?.base64(Bitmap.CompressFormat.JPEG, 85) ?: Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    try { loadUpright(bytes, 800)?.base64(Bitmap.CompressFormat.JPEG, 85) } catch (e: Throwable) { null }
+                        ?: throw Exception(t("scanSticker.scanFailed"))
                 }
                 val res = Api.post("/scan-sticker", JSONObject().put("image_base64", b64)) as? JSONObject ?: JSONObject()
                 val aspect = res.optDouble("aspect", 1.6).takeIf { !it.isNaN() && it > 0 } ?: 1.6
@@ -404,16 +405,21 @@ fun StickerScannerScreen(user: User, nav: Nav) {
     }
 
     // ---- Photo pickers ----
-    var cameraFile by remember { mutableStateOf<File?>(null) }
+    // Path is saved, so the photo isn't lost if Android closes the app while the camera is open.
+    var cameraPath by rememberSaveable { mutableStateOf("") }
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        val f = cameraFile
+        val f = cameraPath.takeIf { it.isNotEmpty() }?.let { File(it) }
         if (ok && f != null && f.exists()) processImage(f.readBytes())
     }
     fun launchCamera() {
-        val dir = File(context.cacheDir, "photos").apply { mkdirs() }
-        val f = File(dir, "sticker_${System.currentTimeMillis()}.jpg")
-        cameraFile = f
-        takePicture.launch(FileProvider.getUriForFile(context, context.packageName + ".files", f))
+        try {
+            val dir = File(context.cacheDir, "photos").apply { mkdirs() }
+            val f = File(dir, "sticker_${System.currentTimeMillis()}.jpg")
+            cameraPath = f.absolutePath
+            takePicture.launch(FileProvider.getUriForFile(context, context.packageName + ".files", f))
+        } catch (e: Exception) {
+            Toast.error(e.message ?: t("scanSticker.cameraPermissionNeeded"))
+        }
     }
     val cameraPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) launchCamera() else Toast.error(t("scanSticker.cameraPermissionNeeded"))
@@ -423,7 +429,12 @@ fun StickerScannerScreen(user: User, nav: Nav) {
         else cameraPerm.launch(Manifest.permission.CAMERA)
     }
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
-        if (uri != null) context.contentResolver.openInputStream(uri)?.use { it.readBytes() }?.let { processImage(it) }
+        if (uri != null) scope.launch {
+            val bytes = withContext(Dispatchers.IO) {
+                try { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } } catch (e: Throwable) { null }
+            }
+            if (bytes == null) Toast.error(t("scanSticker.scanFailed")) else processImage(bytes)
+        }
     }
 
     // ---- Logo ----
@@ -438,7 +449,13 @@ fun StickerScannerScreen(user: User, nav: Nav) {
         scope.launch {
             try {
                 val bytes = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } } ?: return@launch
-                val dataUrl = withContext(Dispatchers.Default) { "data:image/png;base64," + (loadUpright(bytes, 300)?.base64(Bitmap.CompressFormat.PNG, 100) ?: "") }
+                val b64 = withContext(Dispatchers.Default) {
+                    try { loadUpright(bytes, 300)?.base64(Bitmap.CompressFormat.PNG, 100) } catch (e: Throwable) { null }
+                }
+                if (b64.isNullOrEmpty()) {
+                    Toast.error(t("scanSticker.logoSaveFailed")); return@launch
+                }
+                val dataUrl = "data:image/png;base64,$b64"
                 Api.post("/logos", JSONObject().put("name", "Logo").put("data_url", dataUrl))
                 Toast.success(t("scanSticker.logoSaved"))
                 loadSaved()
@@ -617,6 +634,14 @@ fun StickerScannerScreen(user: User, nav: Nav) {
         val parsed = Tpl.parse(s.str("bg_data_url"))
         if (parsed == null) {
             Toast.error(t("scanSticker.couldNotOpenTemplate")); return
+        }
+        val oldType = parsed.code?.type
+        if (oldType != null && Stickers.CODE_TYPES.none { it.first == oldType }) {
+            Toast.show(ux(
+                "આ સ્ટીકરનો કોડ ($oldType) હવે બનતો નથી — QR/PDF417 તરીકે છપાશે",
+                "इस स्टिकर का कोड ($oldType) अब नहीं बनता — QR/PDF417 के रूप में छपेगा",
+                "This sticker's code ($oldType) can't be made now — it will print as QR/PDF417",
+            ))
         }
         val comp = parsed.company ?: "Hyundai / Kia"
         val rawT = parsed.lines.map { Stickers.Raw(it.text, it.bold) }

@@ -151,7 +151,7 @@ fun InventoryScreen(user: User, nav: Nav, onLogout: () -> Unit) {
         busy = true
         scope.launch {
             try {
-                val res = Api.post("/stock/adjust", JSONObject().put("part_number", pn).put("delta", delta)) as JSONObject
+                val res = Api.post("/stock/adjust", JSONObject().put("part_number", pn).put("delta", delta)) as? JSONObject ?: JSONObject()
                 if (res.optBoolean("limit_reached")) {
                     Feedback.error(context)
                     Toast.error("${t("buy.stopBuying")} $pn — ${t("buy.limitReached")}")
@@ -283,7 +283,7 @@ fun InventoryScreen(user: User, nav: Nav, onLogout: () -> Unit) {
                     )
                 }
                 else -> LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    itemsIndexed(units, key = { _, u -> u.str("id") }) { i, u ->
+                    itemsIndexed(units, key = { idx, u -> u.str("id") + "#" + idx }) { i, u ->
                         val pn = u.str("part_number")
                         Column(Modifier.fillMaxWidth().entrance(i).background(C.Card, RoundedCornerShape(12.dp)).border(1.dp, C.Line, RoundedCornerShape(12.dp))) {
                             Row(Modifier.fillMaxWidth().pressable { nav.open(Route.Part(pn, "")) }.padding(14.dp), verticalAlignment = Alignment.Top) {

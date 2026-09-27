@@ -350,7 +350,7 @@ fun CustomersScreen(nav: Nav) {
                 if (q.isNotBlank()) "${t("common.nothingFoundFor")} \"$q\"" else t("customers.emptySub"),
             ) { BigButton(t("customers.add"), icon = Icons.Filled.PersonAdd, onClick = { nav.open(Route.CustomerNew) }, modifier = Modifier.width(220.dp)) }
             else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                itemsIndexed(list, key = { _, c -> c.str("id") }) { i, c ->
+                itemsIndexed(list, key = { idx, c -> c.str("id") + "#" + idx }) { i, c ->
                     val bal = c.num("balance") ?: 0.0
                     Row(
                         Modifier
@@ -439,7 +439,7 @@ fun CustomerNewScreen(nav: Nav) {
                         val c = Api.post(
                             "/customers",
                             JSONObject().put("name", name.trim()).put("phone", phone.trim()).put("address", address.trim()),
-                        ) as JSONObject
+                        ) as? JSONObject ?: JSONObject()
                         Toast.success(t("customers.added"))
                         nav.replace(Route.Customer(c.str("id")))
                     } catch (e: ApiException) {
@@ -515,7 +515,7 @@ fun CustomerDetailScreen(nav: Nav, customerId: String) {
                 }
                 val animBal by animateFloatAsState(abs(balance).toFloat(), tween(900), label = "bal")
                 Text(
-                    money(animBal.toDouble()),
+                    money(if (animBal == abs(balance).toFloat()) abs(balance) else animBal.toDouble()),
                     color = when {
                         balance > 0 -> C.Red
                         balance < 0 -> C.Green
@@ -616,8 +616,8 @@ fun CustomerDetailScreen(nav: Nav, customerId: String) {
                             scope.launch {
                                 try {
                                     val bytes = Api.download("/customers/${Api.seg(customerId)}/ledger/excel")
-                                    Share.file(context, bytes, "ledger_${c.str("name").replace(Regex("\\s+"), "_")}.xlsx", Share.XLSX)
-                                } catch (e: ApiException) {
+                                    Share.file(context, bytes, "ledger_${c.str("name").replace(Regex("[^\\p{L}\\p{N}._-]+"), "_")}.xlsx", Share.XLSX)
+                                } catch (e: Exception) {
                                     Toast.error(e.message ?: t("common.exportFailed"))
                                 } finally {
                                     exporting = false
@@ -711,7 +711,7 @@ fun VendorsScreen(nav: Nav) {
                 if (q.isNotBlank()) "${t("common.nothingFoundFor")} \"$q\"" else t("vendors.emptySub"),
             ) { BigButton(t("vendors.add"), icon = Icons.Filled.AddCircle, onClick = { nav.open(Route.VendorNew) }, modifier = Modifier.width(220.dp)) }
             else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                itemsIndexed(list, key = { _, v -> v.str("id") }) { i, v ->
+                itemsIndexed(list, key = { idx, v -> v.str("id") + "#" + idx }) { i, v ->
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -767,7 +767,7 @@ fun VendorNewScreen(nav: Nav) {
                             "/vendors",
                             JSONObject().put("name", name.trim()).put("phone", phone.trim())
                                 .put("address", address.trim()).put("notes", notes.trim()),
-                        ) as JSONObject
+                        ) as? JSONObject ?: JSONObject()
                         Toast.success(t("vendors.added"))
                         nav.replace(Route.Vendor(v.str("id")))
                     } catch (e: ApiException) {
@@ -936,7 +936,7 @@ fun PartsListScreen(user: User, nav: Nav, category: String) {
             error != null -> LoadError(error ?: "") { reload++ }
             parts.isEmpty() -> EmptyState(Icons.Outlined.Description, t("parts.empty"), t("parts.emptySub"))
             else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                itemsIndexed(parts, key = { _, p -> p.str("id") }) { i, p ->
+                itemsIndexed(parts, key = { idx, p -> p.str("id") + "#" + idx }) { i, p ->
                     Row(
                         Modifier
                             .fillMaxWidth()

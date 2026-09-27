@@ -200,7 +200,8 @@ object Printer {
     }
 
     /** 1250.0 → "1250", 99.5 → "99.5" (like JavaScript number printing). */
-    fun fmtNum(v: Double): String = if (v % 1.0 == 0.0) v.toLong().toString() else v.toString()
+    fun fmtNum(v: Double): String =
+        if (v.isNaN() || v.isInfinite()) "0" else java.math.BigDecimal(v.toString()).stripTrailingZeros().toPlainString().let { if (it == "-0") "0" else it }
 
     fun invoiceHtml(b: Branding, inv: JSONObject): String {
         val meta = mutableListOf("Invoice No." to inv.str("invoice_number"), "Date" to serverDate(inv.str("at")))
@@ -242,9 +243,32 @@ object Printer {
         live.add(web)
         web.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String?) {
-                val pm = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
-                pm?.print(jobName, view.createPrintDocumentAdapter(jobName), PrintAttributes.Builder().build())
-                Handler(Looper.getMainLooper()).postDelayed({ live.remove(view) }, 60_000)
+                if (view.tag != null) return // can fire twice: open the print screen only once
+                view.tag = 1
+                try {
+                    val pm = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
+                    val base = view.createPrintDocumentAdapter(jobName)
+                    // Keep the page alive until the print screen is closed, then free it.
+                    val adapter = object : android.print.PrintDocumentAdapter() {
+                        override fun onStart() = base.onStart()
+                        override fun onLayout(
+                            oldAttributes: PrintAttributes?, newAttributes: PrintAttributes?, cancellationSignal: android.os.CancellationSignal?,
+                            callback: LayoutResultCallback?, extras: android.os.Bundle?,
+                        ) = base.onLayout(oldAttributes, newAttributes, cancellationSignal, callback, extras)
+                        override fun onWrite(
+                            pages: Array<out android.print.PageRange>?, destination: android.os.ParcelFileDescriptor?,
+                            cancellationSignal: android.os.CancellationSignal?, callback: WriteResultCallback?,
+                        ) = base.onWrite(pages, destination, cancellationSignal, callback)
+                        override fun onFinish() {
+                            base.onFinish()
+                            live.remove(view)
+                            Handler(Looper.getMainLooper()).post { runCatching { view.destroy() } }
+                        }
+                    }
+                    if (pm == null) live.remove(view) else pm.print(jobName, adapter, PrintAttributes.Builder().build())
+                } catch (e: Exception) {
+                    live.remove(view)
+                }
             }
         }
         web.loadDataWithBaseURL("https://localhost/", html, "text/html", "UTF-8", null)
@@ -252,16 +276,20 @@ object Printer {
 
     /** Renders the HTML to a PDF file and opens the share menu (WhatsApp, email …). */
     fun sharePdf(context: Context, html: String, fileName: String, onDone: (Boolean) -> Unit = {}) {
-        WebView.enableSlowWholeDocumentDraw()
         val web = WebView(context)
         live.add(web)
-        val widthPx = 794 // A4 width at 96 dpi
-        web.layout(0, 0, widthPx, 1123)
+        // A4 at 96 CSS-dpi, in real screen pixels (else text comes out ~3× too big).
+        val density = context.resources.displayMetrics.density
+        val widthPx = Math.round(794 * density)
+        web.layout(0, 0, widthPx, Math.round(1123 * density))
         web.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String?) {
+                if (view.tag != null) return
+                view.tag = 1
                 Handler(Looper.getMainLooper()).postDelayed({
                     try {
-                        val heightPx = (view.contentHeight * view.scale).toInt().coerceAtLeast(1123)
+                        @Suppress("DEPRECATION")
+                        val heightPx = (view.contentHeight * view.scale).toInt().coerceAtLeast(Math.round(1123 * density))
                         view.measure(
                             View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
                             View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY),
@@ -290,10 +318,11 @@ object Printer {
                         pdf.close()
                         Share.file(context, file.readBytes(), fileName, "application/pdf")
                         onDone(true)
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         onDone(false)
                     } finally {
                         live.remove(view)
+                        runCatching { view.destroy() }
                     }
                 }, 400)
             }

@@ -747,6 +747,15 @@ fun moneyText(v: Double?): String = if (v == null) "-" else "Rs. " + String.form
 /** "2026-09-26T10:15:00+00:00" → "26 Sep 2026" */
 fun shortDate(iso: String): String {
     if (iso.length < 10) return iso
+    // Full server time (UTC) → phone's local date, so a 2 AM entry shows today's date.
+    if (iso.length >= 19 && iso[10] == 'T') {
+        try {
+            val p = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+            val d = p.parse(iso.substring(0, 19))
+            if (d != null) return java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.ENGLISH).format(d)
+        } catch (_: Exception) {
+        }
+    }
     val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
     val y = iso.substring(0, 4)
     val m = iso.substring(5, 7).toIntOrNull() ?: return iso

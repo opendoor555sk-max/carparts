@@ -122,7 +122,7 @@ fun CashBookScreen(user: User, nav: Nav) {
             Card(Modifier.entrance(0)) {
                 SectionTitle(t("cashBook.cashInHand"))
                 val anim by animateFloatAsState(balance.toFloat(), tween(900), label = "cash")
-                Text(money(anim.toDouble()), color = if (balance < 0) C.Red else C.Green, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
+                Text(money(if (anim == balance.toFloat()) balance else anim.toDouble()), color = if (balance < 0) C.Red else C.Green, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
             }
             Card(Modifier.entrance(1)) {
                 SectionTitle(t("cashBook.addEntry"))
@@ -246,7 +246,7 @@ fun DamagedReturnsScreen(nav: Nav) {
             loading -> Loading()
             records.isEmpty() -> EmptyState(Icons.AutoMirrored.Outlined.Undo, t("damagedReturns.noRecords"), t("damagedReturns.noRecordsSub"))
             else -> LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                itemsIndexed(records, key = { _, r -> r.str("id") }) { i, r ->
+                itemsIndexed(records, key = { idx, r -> r.str("id") + "#" + idx }) { i, r ->
                     val m = returnMeta(r.str("type"))
                     Row(
                         Modifier.fillMaxWidth().entrance(i).background(C.Card, RoundedCornerShape(12.dp)).border(1.dp, C.Line, RoundedCornerShape(12.dp)).padding(12.dp),
@@ -390,7 +390,8 @@ private fun resolveRange(range: String, fromDate: String, toDate: String): Pair<
     return when (range) {
         "today" -> todayIso() to todayIso()
         "week" -> {
-            val start = Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY) }
+            // Always back to the last Sunday (phones with a Monday week would jump forward).
+            val start = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, -(get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY)) }
             iso(start) to todayIso()
         }
         "month" -> iso(Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1) }) to todayIso()
@@ -622,7 +623,7 @@ fun ProfitReportScreen(nav: Nav) {
                 scope.launch {
                     try {
                         Share.file(context, Api.download("/reports/profit/excel", params()), "profit_report.xlsx", Share.XLSX)
-                    } catch (e: ApiException) {
+                    } catch (e: Exception) {
                         Toast.error(e.message ?: t("common.exportFailed"))
                     } finally {
                         exporting = false
@@ -665,7 +666,7 @@ fun ProfitReportScreen(nav: Nav) {
                     Spacer(Modifier.height(8.dp))
                     SectionTitle(t("profitReport.byPartHeader"))
                 }
-                itemsIndexed(r.arr("by_part").objects(), key = { _, p -> p.str("part_number") }) { i, p ->
+                itemsIndexed(r.arr("by_part").objects(), key = { idx, p -> p.str("part_number") + "#" + idx }) { i, p ->
                     val unknownAll = p.int("unknown_cost_units") == p.int("units_sold")
                     val profit = p.num("profit") ?: 0.0
                     Row(
@@ -695,6 +696,6 @@ private fun SummaryStat(label: String, value: Double, color: Color, modifier: Mo
     val anim by animateFloatAsState(value.toFloat(), tween(900), label = "stat")
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, color = C.Muted, fontSize = 12.sp)
-        Text(money(anim.toDouble()), color = color, fontSize = if (big) 18.sp else 14.sp, fontWeight = FontWeight.ExtraBold)
+        Text(money(if (anim == value.toFloat()) value else anim.toDouble()), color = color, fontSize = if (big) 18.sp else 14.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
