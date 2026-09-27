@@ -129,7 +129,7 @@ object Updater {
         dir?.listFiles()?.forEach { if (it.name.endsWith(".apk")) it.delete() }
         val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val req = DownloadManager.Request(Uri.parse(rel.url))
-            .setTitle("Kabadi Calculator " + rel.name)
+            .setTitle("Kabadi Market Hisab " + rel.name)
             .setDescription("Update download ho raha hai")
             .setMimeType("application/vnd.android.package-archive")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)

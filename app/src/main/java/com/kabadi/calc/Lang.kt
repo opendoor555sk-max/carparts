@@ -5,7 +5,7 @@ object L {
     var lang = 0
 
     private val T: Map<String, Array<String>> = mapOf(
-        "app" to arrayOf("Kabadi Calculator", "कबाड़ी कैलकुलेटर", "કબાડી કેલ્ક્યુલેટર"),
+        "app" to arrayOf("Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब", "કબાડી માર્કેટ હિસાબ"),
         "new" to arrayOf("+ New Hisab", "+ नया हिसाब", "+ નવો હિસાબ"),
         "saved" to arrayOf("Saved hisab", "पुराने हिसाब", "જૂના હિસાબ"),
         "none" to arrayOf("No hisab yet. Tap + New Hisab.", "अभी कोई हिसाब नहीं। + नया हिसाब दबाएँ।", "હજી કોઈ હિસાબ નથી. + નવો હિસાબ દબાવો."),
@@ -160,10 +160,10 @@ object L {
         "backup_load" to arrayOf("📂 Restore from backup file", "📂 बैकअप फ़ाइल से वापस लाएँ", "📂 બેકઅપ ફાઇલથી પાછું લાવો"),
         "backup_ok" to arrayOf("Backup saved in Downloads/KabadiCalc", "बैकअप Downloads/KabadiCalc में सेव", "બેકઅપ Downloads/KabadiCalc માં સેવ"),
         "restored" to arrayOf("Hisab restored", "हिसाब वापस आए", "હિસાબ પાછા આવ્યા"),
-        "bad_file" to arrayOf("This is not a Kabadi Calculator backup", "यह कबाड़ी कैलकुलेटर का बैकअप नहीं है", "આ કબાડી કેલ્ક્યુલેટરનો બેકઅપ નથી"),
+        "bad_file" to arrayOf("This is not a Kabadi Market Hisab backup", "यह कबाड़ी मार्केट हिसाब का बैकअप नहीं है", "આ કબાડી માર્કેટ હિસાબનો બેકઅપ નથી"),
         "last_backup" to arrayOf("Last backup", "आखिरी बैकअप", "છેલ્લો બેકઅપ"),
         "send_list" to arrayOf("💬 Send list on WhatsApp", "💬 लिस्ट WhatsApp पर भेजें", "💬 યાદી WhatsApp પર મોકલો"),
-        "made" to arrayOf("Made with Kabadi Calculator", "कबाड़ी कैलकुलेटर से बना", "કબાડી કેલ્ક્યુલેટરથી બનાવ્યું")
+        "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 
     fun t(k: String): String = T[k]?.get(lang) ?: k

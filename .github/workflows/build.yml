@@ -40,7 +40,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: kabadi-v1.0.${{ github.run_number }}
-          name: Kabadi Calculator 1.0.${{ github.run_number }}
+          name: Kabadi Market Hisab 1.0.${{ github.run_number }}
           body_path: RELEASE_NOTES.md
           files: KabadiCalc.apk
           make_latest: false
@@ -52,8 +52,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: kabadi-latest
-          name: Kabadi Calculator (latest - OTA)
-          body: "OTA helper for Kabadi Calculator. Latest build: 1.0.${{ github.run_number }}"
+          name: Kabadi Market Hisab (latest - OTA)
+          body: "OTA helper for Kabadi Market Hisab. Latest build: 1.0.${{ github.run_number }}"
           files: |
             version.txt
             KabadiCalc.apk
