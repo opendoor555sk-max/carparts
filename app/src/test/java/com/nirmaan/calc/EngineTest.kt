@@ -337,4 +337,51 @@ class EngineTest {
         assertTrue(r.any { it.stair?.install == true })
         assertEquals("4 nag", r.v("Stringers ki ginti (max 16\" doori)"))
     }
+
+    // ---------------- Machinist calculator ----------------
+    private fun mk(vararg keys: String): String {
+        e.mach = true
+        for (s in keys) {
+            if (s.startsWith("^") && s.length > 1) { pressLabel("Conv"); pressLabel(s.substring(1)) }
+            else if (s.length > 1 && s.all { it.isDigit() || it == '.' }) s.forEach { pressLabel(it.toString()) }
+            else pressLabel(s)
+        }
+        return e.display()
+    }
+
+    @Test fun machRpmFeed() {
+        mk("300", "Cut Speed")
+        mk(".5", "Diam")
+        assertEquals("2291.8312", mk("RPM"))
+        mk("4", "#Teeth")
+        mk(".002", "Feed/Tooth")
+        assertEquals("18.3346", mk("Feed Rate"))
+        assertEquals("0.008in", mk("Cut Feed"))
+        assertEquals("300", mk("Cut Speed"))
+    }
+
+    @Test fun machTriangle() {
+        mk("3", "Adj (x)")
+        mk("4", "Opp (y)")
+        assertEquals("5in", mk("Hyp (r)"))
+        assertEquals("53.13°", mk("Angle (Ø)"))
+    }
+
+    @Test fun machDrillAndThread() {
+        mk(".25", "Drill Size")
+        assertTrue(ui.rows.any { it.label == "Fraction" && it.value.startsWith("1/4\"") })
+        assertTrue(ui.rows.any { it.label == "Letter" && it.value.startsWith("E ") })
+        mk(".25", "Thread Size")
+        mk("^%Thread")
+        assertTrue(ui.rows.any { it.label.startsWith("Drill for 75") && it.value.startsWith("0.2013") })
+        mk("^Wire Size")
+        assertTrue(e.display().startsWith("0.0289"))
+    }
+
+    @Test fun machSwitchKeepsNirmaanKeys() {
+        e.mach = true
+        assertEquals("Cut Speed", e.keyText(0, 0))
+        e.mach = false
+        assertEquals("Rise", e.keyText(0, 0))
+    }
 }
