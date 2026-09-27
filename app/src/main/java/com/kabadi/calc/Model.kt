@@ -12,7 +12,8 @@ class Line(
     var fixed: Boolean,
     var kgText: String = "",
     var rateText: String = "",
-    var amountText: String = ""
+    var amountText: String = "",
+    var litre: Boolean = false     // kg × rate line measured in litre instead (oil, diesel)
 ) {
     val kg get() = evalExpr(kgText).let { if (it.isFinite()) it else 0.0 }
     val rate get() = evalExpr(rateText).let { if (it.isFinite()) it else 0.0 }
@@ -49,7 +50,8 @@ class Hisab(
     fun maalTotal() = maal.sumOf { it.value() }
     fun bikri() = sale + maalTotal()
     fun commission() = if (type != "haraji") 0.0 else if (commPct) bikri() * ev(commText) / 100 else ev(commText)
-    fun kg() = maal.filter { !it.fixed }.sumOf { it.kg }
+    fun kg() = maal.filter { !it.fixed && !it.litre }.sumOf { it.kg }
+    fun litre() = maal.filter { !it.fixed && it.litre }.sumOf { it.kg }
     fun munafa() = bikri() - commission() - lagat()
 
     fun sharesTotal() = partners.sumOf { it.share }
@@ -78,7 +80,7 @@ fun duplicates(lines: List<Line>): List<String> =
     lines.filter { it.name.isNotBlank() }.groupBy { norm(it.name) }.filter { it.value.size > 1 }.map { it.value.first().name }
 
 /** built-in parts: key, usually fixed?, names in English / Hindi / Gujarati */
-class Item(val key: String, val fixed: Boolean, val en: String, val hi: String, val gu: String) {
+class Item(val key: String, val fixed: Boolean, val en: String, val hi: String, val gu: String, val litre: Boolean = false) {
     fun name(lang: Int) = when (lang) { 1 -> hi; 2 -> gu; else -> en }
 }
 
@@ -99,7 +101,9 @@ val PARTS = listOf(
     Item("bhangar", false, "Bhangar", "भंगार", "ભંગાર"),
     Item("battery", true, "Battery", "बैटरी", "બેટરી"),
     Item("seat", true, "Seat", "सीट", "સીટ"),
-    Item("wood", false, "Wood / Ply", "लकड़ी / प्लाई", "લાકડું / પ્લાય")
+    Item("wood", false, "Wood / Ply", "लकड़ी / प्लाई", "લાકડું / પ્લાય"),
+    Item("oil", false, "Engine oil", "इंजन ऑयल", "એન્જિન ઓઇલ", litre = true),
+    Item("diesel", false, "Diesel", "डीज़ल", "ડીઝલ", litre = true)
 )
 
 val EXPENSES = listOf(

@@ -82,7 +82,11 @@ class MainActivity : Activity() {
         root.addView(bottom, llp(MATCH_PARENT, WRAP_CONTENT))
         setContentView(root)
         showHome()
-        Updater.autoCheck(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Updater.autoCheck(this) // on every open (at most every 30 min)
     }
 
     override fun onPause() {
@@ -227,6 +231,10 @@ class MainActivity : Activity() {
         body.addView(heading(L.t("saved")))
         body.addView(list)
         fill("")
+        body.addView(small("⟳  " + L.t("update") + "  (v" + Updater.myVersionName(this) + ")", BLUE).apply {
+            gravity = Gravity.CENTER; textSize = 14f; setPadding(0, dpi(24f), 0, dpi(8f))
+            setOnClickListener { Updater.check(this@MainActivity, manual = true) }
+        }, llp(MATCH_PARENT, WRAP_CONTENT))
     }
 
     private fun askDelete(h: Hisab, after: () -> Unit) {
@@ -246,6 +254,7 @@ class MainActivity : Activity() {
     private lateinit var sumLagat: TextView
     private lateinit var sumMaal: TextView
     private lateinit var sumKg: TextView
+    private lateinit var sumLtr: TextView
     private lateinit var sumResult: TextView
     private lateinit var resultBox: LinearLayout
     private var scrollTo: View? = null
@@ -288,6 +297,8 @@ class MainActivity : Activity() {
         sumLagat.text = money(h.lagat())
         sumMaal.text = money(h.maalTotal())
         sumKg.text = plain(h.kg()) + " " + L.t("kg")
+        sumLtr.text = plain(h.litre()) + " " + L.t("ltr")
+        (sumLtr.parent as? View)?.visibility = if (h.maal.any { !it.fixed && it.litre }) View.VISIBLE else View.GONE
         val m = h.munafa()
         sumResult.text = (if (m >= 0) L.t("profit") else L.t("loss")) + "   " + money(Math.abs(m))
         resultBox.background = round(if (m >= 0) GREEN else RED, 12f)
@@ -370,7 +381,7 @@ class MainActivity : Activity() {
             if (b != null) h.maal.indexOfFirst { sameItem(it, b.key, name) }.let { at ->
                 if (at >= 0) { toast(L.t("dup") + ": " + name); focusAt(mLines, at); return@chips }
             }
-            h.maal.add(Line(b?.key ?: "", name, b?.fixed ?: false, rateText = Store.lastRate[name] ?: ""))
+            h.maal.add(Line(b?.key ?: "", name, b?.fixed ?: false, rateText = Store.lastRate[name] ?: "", litre = b?.litre ?: false))
             drawMaal(); refreshTotals()
             focusLast(mLines)
         }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
@@ -443,6 +454,7 @@ class MainActivity : Activity() {
         sumKharch = sumRow(L.t("sum_kharch"))
         sumLagat = sumRow(L.t("sum_lagat"), true, RED)
         sumKg = sumRow(L.t("sum_kg"))
+        sumLtr = sumRow(L.t("sum_ltr"))
         sumMaal = sumRow(L.t("sum_maal"), true, GREEN)
         if (h.type == "haraji") {
             sumSale = sumRow(L.t("sale_s"))
@@ -532,10 +544,14 @@ class MainActivity : Activity() {
             background = round(if (on) GREEN else Color.WHITE, 14f, GREEN)
             setPadding(dpi(10f), dpi(6f), dpi(10f), dpi(6f)); setOnClickListener { a() }
         }
-        top.addView(modeBtn(L.t("kgrate"), !l.fixed) { if (l.fixed) { l.fixed = false; redraw() } }, llp(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dpi(6f) })
-        top.addView(modeBtn(L.t("fix"), l.fixed) { if (!l.fixed) { l.fixed = true; redraw() } }, llp(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dpi(4f) })
         top.addView(xBtn { confirmRemove { h.maal.remove(l); redraw() } })
         box.addView(top)
+        // Kg / Litre / Fix — own row so all three buttons fit on small phones
+        val modes = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dpi(6f), 0, 0) }
+        modes.addView(modeBtn(L.t("kgrate"), !l.fixed && !l.litre) { if (l.fixed || l.litre) { l.fixed = false; l.litre = false; redraw() } }, llp(0, WRAP_CONTENT, 1f))
+        modes.addView(modeBtn(L.t("ltrrate"), !l.fixed && l.litre) { if (l.fixed || !l.litre) { l.fixed = false; l.litre = true; redraw() } }, llp(0, WRAP_CONTENT, 1f).apply { leftMargin = dpi(4f) })
+        modes.addView(modeBtn(L.t("fix"), l.fixed) { if (!l.fixed) { l.fixed = true; redraw() } }, llp(0, WRAP_CONTENT, 0.7f).apply { leftMargin = dpi(4f) })
+        box.addView(modes)
 
         val r = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dpi(6f), 0, 0) }
         if (l.fixed) {
@@ -543,14 +559,16 @@ class MainActivity : Activity() {
         } else {
             val amt = TextView(this).apply { textSize = 16f; setTextColor(GREEN); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.END }
             fun upd() { amt.text = "= " + money(l.value()) }
-            r.addView(input(L.t("kg"), l.kgText, true) { l.kgText = it; upd(); refreshTotals() }.apply { tag = "focus"; gravity = Gravity.END }, llp(0, WRAP_CONTENT, 1f))
+            val unit = if (l.litre) L.t("ltr") else L.t("kg")
+            val rateHint = if (l.litre) L.t("rate_l") else L.t("rate")
+            r.addView(input(unit, l.kgText, true) { l.kgText = it; upd(); refreshTotals() }.apply { tag = "focus"; gravity = Gravity.END }, llp(0, WRAP_CONTENT, 1f))
             r.addView(TextView(this).apply { text = "×"; textSize = 18f; setTextColor(MUTED); setPadding(dpi(6f), 0, dpi(6f), 0) })
-            r.addView(input(L.t("rate"), l.rateText, true) { l.rateText = it; upd(); refreshTotals() }.apply { gravity = Gravity.END }, llp(0, WRAP_CONTENT, 1f))
+            r.addView(input(rateHint, l.rateText, true) { l.rateText = it; upd(); refreshTotals() }.apply { gravity = Gravity.END }, llp(0, WRAP_CONTENT, 1f))
             r.addView(amt, llp(0, WRAP_CONTENT, 1.2f).apply { leftMargin = dpi(6f) })
             upd()
             val hint = LinearLayout(this)
-            hint.addView(small(L.t("kg")), llp(0, WRAP_CONTENT, 1f))
-            hint.addView(small(L.t("rate")), llp(0, WRAP_CONTENT, 1f).apply { leftMargin = dpi(24f) })
+            hint.addView(small(unit), llp(0, WRAP_CONTENT, 1f))
+            hint.addView(small(rateHint), llp(0, WRAP_CONTENT, 1f).apply { leftMargin = dpi(24f) })
             hint.addView(View(this), llp(0, 1, 1.2f))
             box.addView(r)
             box.addView(hint)
@@ -661,9 +679,9 @@ class MainActivity : Activity() {
             l.forEachIndexed { i, b ->
                 val r = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
                 r.addView(TextView(this).apply {
-                    text = b.label() + (if (!allFixed) "   (" + (if (b.fixed) L.t("fix") else L.t("kgrate")) + ")" else "")
+                    text = b.label() + (if (!allFixed) "   (" + (if (b.fixed) L.t("fix") else if (b.litre) L.t("ltrrate") else L.t("kgrate")) + ")" else "")
                     textSize = 15f; setTextColor(INK); setPadding(0, dpi(6f), 0, dpi(6f))
-                    if (!allFixed) setOnClickListener { l[i] = Btn(b.key, b.name, !b.fixed); Store.save(this@MainActivity); draw() }
+                    if (!allFixed) setOnClickListener { l[i] = b.nextMode(); Store.save(this@MainActivity); draw() }
                 }, llp(0, WRAP_CONTENT, 1f))
                 if (i > 0) r.addView(TextView(this).apply {
                     text = "▲"; textSize = 16f; setTextColor(BLUE); setPadding(dpi(10f), 0, dpi(10f), 0)

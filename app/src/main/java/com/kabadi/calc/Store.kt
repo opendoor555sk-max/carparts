@@ -5,7 +5,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** a quick-add button: built-in (key) or the user's own (name) */
-class Btn(val key: String, val name: String, val fixed: Boolean) {
+class Btn(val key: String, val name: String, val fixed: Boolean, val litre: Boolean = false) {
+    /** Kg × Rate → Litre × Rate → Fix → Kg × Rate */
+    fun nextMode() = when {
+        fixed -> Btn(key, name, false, false)
+        litre -> Btn(key, name, true, false)
+        else -> Btn(key, name, false, true)
+    }
     fun label(): String {
         if (key.isNotEmpty()) (PARTS + EXPENSES).firstOrNull { it.key == key }?.let { return it.name(L.lang) }
         return name
@@ -61,19 +67,19 @@ object Store {
             if (!known(false, it.name)) { expenses.add(Btn("", it.name.trim(), true)); added.add(it.name.trim()) }
         }
         h.maal.filter { it.key.isEmpty() && it.name.isNotBlank() && it.value() != 0.0 }.forEach {
-            if (!known(true, it.name)) { parts.add(Btn("", it.name.trim(), it.fixed)); added.add(it.name.trim()) }
+            if (!known(true, it.name)) { parts.add(Btn("", it.name.trim(), it.fixed, it.litre && !it.fixed)); added.add(it.name.trim()) }
         }
         return added
     }
 
-    fun defaultParts() = PARTS.map { Btn(it.key, "", it.fixed) }.toMutableList()
+    fun defaultParts() = PARTS.map { Btn(it.key, "", it.fixed, it.litre) }.toMutableList()
     fun defaultExpenses() = EXPENSES.map { Btn(it.key, "", true) }.toMutableList()
 
     private fun lj(l: Line) = JSONObject().put("k", l.key).put("n", l.name).put("f", l.fixed)
-        .put("kg", l.kgText).put("r", l.rateText).put("a", l.amountText)
+        .put("kg", l.kgText).put("r", l.rateText).put("a", l.amountText).put("l", l.litre)
 
     private fun jl(o: JSONObject) = Line(o.optString("k"), o.optString("n"), o.optBoolean("f"),
-        o.optString("kg"), o.optString("r"), o.optString("a"))
+        o.optString("kg"), o.optString("r"), o.optString("a"), o.optBoolean("l"))
 
     fun hj(h: Hisab): JSONObject {
         val o = JSONObject().put("id", h.id).put("t", h.time).put("p", h.party).put("v", h.vehicle)
@@ -94,12 +100,12 @@ object Store {
         return h
     }
 
-    private fun bj(l: List<Btn>) = JSONArray().also { a -> l.forEach { a.put(JSONObject().put("k", it.key).put("n", it.name).put("f", it.fixed)) } }
-    private fun jb(a: JSONArray) = MutableList(a.length()) { i -> a.getJSONObject(i).let { Btn(it.optString("k"), it.optString("n"), it.optBoolean("f")) } }
+    private fun bj(l: List<Btn>) = JSONArray().also { a -> l.forEach { a.put(JSONObject().put("k", it.key).put("n", it.name).put("f", it.fixed).put("l", it.litre)) } }
+    private fun jb(a: JSONArray) = MutableList(a.length()) { i -> a.getJSONObject(i).let { Btn(it.optString("k"), it.optString("n"), it.optBoolean("f"), it.optBoolean("l")) } }
 
     fun save(ctx: Context) {
         try {
-            val o = JSONObject().put("owner", owner).put("mobile", mobile).put("address", address).put("lang", L.lang)
+            val o = JSONObject().put("owner", owner).put("mobile", mobile).put("address", address).put("lang", L.lang).put("litreV1", true)
             o.put("h", JSONArray().also { a -> hisabs.forEach { a.put(hj(it)) } })
             o.put("rates", JSONObject(lastRate as Map<*, *>))
             o.put("parts", bj(parts)).put("exp", bj(expenses)).put("tp", bj(trashParts)).put("te", bj(trashExp))
@@ -120,6 +126,10 @@ object Store {
             o.optJSONArray("h")?.let { a -> for (i in 0 until a.length()) hisabs.add(jh(a.getJSONObject(i))) }
             o.optJSONObject("rates")?.let { r -> r.keys().forEach { k -> lastRate[k] = r.optString(k) } }
             o.optJSONArray("parts")?.let { parts = jb(it) }
+            // one-time: give existing users the new litre buttons (Engine oil, Diesel)
+            if (!o.optBoolean("litreV1")) {
+                PARTS.filter { it.litre }.forEach { p -> if (parts.none { it.key == p.key }) parts.add(Btn(p.key, "", false, true)) }
+            }
             o.optJSONArray("exp")?.let { expenses = jb(it) }
             o.optJSONArray("tp")?.let { trashParts.clear(); trashParts.addAll(jb(it)) }
             o.optJSONArray("te")?.let { trashExp.clear(); trashExp.addAll(jb(it)) }

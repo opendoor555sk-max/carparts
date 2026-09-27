@@ -102,8 +102,9 @@ object Bill {
             val cRate = W * 0.68f
             val hp = tp(10.5f * u, true, Color.rgb(0x60, 0x7D, 0x8B))
             c?.drawText(L.t("item"), pad, y + 11 * u, hp)
-            c?.drawText(L.t("kg"), cKg, y + 11 * u, tp(10.5f * u, true, Color.rgb(0x60, 0x7D, 0x8B), Paint.Align.RIGHT))
-            c?.drawText("₹/" + L.t("kg"), cRate, y + 11 * u, tp(10.5f * u, true, Color.rgb(0x60, 0x7D, 0x8B), Paint.Align.RIGHT))
+            val anyLtr = h.maal.any { !it.fixed && it.litre }
+            c?.drawText(if (anyLtr) L.t("qty") else L.t("kg"), cKg, y + 11 * u, tp(10.5f * u, true, Color.rgb(0x60, 0x7D, 0x8B), Paint.Align.RIGHT))
+            c?.drawText(if (anyLtr) L.t("rate").substringBefore(" ") + " ₹" else "₹/" + L.t("kg"), cRate, y + 11 * u, tp(10.5f * u, true, Color.rgb(0x60, 0x7D, 0x8B), Paint.Align.RIGHT))
             c?.drawText(L.t("amount").replace(" ₹", ""), W - pad, y + 11 * u, tp(10.5f * u, true, Color.rgb(0x60, 0x7D, 0x8B), Paint.Align.RIGHT))
             y += 16 * u
             rule()
@@ -113,7 +114,7 @@ object Bill {
                 if (l.fixed) {
                     c?.drawText(L.t("fix"), cRate, y + 13 * u, tp(11.5f * u, false, Color.rgb(0x78, 0x90, 0x9C), Paint.Align.RIGHT))
                 } else {
-                    c?.drawText(plain(l.kg), cKg, y + 13 * u, tp(12.5f * u, false, Color.rgb(0x21, 0x21, 0x21), Paint.Align.RIGHT))
+                    c?.drawText(plain(l.kg) + if (anyLtr) (if (l.litre) " L" else " kg") else "", cKg, y + 13 * u, tp(12.5f * u, false, Color.rgb(0x21, 0x21, 0x21), Paint.Align.RIGHT))
                     c?.drawText(plain(l.rate), cRate, y + 13 * u, tp(12.5f * u, false, Color.rgb(0x21, 0x21, 0x21), Paint.Align.RIGHT))
                 }
                 c?.drawText(money(l.value()).removePrefix("₹ "), W - pad, y + 13 * u, tp(12.5f * u, false, Color.rgb(0x21, 0x21, 0x21), Paint.Align.RIGHT))
@@ -121,6 +122,7 @@ object Bill {
             }
             rule()
             row(L.t("sum_kg"), plain(h.kg()) + " " + L.t("kg"))
+            if (anyLtr) row(L.t("sum_ltr"), plain(h.litre()) + " " + L.t("ltr"))
             row(L.t("sum_maal"), money(h.maalTotal()), true, green, 13.5f)
             y += 6 * u
         }
@@ -273,10 +275,11 @@ object Bill {
             sb.append("\n_").append(L.t("maal").substringBefore(" (").removePrefix("3. ")).append("_\n")
             h.maal.forEach {
                 sb.append("• ").append(it.name).append(": ")
-                if (!it.fixed) sb.append(plain(it.kg)).append(" kg × ").append(plain(it.rate)).append(" = ")
+                if (!it.fixed) sb.append(plain(it.kg)).append(if (it.litre) " litre × " else " kg × ").append(plain(it.rate)).append(" = ")
                 sb.append(money(it.value())).append("\n")
             }
             sb.append(L.t("sum_kg")).append(": ").append(plain(h.kg())).append(" kg\n")
+            if (h.maal.any { !it.fixed && it.litre }) sb.append(L.t("sum_ltr")).append(": ").append(plain(h.litre())).append(" litre\n")
             sb.append("*").append(L.t("sum_maal")).append(": ").append(money(h.maalTotal())).append("*\n")
         }
         if (h.type == "haraji") {

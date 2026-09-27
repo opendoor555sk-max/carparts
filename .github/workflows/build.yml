@@ -44,3 +44,17 @@ jobs:
           body_path: RELEASE_NOTES.md
           files: KabadiCalc.apk
           make_latest: false
+
+      - name: Write version file
+        run: echo "${{ github.run_number }}" > version.txt
+
+      - name: Update rolling OTA release (kabadi-latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: kabadi-latest
+          name: Kabadi Calculator (latest - OTA)
+          body: "OTA helper for Kabadi Calculator. Latest build: 1.0.${{ github.run_number }}"
+          files: |
+            version.txt
+            KabadiCalc.apk
+          make_latest: false

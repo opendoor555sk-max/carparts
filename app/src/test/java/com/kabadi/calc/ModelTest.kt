@@ -55,4 +55,13 @@ class ModelTest {
         assertTrue(sameItem(Line("body", "बॉडी", false), "", "Body"))
         assertEquals(listOf("Tamba"), duplicates(listOf(Line("", "Tamba", false), Line("", " tamba ", false))))
     }
+
+    @Test fun litreTotals() {
+        val h = Hisab(1, 1, priceText = "1000")
+        h.maal.add(Line("body", "Body", false, kgText = "100", rateText = "30"))
+        h.maal.add(Line("oil", "Engine oil", false, kgText = "20", rateText = "25", litre = true))
+        assertEquals(100.0, h.kg(), 1e-9)
+        assertEquals(20.0, h.litre(), 1e-9)
+        assertEquals(3500.0, h.maalTotal(), 1e-9)
+    }
 }
