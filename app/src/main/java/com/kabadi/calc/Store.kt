@@ -72,19 +72,46 @@ object Store {
         return added
     }
 
+    /** variants typed before (1612, 2515 ...) for quick buttons */
+    val variants = mutableListOf("407", "709", "1109", "1612", "2515", "3118", "4018")
+    /** v1 → v2: Engine+Gear and Dhari+Differential merged, Chapani removed, Dalali added */
+    private fun migrate1() {
+        fun fix(l: MutableList<Btn>) {
+            val out = mutableListOf<Btn>()
+            l.forEach { b ->
+                when (b.key) {
+                    "engine" -> out.add(Btn("enginegear", "", true))
+                    "dhari" -> out.add(Btn("dharidiff", "", true))
+                    "gear", "diff", "chapani" -> {}
+                    else -> out.add(b)
+                }
+            }
+            l.clear(); l.addAll(out.distinctBy { if (it.key.isNotEmpty()) it.key else "n:" + norm(it.name) })
+        }
+        fix(parts); fix(expenses); fix(trashParts); fix(trashExp)
+        if (expenses.none { it.key == "dalali" }) expenses.add(0, Btn("dalali", "", true))
+        if (parts.none { it.key == "enginegear" } && trashParts.none { it.key == "enginegear" }) parts.add(Btn("enginegear", "", true))
+        if (parts.none { it.key == "dharidiff" } && trashParts.none { it.key == "dharidiff" }) parts.add(Btn("dharidiff", "", true))
+    }
+
     fun defaultParts() = PARTS.map { Btn(it.key, "", it.fixed, it.litre) }.toMutableList()
     fun defaultExpenses() = EXPENSES.map { Btn(it.key, "", true) }.toMutableList()
 
     private fun lj(l: Line) = JSONObject().put("k", l.key).put("n", l.name).put("f", l.fixed)
         .put("kg", l.kgText).put("r", l.rateText).put("a", l.amountText).put("l", l.litre)
+        .put("pay", l.pay).put("paid", l.paid).put("cn", l.cName).put("cm", l.cMobile).put("d", l.daysText)
+        .put("gn", l.gName).put("gm", l.gMobile).put("sh", l.shop)
 
     private fun jl(o: JSONObject) = Line(o.optString("k"), o.optString("n"), o.optBoolean("f"),
-        o.optString("kg"), o.optString("r"), o.optString("a"), o.optBoolean("l"))
+        kgText = o.optString("kg"), rateText = o.optString("r"), amountText = o.optString("a"), litre = o.optBoolean("l"),
+        pay = o.optString("pay", "rokad"), paid = o.optBoolean("paid"), cName = o.optString("cn"), cMobile = o.optString("cm"),
+        daysText = o.optString("d"), gName = o.optString("gn"), gMobile = o.optString("gm"), shop = o.optString("sh"))
 
     fun hj(h: Hisab): JSONObject {
         val o = JSONObject().put("id", h.id).put("t", h.time).put("p", h.party).put("v", h.vehicle)
             .put("no", h.note).put("pr", h.priceText)
             .put("ty", h.type).put("sa", h.saleText).put("co", h.commText).put("cp", h.commPct)
+            .put("ro", h.role).put("br", h.brand).put("va", h.variant).put("tr", h.tyres).put("yr", h.year).put("pl", h.place)
         o.put("pa", JSONArray().also { a -> h.partners.forEach { a.put(JSONObject().put("n", it.name).put("s", it.shareText)) } })
         o.put("k", JSONArray().also { a -> h.kharch.forEach { a.put(lj(it)) } })
         o.put("m", JSONArray().also { a -> h.maal.forEach { a.put(lj(it)) } })
@@ -93,7 +120,9 @@ object Store {
 
     fun jh(o: JSONObject): Hisab {
         val h = Hisab(o.optLong("id"), o.optLong("t"), o.optString("p"), o.optString("v"), o.optString("no"), o.optString("pr"),
-            type = o.optString("ty", "gaadi"), saleText = o.optString("sa"), commText = o.optString("co"), commPct = o.optBoolean("cp", true))
+            type = o.optString("ty", "gaadi"), saleText = o.optString("sa"), commText = o.optString("co"), commPct = o.optBoolean("cp", true),
+            role = o.optString("ro", "seller"), brand = o.optString("br"), variant = o.optString("va"), tyres = o.optString("tr"),
+            year = o.optString("yr"), place = o.optString("pl"))
         o.optJSONArray("pa")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { h.partners.add(Partner(it.optString("n"), it.optString("s"))) } }
         o.optJSONArray("k")?.let { a -> for (i in 0 until a.length()) h.kharch.add(jl(a.getJSONObject(i))) }
         o.optJSONArray("m")?.let { a -> for (i in 0 until a.length()) h.maal.add(jl(a.getJSONObject(i))) }
@@ -105,7 +134,8 @@ object Store {
 
     fun save(ctx: Context) {
         try {
-            val o = JSONObject().put("owner", owner).put("mobile", mobile).put("address", address).put("lang", L.lang).put("litreV1", true)
+            val o = JSONObject().put("owner", owner).put("mobile", mobile).put("address", address).put("lang", L.lang).put("litreV1", true).put("ver", 2)
+            o.put("variants", JSONArray(variants))
             o.put("h", JSONArray().also { a -> hisabs.forEach { a.put(hj(it)) } })
             o.put("rates", JSONObject(lastRate as Map<*, *>))
             o.put("parts", bj(parts)).put("exp", bj(expenses)).put("tp", bj(trashParts)).put("te", bj(trashExp))
@@ -133,6 +163,8 @@ object Store {
             o.optJSONArray("exp")?.let { expenses = jb(it) }
             o.optJSONArray("tp")?.let { trashParts.clear(); trashParts.addAll(jb(it)) }
             o.optJSONArray("te")?.let { trashExp.clear(); trashExp.addAll(jb(it)) }
+            o.optJSONArray("variants")?.let { a -> variants.clear(); for (i in 0 until a.length()) variants.add(a.getString(i)) }
+            if (o.optInt("ver", 1) < 2) migrate1()
         } catch (_: Exception) {
         }
     }

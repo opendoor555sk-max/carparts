@@ -26,6 +26,12 @@ object Bill {
 
     fun dateText(t: Long): String = SimpleDateFormat("dd-MM-yyyy  hh:mm a", Locale.US).format(Date(t))
 
+    /** sale date + credit days */
+    fun dueDate(t: Long, days: String): String {
+        val d = evalExpr(days).let { if (it.isFinite()) it else 0.0 }
+        return SimpleDateFormat("dd-MM-yyyy", Locale.US).format(Date(t + (d * 86400000L).toLong()))
+    }
+
     private fun tp(size: Float, bold: Boolean = false, color: Int = Color.rgb(0x21, 0x21, 0x21), align: Paint.Align = Paint.Align.LEFT) =
         TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = size; this.color = color; textAlign = align
@@ -62,8 +68,10 @@ object Bill {
             c?.drawText(TextUtils.ellipsize(v, tp(13 * u, true), W - 2 * pad - 110 * u, TextUtils.TruncateAt.END).toString(), pad + 110 * u, y + 13 * u, tp(13 * u, true))
             y += 19 * u
         }
-        info("party", h.party)
+        info("party", h.party + "  (" + (if (h.role == "buyer") L.t("buyer_s") else L.t("seller_s")) + ")")
+        info("vinfo", h.vehicleInfo())
         info("vehicle", h.vehicle)
+        info("place", h.place)
         info("note", h.note)
         y += 4 * u
 
@@ -87,17 +95,21 @@ object Bill {
         // 2. expenses
         if (h.kharch.isNotEmpty()) {
             section(L.t("kharch").substringBefore(" (").removePrefix("2. "))
-            h.kharch.forEachIndexed { i, l -> row("${i + 1}. " + l.name, money(l.value())) }
+            h.kharch.forEachIndexed { i, l ->
+                row("${i + 1}. " + l.name + if (l.udhaar) "  (" + L.t("udhaar") + " • " + (if (l.paid) L.t("chukaya") else L.t("baaki")) + ")" else "", money(l.value()),
+                    color = if (l.udhaar && !l.paid) red else Color.rgb(0x21, 0x21, 0x21))
+            }
             rule()
             row(L.t("sum_kharch"), money(h.kharchTotal()), true)
             y += 4 * u
         }
+        if (h.kharchBaaki() > 0) row(L.t("dena_baaki"), money(h.kharchBaaki()), false, red)
         row(L.t("sum_lagat"), money(h.lagat()), true, red, 13.5f)
         y += 6 * u
 
         // 3. parts
         if (h.maal.isNotEmpty()) {
-            section(L.t("maal").substringBefore(" (").removePrefix("3. "))
+            section((if (h.role == "seller") L.t("sell") else L.t("maal")).substringBefore(" (").removePrefix("3. "))
             val cKg = W * 0.50f
             val cRate = W * 0.68f
             val hp = tp(10.5f * u, true, Color.rgb(0x60, 0x7D, 0x8B))
@@ -119,11 +131,25 @@ object Bill {
                 }
                 c?.drawText(money(l.value()).removePrefix("₹ "), W - pad, y + 13 * u, tp(12.5f * u, false, Color.rgb(0x21, 0x21, 0x21), Paint.Align.RIGHT))
                 y += 19 * u
+                if (h.role == "seller") {
+                    val who = listOf(l.cName, l.cMobile, if (l.udhaar) L.t("udhaar") + (if (l.daysText.isNotBlank()) " • " + L.t("due") + " " + dueDate(h.time, l.daysText) else "") else L.t("rokad"),
+                        if (l.gName.isNotBlank() || l.gMobile.isNotBlank()) L.t("gname").substringBefore(" (") + ": " + (l.gName + " " + l.gMobile).trim() else "",
+                        if (l.shop.isNotBlank()) L.t("shop") + " " + l.shop else "").filter { it.isNotBlank() }.joinToString("  •  ")
+                    if (who.isNotEmpty()) {
+                        c?.drawText(TextUtils.ellipsize("    ↳ " + who, tp(10.5f * u), W - 2 * pad, TextUtils.TruncateAt.END).toString(), pad, y + 10 * u,
+                            tp(10.5f * u, false, if (l.udhaar) Color.rgb(0xEF, 0x6C, 0x00) else Color.rgb(0x60, 0x7D, 0x8B)))
+                        y += 15 * u
+                    }
+                }
             }
             rule()
             row(L.t("sum_kg"), plain(h.kg()) + " " + L.t("kg"))
             if (anyLtr) row(L.t("sum_ltr"), plain(h.litre()) + " " + L.t("ltr"))
             row(L.t("sum_maal"), money(h.maalTotal()), true, green, 13.5f)
+            if (h.udhaarBikri() > 0) {
+                row(L.t("rokad_bikri"), money(h.rokadBikri()))
+                row(L.t("lena_baaki"), money(h.udhaarBikri()), false, Color.rgb(0xEF, 0x6C, 0x00))
+            }
             y += 6 * u
         }
 
@@ -263,11 +289,17 @@ object Bill {
         if (Store.mobile.isNotBlank()) sb.append(Store.mobile).append("\n")
         sb.append(L.t("hisab")).append("  ").append(dateText(h.time)).append("\n")
         if (h.party.isNotBlank()) sb.append(L.t("party")).append(": ").append(h.party).append("\n")
+        if (h.vehicleInfo().isNotBlank()) sb.append(h.vehicleInfo()).append("\n")
         if (h.vehicle.isNotBlank()) sb.append(L.t("vehicle")).append(": ").append(h.vehicle).append("\n")
+        if (h.place.isNotBlank()) sb.append(L.t("place").substringBefore(" (")).append(": ").append(h.place).append("\n")
         sb.append("\n").append(L.t("sum_price")).append(": ").append(money(h.price)).append("\n")
         if (h.kharch.isNotEmpty()) {
             sb.append("\n_").append(L.t("kharch").substringBefore(" (").removePrefix("2. ")).append("_\n")
-            h.kharch.forEach { sb.append("• ").append(it.name).append(": ").append(money(it.value())).append("\n") }
+            h.kharch.forEach {
+                sb.append("• ").append(it.name).append(": ").append(money(it.value()))
+                if (it.udhaar) sb.append(" (").append(L.t("udhaar")).append(" • ").append(if (it.paid) L.t("chukaya") else L.t("baaki")).append(")")
+                sb.append("\n")
+            }
             sb.append(L.t("sum_kharch")).append(": ").append(money(h.kharchTotal())).append("\n")
         }
         sb.append("*").append(L.t("sum_lagat")).append(": ").append(money(h.lagat())).append("*\n")
@@ -276,7 +308,12 @@ object Bill {
             h.maal.forEach {
                 sb.append("• ").append(it.name).append(": ")
                 if (!it.fixed) sb.append(plain(it.kg)).append(if (it.litre) " litre × " else " kg × ").append(plain(it.rate)).append(" = ")
-                sb.append(money(it.value())).append("\n")
+                sb.append(money(it.value()))
+                if (h.role == "seller" && (it.cName.isNotBlank() || it.udhaar)) {
+                    sb.append(" → ").append(it.cName)
+                    if (it.udhaar) sb.append(" (").append(L.t("udhaar")).append(if (it.daysText.isNotBlank()) ", " + L.t("due") + " " + dueDate(h.time, it.daysText) else "").append(")")
+                }
+                sb.append("\n")
             }
             sb.append(L.t("sum_kg")).append(": ").append(plain(h.kg())).append(" kg\n")
             if (h.maal.any { !it.fixed && it.litre }) sb.append(L.t("sum_ltr")).append(": ").append(plain(h.litre())).append(" litre\n")

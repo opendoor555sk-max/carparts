@@ -13,8 +13,21 @@ class Line(
     var kgText: String = "",
     var rateText: String = "",
     var amountText: String = "",
-    var litre: Boolean = false     // kg × rate line measured in litre instead (oil, diesel)
+    var litre: Boolean = false,    // kg × rate line measured in litre instead (oil, diesel)
+    /** "rokad" (cash) or "udhaar" (credit) */
+    var pay: String = "rokad",
+    /** udhaar kharch: already paid? */
+    var paid: Boolean = false,
+    // seller: who bought this item
+    var cName: String = "",
+    var cMobile: String = "",
+    var daysText: String = "",
+    // auction sale: guarantor + shop
+    var gName: String = "",
+    var gMobile: String = "",
+    var shop: String = ""
 ) {
+    val udhaar get() = pay == "udhaar"
     val kg get() = evalExpr(kgText).let { if (it.isFinite()) it else 0.0 }
     val rate get() = evalExpr(rateText).let { if (it.isFinite()) it else 0.0 }
     val amount get() = evalExpr(amountText).let { if (it.isFinite()) it else 0.0 }
@@ -40,8 +53,21 @@ class Hisab(
     var saleText: String = "",          // haraji: resold (auction) amount
     var commText: String = "",          // market commission
     var commPct: Boolean = true,        // commission in % of sale, or a fixed amount
-    val partners: MutableList<Partner> = mutableListOf()
+    val partners: MutableList<Partner> = mutableListOf(),
+    /** "buyer" or "seller" */
+    var role: String = "seller",
+    var brand: String = "",
+    var variant: String = "",
+    var tyres: String = "",
+    var year: String = "",
+    var place: String = ""
 ) {
+    /** credit expenses not paid yet (dena baaki) */
+    fun kharchBaaki() = kharch.filter { it.udhaar && !it.paid }.sumOf { it.value() }
+    /** items sold on credit (lena baaki) */
+    fun udhaarBikri() = maal.filter { it.udhaar }.sumOf { it.value() }
+    fun rokadBikri() = maal.filter { !it.udhaar }.sumOf { it.value() }
+    fun vehicleInfo() = listOf(brand, variant, if (tyres.isNotBlank()) tyres + " tyre" else "", year).filter { it.isNotBlank() }.joinToString(" • ")
     private fun ev(t: String) = evalExpr(t).let { if (it.isFinite()) it else 0.0 }
     val price get() = ev(priceText)
     val sale get() = ev(saleText)
@@ -88,12 +114,10 @@ val PARTS = listOf(
     Item("cabin", false, "Cabin", "केबिन", "કેબિન"),
     Item("body", false, "Body", "बॉडी", "બોડી"),
     Item("chassis", false, "Chassis", "चेसिस", "ચેસિસ"),
-    Item("engine", true, "Engine", "इंजन", "એન્જિન"),
-    Item("gear", true, "Gear box", "गियर बॉक्स", "ગિયર બોક્સ"),
+    Item("enginegear", true, "Engine + Gear", "इंजन + गियर", "એન્જિન + ગિયર"),
     Item("line", false, "Line", "लाइन", "લાઇન"),
     Item("kaman", false, "Kaman (patta)", "कमान", "કમાન"),
-    Item("dhari", false, "Dhari (axle)", "धुरी", "ધરી"),
-    Item("diff", true, "Differential", "डिफरेंशियल", "ડિફરન્શિયલ"),
+    Item("dharidiff", true, "Dhari + Differential", "धुरी + डिफरेंशियल", "ધરી + ડિફરન્શિયલ"),
     Item("wheel", false, "Wheel plate", "व्हील प्लेट", "વ્હીલ પ્લેટ"),
     Item("tyre", true, "Tyre", "टायर", "ટાયર"),
     Item("tamba", false, "Tamba (copper)", "तांबा", "તાંબુ"),
@@ -107,13 +131,13 @@ val PARTS = listOf(
 )
 
 val EXPENSES = listOf(
+    Item("dalali", true, "Gaadi kharidi ki dalali", "गाड़ी खरीदी की दलाली", "ગાડી ખરીદીની દલાલી"),
     Item("crane", true, "Crane kiraya", "क्रेन किराया", "ક્રેન ભાડું"),
-    Item("loading", true, "Loading charge", "लोडिंग चार्ज", "લોડિંગ ચાર્જ"),
+    Item("loading", true, "Maal bharne ki majuri", "माल भरने की मजदूरी", "માલ ભરવાની મજૂરી"),
     Item("rickshaw", true, "Loading rickshaw", "लोडिंग रिक्शा", "લોડિંગ રિક્ષા"),
-    Item("hydra", true, "Hydra loading", "हाइड्रा लोडिंग", "હાઇડ્રા લોડિંગ"),
+    Item("hydra", true, "Hydra charge", "हाइड्रा चार्ज", "હાઇડ્રા ચાર્જ"),
     Item("bhada", true, "Bhada", "भाड़ा", "ભાડું"),
-    Item("chapani", true, "Chapani", "छपाणी", "છાપણી"),
-    Item("food", true, "Food / Jaman", "खाना", "જમવાનું"),
+    Item("food", true, "Khana kharcha", "खाना खर्चा", "જમવાનો ખર્ચ"),
     Item("petrol", true, "Petrol", "पेट्रोल", "પેટ્રોલ"),
     Item("kiraya", true, "Kiraya", "किराया", "કિરાયું"),
     Item("majuri", true, "Gaadi kholne ki majuri", "गाड़ी खोलने की मजदूरी", "ગાડી ખોલવાની મજૂરી"),
@@ -194,3 +218,6 @@ private class Parser(val s: String) {
         return s.substring(st, i).toDoubleOrNull() ?: Double.NaN
     }
 }
+
+val BRANDS = listOf("Tata", "Ashok Leyland", "Mahindra", "Eicher", "BharatBenz", "Volvo", "Scania", "SML Isuzu", "Swaraj Mazda", "Force", "Maruti", "Toyota")
+val TYRES = listOf("4", "6", "8", "10", "12", "14", "16")

@@ -64,4 +64,18 @@ class ModelTest {
         assertEquals(20.0, h.litre(), 1e-9)
         assertEquals(3500.0, h.maalTotal(), 1e-9)
     }
+
+    @Test fun rokadUdhaar() {
+        val h = Hisab(1, 1, priceText = "50000")
+        h.kharch.add(Line("dalali", "Dalali", true, amountText = "2000", pay = "udhaar"))
+        h.kharch.add(Line("crane", "Crane", true, amountText = "1500", pay = "udhaar", paid = true))
+        h.kharch.add(Line("food", "Khana", true, amountText = "500"))
+        h.maal.add(Line("body", "Body", false, kgText = "800", rateText = "35", pay = "udhaar", cName = "Rafiq", daysText = "30"))
+        h.maal.add(Line("tamba", "Tamba", false, kgText = "20", rateText = "600"))
+        assertEquals(2000.0, h.kharchBaaki(), 1e-9)
+        assertEquals(4000.0, h.kharchTotal(), 1e-9)
+        assertEquals(28000.0, h.udhaarBikri(), 1e-9)
+        assertEquals(12000.0, h.rokadBikri(), 1e-9)
+        assertEquals(40000.0 - 54000.0, h.munafa(), 1e-9)
+    }
 }
