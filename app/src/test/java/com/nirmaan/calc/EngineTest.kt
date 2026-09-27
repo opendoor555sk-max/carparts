@@ -319,7 +319,7 @@ class EngineTest {
     @Test fun editableSizes() {
         e.metric = true
         e.sizes["oc"] = mutableListOf(0.5 to 0.0)
-        k("1 0 ^m ^qty@oc")
+        k("1 0 m ^qty@oc") // metric: m is the main key
         val r = formRows()
         assertTrue(r.any { it.label.contains("500mm") })
     }
