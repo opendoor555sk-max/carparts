@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -74,15 +76,18 @@ fun LocationGate(content: @Composable () -> Unit) {
             !locationOn(ctx) -> 1
             Gps.hasPermission(ctx) -> 0
             askAgain && launch != null -> { launch(); status.coerceAtLeast(2) }
-            asked -> 3
-            else -> 2
+            else -> if (status == 3) 3 else 2
         }
     }
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
         asked = true
+        val canAskAgain = (ctx as? android.app.Activity)?.let {
+            androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(it, android.Manifest.permission.ACCESS_FINE_LOCATION)
+        } ?: true
         status = when {
             res.values.any { it } || Gps.hasPermission(ctx) -> if (locationOn(ctx)) 0 else 1
+            canAskAgain -> 2
             else -> 3
         }
     }
@@ -100,14 +105,16 @@ fun LocationGate(content: @Composable () -> Unit) {
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
 
-    if (status == 0) {
-        content()
-        return
+    // The app stays underneath (so open screens and drafts are kept); the gate covers it.
+    Box(Modifier.fillMaxSize()) {
+        if (status != -1) content()
+        if (status == -1) Column(Modifier.fillMaxSize().background(C.Bg)) {}
+        else if (status != 0) GateCover(status, ctx, ask) { check(true, ask) }
     }
-    if (status == -1) {
-        Column(Modifier.fillMaxSize().background(C.Bg)) {}
-        return
-    }
+}
+
+@Composable
+private fun GateCover(status: Int, ctx: Context, ask: () -> Unit, retry: () -> Unit) {
 
     val title: String
     val msg: String
@@ -146,7 +153,9 @@ fun LocationGate(content: @Composable () -> Unit) {
         }
     }
     Column(
-        Modifier.fillMaxSize().background(C.Bg).padding(28.dp),
+        Modifier.fillMaxSize().background(C.Bg)
+            .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } } // block touches to the app below
+            .padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -161,7 +170,7 @@ fun LocationGate(content: @Composable () -> Unit) {
         Text(
             ux("મેં ચાલુ કર્યું — ફરી તપાસો", "मैंने चालू किया — फिर जांचें", "I have enabled it — Retry"),
             color = C.Brand, fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(12.dp).pressable { check(true, ask) },
+            modifier = Modifier.padding(12.dp).pressable(retry),
         )
     }
 }

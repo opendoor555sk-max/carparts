@@ -440,6 +440,7 @@ fun CustomerNewScreen(nav: Nav) {
                             "/customers",
                             JSONObject().put("name", name.trim()).put("phone", phone.trim()).put("address", address.trim()),
                         ) as? JSONObject ?: JSONObject()
+                        if (c.str("id").isBlank()) throw ApiException(0, t("common.saveFailed"))
                         Toast.success(t("customers.added"))
                         nav.replace(Route.Customer(c.str("id")))
                     } catch (e: ApiException) {
@@ -768,6 +769,7 @@ fun VendorNewScreen(nav: Nav) {
                             JSONObject().put("name", name.trim()).put("phone", phone.trim())
                                 .put("address", address.trim()).put("notes", notes.trim()),
                         ) as? JSONObject ?: JSONObject()
+                        if (v.str("id").isBlank()) throw ApiException(0, t("common.saveFailed"))
                         Toast.success(t("vendors.added"))
                         nav.replace(Route.Vendor(v.str("id")))
                     } catch (e: ApiException) {
