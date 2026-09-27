@@ -153,6 +153,8 @@ class Engine(val ui: Ui) {
     var mach = false                          // true = Machinist calculator keypad (Switch key)
     val mv = mutableMapOf<String, Double>()   // machinist memories (SI units: m, m/min, m/rev ...)
     val triOrder = mutableListOf<String>()    // machinist triangle: order values were entered
+    var mKey = ""                             // machinist: key pressed last (for repeated-press cycles)
+    var mStep = 0
     val sizes = mutableMapOf<String, MutableList<Pair<Double, Double>>>()
     var dens = 1.5 * 2000 * LB / YD3          // wt/vol memory, kg/m³ (1.5 T/yd³)
 
@@ -1450,6 +1452,12 @@ class Engine(val ui: Ui) {
         if (md0 != null && !wasConv && d.blue == "wt/vol") {
             mode = null
             wtVolKey(md0)
+            return
+        }
+        if (mach && md0 != null && !wasConv && n.length == 1 && n[0] in '1'..'9') {
+            // Machinist: Store 1..9 / Rcl 1..9 = memories M1..M9
+            mode = null
+            machMem(n, md0)
             return
         }
         if (md0 != null && !wasConv && d.blue.isNotEmpty()) {

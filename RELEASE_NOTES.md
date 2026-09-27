@@ -1,3 +1,5 @@
+Machinist Calc ab asli Machinist Calc Pro jaisa: value + key = save ($), sirf key = hisaab, dobara dabane par agla (RPM → CUT → DIA...). Thread Size (8-32, 1/4-28, M5×0.75) → tap drill, roll-tap, close/free drill, pitch/minor/major dia; Thread Class 1A–3B, metric 3–9 G/H/e/f/g/h; Alpha letter drills; Bolt Pattern X/Y; Wire Size; 3-Wire; RCT.
+
 Naya: Machinist Calculator! Conv button ke neeche-daayein hisse (SWITCH) ko dabayein. Cut Speed, RPM, Feed Rate, #Teeth, Feed/Tooth, Cut Feed, Diam, Drill Size/Point, Bolt Pattern, Thread Size (UNC/UNF/Metric), %Thread, Wire Size, 3-Wire, RCT, Right triangle.
 
 Naya keypad: m/cm/mm sirf Conv + Yards/Feet/Inches par (double button hataye). Litre seedha button, Conv+Litre = Frac, Conv+/ = x10ⁿ, Conv+7 = Trig (SIN/COS/TAN), Conv+9 = Metric.

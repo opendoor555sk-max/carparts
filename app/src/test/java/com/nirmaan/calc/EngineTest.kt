@@ -338,7 +338,7 @@ class EngineTest {
         assertEquals("4 nag", r.v("Stringers ki ginti (max 16\" doori)"))
     }
 
-    // ---------------- Machinist calculator ----------------
+    // ---------------- Machinist calculator (examples from the Machinist Calc Pro user's guide) ----------------
     private fun mk(vararg keys: String): String {
         e.mach = true
         for (s in keys) {
@@ -350,14 +350,15 @@ class EngineTest {
     }
 
     @Test fun machRpmFeed() {
+        mk(".375", "Diam")
         mk("300", "Cut Speed")
-        mk(".5", "Diam")
-        assertEquals("2291.8312", mk("RPM"))
+        assertEquals("3056", mk("RPM"))
+        mk("Clear")
         mk("4", "#Teeth")
-        mk(".002", "Feed/Tooth")
-        assertEquals("18.3346", mk("Feed Rate"))
-        assertEquals("0.008in", mk("Cut Feed"))
-        assertEquals("300", mk("Cut Speed"))
+        mk(".005", "Feed/Tooth")
+        mk("1000", "RPM")
+        assertEquals("20", mk("Feed Rate"))
+        assertEquals("0.02in", mk("Cut Feed"))
     }
 
     @Test fun machTriangle() {
@@ -365,17 +366,75 @@ class EngineTest {
         mk("4", "Opp (y)")
         assertEquals("5in", mk("Hyp (r)"))
         assertEquals("53.13°", mk("Angle (Ø)"))
+        assertEquals("36.87°", mk("Angle (Ø)"))
     }
 
-    @Test fun machDrillAndThread() {
-        mk(".25", "Drill Size")
-        assertTrue(ui.rows.any { it.label == "Fraction" && it.value.startsWith("1/4\"") })
-        assertTrue(ui.rows.any { it.label == "Letter" && it.value.startsWith("E ") })
-        mk(".25", "Thread Size")
-        mk("^%Thread")
-        assertTrue(ui.rows.any { it.label.startsWith("Drill for 75") && it.value.startsWith("0.2013") })
-        mk("^Wire Size")
-        assertTrue(e.display().startsWith("0.0289"))
+    @Test fun machDrills() {
+        mk("36", "Drill Size")
+        assertEquals("0.1065in", e.display())
+        assertTrue(e.displayLabel().startsWith("#36"))
+        mk("^Alpha", "8", "8", "8", "8", "Drill Size")
+        assertTrue(e.displayLabel().startsWith("E "))
+        assertEquals("0.25in", e.display())
+        mk(".5", "Drill Size")
+        assertEquals("0.1502in", mk("^Drill Point"))
+    }
+
+    private fun cycleLabels(n: Int): List<String> = (0 until n).map { mk("Thread Size"); e.displayLabel() + " = " + e.display() }
+
+    @Test fun machThread832() {
+        mk("8", "Thread Size", "32", "Thread Size")
+        val c = cycleLabels(10)
+        assertTrue(c[1], c[1].contains("#29"))
+        assertTrue(c[2], c[2].contains("3.75 mm"))
+        assertTrue(c[3], c[3].contains("#18"))
+        assertTrue(c[4], c[4].contains("#16"))
+        assertTrue(c[5], c[5].endsWith("0.1437in"))
+        assertTrue(c[6], c[6].endsWith("0.1475in"))
+        assertTrue(c[7], c[7].endsWith("0.13in"))
+        assertTrue(c[8], c[8].endsWith("0.139in"))
+        assertTrue(c[9], c[9].endsWith("0.164in"))
+        mk("^Thread Class", "^Thread Class")          // INT 2B -> EXT 2A
+        assertTrue(e.displayLabel(), e.displayLabel().startsWith("EXT 2A"))
+        val x = cycleLabels(8)
+        assertTrue(x[2], x[2].endsWith("0.1412in"))
+        assertTrue(x[3], x[3].endsWith("0.1428in"))
+        assertTrue(x[4], x[4].endsWith("0.1399in"))
+        assertTrue(x[5], x[5].endsWith("0.1631in"))
+        assertTrue(x[7], x[7].endsWith("0.1259in"))
+    }
+
+    @Test fun machThreadMetric() {
+        e.metric = true
+        mk("5", "Thread Size", "0.75", "Thread Size")
+        mk("4", "^Thread Class")                      // INT MM 4H
+        val c = cycleLabels(9)
+        assertTrue(c[1], c[1].contains("4.25 mm"))
+        assertTrue(c[2], c[2].contains("#14"))
+        assertTrue(c[3], c[3].contains("5.30 mm"))
+        assertTrue(c[4], c[4].contains("5.80 mm"))
+        assertTrue(c[5], c[5].endsWith("4.513mm"))
+        assertTrue(c[7], c[7].endsWith("4.188mm"))
+        assertTrue(c[8], c[8].endsWith("4.306mm"))
+        mk("^Thread Class", "^Thread Class")          // show, then INT 4H -> EXT 4g
+        val x = cycleLabels(8)
+        assertTrue(x[2], x[2].endsWith("4.452mm"))
+        assertTrue(x[3], x[3].endsWith("4.491mm"))
+        assertTrue(x[4], x[4].endsWith("4.435mm"))
+        assertTrue(x[5], x[5].endsWith("4.978mm"))
+        assertTrue(x[6], x[6].endsWith("4.888mm"))
+        assertTrue(x[7], x[7].endsWith("4.166mm"))
+    }
+
+    @Test fun machWireAndBolts() {
+        mk(".375", "Thread Size", "16", "Thread Size")
+        assertEquals("0.0361in", mk("^Wire Size"))
+        assertEquals("0.0563in", mk("^Wire Size"))
+        assertEquals("0.035in", mk("^Wire Size"))
+        mk("10", "Adj (x)", "15", "Opp (y)", "20", "Angle (Ø)", "3.5", "Diam", "3", "Bolt Pattern")
+        assertEquals("3.0311in", mk("Bolt Pattern"))
+        assertEquals("11.6445in", mk("Bolt Pattern"))
+        assertEquals("15.5985in", mk("Bolt Pattern"))
     }
 
     @Test fun machSwitchKeepsNirmaanKeys() {
