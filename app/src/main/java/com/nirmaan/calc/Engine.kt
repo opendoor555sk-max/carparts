@@ -1378,7 +1378,7 @@ class Engine(val ui: Ui) {
         arrayOf(k("Rise", "R/Wall", "fn"), k("Run", "Roof", "fn"), k("Pitch", "Slope", "fn"), k("Diag", "Polygon", "fn"), k("Stair", "Baluster", "fn")),
         arrayOf(k("Hip/V", "IrPitch", "fn"), k("Jack", "IrJack", "fn"), k("Arc", "Radius", "fn"), k("Circle", "ColCon", "fn"), k("CmpMtr", "Fence", "fn")),
         arrayOf(k("m", "Litre", "unit"), k("Length", "Masonry", "green"), k("Width", "Footing", "green"), k("Height", "Drywall", "green"), k("⌫", "√x", "red")),
-        arrayOf(k("Yards", "", "unit"), k("Feet", "", "unit"), k("Inches", "", "unit"), k("/", "Frac", "unit"), k("%", "x²", "op")),
+        arrayOf(k("Yards", "m", "unit"), k("Feet", "cm", "unit"), k("Inches", "mm", "unit"), k("/", "Frac", "unit"), k("%", "x²", "op")),
         arrayOf(k("Conv", "", "conv"), k("7", "cm", "num", "Rails"), k("8", "BdFt", "num"), k("9", "mm", "num"), k("÷", "1/x", "op")),
         arrayOf(k("Store", "Prefs", "st"), k("4", "lbs", "num"), k("5", "qty@oc", "num", "o.c."), k("6", "Tons", "num"), k("×", "ClrAll", "op")),
         arrayOf(k("Recall", "M-R/C", "st"), k("1", "kg", "num", "M1"), k("2", "Acre", "num", "M2"), k("3", "met tons", "num", "M3"), k("−", "+/-", "op")),
@@ -1391,7 +1391,8 @@ class Engine(val ui: Ui) {
         val o = ROWS[r][c]
         val d = KeyDef(o.main, o.conv, o.cls, o.blue)
         if (trig && r == 2 && c in 1..3) { d.main = listOf("SIN", "COS", "TAN")[c - 1]; d.conv = listOf("ASIN", "ACOS", "ATAN")[c - 1] }
-        if (metric && r == 3 && c <= 2) d.main = listOf("m", "cm", "mm")[c]
+        // Conv flips this row: Yards/Feet/Inches ⇄ m/cm/mm (one press, then back automatically)
+        if (metric && r == 3 && c <= 2) { d.main = listOf("m", "cm", "mm")[c]; d.conv = listOf("Yards", "Feet", "Inches")[c] }
         if (metric && r == 2 && c == 0) d.main = "Feet"
         if (!advanced) {
             val legacy = mapOf("4" to "MsnSz", "6" to "SprAng", "8" to "TreadW", "9" to "RiserH", "." to "FloorH", "+" to "FtArea")

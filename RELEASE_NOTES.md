@@ -1,3 +1,4 @@
+Naya: Conv dabavo to Yards → m, Feet → cm, Inches → mm (ek vaar dabavya pachhi aapmele pachhu).
 Naya: Litre button — Conv + m = Litre. Number ya koi bhi volume (m³ / cft / yd³) litre mein.
 
 BuildCalc ke baaki saare kaam:
