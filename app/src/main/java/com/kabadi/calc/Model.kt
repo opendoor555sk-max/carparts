@@ -20,6 +20,11 @@ class Line(
     fun value(): Double = if (fixed) amount else kg * rate
 }
 
+/** a partner in the "company": share in paise (1 paisa = 1 %) */
+class Partner(var name: String, var shareText: String = "") {
+    val share get() = evalExpr(shareText).let { if (it.isFinite() && it > 0) it else 0.0 }
+}
+
 class Hisab(
     var id: Long,
     var time: Long,
@@ -28,15 +33,49 @@ class Hisab(
     var note: String = "",
     var priceText: String = "",
     val kharch: MutableList<Line> = mutableListOf(),
-    val maal: MutableList<Line> = mutableListOf()
+    val maal: MutableList<Line> = mutableListOf(),
+    /** "gaadi" = vehicle bought and parts sold; "haraji" = auction deal with company partners */
+    var type: String = "gaadi",
+    var saleText: String = "",          // haraji: resold (auction) amount
+    var commText: String = "",          // market commission
+    var commPct: Boolean = true,        // commission in % of sale, or a fixed amount
+    val partners: MutableList<Partner> = mutableListOf()
 ) {
-    val price get() = evalExpr(priceText).let { if (it.isFinite()) it else 0.0 }
+    private fun ev(t: String) = evalExpr(t).let { if (it.isFinite()) it else 0.0 }
+    val price get() = ev(priceText)
+    val sale get() = ev(saleText)
     fun kharchTotal() = kharch.sumOf { it.value() }
     fun lagat() = price + kharchTotal()
     fun maalTotal() = maal.sumOf { it.value() }
+    fun bikri() = sale + maalTotal()
+    fun commission() = if (type != "haraji") 0.0 else if (commPct) bikri() * ev(commText) / 100 else ev(commText)
     fun kg() = maal.filter { !it.fixed }.sumOf { it.kg }
-    fun munafa() = maalTotal() - lagat()
+    fun munafa() = bikri() - commission() - lagat()
+
+    fun sharesTotal() = partners.sumOf { it.share }
+    /** part of the deal not given to partners (goes to the owner) */
+    fun ownerShare() = (100 - sharesTotal()).coerceAtLeast(0.0)
+    /** each partner's money in: cost × share % */
+    fun partnerLagat(p: Partner) = lagat() * p.share / 100
+    fun partnerMunafa(p: Partner) = munafa() * p.share / 100
 }
+
+/** "  Body " == "body" : for finding the same item twice */
+fun norm(s: String) = s.trim().lowercase().replace(Regex("\\s+"), " ")
+
+/** true when a line is the same item as [name] / [key] (built-in names in all 3 languages count) */
+fun sameItem(l: Line, key: String, name: String): Boolean {
+    if (key.isNotEmpty() && l.key == key) return true
+    val n = norm(name)
+    if (n.isEmpty()) return false
+    if (norm(l.name) == n) return true
+    val item = (PARTS + EXPENSES).firstOrNull { it.key == l.key && l.key.isNotEmpty() } ?: return false
+    return listOf(item.en, item.hi, item.gu).any { norm(it) == n }
+}
+
+/** duplicate names inside one list (after trimming / ignoring case) */
+fun duplicates(lines: List<Line>): List<String> =
+    lines.filter { it.name.isNotBlank() }.groupBy { norm(it.name) }.filter { it.value.size > 1 }.map { it.value.first().name }
 
 /** built-in parts: key, usually fixed?, names in English / Hindi / Gujarati */
 class Item(val key: String, val fixed: Boolean, val en: String, val hi: String, val gu: String) {

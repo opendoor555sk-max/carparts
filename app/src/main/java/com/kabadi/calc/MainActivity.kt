@@ -192,7 +192,8 @@ class MainActivity : Activity() {
     private fun showHome() {
         editing = null
         val body = setScreen("home", L.t("app"), null)
-        body.addView(bigButton(L.t("new"), GREEN) { newHisab() }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
+        body.addView(bigButton(L.t("new_gaadi"), GREEN) { newHisab("gaadi") }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+        body.addView(bigButton(L.t("new_haraji"), 0xFF6A1B9A.toInt()) { newHisab("haraji") }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
 
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun fill(q: String) {
@@ -216,7 +217,7 @@ class MainActivity : Activity() {
                 val m = h.munafa()
                 top.addView(TextView(this).apply { text = money(m); textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (m >= 0) GREEN else RED) })
                 c.addView(top)
-                c.addView(small(listOf(h.vehicle, Bill.dateText(h.time)).filter { it.isNotBlank() }.joinToString("  •  ")))
+                c.addView(small(listOf(if (h.type == "haraji") "🔨 " + L.t("haraji") else "", h.vehicle, Bill.dateText(h.time)).filter { it.isNotBlank() }.joinToString("  •  ")))
                 c.setOnClickListener { showEditor(h) }
                 c.setOnLongClickListener { askDelete(h) { fill(q) }; true }
                 list.addView(c, cardLp())
@@ -234,9 +235,9 @@ class MainActivity : Activity() {
             .setNegativeButton(L.t("no"), null).show()
     }
 
-    private fun newHisab() {
+    private fun newHisab(type: String) {
         val now = System.currentTimeMillis()
-        showEditor(Hisab(now, now))
+        showEditor(Hisab(now, now, type = type))
     }
 
     // ================= EDITOR =================
@@ -249,14 +250,36 @@ class MainActivity : Activity() {
     private lateinit var resultBox: LinearLayout
     private var scrollTo: View? = null
 
-    private fun hasContent(h: Hisab) = h.party.isNotBlank() || h.vehicle.isNotBlank() || h.priceText.isNotBlank() || h.kharch.isNotEmpty() || h.maal.isNotEmpty()
+    private fun hasContent(h: Hisab) = h.party.isNotBlank() || h.vehicle.isNotBlank() || h.priceText.isNotBlank() ||
+        h.kharch.isNotEmpty() || h.maal.isNotEmpty() || h.saleText.isNotBlank() || h.partners.isNotEmpty()
 
     private fun autoSave() {
         val h = editing ?: return
         if (!hasContent(h)) return
         if (Store.hisabs.none { it === h }) Store.hisabs.add(h)
         h.maal.forEach { if (!it.fixed && it.rateText.isNotBlank()) Store.lastRate[it.name] = it.rateText }
+        lastLearned = Store.learn(h)
     }
+
+    private var lastLearned: List<String> = emptyList()
+
+    /** explicit Save: warn about the same item written twice, then save */
+    private fun saveNow(h: Hisab) {
+        val d = duplicates(h.maal) + duplicates(h.kharch)
+        fun go() {
+            autoSave(); Store.save(this)
+            toast(L.t("saved_ok") + if (lastLearned.isNotEmpty()) "\n" + L.t("learned") + ": " + lastLearned.joinToString(", ") else "")
+        }
+        if (d.isEmpty()) return go()
+        AlertDialog.Builder(this).setTitle(L.t("dup_save")).setMessage(d.joinToString("\n") { "• $it" })
+            .setPositiveButton(L.t("save")) { _, _ -> go() }
+            .setNegativeButton(L.t("back"), null).show()
+    }
+
+    private lateinit var sumSale: TextView
+    private lateinit var sumComm: TextView
+    private lateinit var sumBikri: TextView
+    private lateinit var partnerBox: LinearLayout
 
     private fun refreshTotals() {
         val h = editing ?: return
@@ -268,6 +291,25 @@ class MainActivity : Activity() {
         val m = h.munafa()
         sumResult.text = (if (m >= 0) L.t("profit") else L.t("loss")) + "   " + money(Math.abs(m))
         resultBox.background = round(if (m >= 0) GREEN else RED, 12f)
+        if (h.type == "haraji") {
+            sumSale.text = money(h.sale)
+            sumBikri.text = money(h.bikri())
+            sumComm.text = "- " + money(h.commission())
+            partnerBox.removeAllViews()
+            if (h.partners.isNotEmpty()) {
+                partnerBox.addView(heading(L.t("company").removePrefix("6. ")).apply { textSize = 15f; setPadding(0, dpi(10f), 0, dpi(4f)) })
+                val rows = h.partners.map { p -> Triple(p.name.ifBlank { "—" }, p.share, h.partnerLagat(p) to h.partnerMunafa(p)) } +
+                    (if (h.ownerShare() > 0) listOf(Triple(L.t("owner_share"), h.ownerShare(), h.lagat() * h.ownerShare() / 100 to m * h.ownerShare() / 100)) else emptyList())
+                rows.forEach { (n, sh, v) ->
+                    val r = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dpi(4f), 0, dpi(4f)) }
+                    r.addView(TextView(this).apply { text = n + "  (" + plain(sh) + " " + L.t("share").substringBefore(" (") + ")"; textSize = 15f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD })
+                    r.addView(small(L.t("invest") + ": " + money(v.first) + "   •   " + (if (v.second >= 0) L.t("profit") else L.t("loss")) + ": " + money(Math.abs(v.second)) +
+                        "   •   " + L.t("gets") + ": " + money(v.first + v.second), if (v.second >= 0) GREEN else RED))
+                    partnerBox.addView(r)
+                }
+                if (h.sharesTotal() > 100) partnerBox.addView(small(L.t("over100"), RED).apply { typeface = Typeface.DEFAULT_BOLD })
+            }
+        }
     }
 
     private fun showEditor(h: Hisab) {
@@ -288,7 +330,7 @@ class MainActivity : Activity() {
 
         // 1. vehicle price
         val pc = card()
-        pc.addView(heading(L.t("price"), BLUE))
+        pc.addView(heading(if (h.type == "haraji") L.t("buy_price") else L.t("price"), BLUE))
         pc.addView(input("₹", h.priceText, true) { h.priceText = it; refreshTotals() }, llp(MATCH_PARENT, WRAP_CONTENT))
         body.addView(pc, cardLp())
 
@@ -303,6 +345,9 @@ class MainActivity : Activity() {
         kc.addView(kLines)
         kc.addView(chips(Store.expenses.map { it.label() } + L.t("other"), ORANGE) { i ->
             val b = Store.expenses.getOrNull(i)
+            if (b != null) h.kharch.indexOfFirst { sameItem(it, b.key, b.label()) }.let { at ->
+                if (at >= 0) { toast(L.t("dup") + ": " + b.label()); focusAt(kLines, at); return@chips }
+            }
             h.kharch.add(Line(b?.key ?: "", b?.label() ?: "", true))
             drawKharch(); refreshTotals()
             focusLast(kLines)
@@ -322,12 +367,66 @@ class MainActivity : Activity() {
         mc.addView(chips(Store.parts.map { it.label() } + L.t("other"), GREEN) { i ->
             val b = Store.parts.getOrNull(i)
             val name = b?.label() ?: ""
+            if (b != null) h.maal.indexOfFirst { sameItem(it, b.key, name) }.let { at ->
+                if (at >= 0) { toast(L.t("dup") + ": " + name); focusAt(mLines, at); return@chips }
+            }
             h.maal.add(Line(b?.key ?: "", name, b?.fixed ?: false, rateText = Store.lastRate[name] ?: ""))
             drawMaal(); refreshTotals()
             focusLast(mLines)
         }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         drawMaal()
         body.addView(mc, cardLp())
+
+        if (h.type == "haraji") {
+            // 4. sold in auction
+            val sc = card()
+            sc.addView(heading(L.t("sale"), GREEN))
+            sc.addView(input("₹", h.saleText, true) { h.saleText = it; refreshTotals() }, llp(MATCH_PARENT, WRAP_CONTENT))
+            body.addView(sc, cardLp())
+
+            // 5. market commission: % or fixed
+            val cc = card()
+            cc.addView(heading(L.t("comm"), ORANGE))
+            val cr = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            val pctB = TextView(this)
+            val fixB = TextView(this)
+            fun paint() {
+                listOf(pctB to h.commPct, fixB to !h.commPct).forEach { (v, on) ->
+                    v.setTextColor(if (on) Color.WHITE else ORANGE); v.background = round(if (on) ORANGE else Color.WHITE, 14f, ORANGE)
+                }
+            }
+            pctB.apply { text = L.t("pct"); textSize = 15f; gravity = Gravity.CENTER; setPadding(dpi(16f), dpi(8f), dpi(16f), dpi(8f)); setOnClickListener { h.commPct = true; paint(); refreshTotals() } }
+            fixB.apply { text = L.t("fixamt"); textSize = 15f; gravity = Gravity.CENTER; setPadding(dpi(16f), dpi(8f), dpi(16f), dpi(8f)); setOnClickListener { h.commPct = false; paint(); refreshTotals() } }
+            paint()
+            cr.addView(input("0", h.commText, true) { h.commText = it; refreshTotals() }, llp(0, WRAP_CONTENT, 1f))
+            cr.addView(pctB, llp(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dpi(6f) })
+            cr.addView(fixB, llp(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dpi(4f) })
+            cc.addView(cr)
+            body.addView(cc, cardLp())
+
+            // 6. company partners
+            val pcd = card()
+            pcd.addView(heading(L.t("company"), 0xFF6A1B9A.toInt()))
+            val pLines = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            fun drawP() {
+                pLines.removeAllViews()
+                h.partners.forEach { p ->
+                    val r = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dpi(3f), 0, dpi(3f)) }
+                    r.addView(input(L.t("partner"), p.name, false) { p.name = it; refreshTotals() }.apply { textSize = 15f; tag = "focus" }, llp(0, WRAP_CONTENT, 1.6f))
+                    r.addView(input(L.t("share"), p.shareText, true) { p.shareText = it; refreshTotals() }.apply { gravity = Gravity.END },
+                        llp(0, WRAP_CONTENT, 1f).apply { leftMargin = dpi(6f) })
+                    r.addView(xBtn { confirmRemove { h.partners.remove(p); drawP(); refreshTotals() } })
+                    pLines.addView(r)
+                }
+            }
+            pcd.addView(pLines)
+            pcd.addView(bigButton(L.t("add_partner"), 0xFF6A1B9A.toInt()) {
+                h.partners.add(Partner("")); drawP(); refreshTotals(); focusLast(pLines)
+            }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+            pcd.addView(small("1 " + L.t("share").substringBefore(" (") + " = 1%"))
+            drawP()
+            body.addView(pcd, cardLp())
+        }
 
         // totals
         val tc = card()
@@ -345,10 +444,17 @@ class MainActivity : Activity() {
         sumLagat = sumRow(L.t("sum_lagat"), true, RED)
         sumKg = sumRow(L.t("sum_kg"))
         sumMaal = sumRow(L.t("sum_maal"), true, GREEN)
+        if (h.type == "haraji") {
+            sumSale = sumRow(L.t("sale_s"))
+            sumBikri = sumRow(L.t("bikri"), true, GREEN)
+            sumComm = sumRow(L.t("comm_s"), false, ORANGE)
+        }
         resultBox = LinearLayout(this).apply { gravity = Gravity.CENTER; setPadding(dpi(8f), dpi(14f), dpi(8f), dpi(14f)) }
         sumResult = TextView(this).apply { textSize = 22f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER }
         resultBox.addView(sumResult)
         tc.addView(resultBox, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
+        partnerBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        tc.addView(partnerBox)
         body.addView(tc, cardLp())
         body.addView(small(L.t("tip")).apply { gravity = Gravity.CENTER })
 
@@ -358,7 +464,7 @@ class MainActivity : Activity() {
         bottom.visibility = View.VISIBLE
         fun act(t: String, color: Int, a: () -> Unit) = bottom.addView(bigButton(t, color, a).apply { textSize = 15f },
             llp(0, WRAP_CONTENT, 1f).apply { setMargins(dpi(3f), 0, dpi(3f), 0) })
-        act(L.t("save"), BLUE) { autoSave(); Store.save(this); toast(L.t("saved_ok")) }
+        act(L.t("save"), BLUE) { saveNow(h) }
         act(L.t("jpg"), ORANGE) { exportJpg(h) }
         act(L.t("pdf"), RED) { exportPdf(h) }
         act(L.t("share"), GREEN) { shareText(h) }
@@ -379,6 +485,24 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun confirmRemove(act: () -> Unit) {
+        AlertDialog.Builder(this).setMessage(L.t("del_line"))
+            .setPositiveButton(L.t("yes")) { _, _ -> act() }
+            .setNegativeButton(L.t("no"), null).show()
+    }
+
+    private fun focusAt(lines: LinearLayout, i: Int) {
+        val v = lines.getChildAt(i) ?: return
+        v.post {
+            (v.findViewWithTag<View>("focus") ?: v).requestFocus()
+            (content.getChildAt(0) as? ScrollView)?.let { sv ->
+                val loc = IntArray(2); v.getLocationInWindow(loc)
+                val sl = IntArray(2); sv.getLocationInWindow(sl)
+                sv.smoothScrollBy(0, loc[1] - sl[1] - dpi(120f))
+            }
+        }
+    }
+
     private fun xBtn(act: () -> Unit) = TextView(this).apply {
         text = "✕"; textSize = 18f; setTextColor(RED); gravity = Gravity.CENTER
         setPadding(dpi(10f), dpi(4f), dpi(4f), dpi(4f)); setOnClickListener { act() }
@@ -389,7 +513,7 @@ class MainActivity : Activity() {
         r.addView(input(L.t("name_q"), l.name, false) { l.name = it }.apply { textSize = 15f }, llp(0, WRAP_CONTENT, 1.3f))
         r.addView(input("₹", l.amountText, true) { l.amountText = it; refreshTotals() }.apply { tag = "focus"; gravity = Gravity.END },
             llp(0, WRAP_CONTENT, 1f).apply { leftMargin = dpi(6f) })
-        r.addView(xBtn { h.kharch.remove(l); redraw() })
+        r.addView(xBtn { confirmRemove { h.kharch.remove(l); redraw() } })
         return r
     }
 
@@ -410,7 +534,7 @@ class MainActivity : Activity() {
         }
         top.addView(modeBtn(L.t("kgrate"), !l.fixed) { if (l.fixed) { l.fixed = false; redraw() } }, llp(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dpi(6f) })
         top.addView(modeBtn(L.t("fix"), l.fixed) { if (!l.fixed) { l.fixed = true; redraw() } }, llp(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dpi(4f) })
-        top.addView(xBtn { h.maal.remove(l); redraw() })
+        top.addView(xBtn { confirmRemove { h.maal.remove(l); redraw() } })
         box.addView(top)
 
         val r = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dpi(6f), 0, 0) }
@@ -545,7 +669,7 @@ class MainActivity : Activity() {
                     text = "▲"; textSize = 16f; setTextColor(BLUE); setPadding(dpi(10f), 0, dpi(10f), 0)
                     setOnClickListener { val x = l.removeAt(i); l.add(i - 1, x); Store.save(this@MainActivity); draw() }
                 })
-                r.addView(xBtn { l.removeAt(i); Store.save(this@MainActivity); draw() })
+                r.addView(xBtn { Store.remove(!allFixed, i); Store.save(this@MainActivity); draw() })
                 box.addView(r)
             }
             val add = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
@@ -557,8 +681,8 @@ class MainActivity : Activity() {
             }.apply { textSize = 14f; setPadding(dpi(14f), dpi(10f), dpi(14f), dpi(10f)) }, llp(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dpi(6f) })
             box.addView(add)
             box.addView(TextView(this).apply {
-                text = L.t("reset"); textSize = 13f; setTextColor(MUTED); setPadding(0, dpi(6f), 0, 0)
-                setOnClickListener { set(def()); Store.save(this@MainActivity); draw() }
+                text = "↺ " + L.t("restore"); textSize = 14f; setTextColor(BLUE); setPadding(0, dpi(8f), 0, 0)
+                setOnClickListener { Store.restore(!allFixed); Store.save(this@MainActivity); draw() }
             })
         }
         draw()

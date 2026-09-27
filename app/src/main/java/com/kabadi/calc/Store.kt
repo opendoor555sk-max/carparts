@@ -22,6 +22,49 @@ object Store {
     val lastRate = mutableMapOf<String, String>()
     var parts: MutableList<Btn> = defaultParts()
     var expenses: MutableList<Btn> = defaultExpenses()
+    /** buttons removed from the lists: kept here so "Reset" can bring them back */
+    val trashParts = mutableListOf<Btn>()
+    val trashExp = mutableListOf<Btn>()
+
+    private fun same(a: Btn, b: Btn) = (a.key.isNotEmpty() && a.key == b.key) || (a.key.isEmpty() && b.key.isEmpty() && norm(a.name) == norm(b.name))
+
+    /** built-in buttons that are missing + everything that was deleted come back; own buttons stay */
+    fun restore(parts: Boolean) {
+        val list = if (parts) this.parts else expenses
+        val trash = if (parts) trashParts else trashExp
+        val all = (if (parts) defaultParts() else defaultExpenses()) + trash
+        all.forEach { b -> if (list.none { same(it, b) }) list.add(b) }
+        trash.clear()
+    }
+
+    fun remove(parts: Boolean, i: Int) {
+        val list = if (parts) this.parts else expenses
+        val b = list.removeAt(i)
+        val trash = if (parts) trashParts else trashExp
+        if (trash.none { same(it, b) }) trash.add(b)
+    }
+
+    /** is this name already a button (any language)? */
+    fun known(parts: Boolean, name: String): Boolean {
+        val n = norm(name)
+        val list = if (parts) this.parts else expenses
+        return list.any { b ->
+            norm(b.name) == n || (b.key.isNotEmpty() && (PARTS + EXPENSES).firstOrNull { it.key == b.key }
+                ?.let { listOf(it.en, it.hi, it.gu).any { x -> norm(x) == n } } == true)
+        }
+    }
+
+    /** after a hisab is saved: new item names typed by the user become buttons (once, no duplicates) */
+    fun learn(h: Hisab): List<String> {
+        val added = mutableListOf<String>()
+        h.kharch.filter { it.key.isEmpty() && it.name.isNotBlank() && it.amount != 0.0 }.forEach {
+            if (!known(false, it.name)) { expenses.add(Btn("", it.name.trim(), true)); added.add(it.name.trim()) }
+        }
+        h.maal.filter { it.key.isEmpty() && it.name.isNotBlank() && it.value() != 0.0 }.forEach {
+            if (!known(true, it.name)) { parts.add(Btn("", it.name.trim(), it.fixed)); added.add(it.name.trim()) }
+        }
+        return added
+    }
 
     fun defaultParts() = PARTS.map { Btn(it.key, "", it.fixed) }.toMutableList()
     fun defaultExpenses() = EXPENSES.map { Btn(it.key, "", true) }.toMutableList()
@@ -35,13 +78,17 @@ object Store {
     fun hj(h: Hisab): JSONObject {
         val o = JSONObject().put("id", h.id).put("t", h.time).put("p", h.party).put("v", h.vehicle)
             .put("no", h.note).put("pr", h.priceText)
+            .put("ty", h.type).put("sa", h.saleText).put("co", h.commText).put("cp", h.commPct)
+        o.put("pa", JSONArray().also { a -> h.partners.forEach { a.put(JSONObject().put("n", it.name).put("s", it.shareText)) } })
         o.put("k", JSONArray().also { a -> h.kharch.forEach { a.put(lj(it)) } })
         o.put("m", JSONArray().also { a -> h.maal.forEach { a.put(lj(it)) } })
         return o
     }
 
     fun jh(o: JSONObject): Hisab {
-        val h = Hisab(o.optLong("id"), o.optLong("t"), o.optString("p"), o.optString("v"), o.optString("no"), o.optString("pr"))
+        val h = Hisab(o.optLong("id"), o.optLong("t"), o.optString("p"), o.optString("v"), o.optString("no"), o.optString("pr"),
+            type = o.optString("ty", "gaadi"), saleText = o.optString("sa"), commText = o.optString("co"), commPct = o.optBoolean("cp", true))
+        o.optJSONArray("pa")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { h.partners.add(Partner(it.optString("n"), it.optString("s"))) } }
         o.optJSONArray("k")?.let { a -> for (i in 0 until a.length()) h.kharch.add(jl(a.getJSONObject(i))) }
         o.optJSONArray("m")?.let { a -> for (i in 0 until a.length()) h.maal.add(jl(a.getJSONObject(i))) }
         return h
@@ -55,7 +102,7 @@ object Store {
             val o = JSONObject().put("owner", owner).put("mobile", mobile).put("address", address).put("lang", L.lang)
             o.put("h", JSONArray().also { a -> hisabs.forEach { a.put(hj(it)) } })
             o.put("rates", JSONObject(lastRate as Map<*, *>))
-            o.put("parts", bj(parts)).put("exp", bj(expenses))
+            o.put("parts", bj(parts)).put("exp", bj(expenses)).put("tp", bj(trashParts)).put("te", bj(trashExp))
             ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString("state", o.toString()).apply()
         } catch (_: Exception) {
         }
@@ -74,6 +121,8 @@ object Store {
             o.optJSONObject("rates")?.let { r -> r.keys().forEach { k -> lastRate[k] = r.optString(k) } }
             o.optJSONArray("parts")?.let { parts = jb(it) }
             o.optJSONArray("exp")?.let { expenses = jb(it) }
+            o.optJSONArray("tp")?.let { trashParts.clear(); trashParts.addAll(jb(it)) }
+            o.optJSONArray("te")?.let { trashExp.clear(); trashExp.addAll(jb(it)) }
         } catch (_: Exception) {
         }
     }
