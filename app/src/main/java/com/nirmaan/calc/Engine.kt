@@ -403,6 +403,12 @@ class Engine(val ui: Ui) {
 
     fun calc(a: Q, op: String, b: Q): Q {
         if (a.t == 'e' || b.t == 'e') return Q.ERR
+        if (op == "×10ⁿ") {
+            // 2.5 x10ⁿ 3 = 2500 (keeps the unit of the first number)
+            if (b.t != 'n') return Q.ERR
+            val r = a.v * 10.0.pow(b.v)
+            return if (r.isFinite()) (if (a.t == 'p') Q('n', r) else a.copy(v = r)) else Q.ERR
+        }
         var A = norm(a)
         var B = norm(b)
         if (A.t == 'W' || B.t == 'W' || A.t == 'c' || B.t == 'c') return calcW(A, op, B)
@@ -1377,9 +1383,9 @@ class Engine(val ui: Ui) {
     private val ROWS = arrayOf(
         arrayOf(k("Rise", "R/Wall", "fn"), k("Run", "Roof", "fn"), k("Pitch", "Slope", "fn"), k("Diag", "Polygon", "fn"), k("Stair", "Baluster", "fn")),
         arrayOf(k("Hip/V", "IrPitch", "fn"), k("Jack", "IrJack", "fn"), k("Arc", "Radius", "fn"), k("Circle", "ColCon", "fn"), k("CmpMtr", "Fence", "fn")),
-        arrayOf(k("m", "Litre", "unit"), k("Length", "Masonry", "green"), k("Width", "Footing", "green"), k("Height", "Drywall", "green"), k("⌫", "√x", "red")),
-        arrayOf(k("Yards", "m", "unit"), k("Feet", "cm", "unit"), k("Inches", "mm", "unit"), k("/", "Frac", "unit"), k("%", "x²", "op")),
-        arrayOf(k("Conv", "", "conv"), k("7", "cm", "num", "Rails"), k("8", "BdFt", "num"), k("9", "mm", "num"), k("÷", "1/x", "op")),
+        arrayOf(k("Litre", "Frac", "unit"), k("Length", "Masonry", "green"), k("Width", "Footing", "green"), k("Height", "Drywall", "green"), k("⌫", "√x", "red")),
+        arrayOf(k("Yards", "m", "unit"), k("Feet", "cm", "unit"), k("Inches", "mm", "unit"), k("/", "x10ⁿ", "unit"), k("%", "x²", "op")),
+        arrayOf(k("Conv", "", "conv"), k("7", "Trig", "num", "Rails"), k("8", "BdFt", "num"), k("9", "Metric", "num"), k("÷", "1/x", "op")),
         arrayOf(k("Store", "Prefs", "st"), k("4", "lbs", "num"), k("5", "qty@oc", "num", "o.c."), k("6", "Tons", "num"), k("×", "ClrAll", "op")),
         arrayOf(k("Recall", "M-R/C", "st"), k("1", "kg", "num", "M1"), k("2", "Acre", "num", "M2"), k("3", "met tons", "num", "M3"), k("−", "+/-", "op")),
         arrayOf(k("M+", "M-", "op"), k("0", "Cost", "num", "wt/vol"), k(".", "dms⇄deg", "num"), k("=", "Tape", "op"), k("+", "π", "op"))
@@ -1393,7 +1399,6 @@ class Engine(val ui: Ui) {
         if (trig && r == 2 && c in 1..3) { d.main = listOf("SIN", "COS", "TAN")[c - 1]; d.conv = listOf("ASIN", "ACOS", "ATAN")[c - 1] }
         // Conv flips this row: Yards/Feet/Inches ⇄ m/cm/mm (one press, then back automatically)
         if (metric && r == 3 && c <= 2) { d.main = listOf("m", "cm", "mm")[c]; d.conv = listOf("Yards", "Feet", "Inches")[c] }
-        if (metric && r == 2 && c == 0) d.main = "Feet"
         if (!advanced) {
             val legacy = mapOf("4" to "MsnSz", "6" to "SprAng", "8" to "TreadW", "9" to "RiserH", "." to "FloorH", "+" to "FtArea")
             legacy[d.main]?.let { d.blue = it }
@@ -1494,6 +1499,9 @@ class Engine(val ui: Ui) {
             "dms⇄deg" -> { dmsKey(); lastKey = "dms⇄deg" }
             "Acre" -> acreKey()
             "Litre" -> litreKey()
+            "x10ⁿ" -> opKey("×10ⁿ")
+            "Trig" -> { trig = !trig; ui.toast(if (trig) "SIN / COS / TAN (ek vaar)" else "Length / Width / Height") }
+            "Metric" -> { metric = !metric; ui.toast(if (metric) "Metric: m / cm / mm" else "Feet / Inch") }
             "Pitch" -> triKey("pitch", md)
             "Slope" -> triKey("pitch", md, true)
             "Rise" -> triKey("rise", md)
