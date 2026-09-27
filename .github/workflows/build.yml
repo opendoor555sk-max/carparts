@@ -24,7 +24,16 @@ jobs:
           gradle-version: "8.11.1"
 
       - name: Test + build APK
-        run: gradle testReleaseUnitTest assembleRelease --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle testReleaseUnitTest assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: Show errors
+        if: failure()
+        run: |
+          { grep -E "^e: " build.log; grep -E "FAILED|AssertionError|expected:|No key|What went wrong" build.log; } | head -40 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
 
       - name: Rename APK
         run: |
