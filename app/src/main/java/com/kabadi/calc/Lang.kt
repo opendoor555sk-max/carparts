@@ -231,6 +231,12 @@ object L {
         "adm_req_new" to arrayOf("new OTP request – open", "नई OTP रिक्वेस्ट – देखें", "નવી OTP રિક્વેસ્ટ – જુઓ"),
         "adm_accept" to arrayOf("✅ Accept", "✅ मंज़ूर", "✅ મંજૂર"),
         "adm_manual" to arrayOf("Request came on WhatsApp? Paste it below:", "रिक्वेस्ट WhatsApp पर आई? नीचे पेस्ट करें:", "રિક્વેસ્ટ WhatsApp પર આવી? નીચે પેસ્ટ કરો:"),
+        "adm_login" to arrayOf("Admin login", "एडमिन लॉगिन", "એડમિન લોગિન"),
+        "adm_fill_first" to arrayOf("First write name, mobile and PIN, then Admin login", "पहले नाम, मोबाइल और PIN लिखें, फिर एडमिन लॉगिन", "પહેલા નામ, મોબાઇલ અને PIN લખો, પછી એડમિન લોગિન"),
+        "crash_t" to arrayOf("The app closed last time", "पिछली बार ऐप बंद हो गई थी", "છેલ્લી વાર એપ બંધ થઈ ગઈ હતી"),
+        "crash_h" to arrayOf("Send this error on WhatsApp so it can be fixed. Then tap Continue.", "यह एरर WhatsApp पर भेजें ताकि ठीक हो सके। फिर आगे बढ़ें दबाएँ।", "આ એરર WhatsApp પર મોકલો જેથી સુધારી શકાય. પછી આગળ વધો દબાવો."),
+        "crash_send" to arrayOf("💬 Send error", "💬 एरर भेजें", "💬 એરર મોકલો"),
+        "crash_go" to arrayOf("Continue ➜", "आगे बढ़ें ➜", "આગળ વધો ➜"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 

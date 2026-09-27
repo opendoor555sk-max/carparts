@@ -61,6 +61,12 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // if the app ever closes by itself, keep the reason and show it on next open
+        val old = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            try { getSharedPreferences("kabadi_crash", MODE_PRIVATE).edit().putString("e", "v" + Updater.myVersionName(this) + "\n" + android.util.Log.getStackTraceString(e)).commit() } catch (_: Exception) {}
+            old?.uncaughtException(t, e)
+        }
         Store.load(this)
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(BG); fitsSystemWindows = true }
 
@@ -82,7 +88,7 @@ class MainActivity : Activity() {
         bottom = LinearLayout(this).apply { setBackgroundColor(Color.WHITE); setPadding(dpi(6f), dpi(6f), dpi(6f), dpi(6f)) }
         root.addView(bottom, llp(MATCH_PARENT, WRAP_CONTENT))
         setContentView(root)
-        Reminders.schedule(this)
+        try { Reminders.schedule(this) } catch (_: Exception) {}
         val toKhata = intent?.getBooleanExtra("khata", false) == true
         fun start() {
             bar.visibility = View.VISIBLE
@@ -93,8 +99,25 @@ class MainActivity : Activity() {
             else if (intent?.getBooleanExtra("admin", false) == true && Account.isAdmin(this)) showAdmin()
         }
         Account.refreshAdminNumber(this)
-        startApp = { start() }
-        route()
+        startApp = { try { start() } catch (e: Exception) { showCrash(android.util.Log.getStackTraceString(e)) } }
+        val crash = getSharedPreferences("kabadi_crash", MODE_PRIVATE).getString("e", null)
+        if (crash != null) showCrash(crash)
+        else try { route() } catch (e: Exception) { showCrash(android.util.Log.getStackTraceString(e)) }
+    }
+
+    /** the app closed by itself last time: show why, so it can be sent and fixed */
+    private fun showCrash(err: String) {
+        getSharedPreferences("kabadi_crash", MODE_PRIVATE).edit().remove("e").commit()
+        bar.visibility = View.GONE
+        val body = setScreen("login", "⚠", null)
+        body.addView(heading("⚠ " + L.t("crash_t"), RED))
+        body.addView(small(L.t("crash_h"), INK).apply { textSize = 15f; setPadding(0, 0, 0, dpi(10f)) })
+        body.addView(bigButton(L.t("crash_send"), 0xFF25D366.toInt()) {
+            val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "Kabadi Market Hisab error\n" + err.take(3000))
+            try { startActivity(Intent.createChooser(i, "WhatsApp")) } catch (_: Exception) {}
+        }, gap())
+        body.addView(bigButton(L.t("crash_go"), GREEN) { try { route() } catch (e: Exception) { showCrash(android.util.Log.getStackTraceString(e)) } }, gap())
+        body.addView(small(err.take(1500)).apply { textSize = 11f; setTextIsSelectable(true) })
     }
 
     // ================= ACCOUNT: sign up (OTP from admin on WhatsApp) / sign in / sign out =================
@@ -123,6 +146,12 @@ class MainActivity : Activity() {
         }, llp(MATCH_PARENT, WRAP_CONTENT))
         body.addView(TextView(this).apply { text = L.t("app"); textSize = 22f; gravity = Gravity.CENTER; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD }, llp(MATCH_PARENT, WRAP_CONTENT))
         body.addView(small(title).apply { gravity = Gravity.CENTER; textSize = 15f; setPadding(0, dpi(4f), 0, dpi(18f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        if (onAdmin != null) ui.post {
+            body.addView(small("👑 " + L.t("adm_login"), 0xFF6A1B9A.toInt()).apply {
+                gravity = Gravity.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(24f), 0, dpi(8f))
+                setOnClickListener { askAdminCode(onAdmin) }
+            }, llp(MATCH_PARENT, WRAP_CONTENT))
+        }
         return body
     }
 
@@ -168,7 +197,7 @@ class MainActivity : Activity() {
                 }
             }
         }
-        val body = loginScreen(L.t("acc_new")) { if (save()) { Account.approveAsAdmin(this); Reminders.schedule(this); startApp() } }
+        val body = loginScreen(L.t("acc_new")) { if (save()) { Account.approveAsAdmin(this); Reminders.schedule(this); startApp() } else toast(L.t("adm_fill_first")) }
         body.addView(langRow { showSignup() }, gap())
         body.addView(input(L.t("acc_name"), name, false) { name = it }, gap())
         body.addView(mobileInput("📞 " + L.t("acc_mobile"), mob) { mob = it }.apply { textSize = 18f }, gap())
