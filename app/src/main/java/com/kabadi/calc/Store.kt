@@ -123,7 +123,7 @@ object Store {
             .put("mn", h.mudiName).put("mm", h.mudiMobile).put("mp", h.mudiPctText)
             .put("kn", h.khedName).put("km", h.khedMobile).put("kp", h.khedPctText)
             .put("mu", h.muddatText).put("bl", lj(h.buyLine)).put("sl", lj(h.saleLine))
-            .put("cmo", h.coMode).put("mac", h.mudiAddCo).put("kac", h.khedAddCo).put("fin", h.finalAt)
+            .put("cbc", h.commByCo).put("cmo", h.coMode).put("mac", h.mudiAddCo).put("kac", h.khedAddCo).put("fin", h.finalAt)
         o.put("vh", vj(h.vehicles))
         o.put("lt", JSONArray().also { a -> h.lots.forEach { t ->
             a.put(JSONObject().put("n", t.name).put("p", t.priceText).put("vh", vj(t.vehicles)).put("it", JSONArray().also { b -> t.items.forEach { b.put(lj(it)) } })) } })
@@ -140,7 +140,7 @@ object Store {
             year = o.optString("yr"), place = o.optString("pl"),
             mudiName = o.optString("mn"), mudiMobile = o.optString("mm"), mudiPctText = o.optString("mp"),
             khedName = o.optString("kn"), khedMobile = o.optString("km"), khedPctText = o.optString("kp"),
-            muddatText = o.optString("mu"), coMode = o.optBoolean("cmo"), mudiAddCo = o.optBoolean("mac"), khedAddCo = o.optBoolean("kac"), finalAt = o.optLong("fin"))
+            muddatText = o.optString("mu"), commByCo = o.optBoolean("cbc"), coMode = o.optBoolean("cmo"), mudiAddCo = o.optBoolean("mac"), khedAddCo = o.optBoolean("kac"), finalAt = o.optLong("fin"))
         o.optJSONObject("bl")?.let { h.buyLine = jl(it) }
         o.optJSONObject("sl")?.let { h.saleLine = jl(it) }
         h.bind()

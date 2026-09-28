@@ -1021,6 +1021,12 @@ class MainActivity : Activity() {
             cr.addView(pctB, llp(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dpi(6f) })
             cr.addView(fixB, llp(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dpi(4f) })
             cc.addView(cr)
+            if (h.coMode) {
+                cc.addView(small(L.t("comm_who")).apply { setPadding(0, dpi(8f), 0, dpi(2f)); typeface = Typeface.DEFAULT_BOLD })
+                cc.addView(row(pill("💰 " + L.t("mudi_h"), !h.commByCo, ORANGE) { if (h.commByCo) { h.commByCo = false; showEditor(h) } } to 1f,
+                    pill("🏢 " + L.t("comm_co"), h.commByCo, ORANGE) { if (!h.commByCo) { h.commByCo = true; showEditor(h) } } to 1f))
+                cc.addView(small(if (h.commByCo) L.t("comm_co_h") else L.t("comm_mudi_h")))
+            }
             body.addView(cc, cardLp())
 
             // 6. company partners
@@ -1069,7 +1075,7 @@ class MainActivity : Activity() {
         if (h.type == "haraji" || h.isLot) {
             sumSale = sumRow(when { h.isLot -> L.t("lot_sale"); h.isCo -> L.t("co_give"); else -> L.t("sale_s") })
             sumBikri = sumRow(if (h.isCo) L.t("co_sales") else L.t("bikri"), true, GREEN)
-            sumComm = sumRow(L.t("comm_s"), false, ORANGE)
+            sumComm = sumRow(L.t("comm_s") + if (h.isCo) "  (" + (if (h.commByCo) "🏢" else "💰 " + L.t("mudi_h")) + ")" else "", false, ORANGE)
         }
         resultBox = LinearLayout(this).apply { gravity = Gravity.CENTER; setPadding(dpi(8f), dpi(14f), dpi(8f), dpi(14f)) }
         sumResult = TextView(this).apply { textSize = 22f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER }

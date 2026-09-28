@@ -107,7 +107,9 @@ class Hisab(
     /** when "Final" was pressed (0 = still open) */
     var finalAt: Long = 0L,
     /** haraji / lot: credit time for everything, counted from the haraji day: "30" days or "2m" months */
-    var muddatText: String = ""
+    var muddatText: String = "",
+    /** Rit B: office commission paid by the company (added to its purchase) instead of the mudi malik */
+    var commByCo: Boolean = false
 ) {
     /** vehicle bought on credit (we pay) and auction / company sale on credit (we get) */
     var buyLine = Line("veh", "", true)
@@ -144,8 +146,9 @@ class Hisab(
         if (off(maalTotal(), m)) bad.add("maal")
         if (off(lagat(), bd(price).add(k))) bad.add("lagat")
         if (isCo) {
-            if (off(munafa(), bd(sale).subtract(bd(price)).subtract(k))) bad.add("munafa")
-            if (off(companyResult() + commission(), m.subtract(bd(sale)))) bad.add("company")
+            if (off(munafa() + ownerComm(), bd(sale).subtract(bd(price)).subtract(k))) bad.add("munafa")
+            if (off(companyResult() + coComm(), m.subtract(bd(sale)))) bad.add("company")
+            if (off(munafa() + companyResult() + commission(), m.subtract(bd(price)).subtract(k))) bad.add("total")
         } else if (off(munafa() + commission(), bd(sale).add(m).subtract(bd(price)).subtract(k))) bad.add("munafa")
         if (isLot && lots.isNotEmpty() && off(price, lots.fold(BigDecimal.ZERO) { a, t ->
                 a.add(if (t.priceText.isBlank()) t.vehicles.fold(BigDecimal.ZERO) { b, v -> b.add(bd(v.price)) }.add(t.items.fold(BigDecimal.ZERO) { b, l -> b.add(lineBd(l)) }) else bd(t.price)) })) bad.add("lot")
@@ -168,15 +171,18 @@ class Hisab(
     fun maalTotal() = maal.sumOf { it.value() }
     /** Rit B: the company's sales are only the parts (the vehicle price is paid to the owner) */
     fun bikri() = if (isCo) maalTotal() else sale + maalTotal()
-    fun commission() = if (type != "haraji") 0.0 else if (commPct) bikri() * ev(commText) / 100 else ev(commText)
+    /** office commission. Rit B: % of the price the company pays */
+    fun commission() = if (type != "haraji") 0.0 else if (commPct) (if (isCo) sale else bikri()) * ev(commText) / 100 else ev(commText)
+    private fun ownerComm() = if (isCo && commByCo) 0.0 else commission()
+    private fun coComm() = if (isCo && commByCo) commission() else 0.0
     fun kg() = maal.filter { !it.fixed && !it.litre }.sumOf { it.kg }
     fun litre() = maal.filter { !it.fixed && it.litre }.sumOf { it.kg }
     /** the owner's (mudi malik + khedut) result. Rit B: company price − cost */
-    fun munafa() = if (isCo) sale - lagat() else bikri() - commission() - lagat()
+    fun munafa() = if (isCo) sale - lagat() - ownerComm() else bikri() - commission() - lagat()
     /** company's result, shown apart. Rit B: parts sold − price paid − commission; Rit A: the whole deal */
-    fun companyResult() = if (isCo) maalTotal() - sale - commission() else munafa()
-    /** company's money in */
-    fun companyLagat() = if (isCo) sale else lagat()
+    fun companyResult() = if (isCo) maalTotal() - sale - coComm() else munafa()
+    /** company's money in (Rit B: price + commission when the company pays it) */
+    fun companyLagat() = if (isCo) sale + coComm() else lagat()
     /** a person's company share (when mudi malik / khedut are partners too) */
     fun coShareOf(name: String) = if (norm(name).isEmpty()) 0.0 else partners.filter { norm(it.name) == norm(name) }.sumOf { partnerMunafa(it) }
     fun inCompany(name: String) = norm(name).isNotEmpty() && partners.any { norm(it.name) == norm(name) }

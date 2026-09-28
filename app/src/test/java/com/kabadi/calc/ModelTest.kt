@@ -165,18 +165,26 @@ class ModelTest {
         val h = Hisab(1, 0, type = "haraji", coMode = true, priceText = "300000", saleText = "350000", mudiName = "Salam", mudiPctText = "60", khedName = "Rafik", khedPctText = "40")
         h.kharch.add(Line("crane", "Crane", true, amountText = "10000"))
         h.maal.add(Line("body", "Body", true, amountText = "400000"))
-        h.commText = "1"                                 // 1% of company sales = 4000
+        h.commText = "1"                                 // office: 1% of 350000 = 3500
         h.partners.add(Partner("Salam", "50")); h.partners.add(Partner("Asif", "50"))
-        assertEquals(40000.0, h.munafa(), 1e-9)          // owner: 350000 − 310000
-        assertEquals(46000.0, h.companyResult(), 1e-9)   // company: 400000 − 350000 − 4000
-        assertEquals(24000.0, h.mudiShare(), 1e-9)
-        assertEquals(23000.0, h.coShareOf("salam"), 1e-9)
+        // mudi malik pays the commission
+        assertEquals(3500.0, h.commission(), 1e-9)
+        assertEquals(36500.0, h.munafa(), 1e-9)          // 350000 − 310000 − 3500
+        assertEquals(50000.0, h.companyResult(), 1e-9)   // 400000 − 350000
+        assertEquals(21900.0, h.mudiShare(), 1e-9)
+        assertEquals(25000.0, h.coShareOf("salam"), 1e-9)
         assertEquals(175000.0, h.partnerLagat(h.partners[1]), 1e-9)
         assertTrue(h.verify().isEmpty())
         val book = personBook(listOf(h), "Salam")
         assertEquals(listOf("mudi", "co"), book.map { it.role })
-        assertEquals(47000.0, book.sumOf { it.amount }, 1e-9)
+        assertEquals(46900.0, book.sumOf { it.amount }, 1e-9)
         assertTrue(RFilter(mudi = "Asif").matches(h))
+        // company adds the commission to its purchase
+        h.commByCo = true
+        assertEquals(40000.0, h.munafa(), 1e-9)
+        assertEquals(46500.0, h.companyResult(), 1e-9)
+        assertEquals(176750.0, h.partnerLagat(h.partners[1]), 1e-9)
+        assertTrue(h.verify().isEmpty())
     }
 
     @Test fun finalLock() {

@@ -191,6 +191,7 @@ object Bill {
         if (h.isCo) {
             section(L.t("co_give"))
             row(L.t("co_give"), money(h.sale), true, green)
+            if (!h.commByCo && h.commission() != 0.0) row(L.t("comm_s") + " (" + L.t("mudi_h") + ")", "- " + money(h.commission()), false, Color.rgb(0xEF, 0x6C, 0x00))
             credit(h, h.saleLine).let { if (it.isNotEmpty()) row("   ⏳ " + it, "", false, Color.rgb(0xEF, 0x6C, 0x00), 11f) }
             y += 6 * u
         } else if (h.type == "haraji") {
@@ -233,7 +234,7 @@ object Bill {
             if (h.isCo) {
                 row(L.t("sum_maal"), money(h.maalTotal()))
                 row(L.t("co_give"), "- " + money(h.sale))
-                if (h.commission() != 0.0) row(L.t("comm_s"), "- " + money(h.commission()), false, Color.rgb(0xEF, 0x6C, 0x00))
+                if (h.commByCo && h.commission() != 0.0) row(L.t("comm_s") + " (🏢)", "- " + money(h.commission()), false, Color.rgb(0xEF, 0x6C, 0x00))
                 row(L.t("co_result") + ": " + (if (m2 >= 0) L.t("profit") else L.t("loss")), money(Math.abs(m2)), true, if (m2 >= 0) green else red)
                 y += 4 * u
             }
@@ -394,6 +395,7 @@ object Bill {
         if (h.isLot && h.sale != 0.0) sb.append("\n").append(L.t("lot_sale")).append(": ").append(money(h.sale)).append("\n")
         if (h.isCo) {
             sb.append("\n").append(L.t("co_give")).append(": ").append(money(h.sale)).append("\n")
+            if (h.commission() != 0.0) sb.append(L.t("comm_s")).append(" (").append(if (h.commByCo) "🏢" else L.t("mudi_h")).append("): -").append(money(h.commission())).append("\n")
             credit(h, h.saleLine).let { if (it.isNotEmpty()) sb.append("⏳ ").append(it).append("\n") }
         } else if (h.type == "haraji") {
             sb.append("\n").append(L.t("sale_s")).append(": ").append(money(h.sale)).append("\n")

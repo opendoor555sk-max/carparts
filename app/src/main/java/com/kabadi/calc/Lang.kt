@@ -293,6 +293,10 @@ object L {
         "get_from" to arrayOf("Get from (name)", "किससे लेना (नाम)", "કોની પાસેથી લેવાના (નામ)"),
         "rokad_s" to arrayOf("Cash", "रोकड़", "રોકડ"),
         "muddat_own" to arrayOf("Days (empty = haraji time)", "दिन (खाली = हराजी मुद्दत)", "દિવસ (ખાલી = હરાજી મુદત)"),
+        "comm_who" to arrayOf("Who pays the office commission?", "ऑफिस कमीशन कौन भरेगा?", "ઓફિસ કમિશન કોણ ભરશે?"),
+        "comm_co" to arrayOf("Company (in its purchase)", "कंपनी (अपनी खरीदी में)", "કંપની (પોતાની ખરીદીમાં)"),
+        "comm_co_h" to arrayOf("Company adds the commission to its purchase cost, then starts the haraji.", "कंपनी कमीशन अपनी खरीदी में जोड़ कर हराजी शुरू करती है।", "કંપની કમિશન પોતાની ખરીદીમાં જોડીને હરાજી શરૂ કરે છે."),
+        "comm_mudi_h" to arrayOf("Commission is the mudi malik's expense (cut from the vehicle hisab).", "कमीशन मुडी मालिक का खर्च (गाड़ी के हिसाब से कटेगा)।", "કમિશન મૂડી માલિકનો ખર્ચ (ગાડીના હિસાબમાંથી કપાશે)."),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 
