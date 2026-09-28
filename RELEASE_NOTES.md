@@ -1,4 +1,4 @@
-Admin panel: '⚪ बंद 7 दिन' filter (kon vaparta nathi), user ne '🚫 बंद करें' (deactive: eni app band, hisab salamat) ane '✅ चालू करें', '🗑' list mathi kadhvo.
+Admin chalu karvano sahelo rasto: Home par upar na naam par 5 vaar jhadpi thi tap (fakt malik mate, user ne kai dekhatu nathi).\n\nAdmin panel: '⚪ बंद 7 दिन' filter (kon vaparta nathi), user ne '🚫 बंद करें' (deactive: eni app band, hisab salamat) ane '✅ चालू करें', '🗑' list mathi kadhvo.
 
 Sudharo: juna hisab ma pehla thi lakhelo vechan maal bamnu nahi aave; Final hisab aapmele badlay nahi.
 

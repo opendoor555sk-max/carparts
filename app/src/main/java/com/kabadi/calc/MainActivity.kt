@@ -79,6 +79,21 @@ class MainActivity : Activity() {
         bar.addView(backBtn)
         titleTv = TextView(this).apply { textSize = 20f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD; setPadding(dpi(8f), 0, 0, 0); maxLines = 1 }
         bar.addView(titleTv, llp(0, WRAP_CONTENT, 1f))
+        // owner only: tap the title 5 times quickly on the home screen -> admin code (nothing visible for users)
+        var taps = 0; var lastTap = 0L
+        titleTv.setOnClickListener {
+            if (screen != "home" || !Account.ENABLED || Account.isAdmin(this)) return@setOnClickListener
+            val now = System.currentTimeMillis()
+            taps = if (now - lastTap < 1500) taps + 1 else 1
+            lastTap = now
+            if (taps >= 5) {
+                taps = 0
+                askAdminCode {
+                    if (!Account.exists(this)) Account.create(this, Store.owner.ifBlank { "Admin" }, Store.mobile.filter { c -> c.isDigit() }.takeLast(10), "")
+                    Account.approveAsAdmin(this); Reminders.schedule(this); showHome()
+                }
+            }
+        }
         bar.addView(barBtn("🧮") { showCalc() })
         bar.addView(barBtn("⚙") { showSettings() })
         root.addView(bar, llp(MATCH_PARENT, WRAP_CONTENT))
