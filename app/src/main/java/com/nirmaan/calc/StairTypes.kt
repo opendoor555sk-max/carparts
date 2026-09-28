@@ -18,6 +18,86 @@ import kotlin.math.sin
  * and all measurements (steps, landings, winder widths, marking, RCC, steel).
  */
 
+// ================= Straight concrete (RCC) stair: formula + material =================
+
+/** Input unit for the concrete stair. Every value is changed to millimetre (mm) first. */
+enum class LenUnit(val label: String, val toMm: Double) {
+    FOOT("ft", 304.8),      // 1 foot  = 304.8 mm
+    INCH("inch", 25.4),     // 1 inch  = 25.4 mm
+    METER("m", 1000.0),     // 1 metre = 1000 mm
+    CM("cm", 10.0),         // 1 cm    = 10 mm
+    MM("mm", 1.0);          // mm stays mm
+
+    /** value in this unit → mm */
+    fun mm(v: Double) = v * toMm
+    /** mm → value in this unit */
+    fun from(mm: Double) = mm / toMm
+}
+
+/** Concrete mix: parts of cement : sand : aggregate (M20 = 1 : 1.5 : 3) */
+enum class Mix(val label: String, val cement: Double, val sand: Double, val agg: Double) {
+    M20("M20 (1:1.5:3)", 1.0, 1.5, 3.0),
+    M15("M15 (1:2:4)", 1.0, 2.0, 4.0),
+    M25("M25 (1:1:2)", 1.0, 1.0, 2.0);
+    val parts get() = cement + sand + agg     // M20 → 5.5
+}
+
+/** Result of the straight concrete stair (lengths in mm, volumes in m³) */
+data class ConcreteStair(
+    val risers: Int,          // number of risers
+    val riserMm: Double,      // actual riser height
+    val treads: Int,          // number of treads = risers − 1
+    val treadMm: Double,      // tread (going)
+    val runMm: Double,        // total run (lying length)
+    val slabLenMm: Double,    // sloping length of the waist slab
+    val slabM3: Double,       // waist slab concrete
+    val stepsM3: Double,      // step triangles concrete
+    val wetM3: Double,        // wet volume = slab + steps
+    val dryM3: Double,        // dry volume = wet × 1.54
+    val cementBags: Int,      // 50 kg bags (rounded up)
+    val sandCft: Double,      // sand in cubic feet
+    val aggCft: Double,       // aggregate (gitti) in cubic feet
+    val angleDeg: Double      // slope of the stair
+)
+
+const val DRY_FACTOR = 1.54        // 54% extra for shrinkage + wastage
+const val CEMENT_KG_M3 = 1440.0    // cement density
+const val BAG_KG = 50.0            // one cement bag
+const val M3_TO_CFT = 35.3147      // 1 m³ = 35.3147 cft
+
+/**
+ * Straight concrete stair.
+ * heightMm = floor to floor, widthMm = stair width, targets: riser 150, tread 270, waist slab 150 (mm).
+ * Returns null when a value is missing or zero.
+ */
+fun concreteStair(
+    heightMm: Double, widthMm: Double,
+    targetRiser: Double = 150.0, targetTread: Double = 270.0, slabMm: Double = 150.0,
+    mix: Mix = Mix.M20
+): ConcreteStair? {
+    if (!(heightMm > 0) || !(widthMm > 0) || !(targetRiser > 0) || !(targetTread > 0) || !(slabMm > 0)) return null
+    // 1. steps: risers = round(height / target riser), actual riser = height / risers
+    val risers = max(1, (heightMm / targetRiser).roundToInt())
+    val riser = heightMm / risers
+    val treads = risers - 1
+    // 2. total run and the sloping waist slab length (Pythagoras)
+    val run = treads * targetTread
+    val slabLen = hypot(run, heightMm)
+    // 3. concrete: waist slab + step triangles (½ × riser × tread × width × treads), mm³ → m³
+    val slab = slabLen * widthMm * slabMm / 1e9
+    val steps = 0.5 * riser * targetTread * widthMm * treads / 1e9
+    val wet = slab + steps
+    val dry = wet * DRY_FACTOR
+    // 4. material from the dry volume
+    val one = dry / mix.parts
+    val bags = ceil(one * mix.cement * CEMENT_KG_M3 / BAG_KG - 1e-9).toInt()
+    return ConcreteStair(
+        risers, riser, treads, targetTread, run, slabLen, slab, steps, wet, dry, bags,
+        one * mix.sand * M3_TO_CFT, one * mix.agg * M3_TO_CFT,
+        if (run > 0) atan(heightMm / run) * 180 / PI else 90.0
+    )
+}
+
 // ================= generic drawing data (used by PlanView) =================
 class P(val x: Double, val y: Double)
 

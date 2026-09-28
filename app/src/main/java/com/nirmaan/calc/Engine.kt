@@ -1363,7 +1363,69 @@ class Engine(val ui: Ui) {
                 if (throat.isFinite() && throat < 3.5 * IN) rows.add(Row("Throat kam hai — chaudi patiya lein", "⚠", true))
                 rows
             }
-        .apply { links = listOf("📐 Stair Planner — jagya se seedhi ke prakar (L, U, Winder, Spiral…)" to { stairPlanner() }) })
+        .apply { links = listOf("📐 Stair Planner — jagya se seedhi ke prakar (L, U, Winder, Spiral…)" to { stairPlanner() },
+            "🧱 Concrete (RCC) seedhi — maal ki ganatri" to { concreteStairKey() }) })
+    }
+
+    /** Straight concrete stair: any unit in, steps + concrete + cement / sand / gitti out */
+    fun concreteStairKey() {
+        val units = LenUnit.values().toList()
+        val mixes = Mix.values().toList()
+        ui.form(
+            FormSpec(
+                "Concrete (RCC) Seedhi", listOf(
+                    Field("h", "Kul oonchai (floor se floor)", false, "", "upar chuni unit mein"),
+                    Field("w", "Seedhi ki chaudai", false, "", "upar chuni unit mein"),
+                    Field("r", "Target riser (mm)", false, "150", "aaram: 150 mm"),
+                    Field("t", "Tread / paydan (mm)", false, "270", "aaram: 270 mm"),
+                    Field("s", "Waist slab motai (mm)", false, "150", "150 mm")
+                ), units.map { it.label }, mixes.map { it.label }, segSel = if (metric) units.indexOf(LenUnit.CM) else 0
+            ) { v, sg ->
+                val u = units.firstOrNull { it.label == sg?.split('|')?.getOrNull(0) } ?: LenUnit.FOOT
+                val mix = mixes.firstOrNull { it.label == sg?.split('|')?.getOrNull(1) } ?: Mix.M20
+                val h = v["h"] ?: Double.NaN
+                val w = v["w"] ?: Double.NaN
+                val c = concreteStair(u.mm(h), u.mm(w), v["r"] ?: 150.0, v["t"] ?: 270.0, v["s"] ?: 150.0, mix)
+                    ?: return@FormSpec listOf(Row("Oonchai aur chaudai bhariye (" + u.label + ")", "—", true))
+                // show a length in mm + in the chosen unit
+                fun both(mm: Double): String {
+                    val inU = when (u) {
+                        LenUnit.FOOT, LenUnit.INCH -> { val tin = mm / 25.4; val f = floor(tin / 12 + 1e-9).toInt()
+                            (if (f > 0) "$f' " else "") + num(rnd(tin - f * 12, 1)) + "\"" }
+                        LenUnit.MM -> ""
+                        else -> num(rnd(u.from(mm), 2)) + " " + u.label
+                    }
+                    return num(rnd(mm, 0)) + " mm" + (if (inU.isNotEmpty()) "  (" + inU + ")" else "")
+                }
+                fun m3(x: Double) = num(rnd(x, 3)) + " m³  (" + num(rnd(x * M3_TO_CFT, 1)) + " cft)"
+                val rows = mutableListOf<Row>()
+                rows.add(Row("", stair = StairPlan(c.risers, c.riserMm / 1000, c.treadMm / 1000, (v["s"] ?: 150.0) / 1000, emptyList(),
+                    listOf("Riser: " + num(rnd(c.riserMm, 1)) + " mm × " + c.risers, "Tread: " + num(rnd(c.treadMm, 0)) + " mm × " + c.treads,
+                        "Run: " + both(c.runMm), "Slab: " + both(c.slabLenMm)))))
+                rows.addAll(listOf(
+                    sec("Seedhi ka maap"),
+                    Row("Risers ki sankhya", c.risers.toString()),
+                    Row("Asli riser oonchai", both(c.riserMm), c.riserMm > 190 || c.riserMm < 120),
+                    Row("Treads ki sankhya", c.treads.toString()),
+                    Row("Tread (paydan)", both(c.treadMm)),
+                    Row("Kul leti lambai (Total Run)", both(c.runMm)),
+                    Row("Waist slab ki tircchi lambai", both(c.slabLenMm)),
+                    Row("Dhalan (angle)", f2(c.angleDeg) + "°", c.angleDeg > 42),
+                    Row("2R + T (550–700 mm theek)", num(rnd(2 * c.riserMm + c.treadMm, 0)) + " mm", 2 * c.riserMm + c.treadMm !in 550.0..700.0),
+                    sec("Concrete"),
+                    Row("Waist slab", m3(c.slabM3)),
+                    Row("Steps (tikone)", m3(c.stepsM3)),
+                    Row("Kul geela (wet) volume", m3(c.wetM3)),
+                    Row("Sookha (dry) volume  × 1.54", m3(c.dryM3)),
+                    sec("Maal — " + mix.label),
+                    Row("Cement (50 kg bag)", c.cementBags.toString() + " bag"),
+                    Row("Ret (sand)", num(rnd(c.sandCft, 1)) + " cft"),
+                    Row("Gitti / kapchi (aggregate)", num(rnd(c.aggCft, 1)) + " cft")
+                ))
+                if (c.riserMm > 190) rows.add(Row("Riser bahut ooncha — target riser kam karein", "⚠", true))
+                if (c.angleDeg > 42) rows.add(Row("Seedhi bahut steep hai", "⚠", true))
+                rows
+            }.apply { links = listOf("← Seedhi (stringer / marking)" to { stairKey() }, "📐 Stair Planner" to { stairPlanner() }) })
     }
 
     private fun miterKey() {

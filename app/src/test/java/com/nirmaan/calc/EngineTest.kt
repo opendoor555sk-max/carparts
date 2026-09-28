@@ -675,4 +675,24 @@ class EngineTest {
         assertTrue("Self-test found ${errors.size} problems:\n" + errors.take(40).joinToString("\n"), errors.isEmpty())
         assertTrue("Self-test ne sirf $checked keys check kiye", checked > 1500)
     }
+
+    @Test
+    fun concreteStraightStair() {
+        assertEquals(3048.0, LenUnit.FOOT.mm(10.0), 1e-9)
+        assertEquals(254.0, LenUnit.INCH.mm(10.0), 1e-9)
+        assertEquals(3000.0, LenUnit.METER.mm(3.0), 1e-9)
+        assertEquals(300.0, LenUnit.CM.mm(30.0), 1e-9)
+        val c = concreteStair(3000.0, 1000.0)!!
+        assertEquals(20, c.risers); assertEquals(150.0, c.riserMm, 1e-9); assertEquals(19, c.treads)
+        assertEquals(5130.0, c.runMm, 1e-9)
+        assertEquals(5942.8, c.slabLenMm, 0.05)
+        assertEquals(0.89142, c.slabM3, 1e-4); assertEquals(0.38475, c.stepsM3, 1e-5)
+        assertEquals(1.9653, c.dryM3, 1e-4)
+        assertEquals(11, c.cementBags)
+        assertEquals(18.93, c.sandCft, 0.01); assertEquals(37.86, c.aggCft, 0.01)
+        // 10 ft high, 3 ft wide
+        val f = concreteStair(LenUnit.FOOT.mm(10.0), LenUnit.FOOT.mm(3.0))!!
+        assertEquals(20, f.risers); assertEquals(152.4, f.riserMm, 1e-9); assertEquals(10, f.cementBags)
+        assertTrue(concreteStair(0.0, 1000.0) == null)
+    }
 }
