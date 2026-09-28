@@ -1,3 +1,5 @@
+Admin: Settings ma sauthi upar '👑 Admin code nakho' button (sada tap thi). Code ma Gujarati/Hindi ank pan chale, ane khoto hoy to kitna digit vachaya te batave. Admin chalu hoy to Settings ma '👑 Admin ✓' dekhase. Admin fakt AbdulSalam (malik); Nauman normal user.
+
 Admin chalu karvano sahelo rasto: Home par upar na naam par 5 vaar jhadpi thi tap (fakt malik mate, user ne kai dekhatu nathi).\n\nAdmin panel: '⚪ बंद 7 दिन' filter (kon vaparta nathi), user ne '🚫 बंद करें' (deactive: eni app band, hisab salamat) ane '✅ चालू करें', '🗑' list mathi kadhvo.
 
 Sudharo: juna hisab ma pehla thi lakhelo vechan maal bamnu nahi aave; Final hisab aapmele badlay nahi.

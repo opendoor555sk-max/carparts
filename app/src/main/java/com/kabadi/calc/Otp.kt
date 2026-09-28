@@ -40,7 +40,10 @@ object Otp {
 
     fun check(mobile: String, dev: String, otp: String) = mobile10(mobile).length == 10 && code(mobile, dev) == otp.trim()
 
-    fun isAdminCode(c: String): Boolean = MessageDigest.getInstance("SHA-256").digest(("kmh-admin:" + c.trim()).toByteArray())
+    fun asciiDigits(c: String): String = c.filter { Character.isDigit(it) }.map { Character.digit(it, 10).toString() }.joinToString("")
+
+    /** accepts Gujarati / Hindi digits and spaces too */
+    fun isAdminCode(c: String): Boolean = MessageDigest.getInstance("SHA-256").digest(("kmh-admin:" + asciiDigits(c)).toByteArray())
         .joinToString("") { "%02x".format(it) } == ADMIN
 
     /** read mobile + phone code from a pasted WhatsApp request */

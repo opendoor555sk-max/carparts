@@ -214,12 +214,20 @@ class MainActivity : Activity() {
     }
 
     private fun askAdminCode(ok: () -> Unit) {
-        val e = pinInput("• • • • • •").apply { filters = arrayOf(android.text.InputFilter.LengthFilter(6)) }
+        val e = EditText(this).apply {
+            hint = "6 digit code"; textSize = 22f; gravity = Gravity.CENTER; setSingleLine()
+            inputType = InputType.TYPE_CLASS_NUMBER
+            filters = arrayOf(android.text.InputFilter.LengthFilter(12))
+            background = round(0xFFF7F9FA.toInt(), 8f, 0xFFCFD8DC.toInt())
+            setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f))
+        }
         val box = LinearLayout(this).apply { setPadding(dpi(20f), dpi(8f), dpi(20f), 0); addView(e, llp(MATCH_PARENT, WRAP_CONTENT)) }
-        AlertDialog.Builder(this).setTitle("👑 Admin").setView(box)
+        AlertDialog.Builder(this).setTitle("👑 Admin code").setView(box)
             .setPositiveButton(L.t("acc_open")) { _, _ ->
-                if (Otp.isAdminCode(e.text.toString())) { Account.makeAdmin(this); toast("👑 Admin ✓"); ok() } else toast(L.t("acc_wrong"))
+                if (Otp.isAdminCode(e.text.toString())) { Account.makeAdmin(this); toast("👑 Admin ✓"); ok() }
+                else toast("❌ Code khoto (" + Otp.asciiDigits(e.text.toString()).length + " digit nakhya, 6 joiye)")
             }.setNegativeButton(L.t("back"), null).show()
+        e.requestFocus()
     }
 
     private fun pinInput(hint: String) = input(hint, "", true) {}.apply {
@@ -2635,6 +2643,23 @@ class MainActivity : Activity() {
         val from = editing.takeIf { viewOnly == null }; if (viewOnly != null) { viewOnly = null; editing = null }
         autoSave()
         val body = setScreen("settings", L.t("settings"), { if (from != null) showEditor(from) else showHome() })
+        if (LOGIN_ON) {
+            val ad = card()
+            if (Account.isAdmin(this)) {
+                ad.addView(heading("👑 Admin ✓ (AbdulSalam)"))
+                ad.addView(pill("👑 " + L.t("adm_users_btn"), true, 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+            } else {
+                ad.addView(heading("👑 Admin login"))
+                ad.addView(small("Fakt malik (AbdulSalam) mate – code nakho.").apply { setPadding(0, 0, 0, dpi(8f)) })
+                ad.addView(pill("👑 Admin code nakho", false, 0xFF6A1B9A.toInt()) {
+                    askAdminCode {
+                        if (!Account.exists(this)) Account.create(this, Store.owner.ifBlank { "Admin" }, Store.mobile.filter { c -> c.isDigit() }.takeLast(10), "")
+                        Account.approveAsAdmin(this); Reminders.schedule(this); showHome()
+                    }
+                }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+            }
+            body.addView(ad, cardLp())
+        }
         val c = card()
         c.addView(heading(L.t("lang")))
         val langs = LinearLayout(this)

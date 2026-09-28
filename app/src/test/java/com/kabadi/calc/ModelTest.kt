@@ -145,6 +145,7 @@ class ModelTest {
         assertEquals(null, Otp.parse("hello 12345"))
         assertEquals(20, Otp.topic("requests").length); assertTrue(Otp.topic("a") != Otp.topic("b"))
         assertTrue(Otp.isAdminCode("219977")); assertFalse(Otp.isAdminCode("123456"))
+        assertTrue(Otp.isAdminCode("૨૧૯૯૭૭")); assertTrue(Otp.isAdminCode(" 219 977 "))
     }
 
     @Test fun lotHisab() {
