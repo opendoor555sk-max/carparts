@@ -1,3 +1,5 @@
+Naya: 📐 Stair Planner (Stair screen ke upar button). Jagya ki lambai × pohlai + oonchai daalo → kaunsi seedhi bethegi (✓/✗), ⭐ salah, upar se aur baju se drawing, pagthiye ki pohlai, landing, marking, RCC aur steel. Bhag 1: Straight aur Straight + landing (baaki prakar agle update mein).
+
 Stair: Installation drawing mein ab rise/run map (har step ki oonchai aur aage ki doori). Naye naap: deewar par marking table, RCC seedhi (waist slab, concrete, cement, ret, kapchi, sariya), Steel (MS) seedhi.
 
 Machinist Calc ab asli Machinist Calc Pro jaisa: value + key = save ($), sirf key = hisaab, dobara dabane par agla (RPM → CUT → DIA...). Thread Size (8-32, 1/4-28, M5×0.75) → tap drill, roll-tap, close/free drill, pitch/minor/major dia; Thread Class 1A–3B, metric 3–9 G/H/e/f/g/h; Alpha letter drills; Bolt Pattern X/Y; Wire Size; 3-Wire; RCT.

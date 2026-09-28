@@ -454,6 +454,45 @@ class EngineTest {
         }
     }
 
+    @Test fun stairPlannerStraight() {
+        e.stairPlanner()
+        val sp = ui.spec!!
+        assertEquals("Stair Planner", sp.title)
+        assertTrue(sp.links.isNotEmpty())
+        val vals = mapOf("L" to "20'", "W" to "8'", "H" to "10'", "sw" to "3'", "dr" to "7\"", "dt" to "10\"")
+        val r = formRows(vals, "Ghar|1 Straight")
+        assertTrue(r.v("Riser (oonchai) × ginti").endsWith("× 18"))
+        // straight: 18 risers in one flight -> fits but code warning
+        assertTrue(r.first { it.label.endsWith("1 Straight") }.value.startsWith("✓"))
+        assertTrue(r.first { it.label.endsWith("1 Straight") }.value.contains("⚠"))
+        // straight + landing: 9 + 9, fits and is the suggestion
+        val two = r.first { it.label.endsWith("2 Straight + landing") }
+        assertTrue(two.label.startsWith("⭐"))
+        assertTrue(two.value.startsWith("✓"))
+        assertEquals(2, r.count { it.plan != null })
+        val r2 = formRows(vals, "Ghar|2 Straight + landing")
+        assertTrue(r2.v("Flight 1").startsWith("9 riser"))
+        assertTrue(r2.v("Flight 2").startsWith("9 riser"))
+        assertTrue(r2.v("Jagya chahiye (lambai × pohlai)").startsWith("19'"))
+        // short room: straight + landing does not fit in 15'
+        val r3 = formRows(vals + ("L" to "15'"), "Ghar|1 Straight")
+        assertTrue(r3.first { it.label.endsWith("2 Straight + landing") }.value.startsWith("✗"))
+        // metric and all options run without error
+        val errs = mutableListOf<String>()
+        checkForm("planner", errs)
+        e.metric = true; e.stairPlanner(); checkForm("planner metric", errs)
+        assertTrue(errs.joinToString("\n"), errs.isEmpty())
+    }
+
+    @Test fun stairKeyLinksToPlanner() {
+        k("1 0 Feet Rise 1 2 Feet Run Stair")
+        // the stair result is a panel; the planner is opened from the stair form link
+        e.stairKey()
+        val link = ui.spec!!.links.first()
+        link.second()
+        assertEquals("Stair Planner", ui.spec!!.title)
+    }
+
     /** runs a form's calculation with its default values and with every option */
     private fun checkForm(where: String, errors: MutableList<String>) {
         val sp = ui.spec ?: return

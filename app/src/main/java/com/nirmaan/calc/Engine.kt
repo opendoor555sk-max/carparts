@@ -68,7 +68,9 @@ class Row(
     val value: String = "",
     val warn: Boolean = false,
     val section: Boolean = false,
-    val stair: StairPlan? = null
+    val stair: StairPlan? = null,
+    /** any other drawing (stair planner: top view, side view) */
+    val plan: PlanDrawing? = null
 )
 
 /** Everything the stair drawing needs (lengths in metres, labels already formatted). */
@@ -115,7 +117,10 @@ class FormSpec(
     /** size list the user can edit on this screen: drywall, roof, tile, oc, picket */
     val sizeCat: String? = null,
     val compute: (Map<String, Double>, String?) -> List<Row>
-)
+) {
+    /** buttons shown at the top of the form (open another screen) */
+    var links: List<Pair<String, () -> Unit>> = emptyList()
+}
 
 class KeyDef(var main: String, var conv: String, val cls: String, var blue: String)
 
@@ -1218,7 +1223,7 @@ class Engine(val ui: Ui) {
         return (if (f != 0L) "$f' " else "") + fracStr(r).replace("- ", "-") + "\""
     }
 
-    private fun stairKey() {
+    fun stairKey() {
         if (isFresh()) {
             val q = value()
             toLen(q)?.let { if (it > 0) T["rise"] = Mem(it, ++TS) }
@@ -1358,7 +1363,7 @@ class Engine(val ui: Ui) {
                 if (throat.isFinite() && throat < 3.5 * IN) rows.add(Row("Throat kam hai — chaudi patiya lein", "⚠", true))
                 rows
             }
-        )
+        .apply { links = listOf("📐 Stair Planner — jagya se seedhi ke prakar (L, U, Winder, Spiral…)" to { stairPlanner() }) })
     }
 
     private fun miterKey() {

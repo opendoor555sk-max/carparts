@@ -479,7 +479,7 @@ class MainActivity : Activity(), Ui {
     private fun rowsText(title: String, rows: List<Row>): String {
         val sb = StringBuilder(title).append("\n")
         for (r in rows) {
-            if (r.stair != null) continue
+            if (r.stair != null || r.plan != null) continue
             if (r.section) sb.append("\n— ").append(r.label).append(" —\n")
             else if (r.value.isEmpty()) sb.append(r.label).append("\n")
             else sb.append(r.label).append(": ").append(r.value).append("\n")
@@ -621,15 +621,16 @@ class MainActivity : Activity(), Ui {
                     val lines = if (textOnly.isNotEmpty()) textOnly.lines().map { Row(it) } else rows
                     for (r in lines) {
                         val st = r.stair
-                        if (st != null) {
+                        val pl = r.plan
+                        if (st != null || pl != null) {
                             val w = pw - 2 * margin
-                            val h = w * 0.95f
-                            need(h + 8f)
                             val dens = resources.displayMetrics.density
-                            val v = StairView(act, st)
+                            val v: View = if (st != null) StairView(act, st) else PlanView(act, pl!!)
                             val wpx = (w * dens).toInt()
                             v.measure(View.MeasureSpec.makeMeasureSpec(wpx, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
                             v.layout(0, 0, v.measuredWidth, v.measuredHeight)
+                            val h = v.measuredHeight / dens
+                            need(h + 8f)
                             val cv = page.canvas
                             cv.save(); cv.translate(margin, y); cv.scale(1 / dens, 1 / dens); v.draw(cv); cv.restore()
                             y += h + 8f
@@ -694,6 +695,9 @@ class MainActivity : Activity(), Ui {
         if (r.stair != null) return StairView(this, r.stair).apply {
             layoutParams = llp(MATCH_PARENT, WRAP_CONTENT)
         }
+        if (r.plan != null) return PlanView(this, r.plan).apply {
+            layoutParams = llp(MATCH_PARENT, WRAP_CONTENT)
+        }
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(8f))
@@ -724,9 +728,19 @@ class MainActivity : Activity(), Ui {
             background = GradientDrawable().apply { setStroke(1, c(0xFF888888)); cornerRadius = dp(8f); setColor(c(0xFFEEEEEE)) }
             setPadding(1, 1, 1, 1)
         }
+        if (opts.size > 4) {
+            // many options: rows of 3 so the names stay readable
+            val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            opts.indices.chunked(3).forEachIndexed { ri, idx ->
+                val rowSeg = seg(idx.map { opts[it] } + List(3 - idx.size) { "" }, idx.indexOf(sel)) { j -> if (j < idx.size) onPick(idx[j]) }
+                col.addView(rowSeg, llp(MATCH_PARENT, WRAP_CONTENT).apply { if (ri > 0) topMargin = dpi(4f) })
+            }
+            return col
+        }
         opts.forEachIndexed { i, o ->
             s.addView(TextView(this).apply {
                 text = o; textSize = if (opts.size > 3) 13f else 15f; gravity = Gravity.CENTER; maxLines = 2
+                if (o.isEmpty()) visibility = View.INVISIBLE
                 setPadding(dpi(4f), dpi(10f), dpi(4f), dpi(10f))
                 if (i == sel) {
                     background = GradientDrawable().apply { setColor(c(0xFF777777)); cornerRadius = dp(7f) }
@@ -780,6 +794,16 @@ class MainActivity : Activity(), Ui {
                 holder.addView(seg(opts, opts.indexOf(seg2Val)) { i -> seg2Val = opts[i]; drawSegs(); recompute() },
                     llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             }
+        }
+        for ((label, go) in spec.links) {
+            val lb = LinearLayout(this).apply { setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(2f)) }
+            lb.addView(TextView(this).apply {
+                text = label; textSize = 15f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+                background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(c(0xFF42A5F5), c(0xFF1565C0))).apply { cornerRadius = dp(8f) }
+                setPadding(dpi(8f), dpi(11f), dpi(8f), dpi(11f))
+                setOnClickListener { go() }
+            }, llp(MATCH_PARENT, WRAP_CONTENT))
+            panelBody.addView(lb)
         }
         if (spec.seg != null || spec.seg2 != null) {
             drawSegs()
