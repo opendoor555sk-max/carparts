@@ -402,6 +402,46 @@ class MainActivity : Activity() {
         }
         reqList.addView(small("⏳ …"))
         if (Account.REQUIRED) every(10000L, { Relay.pending(this) }) { drawReqs(it); true }
+        // ---- users' problems: voice + text ----
+        val fc = card().apply { background = round(0xFFFFF3E0.toInt(), 12f, 0xFFFFCC80.toInt()) }
+        fc.addView(heading("🎤 " + L.t("fb_admin"), 0xFFE65100.toInt()))
+        val fList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fc.addView(fList)
+        body.addView(fc, cardLp())
+        fun drawFb() {
+            fList.removeAllViews()
+            val l = Feedback.list(this)
+            if (l.isEmpty()) { fList.addView(small(L.t("fb_none"))); return }
+            l.forEach { o ->
+                val id = o.optString("id"); val m = o.optString("m"); val nm = o.optString("n")
+                val fresh = !o.optBoolean("heard")
+                val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = round(if (fresh) 0xFFFFE0B2.toInt() else Color.WHITE, 10f); setPadding(dpi(10f), dpi(8f), dpi(10f), dpi(8f)) }
+                box.addView(row(small((if (fresh) "🆕 " else "") + nm.ifBlank { "—" }, INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD } to 1f,
+                    small(Bill.dateText(o.optLong("at"))) to 0f))
+                box.addView(small("📞 " + m.ifBlank { "—" }))
+                if (o.optString("t").isNotBlank()) box.addView(small("✍ " + o.optString("t"), INK).apply { textSize = 15f; setPadding(0, dpi(4f), 0, dpi(2f)) })
+                val acts = LinearLayout(this).apply { setPadding(0, dpi(6f), 0, 0) }
+                fun act(t: String, color: Int, w: Float, a: () -> Unit) = acts.addView(TextView(this).apply {
+                    text = t; textSize = 14f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = round(color, 14f)
+                    setPadding(dpi(6f), dpi(8f), dpi(6f), dpi(8f)); setOnClickListener { a() }
+                }, llp(0, WRAP_CONTENT, w).apply { setMargins(dpi(2f), 0, dpi(2f), 0) })
+                if (o.optBoolean("voice")) act("▶ " + L.t("fb_play") + "  " + (o.optLong("ms") / 1000) + " sec", GREEN, 2f) {
+                    val f = Feedback.file(this, id)
+                    if (!f.exists()) toast("✗") else { play(f); if (fresh) { Feedback.markHeard(this, id); box.background = round(Color.WHITE, 10f) } }
+                }
+                act("💬", 0xFF25D366.toInt(), 1f) { whatsapp(m, "") }
+                act("📞", BLUE, 1f) { try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$m"))) } catch (_: Exception) {} }
+                act("🗑", RED, 1f) {
+                    AlertDialog.Builder(this).setMessage(L.t("del_q")).setPositiveButton(L.t("yes")) { _, _ -> Feedback.delete(this, id); drawFb() }
+                        .setNegativeButton(L.t("no"), null).show()
+                }
+                box.addView(acts)
+                if (fresh && !o.optBoolean("voice")) Feedback.markHeard(this, id)
+                fList.addView(box, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+            }
+        }
+        drawFb()
+        Thread { val n = try { Feedback.collect(this) } catch (_: Exception) { 0 }; ui.post { if (screen == "admin" && n > 0) drawFb() } }.start()
         // ---- all users: search, filter, block / approve again ----
         val uc = card()
         uc.addView(heading("👥 " + L.t("adm_users")))
@@ -563,6 +603,7 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        if (rec != null || player != null) { stopAudio(); if (screen == "feedback") showFeedback() }
         autoSave()
         Store.save(this)
     }
@@ -608,6 +649,7 @@ class MainActivity : Activity() {
 
     private fun setScreen(name: String, title: String, back: (() -> Unit)?): LinearLayout {
         gen++
+        stopAudio()
         screen = name
         onBack = back
         titleTv.text = title
@@ -711,6 +753,115 @@ class MainActivity : Activity() {
     /** where "back" from a hisab goes (report keeps its filter) */
     private var editorBack: (() -> Unit)? = null
 
+    // ================= problem by voice (user → admin) =================
+    private var rec: android.media.MediaRecorder? = null
+    private var player: android.media.MediaPlayer? = null
+
+    private fun stopAudio() {
+        try { rec?.stop() } catch (_: Exception) {}
+        try { rec?.release() } catch (_: Exception) {}
+        rec = null
+        try { player?.release() } catch (_: Exception) {}
+        player = null
+    }
+
+    private fun play(f: java.io.File) {
+        try { player?.release() } catch (_: Exception) {}
+        player = try {
+            android.media.MediaPlayer().apply { setDataSource(f.absolutePath); prepare(); start() }
+        } catch (_: Exception) { toast("▶ ✗"); null }
+    }
+
+    private fun showFeedback() {
+        val body = setScreen("feedback", "🎤 " + L.t("fb_title"), { showHome() })
+        val f = java.io.File(cacheDir, "fb_me.3gp")
+        f.delete()
+        var recorded = false
+        var startAt = 0L
+        var dur = 0L
+        var text = ""
+        val c = card()
+        c.addView(small(L.t("fb_sub"), INK).apply { textSize = 15f; setPadding(0, 0, 0, dpi(10f)) })
+        val status = small("", INK).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setPadding(0, dpi(6f), 0, dpi(6f)) }
+        val playBtn = bigButton("▶ " + L.t("fb_play"), BLUE) { if (recorded) play(f) }.apply { visibility = View.GONE }
+        lateinit var recBtn: TextView
+        fun stopRec() {
+            var ok = true
+            try { rec?.stop() } catch (_: Exception) { ok = false }
+            try { rec?.release() } catch (_: Exception) {}
+            rec = null
+            dur = System.currentTimeMillis() - startAt
+            recorded = ok && f.exists() && f.length() > 0
+            recBtn.text = "🎤 " + L.t(if (recorded) "fb_again" else "fb_rec")
+            status.text = if (recorded) "✅ " + (dur / 1000) + " sec" else ""
+            playBtn.visibility = if (recorded) View.VISIBLE else View.GONE
+        }
+        recBtn = bigButton("🎤 " + L.t("fb_rec"), RED) {
+            if (rec != null) return@bigButton stopRec()
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 51)
+                return@bigButton toast(L.t("fb_perm"))
+            }
+            try { player?.release() } catch (_: Exception) {}
+            player = null
+            f.delete()
+            val r = if (Build.VERSION.SDK_INT >= 31) android.media.MediaRecorder(this) else @Suppress("DEPRECATION") android.media.MediaRecorder()
+            try {
+                r.setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                r.setOutputFormat(android.media.MediaRecorder.OutputFormat.THREE_GPP)
+                r.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AMR_NB)
+                r.setAudioSamplingRate(8000)
+                r.setAudioEncodingBitRate(4750)
+                r.setMaxDuration(60000)
+                r.setOutputFile(f.absolutePath)
+                r.setOnInfoListener { _, what, _ -> if (what == android.media.MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) ui.post { if (rec === r) stopRec() } }
+                r.prepare(); r.start()
+            } catch (_: Exception) {
+                try { r.release() } catch (_: Exception) {}
+                return@bigButton toast("🎤 ✗")
+            }
+            rec = r; startAt = System.currentTimeMillis(); recorded = false
+            recBtn.text = "⏹ " + L.t("fb_stop"); playBtn.visibility = View.GONE
+            val g = gen
+            fun tick() {
+                if (rec !== r || g != gen) return
+                status.text = "🔴 " + ((System.currentTimeMillis() - startAt) / 1000) + " / 60 sec"
+                ui.postDelayed({ tick() }, 500)
+            }
+            tick()
+        }
+        c.addView(recBtn, gap())
+        c.addView(status, llp(MATCH_PARENT, WRAP_CONTENT))
+        c.addView(playBtn, gap())
+        c.addView(small(L.t("fb_write"), INK).apply { typeface = Typeface.DEFAULT_BOLD })
+        c.addView(input(L.t("fb_write"), "", false) { text = it }.apply {
+            setSingleLine(false); minLines = 3; gravity = Gravity.TOP
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        }, gap())
+        lateinit var sendBtn: TextView
+        sendBtn = bigButton("📤 " + L.t("fb_send"), GREEN) {
+            if (rec != null) stopRec()
+            if (!recorded && text.isBlank()) return@bigButton toast(L.t("fb_empty"))
+            val bytes = if (recorded) f.readBytes() else null
+            sendBtn.isEnabled = false; sendBtn.alpha = 0.5f
+            toast(L.t("fb_sending"))
+            val nm = Account.name(this).ifBlank { Store.owner }
+            val mob = myMobile()
+            val dev = Account.device(this)
+            val ms = if (recorded) dur else 0L
+            val t = text.trim()
+            Thread {
+                val ok = try { Feedback.send(nm, mob, dev, t, bytes, ms) } catch (_: Exception) { false }
+                ui.post {
+                    if (ok) { f.delete(); toast("✅ " + L.t("fb_sent")); if (screen == "feedback") showHome() }
+                    else { toast(L.t("otp_net")); sendBtn.isEnabled = true; sendBtn.alpha = 1f }
+                }
+            }.start()
+        }
+        c.addView(sendBtn, gap())
+        body.addView(c, cardLp())
+    }
+
     private fun showHome() {
         editing = null
         editorBack = null
@@ -765,7 +916,17 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(4f), 0, dpi(8f))
         }, llp(MATCH_PARENT, WRAP_CONTENT))
 
+        // any user: tell the admin a problem by voice / text
+        if (LOGIN_ON && !Account.isAdmin(this)) body.addView(bigButton("🎤 " + L.t("fb_btn"), 0xFFE65100.toInt()) { showFeedback() }
+            .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         if (LOGIN_ON && Account.isAdmin(this)) {
+            val fbBanner = bigButton("", 0xFFE65100.toInt()) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
+            body.addView(fbBanner, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+            every(60000L, { Feedback.collect(this); Feedback.unheard(this) }) { u ->
+                val n = u ?: Feedback.unheard(this)
+                fbBanner.visibility = if (n > 0) View.VISIBLE else View.GONE
+                fbBanner.text = "🎤 $n " + L.t("fb_new"); true
+            }
             val nUsers = Relay.seen(this).values.count { !it.optBoolean("adm") }
             body.addView(bigButton("👑 " + L.t(if (Account.REQUIRED) "adm_btn" else "adm_users_btn") + (if (nUsers > 0) "   •   👥 $nUsers" else ""), 0xFF4A148C.toInt()) { showAdmin() }.apply { textSize = 15f },
                 llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })

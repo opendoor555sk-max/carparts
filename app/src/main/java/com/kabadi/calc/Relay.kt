@@ -141,6 +141,19 @@ object Relay {
         if (!Account.isAdmin(ctx)) return
         try { reBlock(ctx) } catch (_: Exception) {}
         try { collect(ctx) } catch (_: Exception) {}
+        // users' voice / text problems: keep them on this phone and ring
+        val nf = try { Feedback.collect(ctx) } catch (_: Exception) { 0 }
+        if (nf > 0) {
+            val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel("otp_req", "OTP", NotificationManager.IMPORTANCE_HIGH))
+            val open = PendingIntent.getActivity(ctx, 15, Intent(ctx, MainActivity::class.java).putExtra("admin", true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            val b = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(ctx, "otp_req") else @Suppress("DEPRECATION") Notification.Builder(ctx)
+            b.setSmallIcon(R.drawable.ic_launcher).setContentTitle("🎤 " + L.t("fb_new") + " (" + Feedback.unheard(ctx) + ")")
+                .setContentText(Feedback.list(ctx).filter { !it.optBoolean("heard") }.joinToString(", ") { it.optString("n").ifBlank { it.optString("m") } })
+                .setContentIntent(open).setAutoCancel(true)
+            try { nm.notify(9, b.build()) } catch (_: Exception) {}
+        }
         val p = pending(ctx) ?: return
         val sp = ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE)
         val seen = sp.getString("seenReq", "").orEmpty().split(",").toSet()
