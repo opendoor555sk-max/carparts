@@ -79,7 +79,8 @@ private class Design(
     val highRiseOk: Boolean,
     val plan: PlanDrawing,
     val side: PlanDrawing,
-    val landingLen: Double
+    val landingLen: Double,
+    val turnNote: String = ""
 )
 
 private class Input(val L: Double, val W: Double, val H: Double, val sw: Double, val n: Int, val ur: Double, val ut: Double, val rules: Rules)
@@ -87,7 +88,9 @@ private class Input(val L: Double, val W: Double, val H: Double, val sw: Double,
 /** all stair types (added part by part) */
 private val STAIR_TYPES = listOf(
     1 to "1 Straight",
-    2 to "2 Straight + landing"
+    2 to "2 Straight + landing",
+    3 to "3 L-shape",
+    4 to "4 Double-L"
 )
 
 /** preferred order when several fit */
@@ -166,6 +169,145 @@ private fun Engine.straightDesign(id: Int, name: String, flights: List<Int>, inp
         highRiseOk = flights.all { it <= inp.rules.maxPerFlight }, plan = plan, side = sideView(flights, sw, inp), landingLen = sw)
 }
 
+// ---------- turning stairs built from flights + square landings (3 L, 4 Double-L, ...) ----------
+private typealias Dir = Pair<Int, Int>
+private val EAST: Dir = 1 to 0
+private val NORTH: Dir = 0 to 1
+private val WEST: Dir = -1 to 0
+
+private class Layout(val shapes: List<Shape>, val labels: List<Label>, val arrow: List<P>,
+                     val x0: Double, val y0: Double, val x1: Double, val y1: Double)
+
+/** Lays the flights out along [dirs]; every flight ends on a square landing (last one = upper floor). */
+private fun Engine.layoutTurns(flights: List<Int>, dirs: List<Dir>, inp: Input): Layout {
+    val sw = inp.sw
+    val ut = inp.ut
+    val sm = if (metric) "cm" else "in"
+    val shapes = ArrayList<Shape>()
+    val labels = ArrayList<Label>()
+    val arrow = ArrayList<P>()
+    // (cx, cy) = middle of the edge where the next piece starts
+    var cx = 0.0
+    var cy = sw / 2
+    var step = 1
+    fun piece(x: Double, y: Double, d: Dir, len: Double): List<P> {
+        val px = -d.second * sw / 2
+        val py = d.first * sw / 2
+        val ex = x + d.first * len
+        val ey = y + d.second * len
+        return listOf(P(x - px, y - py), P(ex - px, ey - py), P(ex + px, ey + py), P(x + px, y + py))
+    }
+    flights.forEachIndexed { i, r ->
+        val d = dirs[i]
+        val rx = d.second.toDouble()          // right-hand side (outside of a left turn)
+        val ry = -d.first.toDouble()
+        if (i == 0) arrow.add(P(cx + d.first * ut * 0.3, cy + d.second * ut * 0.3))
+        val sx = cx; val sy = cy
+        for (t in 1 until r) {
+            shapes.add(Shape(piece(cx, cy, d, ut), WOOD))
+            labels.add(Label(P(cx + d.first * ut / 2 + rx * sw * 0.28, cy + d.second * ut / 2 + ry * sw * 0.28), step.toString(), 8.5f, DARK))
+            cx += d.first * ut; cy += d.second * ut; step++
+        }
+        val vertical = d.first == 0
+        labels.add(Label(P((sx + cx) / 2 + rx * sw * 0.64, (sy + cy) / 2 + ry * sw * 0.64),
+            "F" + (i + 1) + ": " + r + " riser", 9f, 0xFF1565C0.toInt(), 1, if (vertical) -90f else 0f))
+        val last = i == flights.size - 1
+        shapes.add(Shape(piece(cx, cy, d, sw), if (last) FLOOR else LANDING))
+        val lx = cx + d.first * sw / 2
+        val ly = cy + d.second * sw / 2
+        arrow.add(P(lx, ly))
+        labels.add(Label(P(lx, ly + sw * 0.12), if (last) "Upar floor" else "Landing", 9f, DARK))
+        labels.add(Label(P(lx, ly - sw * 0.16), fL(sw, 1, sm) + " × " + fL(sw, 1, sm), 8f, 0xFF1565C0.toInt()))
+        step++
+        if (!last) {
+            val d2 = dirs[i + 1]
+            if (d2 == d) { cx += d.first * sw; cy += d.second * sw }
+            else { cx = lx + d2.first * sw / 2; cy = ly + d2.second * sw / 2 }
+        }
+    }
+    val pts = shapes.flatMap { it.pts }
+    return Layout(shapes, labels, arrow, pts.minOf { it.x }, pts.minOf { it.y }, pts.maxOf { it.x }, pts.maxOf { it.y })
+}
+
+/** how much the footprint sticks out of the room (0 = fits), best of both orientations */
+private fun overflow(inp: Input, nL: Double, nW: Double): Double {
+    if (!(inp.L > 0) || !(inp.W > 0)) return 0.0
+    return min(max(0.0, nL - inp.L) + max(0.0, nW - inp.W), max(0.0, nL - inp.W) + max(0.0, nW - inp.L))
+}
+
+/** all ways to split n risers into k flights (each at least [minR]) */
+private fun splits(n: Int, k: Int, minR: Int): List<List<Int>> {
+    val out = ArrayList<List<Int>>()
+    fun rec(left: Int, parts: List<Int>) {
+        if (parts.size == k - 1) { if (left >= minR) out.add(parts + left); return }
+        for (a in minR..left - minR * (k - 1 - parts.size)) rec(left - a, parts + a)
+    }
+    rec(n, emptyList())
+    return out
+}
+
+private fun Engine.turnDesign(
+    id: Int, name: String, inp: Input, k: Int, dirs: List<Dir>, turnNote: String,
+    foot: (List<Int>, Double) -> Pair<Double, Double>
+): Design {
+    val ut = inp.ut
+    val tooFew = inp.n < 2 * k
+    var cands = splits(inp.n, k, if (tooFew) 1 else 2)
+    if (cands.isEmpty()) cands = listOf(List(k) { if (it < inp.n) 1 else 0 }.let { l -> l.mapIndexed { i, v -> if (i == 0) v + max(0, inp.n - l.sum()) else v } })
+    val maxF = inp.rules.maxPerFlight
+    val best = cands.minWithOrNull(compareBy<List<Int>>(
+        { if (overflow(inp, foot(it, inp.sw).first, foot(it, inp.sw).second) > 1e-6) 1 else 0 },
+        { overflow(inp, foot(it, inp.sw).first, foot(it, inp.sw).second) },
+        { f -> f.count { it > maxF } },
+        { f -> f.maxOf { it } - f.minOf { it } }
+    ))!!
+    val (needL, needW) = foot(best, inp.sw)
+    var (fits, rotated, note) = fitOf(inp, needL, needW)
+    var why = note
+    if (fits == false) {
+        val a = max(0.0, needL - inp.L) to max(0.0, needW - inp.W)
+        val b = max(0.0, needL - inp.W) to max(0.0, needW - inp.L)
+        val (sl, sw2) = if (a.first + a.second <= b.first + b.second) a else b
+        why = listOfNotNull(if (sl > 1e-6) "lambai " + fL(sl) + " kam" else null, if (sw2 > 1e-6) "pohlai " + fL(sw2) + " kam" else null).joinToString(", ")
+    }
+    if (tooFew) { fits = false; why = "oonchai bahu ochhi" }
+    // widest stair this room allows
+    val maxW = if (inp.L > 0 && inp.W > 0) {
+        var lo = 0.0
+        var hi = max(inp.L, inp.W)
+        repeat(36) {
+            val mid = (lo + hi) / 2
+            if (cands.any { overflow(inp, foot(it, mid).first, foot(it, mid).second) <= 1e-9 }) lo = mid else hi = mid
+        }
+        lo
+    } else Double.NaN
+    val code = ArrayList<String>()
+    best.forEachIndexed { i, r -> if (r > maxF) code.add("Flight " + (i + 1) + ": " + r + " riser (max " + maxF + ") — landing chahiye") }
+
+    val lay = layoutTurns(best, dirs, inp)
+    val shapes = ArrayList<Shape>()
+    val labels = ArrayList<Label>()
+    if (inp.L > 0 && inp.W > 0) {
+        val rl = if (rotated) inp.W else inp.L
+        val rw = if (rotated) inp.L else inp.W
+        shapes.add(Shape(rect(lay.x0, lay.y0, lay.x0 + rl, lay.y0 + rw), ROOM, 0xFF607D8B.toInt(), dashed = true))
+        labels.add(Label(P(lay.x0 + rl / 2, lay.y0 + rw + inp.sw * 0.15), "Jagya " + fL(rl) + " × " + fL(rw), 9.5f, 0xFF455A64.toInt()))
+    }
+    shapes.addAll(lay.shapes)
+    labels.addAll(lay.labels)
+    val sm = if (metric) "cm" else "in"
+    val plan = PlanDrawing(
+        "Upar se (plan) — " + name.substringAfter(' '), shapes, labels, listOf(lay.arrow),
+        listOf(
+            "Chahiye: " + fL(needL) + " × " + fL(needW) + if (rotated) "  (ghuma kar)" else "",
+            "Pohlai " + fL(inp.sw, 1, sm) + "  •  Tread " + fL(ut, 1, sm) + "  •  " + turnNote,
+            "Ulti baju (jamne vadank) pan bane — drawing no aaino (mirror)"
+        )
+    )
+    return Design(id, name, best, k - 1, needL, needW, fits, rotated, why, maxW, code,
+        highRiseOk = best.all { it <= maxF }, plan = plan, side = sideView(best, inp.sw, inp), landingLen = inp.sw, turnNote = turnNote)
+}
+
 // ---------- unfolded side view (works for every type) ----------
 private fun Engine.sideView(flights: List<Int>, landingLen: Double, inp: Input): PlanDrawing {
     val ur = inp.ur
@@ -217,6 +359,16 @@ private fun Engine.waistOf(flights: List<Int>, inp: Input): Double {
 
 private fun Engine.buildDesign(id: Int, name: String, inp: Input): Design = when (id) {
     1 -> straightDesign(id, name, listOf(inp.n), inp)
+    // L: flight 1 along the length, square landing, flight 2 at 90°, upper floor
+    3 -> turnDesign(id, name, inp, 2, listOf(EAST, NORTH), "1 vadank 90° (landing par)") { f, sw ->
+        ((f[0] - 1) * inp.ut + sw) to ((f[1] - 1) * inp.ut + 2 * sw)
+    }
+    // Double-L: three flights, two square landings, two 90° turns (flight 3 comes back)
+    4 -> turnDesign(id, name, inp, 3, listOf(EAST, NORTH, WEST), "2 vadank 90° (2 landing)") { f, sw ->
+        val g1 = (f[0] - 1) * inp.ut
+        val g3 = (f[2] - 1) * inp.ut
+        max(g1 + sw, g3 + 2 * sw) to ((f[1] - 1) * inp.ut + 2 * sw)
+    }
     else -> {
         val a = (inp.n + 1) / 2
         straightDesign(id, name, listOf(a, inp.n - a), inp)
@@ -288,6 +440,7 @@ fun Engine.stairPlanner() {
             rows.add(Row("Jagya chahiye (lambai × pohlai)", fL(d.needL) + " × " + fL(d.needW)))
             if (d.maxW.isFinite()) rows.add(Row("Is jagya mein sabse chaudi seedhi", if (d.maxW > 0) fL(d.maxW, 1, sm) else "nahi banegi", d.maxW < rules.wMin))
             d.flights.forEachIndexed { i, r -> rows.add(Row("Flight " + (i + 1), r.toString() + " riser, " + (r - 1) + " tread  •  lambai " + fL((r - 1) * inp.ut))) }
+            if (d.turnNote.isNotEmpty()) rows.add(Row("Vadank (turn)", d.turnNote))
             if (d.landingCount > 0) rows.add(Row("Landing (" + d.landingCount + ")", fL(d.landingLen, 1, sm) + " × " + fL(inp.sw, 1, sm)))
             rows.add(Row("Upar floor par jagya", fL(d.landingLen, 1, sm) + " × " + fL(inp.sw, 1, sm)))
             d.code.forEach { rows.add(Row(it, "⚠", true)) }

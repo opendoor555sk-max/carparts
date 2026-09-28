@@ -465,10 +465,10 @@ class EngineTest {
         // straight: 18 risers in one flight -> fits but code warning
         assertTrue(r.first { it.label.endsWith("1 Straight") }.value.startsWith("✓"))
         assertTrue(r.first { it.label.endsWith("1 Straight") }.value.contains("⚠"))
-        // straight + landing: 9 + 9, fits and is the suggestion
+        // straight + landing: 9 + 9, fits; for a house the L-shape is suggested first
         val two = r.first { it.label.endsWith("2 Straight + landing") }
-        assertTrue(two.label.startsWith("⭐"))
         assertTrue(two.value.startsWith("✓"))
+        assertTrue(r.first { it.label.endsWith("3 L-shape") }.label.startsWith("⭐"))
         assertEquals(2, r.count { it.plan != null })
         val r2 = formRows(vals, "Ghar|2 Straight + landing")
         assertTrue(r2.v("Flight 1").startsWith("9 riser"))
@@ -483,6 +483,30 @@ class EngineTest {
         checkForm("planner", errs)
         e.metric = true; e.stairPlanner(); checkForm("planner metric", errs)
         assertTrue(errs.joinToString("\n"), errs.isEmpty())
+    }
+
+    @Test fun stairPlannerLShapes() {
+        e.stairPlanner()
+        val vals = mapOf("L" to "20'", "W" to "8'", "H" to "10'", "sw" to "3'", "dr" to "7\"", "dt" to "10\"")
+        // L in a 20' x 8' room: the short arm must fit the 8' width -> 15 + 3
+        val l = formRows(vals, "Ghar|3 L-shape")
+        assertTrue(l.v("Flight 1").startsWith("15 riser"))
+        assertTrue(l.v("Flight 2").startsWith("3 riser"))
+        assertEquals("14ft 8in × 7ft 8in", l.v("Jagya chahiye (lambai × pohlai)"))
+        assertTrue(l.first { it.label.endsWith("3 L-shape") }.value.startsWith("✓"))
+        // Double-L: three flights adding to 18, fits
+        val dl = formRows(vals, "Ghar|4 Double-L")
+        val f = (1..3).map { dl.v("Flight $it").substringBefore(' ').toInt() }
+        assertEquals(18, f.sum())
+        assertTrue(dl.first { it.label.endsWith("4 Double-L") }.value.startsWith("✓"))
+        assertEquals(2, dl.count { it.plan != null })
+        // square 12' x 12' room: straight + landing does not fit, the L does
+        val sq = formRows(vals + ("L" to "12'") + ("W" to "12'"), "Ghar|3 L-shape")
+        assertTrue(sq.first { it.label.endsWith("2 Straight + landing") }.value.startsWith("✗"))
+        assertTrue(sq.first { it.label.endsWith("3 L-shape") }.value.startsWith("✓"))
+        // tiny room: nothing fits, reason is given
+        val tiny = formRows(vals + ("L" to "6'") + ("W" to "6'"), "Ghar|4 Double-L")
+        assertTrue(tiny.first { it.label.endsWith("4 Double-L") }.value.contains("kam"))
     }
 
     @Test fun stairKeyLinksToPlanner() {

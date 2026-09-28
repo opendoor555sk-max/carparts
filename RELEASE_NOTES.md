@@ -1,3 +1,5 @@
+Stair Planner Bhag 2: L-shape ane Double-L sidi umeri (upar thi drawing ma vadank, landing, har flight na riser). Jagya pramane flight na riser aapmele goth-vay.
+
 Naya: 📐 Stair Planner (Stair screen ke upar button). Jagya ki lambai × pohlai + oonchai daalo → kaunsi seedhi bethegi (✓/✗), ⭐ salah, upar se aur baju se drawing, pagthiye ki pohlai, landing, marking, RCC aur steel. Bhag 1: Straight aur Straight + landing (baaki prakar agle update mein).
 
 Stair: Installation drawing mein ab rise/run map (har step ki oonchai aur aage ki doori). Naye naap: deewar par marking table, RCC seedhi (waist slab, concrete, cement, ret, kapchi, sariya), Steel (MS) seedhi.
