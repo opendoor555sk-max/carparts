@@ -518,5 +518,6 @@ class EngineTest {
         println("SELFTEST checked=$checked errors=${errors.size}")
         errors.take(60).forEach { println("SELFTEST ERR: $it") }
         assertTrue("Self-test found ${errors.size} problems:\n" + errors.take(40).joinToString("\n"), errors.isEmpty())
+        assertTrue("Self-test ne sirf $checked keys check kiye", checked > 1500)
     }
 }
