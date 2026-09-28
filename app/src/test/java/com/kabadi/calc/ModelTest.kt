@@ -354,4 +354,20 @@ class ModelTest {
         assertTrue(h.maal[0].fixed)
         assertFalse(h.hasVehicle())
     }
+
+    @Test fun syncKeepsOldSaleLinesAndFinals() {
+        // older lot hisab: tyre bought, and the sale already typed by hand -> no second "Tyre" line
+        val h = Hisab(31, 1000, type = "lot")
+        h.lots.add(Lot("Lot 1", items = mutableListOf(Line("", "Tyre", true, amountText = "8000"))))
+        h.maal.add(Line("", "tyre ", true, amountText = "9000"))
+        h.syncSale()
+        assertEquals(1, h.maal.size)
+        assertEquals("9000", h.maal[0].amountText)
+        assertEquals(1000.0, h.munafa(), 0.001)
+        // a final hisab is left exactly as it is
+        val f = Hisab(32, 1000, priceText = "100", finalAt = 5L)
+        f.buyItems.add(Line("", "Scrap", false, kgText = "10", rateText = "1"))
+        assertFalse(f.syncSale())
+        assertEquals(0, f.maal.size)
+    }
 }

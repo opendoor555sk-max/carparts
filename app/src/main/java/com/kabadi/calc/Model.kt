@@ -191,6 +191,7 @@ class Hisab(
      * Returns true when lines were added or removed (the screen must be redrawn).
      */
     fun syncSale(): Boolean {
+        if (finalAt > 0) return false                 // a final hisab is never changed by itself
         var changed = false
         val bought = boughtItems()
         bought.forEach { b -> if (b.link.isEmpty()) b.link = java.util.UUID.randomUUID().toString().take(10) }
@@ -198,6 +199,10 @@ class Hisab(
         if (maal.removeAll { it.link.isNotEmpty() && it.link !in ids }) changed = true
         bought.forEach { b ->
             var s = maal.firstOrNull { it.link == b.link }
+            // an older hisab may already have this item in the sale list (typed by hand): use that line
+            if (s == null && b.name.isNotBlank()) s = maal.firstOrNull { it.link.isEmpty() && sameItem(it, b.key, b.name) }?.also {
+                it.link = b.link; it.syncKg = it.kgText
+            }
             if (s == null) {
                 s = Line(b.key, b.name, b.fixed, kgText = b.kgText, litre = b.litre, link = b.link, syncKg = b.kgText)
                 maal.add(s); changed = true
