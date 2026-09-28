@@ -321,6 +321,7 @@ object L {
         "party_tile" to arrayOf("Buy-Sell khata", "खरीद-बिक्री खाता", "ખરીદ-વેચાણ ખાતું"),
         "p_sold" to arrayOf("We sold him", "हमने उसे बेचा", "અમે તેને વેચ્યું"),
         "p_bought" to arrayOf("We bought from him", "हमने उससे खरीदा", "અમે તેની પાસેથી ખરીદ્યું"),
+        "haraji_do" to arrayOf("Auction it", "हराजी करवाई", "હરાજી કરાવી"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 

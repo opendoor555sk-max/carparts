@@ -977,7 +977,10 @@ class MainActivity : Activity() {
 
         // 3. parts
         val mc = card()
-        mc.addView(heading(if (h.isCo) "🏢 " + L.t("co_maal") else if (h.role == "seller") L.t("sell") else L.t("maal"), GREEN).apply { textSize = 15f })
+        val mh = heading(if (h.isCo) "🏢 " + L.t("co_maal") else if (h.role == "seller") L.t("sell") else L.t("maal"), GREEN).apply { textSize = 15f }
+        if (h.type == "haraji") mc.addView(row(mh to 1f, pill("🔨 " + L.t("haraji_do"), !h.coMode, 0xFF6A1B9A.toInt()) { if (h.coMode) { h.coMode = false; showEditor(h) } }
+            .apply { textSize = 13f } to 0f))
+        else mc.addView(mh)
         val mLines = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun drawMaal() {
             mLines.removeAllViews()
@@ -1010,8 +1013,8 @@ class MainActivity : Activity() {
         if (h.type == "haraji") {
             // 4. how it is sold: auction (Rit A) or the whole vehicle to the company (Rit B)
             val sc = card()
-            sc.addView(row(pill("🔨 " + L.t("mode_auction"), !h.coMode, 0xFF6A1B9A.toInt()) { if (h.coMode) { h.coMode = false; showEditor(h) } } to 1f,
-                pill("🏢 " + L.t("mode_co"), h.coMode, 0xFF6A1B9A.toInt()) { if (!h.coMode) { h.coMode = true; showEditor(h) } } to 1f))
+            sc.addView(pill((if (h.coMode) "✓ " else "") + "🏢 " + L.t("mode_co"), h.coMode, 0xFF6A1B9A.toInt()) { h.coMode = !h.coMode; showEditor(h) }
+                .apply { textSize = 14f; setPadding(dpi(8f), dpi(9f), dpi(8f), dpi(9f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
             sc.addView(heading(if (h.coMode) L.t("co_give") else L.t("sale"), GREEN).apply { textSize = 15f; setPadding(0, dpi(8f), 0, dpi(4f)) })
             if (h.coMode) sc.addView(small(L.t("co_give_h")))
             sc.addView(input("₹", h.saleText, true) { h.saleText = it; refreshTotals() }, llp(MATCH_PARENT, WRAP_CONTENT))
