@@ -1,3 +1,5 @@
+Stair Planner Bhag 3: Dog-legged ane Open-well sidi (180° vadank, paholi landing). Open-well mate vachche khali jagya (well) nu maap nakhi shakay.
+
 Stair Planner Bhag 2: L-shape ane Double-L sidi umeri (upar thi drawing ma vadank, landing, har flight na riser). Jagya pramane flight na riser aapmele goth-vay.
 
 Naya: 📐 Stair Planner (Stair screen ke upar button). Jagya ki lambai × pohlai + oonchai daalo → kaunsi seedhi bethegi (✓/✗), ⭐ salah, upar se aur baju se drawing, pagthiye ki pohlai, landing, marking, RCC aur steel. Bhag 1: Straight aur Straight + landing (baaki prakar agle update mein).

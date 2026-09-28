@@ -83,14 +83,16 @@ private class Design(
     val turnNote: String = ""
 )
 
-private class Input(val L: Double, val W: Double, val H: Double, val sw: Double, val n: Int, val ur: Double, val ut: Double, val rules: Rules)
+private class Input(val L: Double, val W: Double, val H: Double, val sw: Double, val n: Int, val ur: Double, val ut: Double, val rules: Rules, val well: Double = 0.0)
 
 /** all stair types (added part by part) */
 private val STAIR_TYPES = listOf(
     1 to "1 Straight",
     2 to "2 Straight + landing",
     3 to "3 L-shape",
-    4 to "4 Double-L"
+    4 to "4 Double-L",
+    5 to "5 Dog-legged",
+    6 to "6 Open-well"
 )
 
 /** preferred order when several fit */
@@ -179,7 +181,7 @@ private class Layout(val shapes: List<Shape>, val labels: List<Label>, val arrow
                      val x0: Double, val y0: Double, val x1: Double, val y1: Double)
 
 /** Lays the flights out along [dirs]; every flight ends on a square landing (last one = upper floor). */
-private fun Engine.layoutTurns(flights: List<Int>, dirs: List<Dir>, inp: Input): Layout {
+private fun Engine.layoutTurns(flights: List<Int>, dirs: List<Dir>, inp: Input, gap: Double = 0.0): Layout {
     val sw = inp.sw
     val ut = inp.ut
     val sm = if (metric) "cm" else "in"
@@ -212,6 +214,26 @@ private fun Engine.layoutTurns(flights: List<Int>, dirs: List<Dir>, inp: Input):
         labels.add(Label(P((sx + cx) / 2 + rx * sw * 0.64, (sy + cy) / 2 + ry * sw * 0.64),
             "F" + (i + 1) + ": " + r + " riser", 9f, 0xFF1565C0.toInt(), 1, if (vertical) -90f else 0f))
         val last = i == flights.size - 1
+        val nd = if (last) null else dirs[i + 1]
+        if (nd != null && nd.first == -d.first && nd.second == -d.second) {
+            // half turn (180°): one wide landing across both flights and the well
+            val lvx = -d.second.toDouble()     // left of the walking direction
+            val lvy = d.first.toDouble()
+            val off = sw + gap
+            val ax = cx - lvx * sw / 2; val ay = cy - lvy * sw / 2
+            val bx = cx + lvx * (off + sw / 2); val by = cy + lvy * (off + sw / 2)
+            shapes.add(Shape(listOf(P(ax, ay), P(bx, by), P(bx + d.first * sw, by + d.second * sw), P(ax + d.first * sw, ay + d.second * sw)), LANDING))
+            val mx = cx + d.first * sw / 2
+            val my = cy + d.second * sw / 2
+            arrow.add(P(mx, my)); arrow.add(P(mx + lvx * off, my + lvy * off))
+            val clx = mx + lvx * off / 2; val cly = my + lvy * off / 2
+            labels.add(Label(P(clx, cly + sw * 0.12), "Landing", 9f, DARK))
+            labels.add(Label(P(clx, cly - sw * 0.16), fL(sw, 1, sm) + " × " + fL(2 * sw + gap, 1, sm), 8f, 0xFF1565C0.toInt()))
+            if (gap > 1e-6) labels.add(Label(P(cx - d.first * ut * 1.5 + lvx * (sw / 2 + gap / 2), cy - d.second * ut * 1.5 + lvy * (sw / 2 + gap / 2)), "well " + fL(gap, 1, sm), 8f, RED, 1, if (d.first == 0) -90f else 0f))
+            step++
+            cx += lvx * off; cy += lvy * off
+            return@forEachIndexed
+        }
         shapes.add(Shape(piece(cx, cy, d, sw), if (last) FLOOR else LANDING))
         val lx = cx + d.first * sw / 2
         val ly = cy + d.second * sw / 2
@@ -248,7 +270,7 @@ private fun splits(n: Int, k: Int, minR: Int): List<List<Int>> {
 }
 
 private fun Engine.turnDesign(
-    id: Int, name: String, inp: Input, k: Int, dirs: List<Dir>, turnNote: String,
+    id: Int, name: String, inp: Input, k: Int, dirs: List<Dir>, turnNote: String, gap: Double = 0.0, landLen: Double = inp.sw,
     foot: (List<Int>, Double) -> Pair<Double, Double>
 ): Design {
     val ut = inp.ut
@@ -285,7 +307,7 @@ private fun Engine.turnDesign(
     val code = ArrayList<String>()
     best.forEachIndexed { i, r -> if (r > maxF) code.add("Flight " + (i + 1) + ": " + r + " riser (max " + maxF + ") — landing chahiye") }
 
-    val lay = layoutTurns(best, dirs, inp)
+    val lay = layoutTurns(best, dirs, inp, gap)
     val shapes = ArrayList<Shape>()
     val labels = ArrayList<Label>()
     if (inp.L > 0 && inp.W > 0) {
@@ -306,7 +328,7 @@ private fun Engine.turnDesign(
         )
     )
     return Design(id, name, best, k - 1, needL, needW, fits, rotated, why, maxW, code,
-        highRiseOk = best.all { it <= maxF }, plan = plan, side = sideView(best, inp.sw, inp), landingLen = inp.sw, turnNote = turnNote)
+        highRiseOk = best.all { it <= maxF }, plan = plan, side = sideView(best, inp.sw, inp), landingLen = landLen, turnNote = turnNote)
 }
 
 // ---------- unfolded side view (works for every type) ----------
@@ -370,6 +392,15 @@ private fun Engine.buildDesign(id: Int, name: String, inp: Input): Design = when
         val g3 = (f[2] - 1) * inp.ut
         max(g1 + sw, g3 + 2 * sw) to ((f[1] - 1) * inp.ut + 2 * sw)
     }
+    // Dog-legged: two flights side by side (no gap), half-space landing, 180° turn
+    5 -> turnDesign(id, name, inp, 2, listOf(EAST, WEST), "Aadho vadank 180° (paholi landing)", 0.0, 2 * inp.sw) { f, sw ->
+        max((f[0] - 1) * inp.ut + sw, (f[1] - 1) * inp.ut + 2 * sw) to (2 * sw)
+    }
+    // Open-well: like dog-legged but with an open gap (well) between the flights
+    6 -> turnDesign(id, name, inp, 2, listOf(EAST, WEST), "Aadho vadank 180°, vachche well " + fL(inp.well, 1, if (metric) "cm" else "in"),
+        inp.well, 2 * inp.sw + inp.well) { f, sw ->
+        max((f[0] - 1) * inp.ut + sw, (f[1] - 1) * inp.ut + 2 * sw) to (2 * sw + inp.well)
+    }
     else -> {
         val a = (inp.n + 1) / 2
         straightDesign(id, name, listOf(a, inp.n - a), inp)
@@ -388,7 +419,8 @@ fun Engine.stairPlanner() {
                 Field("H", "Oonchai (floor se floor)", true, lenTxt(T["rise"]?.v).ifEmpty { if (m) "300" else "10'" }),
                 Field("sw", "Seedhi ki pohlai (khali = code ki kam se kam)", true, "", if (m) "jaise 100 (cm)" else "jaise 3' 6\""),
                 Field("dr", "Riser (sabse zyada)", true, if (m) "17.5" else "7\""),
-                Field("dt", "Tread (pag rakhne ki jagah)", true, if (m) "25" else "10\"")
+                Field("dt", "Tread (pag rakhne ki jagah)", true, if (m) "25" else "10\""),
+                Field("wg", "Open-well: be flight vachche khali jagya", true, if (m) "30" else "1'", "Dog-legged ma 0, Open-well ma aa")
             ),
             listOf("Ghar", "Commercial", "High-rise"),
             STAIR_TYPES.map { it.second }
@@ -404,7 +436,7 @@ fun Engine.stairPlanner() {
             val n = ceil(H / dr - 1e-9).toInt()
             if (n > 80) return@FormSpec listOf(Row("Bahut zyada pagthiye — values check karein", "—", true))
             val swIn = v["sw"] ?: Double.NaN
-            val inp = Input(v["L"] ?: Double.NaN, v["W"] ?: Double.NaN, H, if (swIn > 0) swIn else rules.wMin, n, H / n, dt, rules)
+            val inp = Input(v["L"] ?: Double.NaN, v["W"] ?: Double.NaN, H, if (swIn > 0) swIn else rules.wMin, n, H / n, dt, rules, (v["wg"] ?: 0.0).let { if (it > 0) it else 0.0 })
             val designs = STAIR_TYPES.map { buildDesign(it.first, it.second, inp) }
             val order = preference(bld)
             val best = designs.filter { it.fits != false && it.code.isEmpty() && (!rules.highRise || it.highRiseOk) }
@@ -443,7 +475,7 @@ fun Engine.stairPlanner() {
             d.flights.forEachIndexed { i, r -> rows.add(Row("Flight " + (i + 1), r.toString() + " riser, " + (r - 1) + " tread  •  lambai " + fL((r - 1) * inp.ut))) }
             if (d.turnNote.isNotEmpty()) rows.add(Row("Vadank (turn)", d.turnNote))
             if (d.landingCount > 0) rows.add(Row("Landing (" + d.landingCount + ")", fL(d.landingLen, 1, sm) + " × " + fL(inp.sw, 1, sm)))
-            rows.add(Row("Upar floor par jagya", fL(d.landingLen, 1, sm) + " × " + fL(inp.sw, 1, sm)))
+            rows.add(Row("Upar floor par jagya", fL(inp.sw, 1, sm) + " × " + fL(inp.sw, 1, sm)))
             d.code.forEach { rows.add(Row(it, "⚠", true)) }
             if (rules.highRise) rows.add(Row(if (d.highRiseOk) "High-rise: chalegi (seedhi flight, landing)" else "High-rise: nahi chalegi", if (d.highRiseOk) "✓" else "✗", !d.highRiseOk))
 

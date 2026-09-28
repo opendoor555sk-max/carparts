@@ -468,7 +468,7 @@ class EngineTest {
         // straight + landing: 9 + 9, fits; for a house the L-shape is suggested first
         val two = r.first { it.label.endsWith("2 Straight + landing") }
         assertTrue(two.value.startsWith("✓"))
-        assertTrue(r.first { it.label.endsWith("3 L-shape") }.label.startsWith("⭐"))
+        assertTrue(r.first { it.label.endsWith("5 Dog-legged") }.label.startsWith("⭐"))
         assertEquals(2, r.count { it.plan != null })
         val r2 = formRows(vals, "Ghar|2 Straight + landing")
         assertTrue(r2.v("Flight 1").startsWith("9 riser"))
@@ -507,6 +507,29 @@ class EngineTest {
         // tiny room: nothing fits, reason is given
         val tiny = formRows(vals + ("L" to "6'") + ("W" to "6'"), "Ghar|4 Double-L")
         assertTrue(tiny.first { it.label.endsWith("4 Double-L") }.value.contains("kam"))
+    }
+
+    @Test fun stairPlannerHalfTurn() {
+        e.stairPlanner()
+        val vals = mapOf("L" to "20'", "W" to "8'", "H" to "10'", "sw" to "3'", "dr" to "7\"", "dt" to "10\"", "wg" to "1'")
+        // dog-legged: 9 + 9, flights side by side -> 6' wide, length = going + 2 landings
+        val dg = formRows(vals, "Ghar|5 Dog-legged")
+        assertTrue(dg.v("Flight 1"), dg.v("Flight 1").startsWith("9 riser"))
+        assertTrue(dg.v("Flight 2"), dg.v("Flight 2").startsWith("9 riser"))
+        assertEquals("12ft 8in × 6ft", dg.v("Jagya chahiye (lambai × pohlai)"))
+        assertEquals("6ft × 3ft", dg.v("Landing (1)"))
+        assertTrue(dg.first { it.label.endsWith("5 Dog-legged") }.value.startsWith("✓"))
+        // open-well: 1' gap -> 7' wide
+        val ow = formRows(vals, "Ghar|6 Open-well")
+        assertEquals("12ft 8in × 7ft", ow.v("Jagya chahiye (lambai × pohlai)"))
+        assertEquals("7ft × 3ft", ow.v("Landing (1)"))
+        // 6'6" wide room: dog-legged fits, open-well does not
+        val nr = formRows(vals + ("W" to "6'6\""), "Ghar|6 Open-well")
+        assertTrue(nr.first { it.label.endsWith("5 Dog-legged") }.value.startsWith("✓"))
+        assertTrue(nr.first { it.label.endsWith("6 Open-well") }.value.startsWith("✗"))
+        // high-rise ranking picks open-well first when it fits
+        val hr = formRows(vals + ("L" to "30'") + ("W" to "12'"), "High-rise|6 Open-well")
+        assertTrue(hr.first { it.label.endsWith("6 Open-well") }.label.startsWith("⭐"))
     }
 
     @Test fun stairKeyLinksToPlanner() {
