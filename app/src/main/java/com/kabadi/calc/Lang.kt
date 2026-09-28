@@ -345,6 +345,16 @@ object L {
         "f_block" to arrayOf("Blocked", "ब्लॉक", "બ્લોક"),
         "block_btn" to arrayOf("Block", "ब्लॉक", "બ્લોક"),
         "block_q" to arrayOf("Block this user? His app stops until you give a new OTP. His hisab stays safe.", "इस यूज़र को ब्लॉक करें? नया OTP देने तक उसकी ऐप बंद रहेगी। उसका हिसाब सुरक्षित रहेगा।", "આ યુઝરને બ્લોક કરવો? નવો OTP આપો ત્યાં સુધી તેની એપ બંધ રહેશે. તેનો હિસાબ સલામત રહેશે."),
+        "u_total" to arrayOf("Users", "यूज़र", "યુઝર"),
+        "u_week" to arrayOf("active 7 days", "7 दिन में चालू", "7 દિવસમાં ચાલુ"),
+        "u_today" to arrayOf("today", "आज", "આજે"),
+        "u_yday" to arrayOf("yesterday", "कल", "ગઈકાલે"),
+        "u_days_ago" to arrayOf("days ago", "दिन पहले", "દિવસ પહેલા"),
+        "u_last" to arrayOf("Last used", "आखिरी बार", "છેલ્લે વાપરી"),
+        "u_hisab" to arrayOf("Hisab", "हिसाब", "હિસાબ"),
+        "u_lasth" to arrayOf("last hisab", "आखिरी हिसाब", "છેલ્લો હિસાબ"),
+        "u_nodata" to arrayOf("No usage info yet (app not opened with internet)", "अभी जानकारी नहीं (इंटरनेट के साथ ऐप नहीं खुली)", "હજી માહિતી નથી (ઇન્ટરનેટ સાથે એપ ખૂલી નથી)"),
+        "u_share" to arrayOf("Share user list", "यूज़र लिस्ट भेजें", "યુઝર યાદી મોકલો"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 

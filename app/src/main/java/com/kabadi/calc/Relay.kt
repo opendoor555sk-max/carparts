@@ -20,6 +20,8 @@ import java.net.URL
 object Relay {
     private const val HOST = "https://ntfy.sh/"
     val REQ = "kmh-r-" + Otp.topic("requests")
+    /** each user's app says "I am using the app" (no money, only counts) */
+    val USE = "kmh-s-" + Otp.topic("usage")
     fun userTopic(mobile: String, dev: String) = "kmh-u-" + Otp.topic(Otp.mobile10(mobile) + ":" + dev)
 
     class Req(val id: String, val time: Long, val name: String, val mobile: String, val dev: String)
@@ -79,6 +81,41 @@ object Relay {
         }
     }
 
+    /** user side: at most every 6 hours, tell the admin this phone uses the app */
+    fun ping(ctx: Context) {
+        val sp = ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE)
+        if (System.currentTimeMillis() - sp.getLong("ping", 0) < 6L * 3600_000L) return
+        val hs = Store.hisabs
+        val o = JSONObject().put("n", Account.name(ctx)).put("m", Account.mobile(ctx)).put("d", Account.device(ctx))
+            .put("v", Updater.myVersionName(ctx)).put("ph", (Build.MANUFACTURER + " " + Build.MODEL).trim())
+            .put("h", hs.size).put("g", hs.count { it.type == "gaadi" }).put("hr", hs.count { it.type == "haraji" }).put("l", hs.count { it.isLot })
+            .put("last", hs.maxOfOrNull { it.time } ?: 0L).put("own", Store.owner).put("adm", Account.isAdmin(ctx))
+        if (post(USE, o)) sp.edit().putLong("ping", System.currentTimeMillis()).apply()
+    }
+
+    /** admin side: keep every ping (the server forgets after 12 h, this phone remembers) */
+    fun collect(ctx: Context): Boolean {
+        val all = poll(USE) ?: return false
+        val sp = ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE)
+        val map = try { JSONObject(sp.getString("seen", "{}")) } catch (_: Exception) { JSONObject() }
+        all.forEach { (o, m) ->
+            val k = m.optString("m") + ":" + m.optString("d")
+            if (m.optString("m").isEmpty()) return@forEach
+            val t = o.optLong("time") * 1000
+            val old = map.optJSONObject(k)
+            if (old == null || old.optLong("at") < t) {
+                map.put(k, JSONObject(m.toString()).put("at", t).put("first", old?.optLong("first")?.takeIf { it > 0 } ?: t))
+            }
+        }
+        sp.edit().putString("seen", map.toString()).apply()
+        return true
+    }
+
+    fun seen(ctx: Context): Map<String, JSONObject> {
+        val map = try { JSONObject(ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE).getString("seen", "{}")) } catch (_: Exception) { JSONObject() }
+        return map.keys().asSequence().associateWith { map.getJSONObject(it) }
+    }
+
     // ---- admin side ----
     /** requests of the last 12 h that are not accepted / rejected yet (newest first) */
     fun pending(ctx: Context): List<Req>? {
@@ -102,6 +139,7 @@ object Relay {
     fun notifyAdmin(ctx: Context) {
         if (!Account.isAdmin(ctx)) return
         try { reBlock(ctx) } catch (_: Exception) {}
+        try { collect(ctx) } catch (_: Exception) {}
         val p = pending(ctx) ?: return
         val sp = ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE)
         val seen = sp.getString("seenReq", "").orEmpty().split(",").toSet()

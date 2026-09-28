@@ -93,6 +93,7 @@ class MainActivity : Activity() {
         fun start() {
             bar.visibility = View.VISIBLE
             showHome()
+            if (LOGIN_ON && Account.exists(this)) Thread { try { Relay.ping(this) } catch (_: Exception) {} }.start()
             if (LOGIN_ON && !Account.isAdmin(this) && Account.verified(this)) {
                 val m = Account.mobile(this); val d = Account.device(this)
                 Thread {
@@ -366,18 +367,34 @@ class MainActivity : Activity() {
         val uList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         var uq = ""; var uf = ""
         val fRow = LinearLayout(this)
+        val sumTv = small("", INK).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD; setPadding(0, 0, 0, dpi(6f)) }
+        fun ago(t: Long): String {
+            if (t <= 0) return "—"
+            val d = ((System.currentTimeMillis() - t) / 86400000L).toInt()
+            return when (d) { 0 -> L.t("u_today"); 1 -> L.t("u_yday"); else -> d.toString() + " " + L.t("u_days_ago") }
+        }
         fun drawUsers() {
             uList.removeAllViews()
-            val all = Account.users(this)
+            val seen = Relay.seen(this)
+            val approved = Account.users(this)
+            // everyone: approved / cancelled / blocked + phones that only sent usage
+            val all = approved + seen.filterKeys { k -> approved.none { (it.optString("m") + ":" + it.optString("d")) == k } }.values
+                .filter { !it.optBoolean("adm") }.map { JSONObject().put("n", it.optString("n")).put("m", it.optString("m")).put("d", it.optString("d")).put("s", "ok").put("t", it.optLong("first")) }
+            val week = System.currentTimeMillis() - 7L * 86400000L
+            val today = System.currentTimeMillis() - 86400000L
+            sumTv.text = L.t("u_total") + ": " + all.size + "   •   🟢 " + L.t("u_week") + ": " + seen.values.count { !it.optBoolean("adm") && it.optLong("at") > week } +
+                "   •   " + L.t("u_today") + ": " + seen.values.count { !it.optBoolean("adm") && it.optLong("at") > today } +
+                "\n📋 " + L.t("u_hisab") + ": " + seen.values.filter { !it.optBoolean("adm") }.sumOf { it.optInt("h") }
             fRow.removeAllViews()
-            listOf("" to L.t("f_all"), "ok" to "✅ " + L.t("f_ok"), "no" to "❌ " + L.t("f_no"), "block" to "🚫 " + L.t("f_block")).forEach { (k, t) ->
-                val n = if (k.isEmpty()) all.size else all.count { (it.optString("s").ifEmpty { if (it.optBoolean("ok")) "ok" else "no" }) == k }
+            listOf("" to L.t("f_all"), "act" to "🟢 7d", "ok" to "✅", "no" to "❌", "block" to "🚫").forEach { (k, t) ->
+                val n = when (k) { "" -> all.size; "act" -> all.count { (seen[it.optString("m") + ":" + it.optString("d")]?.optLong("at") ?: 0) > week }
+                    else -> all.count { (it.optString("s").ifEmpty { if (it.optBoolean("ok")) "ok" else "no" }) == k } }
                 fRow.addView(pill("$t ($n)", uf == k, 0xFF6A1B9A.toInt()) { uf = k; drawUsers() }.apply { textSize = 12f; setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(6f)) },
                     llp(0, WRAP_CONTENT, 1f).apply { setMargins(dpi(2f), 0, dpi(2f), 0) })
             }
             all.filter { u ->
                 val st = u.optString("s").ifEmpty { if (u.optBoolean("ok")) "ok" else "no" }
-                (uf.isEmpty() || st == uf) && (uq.isBlank() || norm(u.optString("n")).contains(norm(uq)) || u.optString("m").contains(uq.filter { it.isDigit() }.ifEmpty { "~" }))
+                (uf.isEmpty() || st == uf || (uf == "act" && (seen[u.optString("m") + ":" + u.optString("d")]?.optLong("at") ?: 0) > week)) && (uq.isBlank() || norm(u.optString("n")).contains(norm(uq)) || u.optString("m").contains(uq.filter { it.isDigit() }.ifEmpty { "~" }))
             }.forEach { u ->
                 val st = u.optString("s").ifEmpty { if (u.optBoolean("ok")) "ok" else "no" }
                 val nm = u.optString("n"); val m = u.optString("m"); val d = u.optString("d")
@@ -385,7 +402,16 @@ class MainActivity : Activity() {
                 box.addView(row(small(nm.ifBlank { "—" }, INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD } to 1f,
                     small(when (st) { "ok" -> "✅ " + L.t("f_ok"); "block" -> "🚫 " + L.t("f_block"); else -> "❌ " + L.t("f_no") },
                         when (st) { "ok" -> GREEN; "block" -> RED; else -> MUTED }).apply { typeface = Typeface.DEFAULT_BOLD } to 0f))
-                box.addView(small("📞 " + m + "   #" + d + "   •  " + Bill.dateText(u.optLong("t"))))
+                box.addView(small("📞 " + m + "   #" + d + "   •  " + Bill.dateText(u.optLong("t")).substringBefore("  ")))
+                val info = seen["$m:$d"]
+                if (info != null) {
+                    val act = info.optLong("at") > week
+                    box.addView(small((if (act) "🟢 " else "⚪ ") + L.t("u_last") + ": " + ago(info.optLong("at")) + "   •   v" + info.optString("v") + "   •   📱 " + info.optString("ph"),
+                        if (act) GREEN else MUTED))
+                    box.addView(small("📋 " + L.t("u_hisab") + ": " + info.optInt("h") + "  (🚚 " + info.optInt("g") + "  🔨 " + info.optInt("hr") + "  📦 " + info.optInt("l") + ")" +
+                        (if (info.optLong("last") > 0) "   •   " + L.t("u_lasth") + ": " + Bill.dateText(info.optLong("last")).substringBefore("  ") else "") +
+                        (if (info.optString("own").isNotBlank() && info.optString("own") != nm) "\n🏪 " + info.optString("own") else ""), INK))
+                } else if (st == "ok") box.addView(small("⚪ " + L.t("u_nodata")))
                 val acts = LinearLayout(this).apply { setPadding(0, dpi(4f), 0, 0) }
                 fun act(t: String, color: Int, a: () -> Unit) = acts.addView(TextView(this).apply {
                     text = t; textSize = 13f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = round(color, 14f)
@@ -406,10 +432,24 @@ class MainActivity : Activity() {
             }
             if (uList.childCount == 0) uList.addView(small(L.t("none")))
         }
+        uc.addView(sumTv)
         uc.addView(input("🔍 " + L.t("f_search"), "", false) { uq = it; drawUsers() }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
         uc.addView(fRow, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
         uc.addView(uList)
         drawUsers()
+        // fetch fresh usage in the background
+        Thread { if (Relay.collect(this)) ui.post { if (screen == "admin") drawUsers() } }.start()
+        uc.addView(bigButton("📤 " + L.t("u_share"), 0xFF455A64.toInt()) {
+            val seen = Relay.seen(this)
+            val sb = StringBuilder(L.t("app")).append(" – ").append(L.t("adm_users")).append("\n\n")
+            Account.users(this).forEach { u ->
+                val i = seen[u.optString("m") + ":" + u.optString("d")]
+                sb.append("• ").append(u.optString("n")).append("  ").append(u.optString("m")).append("  ").append(u.optString("s").ifEmpty { "ok" })
+                if (i != null) sb.append("  v").append(i.optString("v")).append("  ").append(L.t("u_hisab")).append(" ").append(i.optInt("h")).append("  ").append(ago(i.optLong("at")))
+                sb.append("\n")
+            }
+            try { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, sb.toString()), "")) } catch (_: Exception) {}
+        }.apply { textSize = 14f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
         body.addView(uc, cardLp())
         body.addView(small(L.t("adm_manual")).apply { setPadding(dpi(4f), dpi(4f), 0, dpi(6f)) })
         var mob = ""; var dev = ""; var name = ""
@@ -681,7 +721,8 @@ class MainActivity : Activity() {
         }, llp(MATCH_PARENT, WRAP_CONTENT))
 
         if (LOGIN_ON && Account.isAdmin(this)) {
-            body.addView(bigButton("👑 " + L.t("adm_btn"), 0xFF4A148C.toInt()) { showAdmin() }.apply { textSize = 15f },
+            val nUsers = Relay.seen(this).values.count { !it.optBoolean("adm") }
+            body.addView(bigButton("👑 " + L.t("adm_btn") + (if (nUsers > 0) "   •   👥 $nUsers" else ""), 0xFF4A148C.toInt()) { showAdmin() }.apply { textSize = 15f },
                 llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             val banner = bigButton("", 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
             body.addView(banner, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
