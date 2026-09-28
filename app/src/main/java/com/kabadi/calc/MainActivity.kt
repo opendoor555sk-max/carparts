@@ -2537,11 +2537,6 @@ class MainActivity : Activity() {
             body.addView(ac, cardLp())
         }
 
-        if (LOGIN_ON && !Account.isAdmin(this)) body.addView(small("👑 " + L.t("adm_login"), 0xFF6A1B9A.toInt()).apply {
-            gravity = Gravity.CENTER; textSize = 14f; setPadding(0, dpi(4f), 0, dpi(10f))
-            setOnClickListener { askAdminCode { if (!Account.exists(this@MainActivity)) Account.create(this@MainActivity, Store.owner.ifBlank { "Admin" }, Store.mobile.filter { c -> c.isDigit() }.takeLast(10), "")
-                Account.approveAsAdmin(this@MainActivity); Reminders.schedule(this@MainActivity); showHome() } }
-        }, llp(MATCH_PARENT, WRAP_CONTENT))
 
         val sc = card()
         sc.addView(heading("🔔 " + L.t("rem_t")))
@@ -2564,7 +2559,14 @@ class MainActivity : Activity() {
         body.addView(lc, cardLp())
 
         val u = card()
-        u.addView(bigButton(L.t("update") + "  (v" + Updater.myVersionName(this) + ")", BLUE) { Updater.check(this, manual = true) })
+        u.addView(bigButton(L.t("update") + "  (v" + Updater.myVersionName(this) + ")", BLUE) { Updater.check(this, manual = true) }.apply {
+            // hidden (no link on screen): long-press = admin code, only for the owner if his phone ever loses admin
+            if (LOGIN_ON && !Account.isAdmin(this@MainActivity)) setOnLongClickListener {
+                askAdminCode { if (!Account.exists(this@MainActivity)) Account.create(this@MainActivity, Store.owner.ifBlank { "Admin" }, Store.mobile.filter { c -> c.isDigit() }.takeLast(10), "")
+                    Account.approveAsAdmin(this@MainActivity); Reminders.schedule(this@MainActivity); showHome() }
+                true
+            }
+        })
         val bk = card()
         bk.addView(heading(L.t("backup"), 0xFF455A64.toInt()))
         val last = getSharedPreferences("kabadi_calc", MODE_PRIVATE).getLong("lastBackup", 0)

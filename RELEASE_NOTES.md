@@ -1,3 +1,5 @@
+Settings mathi '👑 Admin login' link kadhi nakhi.
+
 Admin phone ni Settings mathi 'Account & PIN lock' (naam/number + 'Admin: make OTP') kadhi nakhyu. Admin tamara phone par j raheshe.
 
 Vechan: gaadi kharidi hoy tyare j gaadi na parts na button. Fakt bijo maal kharidyo hoy to je kharidyu te j aapmele vechan ma aave (naam + vajan). Vechta ochhu vajan = ghat, nuksan kharidi bhav thi dekhay.
