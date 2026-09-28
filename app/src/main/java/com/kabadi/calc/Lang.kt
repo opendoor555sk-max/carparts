@@ -356,6 +356,17 @@ object L {
         "u_nodata" to arrayOf("No usage info yet (app not opened with internet)", "अभी जानकारी नहीं (इंटरनेट के साथ ऐप नहीं खुली)", "હજી માહિતી નથી (ઇન્ટરનેટ સાથે એપ ખૂલી નથી)"),
         "u_share" to arrayOf("Share user list", "यूज़र लिस्ट भेजें", "યુઝર યાદી મોકલો"),
         "adm_users_btn" to arrayOf("Admin: user list", "एडमिन: यूज़र लिस्ट", "એડમિન: યુઝરની યાદી"),
+        "sh_title" to arrayOf("Partner hisab (view only)", "भागीदारी के हिसाब (सिर्फ देखें)", "ભાગીદારીના હિસાબ (ફક્ત જોવા)"),
+        "sh_view" to arrayOf("View only – you cannot change this hisab", "सिर्फ देखने के लिए – बदलाव नहीं होगा", "ફક્ત જોવા માટે – ફેરફાર નહીં થાય"),
+        "sh_by" to arrayOf("Made by", "बनाने वाला", "બનાવનાર"),
+        "sh_upd" to arrayOf("Last update", "आखिरी अपडेट", "છેલ્લો અપડેટ"),
+        "sh_new" to arrayOf("partner hisab received", "भागीदारी हिसाब आए", "ભાગીદારી હિસાબ આવ્યા"),
+        "sh_sent" to arrayOf("Sent to partners", "भागीदारों को भेजा", "ભાગીદારોને મોકલ્યો"),
+        "sh_hint" to arrayOf("Write their mobile: they will see this hisab in their app (view only)", "मोबाइल लिखें: उन्हें यह हिसाब उनकी ऐप में दिखेगा (सिर्फ देखना)", "મોબાઇલ લખો: તેમને આ હિસાબ તેમની એપમાં દેખાશે (ફક્ત જોવા)"),
+        "sh_need_mob" to arrayOf("Write your mobile number to receive partner hisab", "भागीदारी हिसाब पाने के लिए अपना मोबाइल लिखें", "ભાગીદારી હિસાબ મેળવવા તમારો મોબાઇલ લખો"),
+        "sh_my" to arrayOf("Your number", "आपका नंबर", "તમારો નંબર"),
+        "sh_info" to arrayOf("Hisab where someone wrote this number as mudi malik / khedut come here.", "जहाँ किसी ने यह नंबर मुडी मालिक / खेडूत में लिखा, वह हिसाब यहाँ आएगा।", "જ્યાં કોઈએ આ નંબર મૂડી માલિક / ખેડૂતમાં લખ્યો, તે હિસાબ અહીં આવશે."),
+        "sh_refresh" to arrayOf("Refresh", "ताज़ा करें", "તાજું કરો"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 

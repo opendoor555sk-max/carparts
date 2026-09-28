@@ -280,4 +280,14 @@ class ModelTest {
         h.maal[0].pays.add(Pay(day, "80000"))
         assertEquals(listOf("Imran"), reminders(listOf(h), day + 20 * 86400000L).map { it.name })   // overdue: every day until done
     }
+
+    @Test fun shareCodec() {
+        val k = Otp.shareKey("98765 43210")
+        val text = "{\"n\":\"સલામભાઈ\",\"x\":\"" + "body 9000 kg ".repeat(200) + "\"}"
+        val sealed = Codec.seal(text, k)
+        assertTrue(sealed.length < 2000)                         // gzip keeps it small
+        assertEquals(text, Codec.open(sealed, Otp.shareKey("9876543210")))
+        assertEquals(null, Codec.open(sealed, Otp.shareKey("9876543211")))   // other number cannot read
+        for (n in 0..5) { val b = ByteArray(n) { (it * 37).toByte() }; assertTrue(b.contentEquals(Codec.unb64(Codec.b64(b)))) }
+    }
 }

@@ -26,6 +26,9 @@ object Otp {
     /** hard-to-guess topic name for the online relay */
     fun topic(s: String): String = hmac("topic:" + s).take(10).joinToString("") { "%02x".format(it) }
 
+    /** secret key for hisab shared with one mobile number */
+    fun shareKey(mobile: String): ByteArray = hmac("share:" + mobile10(mobile))
+
     fun mobile10(m: String) = m.filter { it.isDigit() }.takeLast(10)
 
     /** the 6-digit OTP for this mobile + phone code */

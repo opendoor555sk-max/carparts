@@ -25,6 +25,8 @@ object Store {
     var mobile = ""
     var address = ""
     val hisabs = mutableListOf<Hisab>()
+    /** hisab of others where this phone is mudi malik / khedut (view only) */
+    val shared = mutableListOf<Shared>()
     val lastRate = mutableMapOf<String, String>()
     var parts: MutableList<Btn> = defaultParts()
     var expenses: MutableList<Btn> = defaultExpenses()
@@ -168,6 +170,7 @@ object Store {
         val o = JSONObject().put("owner", owner).put("mobile", mobile).put("address", address).put("lang", L.lang).put("litreV1", true).put("ver", 2)
         o.put("variants", JSONArray(variants))
         o.put("h", JSONArray().also { a -> hisabs.forEach { a.put(hj(it)) } })
+        o.put("sh", JSONArray().also { a -> shared.forEach { a.put(JSONObject().put("f", it.from).put("fm", it.fromMobile).put("t", it.t).put("h", hj(it.h))) } })
         o.put("rates", JSONObject(lastRate as Map<*, *>))
         o.put("parts", bj(parts)).put("exp", bj(expenses)).put("tp", bj(trashParts)).put("te", bj(trashExp))
         return o
@@ -209,6 +212,8 @@ object Store {
             L.lang = o.optInt("lang", 0)
             hisabs.clear()
             o.optJSONArray("h")?.let { a -> for (i in 0 until a.length()) hisabs.add(jh(a.getJSONObject(i))) }
+            shared.clear()
+            o.optJSONArray("sh")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { shared.add(Shared(it.optString("f"), it.optString("fm"), it.optLong("t"), jh(it.getJSONObject("h")))) } }
             o.optJSONObject("rates")?.let { r -> r.keys().forEach { k -> lastRate[k] = r.optString(k) } }
             o.optJSONArray("parts")?.let { parts = jb(it) }
             // one-time: give existing users the new litre buttons (Engine oil, Diesel)
