@@ -379,7 +379,7 @@ class MainActivity : Activity() {
             val approved = Account.users(this)
             // everyone: approved / cancelled / blocked + phones that only sent usage
             val all = approved + seen.filterKeys { k -> approved.none { (it.optString("m") + ":" + it.optString("d")) == k } }.values
-                .filter { !it.optBoolean("adm") }.map { JSONObject().put("n", it.optString("n")).put("m", it.optString("m")).put("d", it.optString("d")).put("s", "ok").put("t", it.optLong("first")) }
+                .filter { !it.optBoolean("adm") }.map { org.json.JSONObject().put("n", it.optString("n")).put("m", it.optString("m")).put("d", it.optString("d")).put("s", "ok").put("t", it.optLong("first")) }
             val week = System.currentTimeMillis() - 7L * 86400000L
             val today = System.currentTimeMillis() - 86400000L
             sumTv.text = L.t("u_total") + ": " + all.size + "   •   🟢 " + L.t("u_week") + ": " + seen.values.count { !it.optBoolean("adm") && it.optLong("at") > week } +
