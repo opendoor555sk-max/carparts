@@ -315,7 +315,7 @@ object L {
         "rem_hello" to arrayOf("Hello", "नमस्ते", "નમસ્તે"),
         "rem_share" to arrayOf("your share", "आपका हिस्सा", "તમારો ભાગ"),
         "loss_pay" to arrayOf("loss to pay", "नुकसान भरना", "નુકસાન ભરવાનું"),
-        "rem_set_h" to arrayOf("Every day at 10 AM a notification comes. With auto SMS on, the phone also sends the SMS itself (normal SMS charges of your plan).", "रोज़ सुबह 10 बजे नोटिफिकेशन आएगा। ऑटो SMS चालू हो तो फ़ोन खुद SMS भेजेगा (आपके प्लान का SMS चार्ज)।", "રોજ સવારે 10 વાગે નોટિફિકેશન આવશે. ઓટો SMS ચાલુ હોય તો ફોન જાતે SMS મોકલશે (તમારા પ્લાનનો SMS ચાર્જ)."),
+        "rem_set_h" to arrayOf("Every day at 10 AM a notification comes. Open it and send WhatsApp / SMS with one tap each.", "रोज़ सुबह 10 बजे नोटिफिकेशन आएगा। खोलें और हर एक को एक टैप से WhatsApp / SMS भेजें।", "રોજ સવારે 10 વાગે નોટિફિકેશન આવશે. ખોલો અને દરેકને એક ટેપથી WhatsApp / SMS મોકલો."),
         "rem_auto_on" to arrayOf("Auto SMS: ON (tap to turn off)", "ऑटो SMS: चालू (बंद करने के लिए दबाएँ)", "ઓટો SMS: ચાલુ (બંધ કરવા દબાવો)"),
         "rem_auto_off" to arrayOf("Auto SMS: OFF (tap to turn on)", "ऑटो SMS: बंद (चालू करने के लिए दबाएँ)", "ઓટો SMS: બંધ (ચાલુ કરવા દબાવો)"),
         "party_tile" to arrayOf("Buy-Sell khata", "खरीद-बिक्री खाता", "ખરીદ-વેચાણ ખાતું"),

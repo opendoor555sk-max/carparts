@@ -1694,7 +1694,7 @@ class MainActivity : Activity() {
         val groups = reminders(Store.hisabs).groupBy { it.key.ifEmpty { "x:" + it.name } }
         body.addView(small(L.t("rem_h")).apply { setPadding(dpi(4f), 0, 0, dpi(8f)) })
         if (groups.isEmpty()) body.addView(small(L.t("no_due")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
-        val canSms = Build.VERSION.SDK_INT < 23 || checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+        val canSms = false  // no SMS permission (Play Protect blocks apps that ask for it)
         if (groups.isNotEmpty() && canSms) body.addView(bigButton("📩 " + L.t("rem_sms_all"), 0xFF455A64.toInt()) {
             val n = Reminders.sendSms(this, force = true); toast("📩 $n")
         }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
@@ -2142,13 +2142,6 @@ class MainActivity : Activity() {
         val sc = card()
         sc.addView(heading("🔔 " + L.t("rem_t")))
         sc.addView(small(L.t("rem_set_h")).apply { setPadding(0, 0, 0, dpi(8f)) })
-        val auto = Reminders.autoSms(this)
-        sc.addView(pill(if (auto) "✓ " + L.t("rem_auto_on") else L.t("rem_auto_off"), auto, 0xFFE65100.toInt()) {
-            if (auto) { Reminders.setAutoSms(this, false); showSettings() }
-            else if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(Manifest.permission.SEND_SMS), 41)
-            } else { Reminders.setAutoSms(this, true); showSettings() }
-        }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
         body.addView(sc, cardLp())
 
         val ap = card()

@@ -32,7 +32,8 @@ object Reminders {
     }
 
     private fun sp(ctx: Context) = ctx.getSharedPreferences("kabadi_calc", Context.MODE_PRIVATE)
-    fun autoSms(ctx: Context) = sp(ctx).getBoolean("autoSms", false)
+    /** auto SMS switched off for good: the SMS permission makes Google Play Protect block the app */
+    @Suppress("UNUSED_PARAMETER") fun autoSms(ctx: Context) = false
     fun setAutoSms(ctx: Context, on: Boolean) = sp(ctx).edit().putBoolean("autoSms", on).apply()
 
     /** one message for one person (all his items / shares) */
