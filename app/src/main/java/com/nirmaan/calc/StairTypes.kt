@@ -474,8 +474,8 @@ fun Engine.stairPlanner() {
             if (d.maxW.isFinite()) rows.add(Row("Is jagya mein sabse chaudi seedhi", if (d.maxW > 0) fL(d.maxW, 1, sm) else "nahi banegi", d.maxW < rules.wMin))
             d.flights.forEachIndexed { i, r -> rows.add(Row("Flight " + (i + 1), r.toString() + " riser, " + (r - 1) + " tread  •  lambai " + fL((r - 1) * inp.ut))) }
             if (d.turnNote.isNotEmpty()) rows.add(Row("Vadank (turn)", d.turnNote))
-            if (d.landingCount > 0) rows.add(Row("Landing (" + d.landingCount + ")", fL(d.landingLen, 1, sm) + " × " + fL(inp.sw, 1, sm)))
-            rows.add(Row("Upar floor par jagya", fL(inp.sw, 1, sm) + " × " + fL(inp.sw, 1, sm)))
+            if (d.landingCount > 0) rows.add(Row("Landing (" + d.landingCount + ")", fL(d.landingLen) + " × " + fL(inp.sw)))
+            rows.add(Row("Upar floor par jagya", fL(inp.sw) + " × " + fL(inp.sw)))
             d.code.forEach { rows.add(Row(it, "⚠", true)) }
             if (rules.highRise) rows.add(Row(if (d.highRiseOk) "High-rise: chalegi (seedhi flight, landing)" else "High-rise: nahi chalegi", if (d.highRiseOk) "✓" else "✗", !d.highRiseOk))
 
