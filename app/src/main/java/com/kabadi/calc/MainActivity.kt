@@ -141,8 +141,15 @@ class MainActivity : Activity() {
     /** login / OTP switched off for now: the app opens straight away. Set true to bring it back. */
     private val LOGIN_ON = Account.ENABLED
 
+    /** this phone's own contact number (10 digits, "" if not given yet) */
+    private fun myMobile() = Account.mobile(this).ifBlank { Store.mobile }.filter { it.isDigit() }.takeLast(10)
+
     private fun route() {
-        if (!LOGIN_ON || !Account.REQUIRED) return startApp()
+        if (!LOGIN_ON || !Account.REQUIRED) {
+            // the phone's own contact number is required, so it shows in the admin's user list
+            if (LOGIN_ON && !Account.isAdmin(this) && (myMobile().length != 10 || Account.name(this).ifBlank { Store.owner }.isBlank())) return showNeedMobile()
+            return startApp()
+        }
         // admin phone: always opens straight away (no sign in / sign out)
         if (Account.isAdmin(this)) { if (!Account.verified(this) && Account.exists(this)) Account.approveAsAdmin(this); return startApp() }
         when {
@@ -196,6 +203,35 @@ class MainActivity : Activity() {
 
     private fun link(t: String, act: () -> Unit) = small(t, BLUE).apply {
         gravity = Gravity.CENTER; textSize = 15f; setPadding(0, dpi(14f), 0, 0); setOnClickListener { act() }
+    }
+
+    /** first open: user name + own contact number (required), no OTP */
+    private fun showNeedMobile() {
+        var name = Account.name(this).ifBlank { Store.owner }
+        var mob = myMobile()
+        val body = loginScreen(L.t("nm_title")) { startApp() }
+        body.addView(small(L.t("nm_sub")).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, dpi(12f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(langRow { showNeedMobile() }, gap())
+        body.addView(small(L.t("u_name").uppercase() + " *", INK).apply { typeface = Typeface.DEFAULT_BOLD })
+        body.addView(input(L.t("u_name"), name, false) { name = it }.apply { textSize = 17f }, gap())
+        body.addView(small(L.t("u_mobile").uppercase() + " *", INK).apply { typeface = Typeface.DEFAULT_BOLD })
+        body.addView(mobileInput("98xxxxxxxx", mob) { mob = it }.apply { textSize = 18f }, gap())
+        body.addView(bigButton("✅ " + L.t("nm_go"), GREEN) {
+            val m = mob.filter { it.isDigit() }
+            when {
+                name.isBlank() -> toast(L.t("u_name"))
+                m.length != 10 -> toast(L.t("acc_bad_mobile"))
+                else -> {
+                    Account.create(this, name.trim(), m, "")
+                    if (Store.owner.isBlank()) Store.owner = name.trim()
+                    if (Store.mobile.isBlank()) Store.mobile = m
+                    Store.save(this); hideKeyboard()
+                    // tell the admin right away (not after 6 hours)
+                    getSharedPreferences("kabadi_acct", MODE_PRIVATE).edit().putLong("ping", 0L).apply()
+                    startApp()
+                }
+            }
+        }, gap())
     }
 
     /** 1) Create new account: user name + contact number → request to the owner on WhatsApp */
@@ -407,7 +443,8 @@ class MainActivity : Activity() {
                 box.addView(row(small(nm.ifBlank { "—" }, INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD } to 1f,
                     small(when (st) { "ok" -> "✅ " + L.t("f_ok"); "block" -> "🚫 " + L.t("f_block"); else -> "❌ " + L.t("f_no") },
                         when (st) { "ok" -> GREEN; "block" -> RED; else -> MUTED }).apply { typeface = Typeface.DEFAULT_BOLD } to 0f))
-                box.addView(small("📞 " + m + "   #" + d + "   •  " + Bill.dateText(u.optLong("t")).substringBefore("  ")))
+                box.addView(small((if (m.length == 10) "📞 $m" else "📞 ⚠ " + L.t("nm_missing")) + "   #" + d + "   •  " + Bill.dateText(u.optLong("t")).substringBefore("  "),
+                    if (m.length == 10) MUTED else RED))
                 val info = seen["$m:$d"]
                 if (info != null) {
                     val act = info.optLong("at") > week
