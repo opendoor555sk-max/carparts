@@ -39,18 +39,8 @@ object Account {
     fun signOut(c: Context) = p(c).edit().putBoolean("in", false).apply()
     fun signIn(c: Context) = p(c).edit().putBoolean("in", true).apply()
 
-    /** numbers that must never be admin (normal users) */
-    private val NOT_ADMIN = setOf("7203960120")      // Nauman
-
-    fun isAdmin(c: Context): Boolean {
-        if (p(c).getString("adm", "") != hash("admin", device(c))) return false
-        if (mobile(c).filter { it.isDigit() }.takeLast(10) in NOT_ADMIN) { p(c).edit().remove("adm").apply(); return false }
-        return true
-    }
-    fun makeAdmin(c: Context) {
-        if (mobile(c).filter { it.isDigit() }.takeLast(10) in NOT_ADMIN) return
-        p(c).edit().putString("adm", hash("admin", device(c))).apply()
-    }
+    fun isAdmin(c: Context) = p(c).getString("adm", "") == hash("admin", device(c))
+    fun makeAdmin(c: Context) = p(c).edit().putString("adm", hash("admin", device(c))).apply()
 
     @SuppressLint("HardwareIds")
     fun device(c: Context): String = Otp.deviceCode(Settings.Secure.getString(c.contentResolver, Settings.Secure.ANDROID_ID) ?: "none")

@@ -2525,7 +2525,8 @@ class MainActivity : Activity() {
         o.addView(labeled(L.t("address"), input(L.t("address"), Store.address, false) { Store.address = it; Store.save(this) }))
         body.addView(o, cardLp())
 
-        if (LOGIN_ON && Account.exists(this)) {
+        // the admin phone does not need this card (admin has its own button on the home page)
+        if (LOGIN_ON && Account.exists(this) && !Account.isAdmin(this)) {
             val ac = card()
             ac.addView(heading(L.t("acc_sec")))
             ac.addView(small(Account.name(this) + "   📞 " + Account.mobile(this) + (if (Account.isAdmin(this)) "   👑" else ""), INK).apply { textSize = 15f; setPadding(0, 0, 0, dpi(8f)) })

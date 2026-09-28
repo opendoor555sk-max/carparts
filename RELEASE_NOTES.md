@@ -1,3 +1,5 @@
+Admin phone ni Settings mathi 'Account & PIN lock' (naam/number + 'Admin: make OTP') kadhi nakhyu. Admin tamara phone par j raheshe.
+
 Vechan: gaadi kharidi hoy tyare j gaadi na parts na button. Fakt bijo maal kharidyo hoy to je kharidyu te j aapmele vechan ma aave (naam + vajan). Vechta ochhu vajan = ghat, nuksan kharidi bhav thi dekhay.
 Final hisab sudhar: user '🙏 सुधार के लिए एडमिन से इजाज़त माँगें' dabave → Admin screen ma '🔓 सुधार की माँग' ✅/❌ → ha kahe to user no hisab khule, sudhari ne pharithi Final.
 
