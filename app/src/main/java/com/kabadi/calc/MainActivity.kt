@@ -903,7 +903,7 @@ class MainActivity : Activity() {
         val late = dues.count { it.due != null && it.due <= Reminders.endOfToday() }
         // ---- 6 big round buttons: about 80% of the screen ----
         val dm = resources.displayMetrics
-        val rowH = ((dm.heightPixels * 0.8f - dp(70f)) / 3f).toInt()
+        val rowH = ((dm.heightPixels * 0.8f - dp(70f)) / 4f).toInt()
         val d = minOf(rowH - dpi(12f), (dm.widthPixels - dpi(20f)) / 2 - dpi(16f))
         fun circle(icon: String, label: String, color: Int, act: () -> Unit): View {
             val txt = android.text.SpannableString(icon + "\n" + label).apply {
@@ -921,15 +921,46 @@ class MainActivity : Activity() {
         fun gridRow(a1: View, a2: View) = LinearLayout(this).apply {
             addView(a1, llp(0, rowH, 1f)); addView(a2, llp(0, rowH, 1f))
         }
+        // picture buttons (name is inside the picture); a red badge shows a count
+        fun pic(res: Int, desc: String, badge: String = "", act: () -> Unit): View {
+            val iv = android.widget.ImageView(this).apply {
+                setImageResource(res); scaleType = android.widget.ImageView.ScaleType.FIT_CENTER; contentDescription = desc
+                elevation = dp(6f)
+                outlineProvider = object : android.view.ViewOutlineProvider() {
+                    override fun getOutline(v: View, o: android.graphics.Outline) { o.setOval(0, 0, v.width, v.height) }
+                }
+                foreground = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x44FFFFFF),
+                    null, GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) })
+                isClickable = true
+                setOnClickListener { act() }
+                setOnTouchListener { v, e ->
+                    when (e.action) {
+                        android.view.MotionEvent.ACTION_DOWN -> v.animate().scaleX(0.93f).scaleY(0.93f).setDuration(80).start()
+                        android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+                    }
+                    false
+                }
+            }
+            return FrameLayout(this).apply {
+                addView(iv, FrameLayout.LayoutParams(d, d, Gravity.CENTER))
+                if (badge.isNotEmpty()) addView(TextView(this@MainActivity).apply {
+                    text = badge; textSize = 15f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+                    background = round(RED, 14f, Color.WHITE); setPadding(dpi(8f), dpi(2f), dpi(8f), dpi(2f)); elevation = dp(10f)
+                }, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+            }
+        }
         body.addView(gridRow(
-            circle("🚚", L.t("new_gaadi").removePrefix("+ "), GREEN) { newHisab("gaadi") },
-            circle("🔨", L.t("new_haraji").removePrefix("+ "), 0xFF6A1B9A.toInt()) { newHisab("haraji") }))
+            pic(R.drawable.home_gaadi, L.t("new_gaadi")) { newHisab("gaadi") },
+            pic(R.drawable.home_haraji, L.t("new_haraji")) { newHisab("haraji") }))
         body.addView(gridRow(
-            circle("📦", L.t("new_lot").removePrefix("+ "), 0xFF1565C0.toInt()) { newHisab("lot") },
-            circle("🤝", L.t("party_tile"), 0xFF5D4037.toInt()) { showParties() }))
+            pic(R.drawable.home_lot, L.t("new_lot")) { newHisab("lot") },
+            pic(R.drawable.home_party, L.t("party_tile")) { showParties() }))
         body.addView(gridRow(
-            circle("📒", L.t("khata_btn").substringAfter(" ") + (if (late > 0) "\n⚠ $late" else ""), if (late > 0) RED else 0xFF455A64.toInt()) { showKhata() },
-            circle("📊", L.t("report_btn").substringAfter(" "), 0xFF00695C.toInt()) { showReport() }))
+            pic(R.drawable.home_mudi, L.t("mudi_h")) { showRole("mudi") },
+            pic(R.drawable.home_khed, L.t("khed_h")) { showRole("khed") }))
+        body.addView(gridRow(
+            pic(R.drawable.home_khata, L.t("khata_btn"), if (late > 0) "⚠ $late" else "") { showKhata() },
+            pic(R.drawable.home_report, L.t("report_btn")) { showReport() }))
         if (Store.shared.isNotEmpty()) body.addView(bigButton("👁 " + L.t("sh_title") + " (" + Store.shared.size + ")", BLUE) { showShared() }
             .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         val rem = reminders(Store.hisabs)
@@ -2088,6 +2119,59 @@ class MainActivity : Activity() {
             c.setOnClickListener { showEditor(h, sh) }
             body.addView(c, cardLp())
         }
+    }
+
+    // ================= MUDI MALIK / KHEDUT: every person, his hisab and his share =================
+    private fun showRole(role: String) {
+        autoSave(); editing = null
+        val title = if (role == "mudi") "💰 " + L.t("mudi_h") else "🚚 " + L.t("khed_h")
+        val body = setScreen("role_$role", title, null)
+        fun nameOf(h: Hisab) = (if (role == "mudi") h.mudiName else h.khedName).trim()
+        fun mobOf(h: Hisab) = if (role == "mudi") h.mudiMobile else h.khedMobile
+        fun shareOf(h: Hisab) = if (role == "mudi") h.mudiShare() else h.khedShare()
+        val groups = Store.hisabs.filter { nameOf(it).isNotEmpty() }.groupBy { norm(nameOf(it)) }
+            .values.sortedByDescending { g -> g.maxOf { it.time } }
+        val tot = card()
+        val all = groups.flatten()
+        tot.addView(small(groups.size.toString() + " " + L.t("role_people") + "   •   " + all.size + " " + L.t("u_hisab"), INK).apply { textSize = 15f })
+        val sum = all.sumOf { shareOf(it) }
+        tot.addView(TextView(this).apply { text = (if (sum >= 0) L.t("profit") else L.t("loss")) + ": " + money(Math.abs(sum)); textSize = 19f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (sum >= 0) GREEN else RED) })
+        body.addView(tot, cardLp())
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun fill(q: String) {
+            list.removeAllViews()
+            groups.filter { g -> q.isBlank() || norm(nameOf(g.first())).contains(norm(q)) || g.any { digits10(mobOf(it)).contains(q.filter { c -> c.isDigit() }.ifEmpty { "~" }) } }.forEach { g ->
+                val nm = nameOf(g.maxByOrNull { it.time }!!)
+                val mob = g.map { digits10(mobOf(it)) }.firstOrNull { it.length == 10 } ?: ""
+                val s = g.sumOf { shareOf(it) }
+                val c = card()
+                c.addView(row(TextView(this).apply { text = nm; textSize = 18f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD; maxLines = 1 } to 1f,
+                    TextView(this).apply { text = (if (s >= 0) "▲ " else "▼ ") + money(Math.abs(s)); textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (s >= 0) GREEN else RED) } to 0f))
+                c.addView(small(listOf(if (mob.isNotEmpty()) "📞 $mob" else "📞 —", g.size.toString() + " " + L.t("u_hisab")).joinToString("   •   ")))
+                val det = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+                g.sortedByDescending { it.time }.forEach { h ->
+                    val sh = shareOf(h)
+                    val pct = if (role == "mudi") h.mudiPct else h.khedPct
+                    det.addView(row(small((if (h.finalAt > 0) "✅ " else "") + hTitle(h).ifBlank { h.vehicleInfo() } + "\n" + Bill.dateText(h.time).substringBefore("  ") + "   •   " + plain(pct) + "%", INK)
+                        .apply { textSize = 14f } to 1f,
+                        small(money(sh), if (sh >= 0) GREEN else RED).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD } to 0f).apply {
+                        setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(6f)); background = round(0xFFF5F5F5.toInt(), 8f)
+                        setOnClickListener { editorBack = { showRole(role) }; showEditor(h) }
+                    }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(4f) })
+                }
+                if (mob.isNotEmpty()) det.addView(row(
+                    bigButton("💬 WhatsApp", 0xFF25D366.toInt()) { whatsapp(mob, "") }.apply { textSize = 14f } to 1f,
+                    bigButton("📞", BLUE) { try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$mob"))) } catch (_: Exception) {} }.apply { textSize = 14f } to 0f)
+                    .apply { setPadding(0, dpi(6f), 0, 0) })
+                c.addView(det)
+                c.setOnClickListener { det.visibility = if (det.visibility == View.GONE) View.VISIBLE else View.GONE }
+                list.addView(c, cardLp())
+            }
+            if (list.childCount == 0) list.addView(small(L.t("none")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        }
+        body.addView(input("🔍 " + L.t("f_search"), "", false) { fill(it) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+        body.addView(list)
+        fill("")
     }
 
     // ================= VASULI: daily reminders from 3 days before the credit time =================

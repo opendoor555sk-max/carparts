@@ -1,3 +1,5 @@
+Home par nava 8 sundar chitra vala button: Gaadi hisab, Haraji/company, Lot, Kharid-bikri khata, Mudi malik, Khedut, Udhaar khata, Report. Mudi malik / Khedut button thi darek vyakti, eno number, hisab ane nafo/nuksan.
+
 Settings mathi 'खाता और PIN लॉक' (naam + number) puru kadhi nakhyu — badha phone ma.
 
 Settings mathi '👑 Admin login' link kadhi nakhi.

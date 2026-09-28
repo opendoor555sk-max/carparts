@@ -108,6 +108,7 @@ object L {
         "unl_none" to arrayOf("No request", "कोई माँग नहीं", "કોઈ માંગ નથી"),
         "unl_give" to arrayOf("Allow", "इजाज़त दें", "પરવાનગી આપો"),
         "unl_new" to arrayOf("correction request — see", "सुधार की माँग — देखें", "સુધારની માંગ — જુઓ"),
+        "role_people" to arrayOf("people", "लोग", "લોકો"),
         "bought" to arrayOf("Bought", "खरीदा", "ખરીદ્યું"),
         "kami" to arrayOf("Short", "कमी", "ઘટ"),
         "loss_buy" to arrayOf("loss (at purchase rate)", "नुकसान (खरीदी भाव से)", "નુકસાન (ખરીદી ભાવે)"),
