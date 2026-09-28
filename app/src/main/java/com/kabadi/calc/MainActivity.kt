@@ -137,6 +137,8 @@ class MainActivity : Activity() {
 
     private fun route() {
         if (!LOGIN_ON) return startApp()
+        // admin phone: always opens straight away (no sign in / sign out)
+        if (Account.isAdmin(this)) { if (!Account.verified(this) && Account.exists(this)) Account.approveAsAdmin(this); return startApp() }
         when {
             !Account.exists(this) -> showSignup()
             !Account.verified(this) -> showOtp()
@@ -194,7 +196,8 @@ class MainActivity : Activity() {
     private fun showSignup(prefill: String = "") {
         var name = Account.name(this).ifBlank { Store.owner }
         var mob = prefill.ifBlank { Account.mobile(this).ifBlank { Store.mobile.filter { it.isDigit() }.takeLast(10) } }
-        val body = loginScreen(L.t("su_title")) { if (name.isNotBlank() && mob.length == 10) { Account.create(this, name.trim(), mob, ""); Account.approveAsAdmin(this); Reminders.schedule(this); startApp() } else toast(L.t("adm_fill_first")) }
+        val body = loginScreen(L.t("su_title")) {
+            Account.create(this, name.trim().ifBlank { Store.owner.ifBlank { "Admin" } }, mob, ""); Account.approveAsAdmin(this); Reminders.schedule(this); startApp() }
         body.addView(small(L.t("su_sub")).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, dpi(12f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
         body.addView(langRow { showSignup(prefill) }, gap())
         body.addView(small(L.t("u_name").uppercase(), INK).apply { typeface = Typeface.DEFAULT_BOLD })
@@ -271,7 +274,9 @@ class MainActivity : Activity() {
 
     /** 3) Sign in: contact number (approved on this phone before) */
     private fun showSignin() {
-        val body = loginScreen(L.t("si_title")) { if (Account.exists(this)) { Account.approveAsAdmin(this); Reminders.schedule(this); startApp() } else showSignup() }
+        val body = loginScreen(L.t("si_title")) {
+            if (!Account.exists(this)) Account.create(this, Store.owner.ifBlank { "Admin" }, Store.mobile.filter { it.isDigit() }.takeLast(10), "")
+            Account.approveAsAdmin(this); Reminders.schedule(this); startApp() }
         var mob = Account.mobile(this)
         body.addView(small(L.t("u_mobile").uppercase(), INK).apply { typeface = Typeface.DEFAULT_BOLD })
         body.addView(mobileInput("98xxxxxxxx", mob) { mob = it }.apply { textSize = 18f }, gap())
@@ -2082,10 +2087,7 @@ class MainActivity : Activity() {
             fun sp(t: String, on: Boolean, col: Int, top: Boolean, a: () -> Unit) = ac.addView(pill(t, on, col, a).apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) },
                 llp(MATCH_PARENT, WRAP_CONTENT).apply { if (top) topMargin = dpi(8f) })
             if (Account.isAdmin(this)) sp("👑 " + L.t("adm_btn"), true, 0xFF6A1B9A.toInt(), false) { showAdmin() }
-            val on = Account.locked(this)
-            sp(L.t(if (on) "acc_lock_on" else "acc_lock_off"), on, GREEN, Account.isAdmin(this)) { Account.setLock(this, !on); showSettings() }
-            sp(L.t("acc_change"), false, BLUE, true) { askNewPin {} }
-            sp(L.t("signout"), false, RED, true) { signOut() }
+            if (!Account.isAdmin(this)) sp(L.t("signout"), false, RED, false) { signOut() }
             body.addView(ac, cardLp())
         }
 
