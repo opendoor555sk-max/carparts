@@ -1,3 +1,5 @@
+Stair Planner: tamara riser/tread j vaparay che — laal 'galat' nishan kadhi nakhya; code ni vaat have alag 'ⓘ Salah' ma. Pohlai feet-inch ma (3ft 3in).
+
 Stair Planner puru (14 prakar): Bhag 4-7 — Three-quarter turn, L-Winder, Two-quarter winder, U-Winder (winder ni andar / chalvani line / bahar pohlai), Spiral (gol, pole), Helical (gol, vachche khullu), Bifurcated (be baju), Scissor (high-rise fire escape). "★ Badhi sidi (PDF)" thi badha prakar na drawing ek sathe ane PDF.
 
 Stair Planner Bhag 3: Dog-legged ane Open-well sidi (180° vadank, paholi landing). Open-well mate vachche khali jagya (well) nu maap nakhi shakay.

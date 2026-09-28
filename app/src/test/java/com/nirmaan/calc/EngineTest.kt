@@ -461,7 +461,7 @@ class EngineTest {
         assertTrue(sp.links.isNotEmpty())
         val vals = mapOf("L" to "20'", "W" to "8'", "H" to "10'", "sw" to "3'", "dr" to "7\"", "dt" to "10\"")
         val r = formRows(vals, "Ghar|1 Straight")
-        assertTrue(r.v("Riser (oonchai) × ginti").endsWith("× 18"))
+        assertTrue(r.v("Riser (oonchai) × ginti").contains("× 18"))
         // straight: 18 risers in one flight -> fits but code warning
         assertTrue(r.first { it.label.endsWith("1 Straight") }.value.startsWith("✓"))
         assertTrue(r.first { it.label.endsWith("1 Straight") }.value.contains("⚠"))
@@ -584,6 +584,20 @@ class EngineTest {
         // no room given: nothing crashes, fit shows —
         val nr = formRows(vals + ("L" to "") + ("W" to ""), "Ghar|7 Three-quarter")
         assertTrue(nr.first { it.label.endsWith("7 Three-quarter") }.value.startsWith("—"))
+    }
+
+    @Test fun stairPlannerUsesOwnRiserTread() {
+        // user's own 8" riser / 8" tread: used as given, not shown as an error
+        e.stairPlanner()
+        val r = formRows(mapOf("L" to "20'", "W" to "8'", "H" to "10'", "sw" to "", "dr" to "8\"", "dt" to "8\""), "Ghar|1 Straight")
+        val riser = r.first { it.label == "Riser (oonchai) × ginti" }
+        assertTrue(riser.value, riser.value.startsWith("8in × 15"))
+        assertTrue(!riser.warn && !r.first { it.label == "Tread (pag ki jagah)" }.warn)
+        assertTrue(r.any { it.value == "salah" && it.label.contains("riser") })
+        // code width rounded to a whole inch: 1.0 m -> 3ft 3in
+        assertTrue(r.v("Seedhi ki pohlai"), r.v("Seedhi ki pohlai").startsWith("3ft 3in"))
+        // flight uses 8" treads: 15 risers -> 14 treads -> 9ft 4in
+        assertTrue(r.v("Flight 1"), r.v("Flight 1").contains("9ft 4in"))
     }
 
     @Test fun stairKeyLinksToPlanner() {

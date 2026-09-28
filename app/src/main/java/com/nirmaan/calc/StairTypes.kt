@@ -888,7 +888,9 @@ fun Engine.stairPlanner() {
             val n = ceil(H / dr - 1e-9).toInt()
             if (n > 80) return@FormSpec listOf(Row("Bahut zyada pagthiye — values check karein", "—", true))
             val swIn = v["sw"] ?: Double.NaN
-            val inp = Input(v["L"] ?: Double.NaN, v["W"] ?: Double.NaN, H, if (swIn > 0) swIn else rules.wMin, swIn > 0,
+            // code minimum width, rounded to a whole inch / cm so it is easy to mark
+            val swDef = if (m) kotlin.math.round(rules.wMin * 100) / 100 else kotlin.math.round(rules.wMin / IN) * IN
+            val inp = Input(v["L"] ?: Double.NaN, v["W"] ?: Double.NaN, H, if (swIn > 0) swIn else swDef, swIn > 0,
                 n, H / n, dt, rules, (v["wg"] ?: 0.0).let { if (it > 0) it else 0.0 })
             val designs = STAIR_TYPES.map { buildDesign(it.first, it.second, inp) }
             val order = preference(bld)
@@ -908,14 +910,21 @@ fun Engine.stairPlanner() {
 
             val ang = atan(inp.ur / inp.ut) * 180 / PI
             rows.add(sec("Pagthiye (sab prakar ke liye)"))
-            rows.add(Row("Riser (oonchai) × ginti", fL(inp.ur, 1, sm) + " × " + n, inp.ur > rules.rMax + 1e-6))
-            rows.add(Row("Tread (pag ki jagah)", fL(inp.ut, 1, sm), inp.ut < rules.tMin - 1e-6))
-            rows.add(Row("Seedhi ki pohlai", fL(inp.sw, 1, sm) + if (swIn > 0) "" else "  (code ki kam se kam)", inp.sw < rules.wMin - 1e-6))
-            rows.add(Row("2R + T (60–65 cm theek)", fL(2 * inp.ur + inp.ut, 1, sm)))
-            rows.add(Row("Dhalan (angle)", f2(ang) + "°", ang > 42))
-            if (inp.ur > rules.rMax + 1e-6) rows.add(Row("$bld: riser max " + fL(rules.rMax, 1, sm), "⚠", true))
-            if (inp.ut < rules.tMin - 1e-6) rows.add(Row("$bld: tread kam se kam " + fL(rules.tMin, 1, sm), "⚠", true))
-            if (inp.sw < rules.wMin - 1e-6) rows.add(Row("$bld: pohlai kam se kam " + fL(rules.wMin, 1, sm), "⚠", true))
+            // your own riser / tread are used as given; the code limits are only shown as advice
+            rows.add(Row("Riser (oonchai) × ginti", fL(inp.ur, 1, sm) + " × " + n + "  (tamaru maap)"))
+            rows.add(Row("Tread (pag ki jagah)", fL(inp.ut, 1, sm) + "  (tamaru maap)"))
+            rows.add(Row("Seedhi ki pohlai", fL(inp.sw) + if (swIn > 0) "" else "  (code ki kam se kam)"))
+            rows.add(Row(if (m) "2R + T (60–65 cm aaramdayak)" else "2R + T (24–25 in aaramdayak)", fL(2 * inp.ur + inp.ut, 1, sm)))
+            rows.add(Row("Dhalan (angle)", f2(ang) + "°"))
+            val adv = ArrayList<String>()
+            if (inp.ur > rules.rMax + 1e-6) adv.add("$bld code: riser vadhu ma vadhu " + fL(rules.rMax, 1, sm))
+            if (inp.ut < rules.tMin - 1e-6) adv.add("$bld code: tread ochha ma ochha " + fL(rules.tMin, 1, sm))
+            if (inp.sw < rules.wMin - 1e-6) adv.add("$bld code: pohlai ochha ma ochhi " + fL(rules.wMin))
+            if (ang > 42) adv.add("Dhalan 42° thi vadhu — seedhi ubhi (chadvama bhari)")
+            if (adv.isNotEmpty()) {
+                rows.add(sec("ⓘ Salah (code mujab) — seedhi tamara maap thi j bane che"))
+                adv.forEach { rows.add(Row(it, "salah")) }
+            }
 
             if (pick == ALL_OPT) {
                 // every type one after another (for the PDF)
