@@ -1,3 +1,5 @@
+Admin phone: final (✅) hisab pan delete thai shake (list ma dabavi rakho ke hisab ma 🗑). Bija users mate final hisab lock j rahe.
+
 Seller / Buyer badhe thi kadhi nakhyu. 'Aa hisab kon lakhe che' ma Mudi malik / Khedut mota button. Gaadi ane Haraji hisab ma kharidi vakhate gaadi ane/athva '＋ 📦 bijo maal' (naam lakho, kg × bhav ke fix) — Lot ma pehla thi che. Kul kharidi bill ma pan.
 
 Navu: Home par '🎤 कोई परेशानी? बोलकर एडमिन को बताएँ' — user bolkar (60 sec sudhi) ke lakhine moklo. Admin screen ma '🎤 यूज़र की परेशानी' — naam, number, samay, ▶ sambhlo, WhatsApp / call. Admin phone par navo sandesh aave to notification.

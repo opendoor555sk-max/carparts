@@ -209,7 +209,7 @@ class MainActivity : Activity() {
     private fun showNeedMobile() {
         var name = Account.name(this).ifBlank { Store.owner }
         var mob = myMobile()
-        val body = loginScreen(L.t("nm_title")) { startApp() }
+        val body = loginScreen(L.t("nm_title"))
         body.addView(small(L.t("nm_sub")).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, dpi(12f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
         body.addView(langRow { showNeedMobile() }, gap())
         body.addView(small(L.t("u_name").uppercase() + " *", INK).apply { typeface = Typeface.DEFAULT_BOLD })
@@ -978,8 +978,10 @@ class MainActivity : Activity() {
     }
 
     private fun askDelete(h: Hisab, after: () -> Unit) {
-        if (h.finalAt > 0) return toast(L.t("locked_del"))
-        AlertDialog.Builder(this).setMessage(L.t("del_q") + "\n" + hTitle(h) + "  " + money(h.munafa()))
+        // admin phone may delete anything, even a final hisab
+        val admin = LOGIN_ON && Account.isAdmin(this)
+        if (h.finalAt > 0 && !admin) return toast(L.t("locked_del"))
+        AlertDialog.Builder(this).setMessage((if (h.finalAt > 0) "👑 ✅ " + L.t("final_s") + "\n" else "") + L.t("del_q") + "\n" + hTitle(h) + "  " + money(h.munafa()))
             .setPositiveButton(L.t("yes")) { _, _ -> Store.hisabs.remove(h); Store.save(this); after() }
             .setNegativeButton(L.t("no"), null).show()
     }
@@ -1545,7 +1547,7 @@ class MainActivity : Activity() {
         act(L.t("jpg"), ORANGE) { exportJpg(h) }
         act(L.t("pdf"), RED) { exportPdf(h) }
         act(L.t("share"), GREEN) { shareText(h) }
-        if (view == null && Store.hisabs.any { it === h } && h.finalAt == 0L) act("🗑", 0xFF78909C.toInt()) { askDelete(h) { editing = null; showHome() } }
+        if (view == null && Store.hisabs.any { it === h } && (h.finalAt == 0L || (LOGIN_ON && Account.isAdmin(this)))) act("🗑", 0xFF78909C.toInt()) { askDelete(h) { editing = null; showHome() } }
     }
 
     /** each lot's total line in the editor (updated with the totals) */
