@@ -694,7 +694,10 @@ private fun Engine.spiralDesign(id: Int, name: String, inp: Input): Design {
     val sw = if (inp.swGiven) inp.sw else if (metric) 0.76 else 30 * IN
     val R = pr + sw
     val rw = pr + min(0.45, sw / 2)
-    val th = inp.ut / rw
+    // head room: one full turn must rise at least 2.03 m (6' 8"); so the angle per tread is limited
+    val head = if (metric) 2.03 else 80 * IN
+    val th = min(inp.ut / rw, 2 * PI * inp.ur / head)
+    val walkG = th * rw          // tread on the walking line (may be less than the given tread)
     val t = max(0, inp.n - 1)
     val landA = PI / 2
     val total = t * th + landA
@@ -706,6 +709,7 @@ private fun Engine.spiralDesign(id: Int, name: String, inp: Input): Design {
     if (inp.rules.name != "Ghar") code.add("Spiral: " + inp.rules.name + " ma exit seedhi tarike na chale")
     if (perTurn < 2.0) code.add("Sir takrase: ek pheri ma oonchai " + fL(perTurn) + " (" + (if (metric) "2.0 m" else "6'6\"") + " joie)")
     if (sw < 0.66) code.add("Spiral ni pohlai " + (if (metric) "66 cm" else "26\"") + " thi ochhi")
+    if (walkG < 0.19) code.add("Spiral: chalvani line par pag " + fL(walkG, 1, sm) + " (" + (if (metric) "19 cm" else "7-1/2\"") + " joie) — riser vadharo")
     // plan: centre at (R, R)
     val cx = R
     val cy = R
@@ -716,8 +720,10 @@ private fun Engine.spiralDesign(id: Int, name: String, inp: Input): Design {
     for (k in 0 until t) {
         val a = a0 + k * th
         shapes.add(Shape(sector(cx, cy, pr, R, a, a + th), WOOD))
-        if (t * th - k * th <= 2 * PI) {          // numbers only for the treads seen from above
-            val am = a + th / 2
+        val am = a + th / 2
+        // numbers only for treads seen from above (last full turn, not under the upper floor)
+        val underTop = t * th > 2 * PI - landA && ((am - (a0 + t * th)) % (2 * PI) + 2 * PI) % (2 * PI) < landA
+        if (t * th - k * th <= 2 * PI && !underTop) {
             labels.add(Label(P(cx + (R * 0.72) * cos(am), cy + (R * 0.72) * sin(am)), (k + 1).toString(), 8.5f, DARK))
         }
     }
@@ -729,7 +735,7 @@ private fun Engine.spiralDesign(id: Int, name: String, inp: Input): Design {
     val arrowEnd = a0 + min(t * th + landA / 2, 2 * PI * 0.92)
     val arrows = listOf(arc(cx, cy, rw, a0 + th * 0.3, arrowEnd))
     roomShape(inp, rotated, 0.0, 0.0, shapes, labels)
-    val runs = listOf(Run(inp.n, inp.ut, sw, sw))
+    val runs = listOf(Run(inp.n, walkG, sw, sw))
     val deg = th * 180 / PI
     val plan = PlanDrawing("Upar se (plan) — Spiral (gol ghumti)", shapes, labels, arrows, listOf(
         "Chahiye: " + fL(D) + " × " + fL(D) + "  •  pohlai " + fL(sw, 1, sm),
@@ -742,7 +748,8 @@ private fun Engine.spiralDesign(id: Int, name: String, inp: Input): Design {
         Row("Pag no khuno (angle)", f2(deg) + "°  •  ek pheri ma " + num(rnd(2 * PI / th, 1)) + " pag"),
         Row("Kul ghumav", f2(total * 180 / PI) + "°  (" + num(rnd(total / (2 * PI), 2)) + " pheri)"),
         Row("Pag ni pohlai — pole paase", fL(pr * th, 1, sm)),
-        Row("Pag — chalvani line (" + fL(rw - pr, 1, sm) + " andar thi)", fL(inp.ut, 1, sm)),
+        Row("Pag — chalvani line (" + fL(rw - pr, 1, sm) + " andar thi)", fL(walkG, 1, sm) +
+            if (walkG < inp.ut - 1e-6) "  (sir mate tamara tread thi ochhu)" else "", walkG < 0.19),
         Row("Pag — bahar ni kinaar", fL(R * th, 1, sm)),
         Row("Ek pheri ma oonchai (sir mate)", fL(perTurn), perTurn < 2.0),
         sec("Steel (MS) — Spiral"),
@@ -781,10 +788,10 @@ private fun Engine.helicalDesign(id: Int, name: String, inp: Input): Design {
     val sw = inp.sw
     val room = inp.L > 0 && inp.W > 0
     fun over(h: Helix) = overflow(inp, h.x1 - h.x0, h.y1 - h.y0)
-    val hx = if (room) {
-        val all = (0..114).map { helix(inp, 0.3 + it * 0.05, sw) }
-        all.filter { over(it) <= 0.0 }.maxByOrNull { it.ri } ?: all.minByOrNull { over(it) }!!
-    } else helix(inp, 1.0, sw)
+    // smallest comfortable inner radius: at least 0.9 m (3 ft), inner tread ≥ 15 cm, and less than one full turn
+    val all = (0..102).map { helix(inp, 0.9 + it * 0.05, sw) }.filter { it.ri * it.th >= 0.15 - 1e-9 && it.sweep <= 2 * PI * 0.97 }
+        .ifEmpty { listOf(helix(inp, 1.5, sw)) }
+    val hx = if (room) all.firstOrNull { over(it) <= 0.0 } ?: all.minByOrNull { over(it) }!! else all.first()
     val needL = hx.x1 - hx.x0
     val needW = hx.y1 - hx.y0
     var (fits, rotated, why) = fitOf(inp, needL, needW)
@@ -817,8 +824,8 @@ private fun Engine.helicalDesign(id: Int, name: String, inp: Input): Design {
     }
     val la = a0 + t * th
     shapes.add(Shape(sector(0.0, 0.0, ri, ro, la, la + sw / hx.rw), FLOOR))
-    labels.add(Label(P(0.0, 0.0), "+ kendra", 8f, 0xFF607D8B.toInt()))
-    labels.add(Label(P(0.0, -ri * 0.45), "andar R " + fL(ri), 8.5f, BLUE))
+    labels.add(Label(P(0.0, 0.0), "+", 10f, 0xFF607D8B.toInt()))
+    labels.add(Label(P(0.0, -ri * 0.35), "andar R " + fL(ri), 8.5f, BLUE))
     val arrows = listOf(arc(0.0, 0.0, hx.rw, a0 + th * 0.3, a0 + min(t * th + sw / hx.rw / 2, 2 * PI * 0.92)))
     roomShape(inp, rotated, hx.x0, hx.y0, shapes, labels)
     val maxF = inp.rules.maxPerFlight
@@ -946,10 +953,10 @@ fun Engine.stairPlanner() {
     ui.form(
         FormSpec(
             "Stair Planner", listOf(
-                Field("L", "Jagya ki lambai (stair ka kamra)", true, if (m) "600" else "20'", if (m) "cm mein" else "jaise 20' ya 18' 6\""),
-                Field("W", "Jagya ki pohlai", true, if (m) "250" else "8'"),
-                Field("H", "Oonchai (floor se floor)", true, lenTxt(T["rise"]?.v).ifEmpty { if (m) "300" else "10'" }),
-                Field("sw", "Seedhi ki pohlai (khali = code ki kam se kam)", true, "", if (m) "jaise 100 (cm)" else "jaise 3' 6\""),
+                Field("L", "Jagya ki lambai (stair ka kamra)", true, if (m) "600" else "20'", if (m) "cm mein" else "jaise 20 (fut) ya 18' 6\"", bare = 1),
+                Field("W", "Jagya ki pohlai", true, if (m) "250" else "8'", if (m) "cm mein" else "jaise 8 (fut)", bare = 1),
+                Field("H", "Oonchai (floor se floor)", true, lenTxt(T["rise"]?.v).ifEmpty { if (m) "300" else "10'" }, if (m) "cm mein" else "jaise 10 (fut)", bare = 2),
+                Field("sw", "Seedhi ki pohlai (khali = code ki kam se kam)", true, "", if (m) "jaise 100 (cm)" else "jaise 3.5 (fut) ya 42\"", bare = 3),
                 Field("dr", "Riser (sabse zyada)", true, if (m) "17.5" else "7\""),
                 Field("dt", "Tread (pag rakhne ki jagah)", true, if (m) "25" else "10\""),
                 Field("wg", "Open-well: be flight vachche khali jagya", true, if (m) "30" else "1'", "Dog-legged ma 0, Open-well ma aa")
@@ -969,7 +976,7 @@ fun Engine.stairPlanner() {
             if (n > 80) return@FormSpec listOf(Row("Bahut zyada pagthiye — values check karein", "—", true))
             val swIn = v["sw"] ?: Double.NaN
             // code minimum width, rounded to a whole inch / cm so it is easy to mark
-            val swDef = if (m) kotlin.math.round(rules.wMin * 100) / 100 else kotlin.math.round(rules.wMin / IN) * IN
+            val swDef = if (m) ceil(rules.wMin * 100 - 1e-9) / 100 else ceil(rules.wMin / IN - 1e-9) * IN
             val inp = Input(v["L"] ?: Double.NaN, v["W"] ?: Double.NaN, H, if (swIn > 0) swIn else swDef, swIn > 0,
                 n, H / n, dt, rules, (v["wg"] ?: 0.0).let { if (it > 0) it else 0.0 })
             val designs = STAIR_TYPES.map { buildDesign(it.first, it.second, inp) }
@@ -983,6 +990,7 @@ fun Engine.stairPlanner() {
             } + (if (d.code.isNotEmpty()) "  ⚠" else "")
 
             val rows = ArrayList<Row>()
+            rows.add(Row("Tame lakhyu: jagya", (if (inp.L > 0 && inp.W > 0) fL(inp.L) + " × " + fL(inp.W) else "—") + "  •  oonchai " + fL(H)))
             rows.add(sec("Kaunsi seedhi bethegi"))
             for (d in designs) rows.add(Row((if (d === best) "⭐ " else "") + d.name, status(d), d.fits == false))
             if (best != null) rows.add(Row("⭐ Salah: " + best.name.substringAfter(' '), bld))

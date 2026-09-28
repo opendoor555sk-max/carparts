@@ -103,7 +103,9 @@ class Field(
     val hint: String = "",
     val isPitch: Boolean = false,
     /** "AxB" text; compute receives key_a and key_b in metres */
-    val isSize: Boolean = false
+    val isSize: Boolean = false,
+    /** feet mode, a plain number without ' or ": 0 = inches, 1 = feet, 2 = feet up to 30 (more = inches), 3 = feet up to 12 */
+    val bare: Int = 0
 )
 
 class FormSpec(
@@ -1193,10 +1195,15 @@ class Engine(val ui: Ui) {
     }
 
     // ================= FORMS (Stair, Compound Miter) =================
-    fun parseLen(s0: String): Double {
+    fun parseLen(s0: String, bare: Int = 0): Double {
         var s = s0.trim().lowercase()
         if (s.isEmpty()) return Double.NaN
         if (metric) return (s.toDoubleOrNull() ?: Double.NaN) / 100
+        // a plain number for a room / floor height means feet ("10" = 10 ft, not 10 inch)
+        s.toDoubleOrNull()?.let { x ->
+            val feet = when (bare) { 1 -> true; 2 -> x <= 30; 3 -> x <= 12; else -> false }
+            if (feet) return x * 12 * IN
+        }
         s = s.replace(Regex("\"|in$|inch(es)?$"), "").trim()
         var ft = 0.0
         val m = Regex("^(-?\\d*\\.?\\d+)\\s*(?:'|ft|feet)\\s*(.*)$").find(s)
@@ -1234,8 +1241,8 @@ class Engine(val ui: Ui) {
         ui.form(
             FormSpec(
                 "Stairs Function", listOf(
-                    Field("rise", "Rise (floor to floor) – khali ho to Run se", true, lenTxt(T["rise"]?.v), if (m) "cm mein" else "jaise 9' 10\""),
-                    Field("run", "Run (khaali chhod sakte hain)", true, lenTxt(T["run"]?.v), if (m) "cm mein" else "jaise 12'"),
+                    Field("rise", "Rise (floor to floor) – khali ho to Run se", true, lenTxt(T["rise"]?.v), if (m) "cm mein" else "jaise 10 (fut) ya 9' 10\"", bare = 2),
+                    Field("run", "Run (khaali chhod sakte hain)", true, lenTxt(T["run"]?.v), if (m) "cm mein" else "jaise 12 (fut)", bare = 2),
                     Field("dr", "Desired Riser Height", true, M["riserh"]?.let { lenTxt(toLen(it)) } ?: if (m) "19" else "7-1/2\""),
                     Field("dt", "Desired Tread Width", true, M["treadw"]?.let { lenTxt(toLen(it)) } ?: if (m) "25" else "10\""),
                     Field("hr", "Headroom", true, if (m) "203" else "6' 8\""),

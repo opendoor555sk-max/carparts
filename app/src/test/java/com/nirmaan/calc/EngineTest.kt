@@ -695,4 +695,26 @@ class EngineTest {
         assertEquals(20, f.risers); assertEquals(152.4, f.riserMm, 1e-9); assertEquals(10, f.cementBags)
         assertTrue(concreteStair(0.0, 1000.0) == null)
     }
+
+    @Test
+    fun plannerFeetAndRoundStairs() {
+        // a plain number is feet for room / height, inches for riser / tread
+        assertEquals(10 * 12 * IN, e.parseLen("10", 1), 1e-9)
+        assertEquals(10 * IN, e.parseLen("10"), 1e-9)
+        assertEquals(42 * IN, e.parseLen("42", 3), 1e-9)
+        assertEquals(3.5 * 12 * IN, e.parseLen("3.5", 3), 1e-9)
+        assertEquals(120 * IN, e.parseLen("120", 2), 1e-9)
+        e.stairPlanner()
+        val sp = ui.spec!!
+        val v = mapOf("L" to e.parseLen("20", 1), "W" to e.parseLen("10", 1), "H" to e.parseLen("10", 2), "sw" to Double.NaN,
+            "dr" to e.parseLen("7\""), "dt" to e.parseLen("10\""), "wg" to e.parseLen("1'"))
+        val straight = sp.compute(v, "Ghar|1 Straight")
+        assertTrue(straight.first { it.label.startsWith("Tame lakhyu") }.value.startsWith("20ft × 10ft"))
+        assertTrue(straight.none { it.value == "salah" && it.label.contains("pohlai") })   // default width meets the code
+        val spiral = sp.compute(v, "Ghar|11 Spiral")
+        assertTrue(!spiral.first { it.label.startsWith("Ek pheri ma oonchai") }.warn)       // head room ok
+        val hel = sp.compute(v, "Ghar|12 Helical (gol)")
+        val sweep = hel.first { it.label == "Kul ghumav" }.value.removeSuffix("°").toDouble()
+        assertTrue(sweep in 90.0..360.0)                                                     // a real curve, no overlap
+    }
 }

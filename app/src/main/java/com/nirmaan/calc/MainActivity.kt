@@ -766,7 +766,7 @@ class MainActivity : Activity(), Ui {
                 if (f.isSize) {
                     eng.parseSize(s)?.let { vals[f.key + "_a"] = it.first; vals[f.key + "_b"] = it.second }
                 } else {
-                    vals[f.key] = if (f.isPitch) eng.parsePitch(s) else if (f.isLen) eng.parseLen(s)
+                    vals[f.key] = if (f.isPitch) eng.parsePitch(s) else if (f.isLen) eng.parseLen(s, f.bare)
                     else (s.trim().replace(",", ".").replace("₹", "").trim().toDoubleOrNull() ?: Double.NaN)
                 }
             }
