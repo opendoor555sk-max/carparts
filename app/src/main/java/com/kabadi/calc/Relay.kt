@@ -86,7 +86,8 @@ object Relay {
         val sp = ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE)
         if (System.currentTimeMillis() - sp.getLong("ping", 0) < 6L * 3600_000L) return
         val hs = Store.hisabs
-        val o = JSONObject().put("n", Account.name(ctx)).put("m", Account.mobile(ctx)).put("d", Account.device(ctx))
+        val o = JSONObject().put("n", Account.name(ctx).ifBlank { Store.owner }).put("m", Account.mobile(ctx).ifBlank { Store.mobile.filter { it.isDigit() }.takeLast(10) })
+            .put("d", Account.device(ctx))
             .put("v", Updater.myVersionName(ctx)).put("ph", (Build.MANUFACTURER + " " + Build.MODEL).trim())
             .put("h", hs.size).put("g", hs.count { it.type == "gaadi" }).put("hr", hs.count { it.type == "haraji" }).put("l", hs.count { it.isLot })
             .put("last", hs.maxOfOrNull { it.time } ?: 0L).put("own", Store.owner).put("adm", Account.isAdmin(ctx))
@@ -100,7 +101,7 @@ object Relay {
         val map = try { JSONObject(sp.getString("seen", "{}")) } catch (_: Exception) { JSONObject() }
         all.forEach { (o, m) ->
             val k = m.optString("m") + ":" + m.optString("d")
-            if (m.optString("m").isEmpty()) return@forEach
+            if (m.optString("d").isEmpty()) return@forEach
             val t = o.optLong("time") * 1000
             val old = map.optJSONObject(k)
             if (old == null || old.optLong("at") < t) {

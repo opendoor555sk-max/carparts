@@ -16,6 +16,8 @@ import java.security.MessageDigest
 object Account {
     /** login / OTP on or off (off for now: the app opens straight away) */
     const val ENABLED = true
+    /** OTP needed before a user can open the app (off for now: everyone opens directly) */
+    const val REQUIRED = false
     private const val FILE = "kabadi_acct"
     /** admin's WhatsApp number (can be changed without an app update) */
     private const val ADMIN_URL = "https://raw.githubusercontent.com/opendoor555sk-max/carparts/kabadi-calc/kabadi-admin.txt"

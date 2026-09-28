@@ -93,8 +93,8 @@ class MainActivity : Activity() {
         fun start() {
             bar.visibility = View.VISIBLE
             showHome()
-            if (LOGIN_ON && Account.exists(this)) Thread { try { Relay.ping(this) } catch (_: Exception) {} }.start()
-            if (LOGIN_ON && !Account.isAdmin(this) && Account.verified(this)) {
+            if (LOGIN_ON) Thread { try { Relay.ping(this) } catch (_: Exception) {} }.start()
+            if (LOGIN_ON && Account.REQUIRED && !Account.isAdmin(this) && Account.verified(this)) {
                 val m = Account.mobile(this); val d = Account.device(this)
                 Thread {
                     if (Relay.status(m, d) == "block") ui.post { Account.unverify(this); toast("🚫 " + L.t("blocked")); route() }
@@ -137,7 +137,7 @@ class MainActivity : Activity() {
     private val LOGIN_ON = Account.ENABLED
 
     private fun route() {
-        if (!LOGIN_ON) return startApp()
+        if (!LOGIN_ON || !Account.REQUIRED) return startApp()
         // admin phone: always opens straight away (no sign in / sign out)
         if (Account.isAdmin(this)) { if (!Account.verified(this) && Account.exists(this)) Account.approveAsAdmin(this); return startApp() }
         when {
@@ -2128,9 +2128,15 @@ class MainActivity : Activity() {
             fun sp(t: String, on: Boolean, col: Int, top: Boolean, a: () -> Unit) = ac.addView(pill(t, on, col, a).apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) },
                 llp(MATCH_PARENT, WRAP_CONTENT).apply { if (top) topMargin = dpi(8f) })
             if (Account.isAdmin(this)) sp("👑 " + L.t("adm_btn"), true, 0xFF6A1B9A.toInt(), false) { showAdmin() }
-            if (!Account.isAdmin(this)) sp(L.t("signout"), false, RED, false) { signOut() }
+            if (!Account.isAdmin(this) && Account.REQUIRED) sp(L.t("signout"), false, RED, false) { signOut() }
             body.addView(ac, cardLp())
         }
+
+        if (LOGIN_ON && !Account.isAdmin(this)) body.addView(small("👑 " + L.t("adm_login"), 0xFF6A1B9A.toInt()).apply {
+            gravity = Gravity.CENTER; textSize = 14f; setPadding(0, dpi(4f), 0, dpi(10f))
+            setOnClickListener { askAdminCode { if (!Account.exists(this@MainActivity)) Account.create(this@MainActivity, Store.owner.ifBlank { "Admin" }, Store.mobile.filter { c -> c.isDigit() }.takeLast(10), "")
+                Account.approveAsAdmin(this@MainActivity); Reminders.schedule(this@MainActivity); showHome() } }
+        }, llp(MATCH_PARENT, WRAP_CONTENT))
 
         val sc = card()
         sc.addView(heading("🔔 " + L.t("rem_t")))
