@@ -387,14 +387,14 @@ class MainActivity : Activity() {
                 "\n📋 " + L.t("u_hisab") + ": " + seen.values.filter { !it.optBoolean("adm") }.sumOf { it.optInt("h") }
             fRow.removeAllViews()
             listOf("" to L.t("f_all"), "act" to "🟢 7d", "ok" to "✅", "no" to "❌", "block" to "🚫").forEach { (k, t) ->
-                val n = when (k) { "" -> all.size; "act" -> all.count { (seen[it.optString("m") + ":" + it.optString("d")]?.optLong("at") ?: 0) > week }
+                val n = when (k) { "" -> all.size; "act" -> all.count { (seen[it.optString("m") + ":" + it.optString("d")]?.optLong("at") ?: 0L) > week }
                     else -> all.count { (it.optString("s").ifEmpty { if (it.optBoolean("ok")) "ok" else "no" }) == k } }
                 fRow.addView(pill("$t ($n)", uf == k, 0xFF6A1B9A.toInt()) { uf = k; drawUsers() }.apply { textSize = 12f; setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(6f)) },
                     llp(0, WRAP_CONTENT, 1f).apply { setMargins(dpi(2f), 0, dpi(2f), 0) })
             }
             all.filter { u ->
                 val st = u.optString("s").ifEmpty { if (u.optBoolean("ok")) "ok" else "no" }
-                (uf.isEmpty() || st == uf || (uf == "act" && (seen[u.optString("m") + ":" + u.optString("d")]?.optLong("at") ?: 0) > week)) && (uq.isBlank() || norm(u.optString("n")).contains(norm(uq)) || u.optString("m").contains(uq.filter { it.isDigit() }.ifEmpty { "~" }))
+                (uf.isEmpty() || st == uf || (uf == "act" && (seen[u.optString("m") + ":" + u.optString("d")]?.optLong("at") ?: 0L) > week)) && (uq.isBlank() || norm(u.optString("n")).contains(norm(uq)) || u.optString("m").contains(uq.filter { it.isDigit() }.ifEmpty { "~" }))
             }.forEach { u ->
                 val st = u.optString("s").ifEmpty { if (u.optBoolean("ok")) "ok" else "no" }
                 val nm = u.optString("n"); val m = u.optString("m"); val d = u.optString("d")
