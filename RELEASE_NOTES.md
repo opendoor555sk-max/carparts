@@ -1,3 +1,5 @@
+Nauman (7203960120) have normal user — Admin (👑) nikali nakhyu. Admin PIN / final hisab kholvanu fakt Admin phone par; normal user ne password nahi puchhay.
+
 Admin phone: final (✅) hisab pan delete thai shake (list ma dabavi rakho ke hisab ma 🗑). Bija users mate final hisab lock j rahe.
 
 Seller / Buyer badhe thi kadhi nakhyu. 'Aa hisab kon lakhe che' ma Mudi malik / Khedut mota button. Gaadi ane Haraji hisab ma kharidi vakhate gaadi ane/athva '＋ 📦 bijo maal' (naam lakho, kg × bhav ke fix) — Lot ma pehla thi che. Kul kharidi bill ma pan.

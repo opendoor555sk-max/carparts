@@ -1518,7 +1518,8 @@ class MainActivity : Activity() {
             if (ls == 2) ban.addView(small("🔒 " + L.t("lock_forever"), RED).apply { textSize = 14f })
             else {
                 ban.addView(small(L.t("lock_info") + if (h.type == "haraji") "\n⏱ " + L.t("lock_48") + " " + Bill.dateText(h.finalAt + 48L * 3600_000L) else ""))
-                ban.addView(pill("🔓 " + L.t("lock_open"), false, BLUE) { askAdminPin { unlocked.add(h.id); showEditor(h) } }
+                // only the admin phone can open a final hisab (normal users: no password asked)
+                if (!LOGIN_ON || Account.isAdmin(this)) ban.addView(pill("🔓 " + L.t("lock_open"), false, BLUE) { askAdminPin { unlocked.add(h.id); showEditor(h) } }
                     .apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
             }
             body.addView(ban, 0, cardLp())
@@ -2452,7 +2453,7 @@ class MainActivity : Activity() {
         ap.addView(pill(if (hasPin) L.t("adm_pin_change") else L.t("adm_pin_new"), false, BLUE) {
             if (hasPin) askAdminPin { setAdminPin { showSettings() } } else setAdminPin { showSettings() }
         }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
-        body.addView(ap, cardLp())
+        if (!LOGIN_ON || Account.isAdmin(this)) body.addView(ap, cardLp())
 
         val lc = card()
         lc.addView(heading(L.t("lists")))
