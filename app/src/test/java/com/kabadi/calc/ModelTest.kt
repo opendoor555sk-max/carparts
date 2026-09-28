@@ -301,4 +301,19 @@ class ModelTest {
         // old hisab (no writer chosen) is not forced
         assertEquals(0, missingMobile(Hisab(10, 9000)).size)
     }
+
+    @Test fun purchaseVehicleAndOtherGoods() {
+        // vehicle 50,000 + 200 kg scrap × 30 = 56,000 bought
+        val h = Hisab(11, 1000, priceText = "50000")
+        h.buyItems.add(Line("", "Scrap", false, kgText = "200", rateText = "30"))
+        assertEquals(56000.0, h.price, 0.001)
+        assertEquals(50000.0, h.vehPrice(), 0.001)
+        // only other goods, no vehicle
+        val g = Hisab(12, 1000, type = "haraji")
+        g.buyItems.add(Line("", "Battery", true, amountText = "4000"))
+        assertEquals(4000.0, g.price, 0.001)
+        g.maal.add(Line("", "Battery", true, amountText = "5000"))
+        assertEquals(1000.0, g.munafa(), 0.001)
+        assertTrue(g.verify().isEmpty())
+    }
 }

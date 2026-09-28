@@ -81,7 +81,6 @@ object Bill {
             info("khed_h", h.khedName + "   " + plain(h.khedPct) + "%")
         }
         if (h.writer.isNotBlank()) info("writer_s", if (h.writer == "khed") L.t("khed_h") else L.t("mudi_h"))
-        info("role_s", if (h.role == "buyer") L.t("buyer_s") else L.t("seller_s"))
         info("vinfo", h.vehicleInfo())
         info("vehicle", h.vehicle)
         info("place", h.place)
@@ -115,7 +114,12 @@ object Bill {
         }
         // 1. vehicle price
         section(when { h.isLot -> L.t("lot_price"); h.type == "haraji" -> L.t("buy_price"); else -> L.t("price") }.removePrefix("1. "))
-        row(L.t("sum_price"), money(h.price), true)
+        if (!h.isLot && h.buyItems.isNotEmpty()) {
+            if (h.priceText.isNotBlank()) row("   🚚 " + h.vehicleInfo().ifBlank { L.t("vehicle").substringBefore(" /") }, money(h.vehPrice()))
+            h.buyItems.forEach { l -> row("   📦 " + l.name + if (!l.fixed) "  " + plain(l.kg) + (if (l.litre) " L" else " kg") + (if (l.rate != 0.0) " × " + plain(l.rate) else "") else "",
+                if (l.value() != 0.0) money(l.value()) else "") }
+        }
+        row(if (!h.isLot && h.buyItems.isNotEmpty()) L.t("buy_total") else L.t("sum_price"), money(h.price), true)
         credit(h, h.buyLine).let { if (it.isNotEmpty()) row("   ⏳ " + it, "", false, red, 11f) }
         y += 4 * u
 
@@ -365,7 +369,9 @@ object Bill {
         if (h.finalAt > 0) sb.append("✅ ").append(L.t("final_s")).append(": ").append(dateText(h.finalAt)).append("\n")
         if (h.vehicle.isNotBlank()) sb.append(L.t("vehicle")).append(": ").append(h.vehicle).append("\n")
         if (h.place.isNotBlank()) sb.append(L.t("place").substringBefore(" (")).append(": ").append(h.place).append("\n")
-        sb.append("\n").append(L.t("sum_price")).append(": ").append(money(h.price)).append("\n")
+        if (!h.isLot) h.buyItems.forEach { l -> sb.append("📦 ").append(l.name).append(if (!l.fixed) " " + plain(l.kg) + (if (l.litre) " L" else " kg") else "")
+            .append(if (l.value() != 0.0) " – " + money(l.value()) else "").append("\n") }
+        sb.append("\n").append(if (!h.isLot && h.buyItems.isNotEmpty()) L.t("buy_total") else L.t("sum_price")).append(": ").append(money(h.price)).append("\n")
         credit(h, h.buyLine).let { if (it.isNotEmpty()) sb.append("⏳ ").append(it).append("\n") }
         if (h.kharch.isNotEmpty()) {
             sb.append("\n_").append(L.t("kharch").substringBefore(" (").removePrefix("2. ")).append("_\n")

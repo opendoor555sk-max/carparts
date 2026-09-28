@@ -131,6 +131,7 @@ object Store {
             a.put(JSONObject().put("n", t.name).put("p", t.priceText).put("vh", vj(t.vehicles)).put("it", JSONArray().also { b -> t.items.forEach { b.put(lj(it)) } })) } })
         o.put("pa", JSONArray().also { a -> h.partners.forEach { a.put(JSONObject().put("n", it.name).put("s", it.shareText).put("m", it.mobile).put("d", it.done)) } })
         o.put("k", JSONArray().also { a -> h.kharch.forEach { a.put(lj(it)) } })
+        o.put("bi", JSONArray().also { a -> h.buyItems.forEach { a.put(lj(it)) } })
         o.put("m", JSONArray().also { a -> h.maal.forEach { a.put(lj(it)) } })
         return o
     }
@@ -138,7 +139,7 @@ object Store {
     fun jh(o: JSONObject): Hisab {
         val h = Hisab(o.optLong("id"), o.optLong("t"), o.optString("p"), o.optString("v"), o.optString("no"), o.optString("pr"),
             type = o.optString("ty", "gaadi"), saleText = o.optString("sa"), commText = o.optString("co"), commPct = o.optBoolean("cp", true),
-            role = o.optString("ro", "seller"), writer = o.optString("wr"), brand = o.optString("br"), variant = o.optString("va"), tyres = o.optString("tr"),
+            role = "seller", writer = o.optString("wr"), brand = o.optString("br"), variant = o.optString("va"), tyres = o.optString("tr"),
             year = o.optString("yr"), place = o.optString("pl"),
             mudiName = o.optString("mn"), mudiMobile = o.optString("mm"), mudiPctText = o.optString("mp"),
             khedName = o.optString("kn"), khedMobile = o.optString("km"), khedPctText = o.optString("kp"),
@@ -159,6 +160,7 @@ object Store {
         o.optJSONArray("pa")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { h.partners.add(Partner(it.optString("n"), it.optString("s"), it.optString("m"), it.optBoolean("d"))) } }
         o.optJSONArray("k")?.let { a -> for (i in 0 until a.length()) h.kharch.add(jl(a.getJSONObject(i))) }
         o.optJSONArray("m")?.let { a -> for (i in 0 until a.length()) h.maal.add(jl(a.getJSONObject(i))) }
+        o.optJSONArray("bi")?.let { a -> for (x in 0 until a.length()) h.buyItems.add(jl(a.getJSONObject(x))) }
         return h
     }
 

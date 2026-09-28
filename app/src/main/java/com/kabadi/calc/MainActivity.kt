@@ -961,7 +961,7 @@ class MainActivity : Activity() {
                 top.addView(TextView(this).apply { text = money(m); textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (m >= 0) GREEN else RED) })
                 c.addView(top)
                 c.addView(small(listOf(if (h.finalAt > 0) "✅" else "", if (h.isLot) "🚚 " + L.t("lot") else if (h.isCo) "🏢 " + L.t("mode_co") else if (h.type == "haraji") "🔨 " + L.t("haraji") else "",
-                    if (h.role == "buyer") L.t("buyer_s") else L.t("seller_s"), h.vehicleInfo(), h.vehicle, Bill.dateText(h.time)).filter { it.isNotBlank() }.joinToString("  •  ")))
+                    h.vehicleInfo(), h.vehicle, Bill.dateText(h.time)).filter { it.isNotBlank() }.joinToString("  •  ")))
                 c.setOnClickListener { showEditor(h) }
                 c.setOnLongClickListener { askDelete(h) { fill(q) }; true }
                 list.addView(c, cardLp())
@@ -987,14 +987,22 @@ class MainActivity : Activity() {
     private fun newHisab(type: String) {
         val now = System.currentTimeMillis()
         // first choice on every new hisab: who is writing it (mudi malik or khedut)
-        AlertDialog.Builder(this).setTitle(L.t("writer_q"))
-            .setItems(arrayOf(L.t("mudi_h"), L.t("khed_h"))) { _, w ->
-                showEditor(Hisab(now, now, type = type, writer = if (w == 1) "khed" else "mudi"))
-            }.show()
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(18f), dpi(8f), dpi(18f), dpi(4f)) }
+        val dlg = AlertDialog.Builder(this).setView(box).setNegativeButton(L.t("back"), null).create()
+        box.addView(TextView(this).apply { text = L.t("writer_q"); textSize = 22f; typeface = Typeface.DEFAULT_BOLD; setTextColor(INK); gravity = Gravity.CENTER; setPadding(0, dpi(6f), 0, dpi(14f)) },
+            llp(MATCH_PARENT, WRAP_CONTENT))
+        listOf("mudi" to ("💰  " + L.t("mudi_h")), "khed" to ("🚚  " + L.t("khed_h"))).forEach { (w, t) ->
+            box.addView(bigButton(t, if (w == "mudi") 0xFFE65100.toInt() else GREEN) {
+                dlg.dismiss(); showEditor(Hisab(now, now, type = type, writer = w))
+            }.apply { textSize = 24f; setPadding(0, dpi(18f), 0, dpi(18f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(12f) })
+        }
+        dlg.show()
     }
 
     // ================= EDITOR =================
     private lateinit var sumPrice: TextView
+    /** gaadi / haraji: "total purchase" under the other goods bought */
+    private var buyTotalTv: TextView? = null
     private lateinit var sumKharch: TextView
     private lateinit var sumLagat: TextView
     private lateinit var sumMaal: TextView
@@ -1046,6 +1054,7 @@ class MainActivity : Activity() {
 
     private fun refreshTotals() {
         val h = editing ?: return
+        buyTotalTv?.text = L.t("buy_total") + ": " + money(h.price)
         lotTotals.forEach { (t, tv) ->
             val parts = listOfNotNull(if (t.vehicles.isNotEmpty()) t.vehicles.size.toString() + " 🚚" else null,
                 if (t.kg() > 0) plain(t.kg()) + " kg" else null)
@@ -1141,6 +1150,7 @@ class MainActivity : Activity() {
     private var viewOnly: Shared? = null
 
     private fun showEditor(h: Hisab, view: Shared? = null) {
+        buyTotalTv = null
         viewOnly = view
         editing = h
         val body = setScreen("edit", hTitle(h), { if (viewOnly != null) { viewOnly = null; editing = null; showShared() } else { autoSave(); Store.save(this); editorBack?.invoke() ?: showHome() } })
@@ -1171,9 +1181,7 @@ class MainActivity : Activity() {
         // then date + time (tap to change) and seller / buyer
         val dt = small("🕒 " + Bill.dateText(h.time) + "  ✎", BLUE).apply { textSize = 14f; setPadding(0, dpi(6f), 0, dpi(6f)) }
         dt.setOnClickListener { pickDate(h) { dt.text = "🕒 " + Bill.dateText(h.time) + "  ✎" } }
-        top.addView(row(dt to 1f,
-            pill(L.t("seller_s"), h.role != "buyer", BLUE) { if (h.role == "buyer") { h.role = "seller"; showEditor(h) } } to 0f,
-            pill(L.t("buyer_s"), h.role == "buyer", BLUE) { if (h.role != "buyer") { h.role = "buyer"; showEditor(h) } } to 0f))
+        top.addView(row(dt to 1f))
         top.addView(small("🔗 " + L.t("sh_hint"), BLUE).apply { textSize = 12.5f })
         // note only when wanted (anything extra: where the vehicle came from, who sent it, conditions...)
         val more = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -1286,7 +1294,8 @@ class MainActivity : Activity() {
 
         // ---- vehicle details + price ----
         val vc = card()
-        vc.addView(heading(L.t("vinfo"), 0xFF455A64.toInt()).apply { textSize = 15f })
+        vc.addView(heading(if (h.isLot) L.t("vinfo") else L.t("buy_h"), 0xFF455A64.toInt()).apply { textSize = 15f })
+        if (!h.isLot) vc.addView(small(L.t("buy_hint")).apply { setPadding(0, 0, 0, dpi(4f)) })
         val brandIn = input(L.t("brand"), h.brand, false) { h.brand = it }
         val pick = pill("▾", false, 0xFF455A64.toInt()) {
             AlertDialog.Builder(this).setItems(BRANDS.toTypedArray()) { _, w -> brandIn.setText(BRANDS[w]) }.show()
@@ -1303,6 +1312,30 @@ class MainActivity : Activity() {
             text = (if (h.type == "haraji") L.t("buy_price") else L.t("price")).removePrefix("1. ")
             textSize = 15f; setTextColor(BLUE); typeface = Typeface.DEFAULT_BOLD
         } to 1f, priceIn to 1.2f).apply { setPadding(0, dpi(8f), 0, 0) })
+        // other goods bought (with the vehicle, or without it): any name, kg × rate or fixed
+        val biLines = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val buyTot = small("", BLUE).apply { gravity = Gravity.END; typeface = Typeface.DEFAULT_BOLD; textSize = 16f }
+        fun drawBi() {
+            biLines.removeAllViews()
+            h.buyItems.forEach { l -> biLines.addView(itemRow(h.buyItems, l) { drawBi(); refreshTotals() }) }
+            buyTot.visibility = if (h.buyItems.isEmpty()) View.GONE else View.VISIBLE
+        }
+        if (!h.isLot) {
+            vc.addView(small("📦 " + L.t("buy_other_h"), INK).apply { typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(10f), 0, dpi(2f)) })
+            vc.addView(biLines)
+            vc.addView(pill("＋ 📦 " + L.t("add_item"), false, GREEN) {
+                val names = Store.parts.map { it.label() } + ("✎ " + L.t("other"))
+                AlertDialog.Builder(this).setTitle(L.t("add_item")).setItems(names.toTypedArray()) { _, w ->
+                    val b = Store.parts.getOrNull(w)
+                    val nm = b?.label() ?: ""
+                    h.buyItems.add(Line(b?.key ?: "", nm, b?.fixed ?: false, rateText = "", litre = b?.litre ?: false))
+                    drawBi(); refreshTotals(); focusLast(biLines)
+                }.show()
+            }.apply { textSize = 14f; setPadding(dpi(6f), dpi(9f), dpi(6f), dpi(9f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(4f) })
+            vc.addView(buyTot, llp(MATCH_PARENT, WRAP_CONTENT))
+            drawBi()
+            buyTotalTv = buyTot
+        }
         val buyBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun drawBuy() { buyBox.removeAllViews(); payBlock(h, h.buyLine, false, buyBox) { drawBuy() } }
         if (!h.isLot) { drawBuy(); vc.addView(buyBox); body.addView(vc, cardLp()) }
@@ -1519,7 +1552,10 @@ class MainActivity : Activity() {
     private val lotTotals = mutableListOf<Pair<Lot, TextView>>()
 
     /** a thing inside a lot: name (any), kg × rate / litre × rate / fixed */
-    private fun lotItemRow(t: Lot, l: Line, redraw: () -> Unit): View {
+    private fun lotItemRow(t: Lot, l: Line, redraw: () -> Unit): View = itemRow(t.items, l, redraw)
+
+    /** one bought item (lot or gaadi / haraji purchase): name, kg / litre / fixed, amount */
+    private fun itemRow(list: MutableList<Line>, l: Line, redraw: () -> Unit): View {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = round(0xFFF7FAF7.toInt(), 10f, 0xFFC8E6C9.toInt()); setPadding(dpi(8f), dpi(4f), dpi(4f), dpi(6f)) }
         val mode = when { l.fixed -> L.t("fix"); l.litre -> L.t("ltr"); else -> L.t("kg") }
         box.addView(row(small("📦", INK) to 0f, input(L.t("item_name"), l.name, false) { l.name = it }.apply { tag = "focus" } to 1f,
@@ -1527,7 +1563,7 @@ class MainActivity : Activity() {
                 when { l.fixed -> { l.fixed = false; l.litre = false }; l.litre -> { l.fixed = true; l.litre = false }; else -> l.litre = true }
                 redraw()
             }.apply { textSize = 12f } to 0f,
-            xBtn { confirmRemove { t.items.remove(l); redraw() } } to 0f))
+            xBtn { confirmRemove { list.remove(l); redraw() } } to 0f))
         val res = small("").apply { typeface = Typeface.DEFAULT_BOLD; setTextColor(GREEN); gravity = Gravity.END }
         fun upd() { res.text = "= " + money(l.value()); refreshTotals() }
         if (l.fixed) box.addView(row(small(L.t("fixamt")) to 1f, input("₹", l.amountText, true) { l.amountText = it; upd() }.apply { gravity = Gravity.END } to 1.2f))

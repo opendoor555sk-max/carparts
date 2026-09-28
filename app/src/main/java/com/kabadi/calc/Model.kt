@@ -85,6 +85,8 @@ class Hisab(
     var role: String = "seller",
     /** who is writing this hisab: "mudi" (mudi malik) or "khed" (khedut); "" = old hisab */
     var writer: String = "",
+    /** gaadi / haraji: other goods bought with (or instead of) the vehicle, each with its own name */
+    val buyItems: MutableList<Line> = mutableListOf(),
     var brand: String = "",
     var variant: String = "",
     var tyres: String = "",
@@ -165,8 +167,10 @@ class Hisab(
     val price get() = when {
         isLot && lots.isNotEmpty() -> lots.sumOf { it.price }
         isLot && priceText.isBlank() -> vehicles.sumOf { it.price }
-        else -> ev(priceText)
+        else -> ev(priceText) + buyItems.sumOf { it.value() }
     }
+    /** gaadi / haraji: price written for the vehicle only */
+    fun vehPrice() = if (isLot) 0.0 else ev(priceText)
     val sale get() = ev(saleText)
     fun kharchTotal() = kharch.sumOf { it.value() }
     fun lagat() = price + kharchTotal()
