@@ -232,6 +232,7 @@ private fun Engine.layoutTurns(flights: List<Int>, dirs: List<Dir>, inp: Input):
 /** how much the footprint sticks out of the room (0 = fits), best of both orientations */
 private fun overflow(inp: Input, nL: Double, nW: Double): Double {
     if (!(inp.L > 0) || !(inp.W > 0)) return 0.0
+    // (tiny rounding differences count as a fit)
     return min(max(0.0, nL - inp.L) + max(0.0, nW - inp.W), max(0.0, nL - inp.W) + max(0.0, nW - inp.L))
 }
 
@@ -257,7 +258,7 @@ private fun Engine.turnDesign(
     val maxF = inp.rules.maxPerFlight
     val best = cands.minWithOrNull(compareBy<List<Int>>(
         { if (overflow(inp, foot(it, inp.sw).first, foot(it, inp.sw).second) > 1e-6) 1 else 0 },
-        { overflow(inp, foot(it, inp.sw).first, foot(it, inp.sw).second) },
+        { overflow(inp, foot(it, inp.sw).first, foot(it, inp.sw).second).let { o -> if (o < 1e-6) 0.0 else o } },
         { f -> f.count { it > maxF } },
         { f -> f.maxOf { it } - f.minOf { it } }
     ))!!
@@ -277,7 +278,7 @@ private fun Engine.turnDesign(
         var hi = max(inp.L, inp.W)
         repeat(36) {
             val mid = (lo + hi) / 2
-            if (cands.any { overflow(inp, foot(it, mid).first, foot(it, mid).second) <= 1e-9 }) lo = mid else hi = mid
+            if (cands.any { overflow(inp, foot(it, mid).first, foot(it, mid).second) <= 1e-6 }) lo = mid else hi = mid
         }
         lo
     } else Double.NaN
