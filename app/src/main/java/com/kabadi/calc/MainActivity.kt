@@ -94,6 +94,14 @@ class MainActivity : Activity() {
             bar.visibility = View.VISIBLE
             showHome()
             if (LOGIN_ON) Thread { try { Relay.ping(this) } catch (_: Exception) {} }.start()
+            if (LOGIN_ON && !Account.isAdmin(this)) Thread {
+                val r = try { Unlock.check(this) } catch (_: Exception) { emptyList() }
+                if (r.isNotEmpty()) ui.post {
+                    Store.save(this)
+                    toast(r.joinToString("\n") { (_, ok) -> if (ok) "✅ " + L.t("unl_yes") else "❌ " + L.t("unl_no") })
+                    if (screen == "home") showHome()
+                }
+            }.start()
             Thread {
                 try { Share.republish(this) } catch (_: Exception) {}
                 val n = try { Share.fetch(this) } catch (_: Exception) { 0 }
@@ -402,6 +410,31 @@ class MainActivity : Activity() {
         }
         reqList.addView(small("⏳ …"))
         if (Account.REQUIRED) every(10000L, { Relay.pending(this) }) { drawReqs(it); true }
+        // ---- users asking to correct a final hisab ----
+        val uc0 = card().apply { background = round(0xFFE8F5E9.toInt(), 12f, 0xFFA5D6A7.toInt()) }
+        uc0.addView(heading("🔓 " + L.t("unl_admin"), GREEN))
+        val unlList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        uc0.addView(unlList)
+        body.addView(uc0, cardLp())
+        fun drawUnl(list: List<Unlock.Req>?) {
+            unlList.removeAllViews()
+            if (list == null) { unlList.addView(small("📶 " + L.t("otp_net"), RED)); return }
+            if (list.isEmpty()) { unlList.addView(small(L.t("unl_none"))); return }
+            list.forEach { r ->
+                val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = round(Color.WHITE, 10f); setPadding(dpi(10f), dpi(8f), dpi(10f), dpi(8f)) }
+                box.addView(small(r.name.ifBlank { "—" } + "   📞 " + r.mobile, INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD })
+                box.addView(small("📋 " + r.title.ifBlank { "#" + r.hid } + "\n🕒 " + Bill.dateText(r.time), INK))
+                fun act(ok: Boolean) {
+                    box.alpha = 0.4f
+                    Thread { val sent = Unlock.decide(this, r, ok); ui.post { toast(if (sent) (if (ok) "✅ " else "❌ ") + r.name else L.t("otp_net")); if (!sent) box.alpha = 1f else box.visibility = View.GONE } }.start()
+                }
+                box.addView(row(bigButton("✅ " + L.t("unl_give"), GREEN) { act(true) }.apply { textSize = 15f; setPadding(0, dpi(10f), 0, dpi(10f)) } to 1f,
+                    bigButton("❌ " + L.t("adm_no"), RED) { act(false) }.apply { textSize = 15f; setPadding(0, dpi(10f), 0, dpi(10f)) } to 1f))
+                unlList.addView(box, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+            }
+        }
+        unlList.addView(small("⏳ …"))
+        every(15000L, { Unlock.pending(this) }) { drawUnl(it); true }
         // ---- users' problems: voice + text ----
         val fc = card().apply { background = round(0xFFFFF3E0.toInt(), 12f, 0xFFFFCC80.toInt()) }
         fc.addView(heading("🎤 " + L.t("fb_admin"), 0xFFE65100.toInt()))
@@ -922,6 +955,12 @@ class MainActivity : Activity() {
         if (LOGIN_ON && Account.isAdmin(this)) {
             val fbBanner = bigButton("", 0xFFE65100.toInt()) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
             body.addView(fbBanner, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+            val unlBanner = bigButton("", GREEN) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
+            body.addView(unlBanner, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+            every(30000L, { Unlock.pending(this) }) { p ->
+                unlBanner.visibility = if (p.isNullOrEmpty()) View.GONE else View.VISIBLE
+                unlBanner.text = "🔓 " + (p?.size ?: 0) + " " + L.t("unl_new"); true
+            }
             every(60000L, { Feedback.collect(this); Feedback.unheard(this) }) { u ->
                 val n = u ?: Feedback.unheard(this)
                 fbBanner.visibility = if (n > 0) View.VISIBLE else View.GONE
@@ -1005,6 +1044,20 @@ class MainActivity : Activity() {
     private lateinit var sumPrice: TextView
     /** gaadi / haraji: "total purchase" under the other goods bought */
     private var buyTotalTv: TextView? = null
+    /** sale lines that come from bought goods: name, sold-qty input, info (bought / shortage) */
+    private val linkViews = HashMap<String, Triple<TextView, EditText?, TextView>>()
+    /** vehicle-part buttons in the sale card (only when a vehicle was bought) */
+    private var partChips: View? = null
+    private var redrawMaalFn: (() -> Unit)? = null
+    private var syncing = false
+
+    private fun linkInfo(h: Hisab, s: Line): Pair<String, Int> {
+        val b = h.boughtOf(s) ?: return "" to MUTED
+        val unit = if (b.litre) " L" else " kg"
+        val buy = "🛒 " + L.t("bought") + ": " + if (b.fixed) money(b.amount) else plain(b.kg) + unit + (if (b.rate != 0.0) " × " + plain(b.rate) else "")
+        val sh = h.shortage(s) ?: return buy to MUTED
+        return (buy + "\n⚠ " + L.t("kami") + ": " + plain(sh.first) + unit + " → " + L.t("loss_buy") + " " + money(sh.second)) to RED
+    }
     private lateinit var sumKharch: TextView
     private lateinit var sumLagat: TextView
     private lateinit var sumMaal: TextView
@@ -1056,6 +1109,20 @@ class MainActivity : Activity() {
 
     private fun refreshTotals() {
         val h = editing ?: return
+        // bought goods always appear in the sale list (same name, same qty until changed)
+        if (!syncing && viewOnly == null) {
+            syncing = true
+            try {
+                if (h.syncSale()) redrawMaalFn?.invoke()
+                else h.maal.forEach { s ->
+                    val v = linkViews[s.link] ?: return@forEach
+                    v.first.text = "📦 " + s.name
+                    if (v.second != null && v.second!!.text.toString() != s.kgText) v.second!!.setText(s.kgText)
+                    linkInfo(h, s).let { (t, col) -> v.third.text = t; v.third.setTextColor(col) }
+                }
+                partChips?.visibility = if (h.hasVehicle()) View.VISIBLE else View.GONE
+            } finally { syncing = false }
+        }
         buyTotalTv?.text = L.t("buy_total") + ": " + money(h.price)
         lotTotals.forEach { (t, tv) ->
             val parts = listOfNotNull(if (t.vehicles.isNotEmpty()) t.vehicles.size.toString() + " 🚚" else null,
@@ -1153,6 +1220,8 @@ class MainActivity : Activity() {
 
     private fun showEditor(h: Hisab, view: Shared? = null) {
         buyTotalTv = null
+        linkViews.clear(); partChips = null; redrawMaalFn = null
+        if (view == null) h.syncSale()
         viewOnly = view
         editing = h
         val body = setScreen("edit", hTitle(h), { if (viewOnly != null) { viewOnly = null; editing = null; showShared() } else { autoSave(); Store.save(this); editorBack?.invoke() ?: showHome() } })
@@ -1375,7 +1444,9 @@ class MainActivity : Activity() {
             h.maal.forEach { l -> mLines.addView(maalRow(h, l) { drawMaal(); refreshTotals() }) }
         }
         mc.addView(mLines)
-        mc.addView(chips(Store.parts.map { it.label() } + L.t("other"), GREEN, 4) { i ->
+        redrawMaalFn = { drawMaal(); refreshTotals() }
+        if (h.boughtItems().isNotEmpty()) mc.addView(small("📦 " + L.t("sale_auto_h")).apply { setPadding(0, dpi(4f), 0, 0) })
+        val partBtns = chips(Store.parts.map { it.label() } + L.t("other"), GREEN, 4) { i ->
             val b = Store.parts.getOrNull(i)
             val name = b?.label() ?: ""
             if (b != null) h.maal.indexOfFirst { sameItem(it, b.key, name) }.let { at ->
@@ -1384,7 +1455,10 @@ class MainActivity : Activity() {
             h.maal.add(Line(b?.key ?: "", name, b?.fixed ?: false, rateText = Store.lastRate[name] ?: "", litre = b?.litre ?: false))
             drawMaal(); refreshTotals()
             focusLast(mLines)
-        }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+        }
+        mc.addView(partBtns, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+        partChips = partBtns
+        partBtns.visibility = if (h.hasVehicle()) View.VISIBLE else View.GONE
         drawMaal()
         body.addView(mc, cardLp())
 
@@ -1516,7 +1590,23 @@ class MainActivity : Activity() {
             val ban = card().apply { background = round(if (ls == 2) 0xFFFFEBEE.toInt() else 0xFFE8F5E9.toInt(), 12f, if (ls == 2) RED else GREEN) }
             ban.addView(small("✅ " + L.t("final_s") + ": " + Bill.dateText(h.finalAt), INK).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD })
             if (ls == 2) ban.addView(small("🔒 " + L.t("lock_forever"), RED).apply { textSize = 14f })
-            else {
+            // normal user: correction only with the admin's permission
+            if (LOGIN_ON && !Account.isAdmin(this)) {
+                if (Unlock.asked(this, h.id)) {
+                    ban.addView(small("⏳ " + L.t("unl_wait"), ORANGE).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(8f), 0, 0) })
+                    every(10000L, { Unlock.check(this) }) { r ->
+                        if (r.isNullOrEmpty()) return@every true
+                        Store.save(this)
+                        r.firstOrNull { it.first == h.id }?.let { (_, ok) -> toast(if (ok) "✅ " + L.t("unl_yes") else "❌ " + L.t("unl_no")); showEditor(h); false } ?: true
+                    }
+                } else ban.addView(pill("🙏 " + L.t("unl_ask"), false, ORANGE) {
+                    Thread {
+                        val ok = try { Unlock.ask(this, h, hTitle(h).ifBlank { h.vehicleInfo() } + "  " + Bill.dateText(h.time).substringBefore("  ")) } catch (_: Exception) { false }
+                        ui.post { toast(if (ok) "📤 " + L.t("unl_sent") else L.t("otp_net")); if (ok && screen == "edit") showEditor(h) }
+                    }.start()
+                }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
+            }
+            if (ls != 2) {
                 ban.addView(small(L.t("lock_info") + if (h.type == "haraji") "\n⏱ " + L.t("lock_48") + " " + Bill.dateText(h.finalAt + 48L * 3600_000L) else ""))
                 // only the admin phone can open a final hisab (normal users: no password asked)
                 if (!LOGIN_ON || Account.isAdmin(this)) ban.addView(pill("🔓 " + L.t("lock_open"), false, BLUE) { askAdminPin { unlocked.add(h.id); showEditor(h) } }
@@ -1561,7 +1651,7 @@ class MainActivity : Activity() {
     private fun itemRow(list: MutableList<Line>, l: Line, redraw: () -> Unit): View {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = round(0xFFF7FAF7.toInt(), 10f, 0xFFC8E6C9.toInt()); setPadding(dpi(8f), dpi(4f), dpi(4f), dpi(6f)) }
         val mode = when { l.fixed -> L.t("fix"); l.litre -> L.t("ltr"); else -> L.t("kg") }
-        box.addView(row(small("📦", INK) to 0f, input(L.t("item_name"), l.name, false) { l.name = it }.apply { tag = "focus" } to 1f,
+        box.addView(row(small("📦", INK) to 0f, input(L.t("item_name"), l.name, false) { l.name = it; refreshTotals() }.apply { tag = "focus" } to 1f,
             pill(mode + " ⇄", false, GREEN) {
                 when { l.fixed -> { l.fixed = false; l.litre = false }; l.litre -> { l.fixed = true; l.litre = false }; else -> l.litre = true }
                 redraw()
@@ -1844,14 +1934,19 @@ class MainActivity : Activity() {
             background = round(0xFFF7FAF7.toInt(), 10f, 0xFFC8E6C9.toInt())
             setPadding(dpi(6f), dpi(4f), dpi(4f), dpi(6f))
         }
-        // name | Kg / Litre / Fix | ✕
+        // name | Kg / Litre / Fix | ✕   (goods that were bought: name / mode come from the purchase, cannot be removed)
         val mode = when { l.fixed -> L.t("fix"); l.litre -> L.t("ltr"); else -> L.t("kg") }
-        box.addView(row(input(L.t("name_q"), l.name, false) { l.name = it }.apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD } to 1f,
+        val linked = l.link.isNotEmpty() && h.boughtOf(l) != null
+        val nameTv = TextView(this).apply { text = "📦 " + l.name; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(INK); setPadding(dpi(4f), dpi(6f), 0, dpi(6f)) }
+        val infoTv = small("").apply { textSize = 12.5f }
+        if (linked) box.addView(row(nameTv to 1f, small("🔗 " + L.t("from_buy"), BLUE) to 0f))
+        else box.addView(row(input(L.t("name_q"), l.name, false) { l.name = it }.apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD } to 1f,
             pill("$mode ▾", true, GREEN) {
                 when { l.fixed -> { l.fixed = false; l.litre = false }; l.litre -> l.fixed = true; else -> l.litre = true }
                 redraw(); refreshTotals()
             } to 0f,
             xBtn { confirmRemove { h.maal.remove(l); redraw() } } to 0f))
+        var kgIn: EditText? = null
         if (l.fixed) {
             box.addView(row(input(L.t("amount"), l.amountText, true) { l.amountText = it; refreshTotals() }.apply { tag = "focus"; gravity = Gravity.END } to 1f))
         } else {
@@ -1859,11 +1954,17 @@ class MainActivity : Activity() {
             fun upd() { amt.text = "= " + money(l.value()) }
             val unit = if (l.litre) L.t("ltr") else L.t("kg")
             val rateHint = if (l.litre) L.t("rate_l") else L.t("rate")
-            box.addView(row(input(unit, l.kgText, true) { l.kgText = it; upd(); refreshTotals() }.apply { tag = "focus"; gravity = Gravity.END } to 1f,
+            kgIn = input(unit, l.kgText, true) { l.kgText = it; upd(); refreshTotals() }.apply { tag = "focus"; gravity = Gravity.END }
+            box.addView(row(kgIn to 1f,
                 small("×") to 0f,
                 input(rateHint, l.rateText, true) { l.rateText = it; upd(); refreshTotals() }.apply { gravity = Gravity.END } to 1f,
                 amt to 1.2f))
             upd()
+        }
+        if (linked) {
+            linkInfo(h, l).let { (t, col) -> infoTv.text = t; infoTv.setTextColor(col) }
+            box.addView(infoTv)
+            linkViews[l.link] = Triple(nameTv, kgIn, infoTv)
         }
         if (h.role == "seller") sellerBlock(h, l, box, redraw)
         return wrap(box)

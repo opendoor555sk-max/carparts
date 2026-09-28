@@ -316,4 +316,42 @@ class ModelTest {
         assertEquals(1000.0, g.munafa(), 0.001)
         assertTrue(g.verify().isEmpty())
     }
+
+    @Test fun boughtGoodsAreSold() {
+        // only other goods bought (no vehicle): 12000 kg scrap × 30
+        val h = Hisab(21, 1000, type = "gaadi")
+        assertFalse(h.hasVehicle())
+        val b = Line("", "Scrap", false, kgText = "12000", rateText = "30")
+        h.buyItems.add(b)
+        assertTrue(h.syncSale())
+        assertEquals(1, h.maal.size)
+        val s = h.maal[0]
+        assertEquals("Scrap", s.name); assertEquals("12000", s.kgText)
+        // purchase qty changed -> sale follows (user did not type his own)
+        b.kgText = "12500"; h.syncSale()
+        assertEquals("12500", s.kgText)
+        // sold 12000 only: 500 kg short -> loss 500 × 30 at purchase rate
+        s.kgText = "12000"; s.rateText = "32"
+        b.kgText = "12500"; h.syncSale()
+        assertEquals("12000", s.kgText)                   // user's own qty kept
+        val sh = h.shortage(s)!!
+        assertEquals(500.0, sh.first, 0.001); assertEquals(15000.0, sh.second, 0.001)
+        // profit already counts the shortage: 12000×32 − 12500×30 = 9000
+        assertEquals(9000.0, h.munafa(), 0.001)
+        // purchase line removed -> its sale line goes too
+        h.buyItems.clear(); h.syncSale()
+        assertEquals(0, h.maal.size)
+        // vehicle bought -> vehicle parts may be sold
+        h.priceText = "50000"
+        assertTrue(h.hasVehicle())
+    }
+
+    @Test fun lotItemsAreSoldToo() {
+        val h = Hisab(22, 1000, type = "lot")
+        h.lots.add(Lot("Lot 1", items = mutableListOf(Line("", "Tyre", true, amountText = "8000"))))
+        h.syncSale()
+        assertEquals(1, h.maal.size)
+        assertTrue(h.maal[0].fixed)
+        assertFalse(h.hasVehicle())
+    }
 }

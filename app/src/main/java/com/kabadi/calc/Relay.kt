@@ -154,6 +154,24 @@ object Relay {
                 .setContentIntent(open).setAutoCancel(true)
             try { nm.notify(9, b.build()) } catch (_: Exception) {}
         }
+        // users asking to correct a final hisab
+        try {
+            val u = Unlock.pending(ctx)
+            val sp0 = ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE)
+            val seen0 = sp0.getString("seenUnl", "").orEmpty().split(",").toSet()
+            val fresh0 = u?.filter { it.id !in seen0 }.orEmpty()
+            if (u != null) sp0.edit().putString("seenUnl", u.joinToString(",") { it.id }).apply()
+            if (fresh0.isNotEmpty()) {
+                val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel("otp_req", "OTP", NotificationManager.IMPORTANCE_HIGH))
+                val open = PendingIntent.getActivity(ctx, 16, Intent(ctx, MainActivity::class.java).putExtra("admin", true)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                val b = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(ctx, "otp_req") else @Suppress("DEPRECATION") Notification.Builder(ctx)
+                b.setSmallIcon(R.drawable.ic_launcher).setContentTitle("🔓 " + L.t("unl_new") + " (" + (u?.size ?: 0) + ")")
+                    .setContentText(fresh0.joinToString(", ") { it.name.ifBlank { it.mobile } }).setContentIntent(open).setAutoCancel(true)
+                try { nm.notify(10, b.build()) } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {}
         val p = pending(ctx) ?: return
         val sp = ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE)
         val seen = sp.getString("seenReq", "").orEmpty().split(",").toSet()

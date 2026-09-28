@@ -27,7 +27,11 @@ class Line(
     var gMobile: String = "",
     var shop: String = "",
     /** installments received / paid on a credit line */
-    val pays: MutableList<Pay> = mutableListOf()
+    val pays: MutableList<Pay> = mutableListOf(),
+    /** bought item ↔ its sale line (same id on both); "" = not linked */
+    var link: String = "",
+    /** sale line: the bought quantity last copied in (so a changed purchase qty follows until the user types his own) */
+    var syncKg: String = ""
 ) {
     /** for the vehicle price / auction sale lines: value comes from the hisab */
     var calc: (() -> Double)? = null
@@ -171,6 +175,50 @@ class Hisab(
     }
     /** gaadi / haraji: price written for the vehicle only */
     fun vehPrice() = if (isLot) 0.0 else ev(priceText)
+
+    /** other goods bought (lot items or gaadi / haraji extra goods) */
+    fun boughtItems(): List<Line> = if (isLot) lots.flatMap { it.items } else buyItems
+
+    /** a vehicle was bought: only then the vehicle-part buttons are offered for sale */
+    fun hasVehicle(): Boolean = if (isLot) allVehicles().isNotEmpty()
+        else vehPrice() != 0.0 || listOf(brand, variant, vehicle, year).any { it.isNotBlank() }
+
+    /** the bought line of a linked sale line */
+    fun boughtOf(sale: Line): Line? = if (sale.link.isEmpty()) null else boughtItems().firstOrNull { it.link == sale.link }
+
+    /**
+     * Whatever was bought (other goods) is always in the sale list too, same name and quantity by default.
+     * Returns true when lines were added or removed (the screen must be redrawn).
+     */
+    fun syncSale(): Boolean {
+        var changed = false
+        val bought = boughtItems()
+        bought.forEach { b -> if (b.link.isEmpty()) b.link = java.util.UUID.randomUUID().toString().take(10) }
+        val ids = bought.map { it.link }.toSet()
+        if (maal.removeAll { it.link.isNotEmpty() && it.link !in ids }) changed = true
+        bought.forEach { b ->
+            var s = maal.firstOrNull { it.link == b.link }
+            if (s == null) {
+                s = Line(b.key, b.name, b.fixed, kgText = b.kgText, litre = b.litre, link = b.link, syncKg = b.kgText)
+                maal.add(s); changed = true
+            }
+            if (s.fixed != b.fixed || s.litre != b.litre) changed = true
+            s.name = b.name; s.key = b.key; s.fixed = b.fixed; s.litre = b.litre
+            // quantity follows the purchase until the user writes a different sold quantity
+            if (s.kgText == s.syncKg && s.kgText != b.kgText) s.kgText = b.kgText
+            s.syncKg = b.kgText
+        }
+        return changed
+    }
+
+    /** sold less than bought: (missing qty, loss at the purchase rate); null when nothing missing */
+    fun shortage(sale: Line): Pair<Double, Double>? {
+        val b = boughtOf(sale) ?: return null
+        if (b.fixed || sale.fixed) return null
+        val miss = b.kg - sale.kg
+        if (miss <= 1e-9) return null
+        return miss to miss * b.rate
+    }
     val sale get() = ev(saleText)
     fun kharchTotal() = kharch.sumOf { it.value() }
     fun lagat() = price + kharchTotal()

@@ -162,6 +162,10 @@ object Bill {
                 }
                 c?.drawText(money(l.value()).removePrefix("₹ "), W - pad, y + 13 * u, tp(12.5f * u, false, Color.rgb(0x21, 0x21, 0x21), Paint.Align.RIGHT))
                 y += 19 * u
+                h.shortage(l)?.let { (q, loss) ->
+                    c?.drawText("    ⚠ " + L.t("kami") + " " + plain(q) + (if (l.litre) " L" else " kg") + " → " + L.t("loss_buy") + " " + money(loss), pad, y + 10 * u, tp(10.5f * u, false, Color.rgb(0xC6, 0x28, 0x28)))
+                    y += 15 * u
+                }
                 if (h.role == "seller") {
                     val mob = l.cMobile.filter { it.isDigit() }
                     val plainRokad = !l.udhaar && l.cName.isBlank() && mob.length < 10 && l.gName.isBlank() && l.gMobile.isBlank() && l.shop.isBlank()

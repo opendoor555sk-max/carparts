@@ -1,3 +1,6 @@
+Vechan: gaadi kharidi hoy tyare j gaadi na parts na button. Fakt bijo maal kharidyo hoy to je kharidyu te j aapmele vechan ma aave (naam + vajan). Vechta ochhu vajan = ghat, nuksan kharidi bhav thi dekhay.
+Final hisab sudhar: user '🙏 सुधार के लिए एडमिन से इजाज़त माँगें' dabave → Admin screen ma '🔓 सुधार की माँग' ✅/❌ → ha kahe to user no hisab khule, sudhari ne pharithi Final.
+
 Nauman (7203960120) have normal user — Admin (👑) nikali nakhyu. Admin PIN / final hisab kholvanu fakt Admin phone par; normal user ne password nahi puchhay.
 
 Admin phone: final (✅) hisab pan delete thai shake (list ma dabavi rakho ke hisab ma 🗑). Bija users mate final hisab lock j rahe.
