@@ -276,6 +276,12 @@ object L {
         "book_gaadi" to arrayOf("From vehicle hisab (mudi / khedut)", "गाड़ी हिसाब से (मुडी / खेडूत)", "ગાડી હિસાબથી (મૂડી / ખેડૂત)"),
         "book_co" to arrayOf("From company", "कंपनी से", "કંપનીથી"),
         "book_total" to arrayOf("Total", "कुल", "કુલ"),
+        "lot_name" to arrayOf("Lot name (e.g. GSRTC lot)", "लॉट का नाम (जैसे GSRTC लॉट)", "લોટનું નામ (જેમ કે GSRTC લોટ)"),
+        "add_veh1" to arrayOf("Vehicle", "गाड़ी", "ગાડી"),
+        "add_item" to arrayOf("Other item", "दूसरी चीज़", "બીજી વસ્તુ"),
+        "item_name" to arrayOf("Item name (scrap, tyre …)", "चीज़ का नाम (भंगार, टायर …)", "વસ્તુનું નામ (ભંગાર, ટાયર …)"),
+        "this_lot_price" to arrayOf("This lot's price", "इस लॉट की कीमत", "આ લોટની કિંમત"),
+        "add_lot" to arrayOf("+ Add another lot", "+ दूसरा लॉट जोड़ें", "+ બીજો લોટ ઉમેરો"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 

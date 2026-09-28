@@ -110,6 +110,11 @@ object Store {
         o.optJSONArray("py")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { l.pays.add(Pay(it.optLong("t"), it.optString("a"))) } }
     }
 
+    private fun vj(l: List<Veh>) = JSONArray().also { a -> l.forEach { v ->
+        a.put(JSONObject().put("b", v.brand).put("v", v.variant).put("t", v.tyres).put("y", v.year).put("n", v.no).put("p", v.priceText)) } }
+    private fun jv(a: JSONArray) = (0 until a.length()).map { i -> a.getJSONObject(i).let {
+        Veh(it.optString("b"), it.optString("v"), it.optString("t"), it.optString("y"), it.optString("n"), it.optString("p")) } }
+
     fun hj(h: Hisab): JSONObject {
         val o = JSONObject().put("id", h.id).put("t", h.time).put("p", h.party).put("v", h.vehicle)
             .put("no", h.note).put("pr", h.priceText)
@@ -118,8 +123,9 @@ object Store {
             .put("mn", h.mudiName).put("mm", h.mudiMobile).put("mp", h.mudiPctText)
             .put("kn", h.khedName).put("km", h.khedMobile).put("kp", h.khedPctText)
             .put("cmo", h.coMode).put("mac", h.mudiAddCo).put("kac", h.khedAddCo).put("fin", h.finalAt)
-        o.put("vh", JSONArray().also { a -> h.vehicles.forEach { v ->
-            a.put(JSONObject().put("b", v.brand).put("v", v.variant).put("t", v.tyres).put("y", v.year).put("n", v.no).put("p", v.priceText)) } })
+        o.put("vh", vj(h.vehicles))
+        o.put("lt", JSONArray().also { a -> h.lots.forEach { t ->
+            a.put(JSONObject().put("n", t.name).put("p", t.priceText).put("vh", vj(t.vehicles)).put("it", JSONArray().also { b -> t.items.forEach { b.put(lj(it)) } })) } })
         o.put("pa", JSONArray().also { a -> h.partners.forEach { a.put(JSONObject().put("n", it.name).put("s", it.shareText)) } })
         o.put("k", JSONArray().also { a -> h.kharch.forEach { a.put(lj(it)) } })
         o.put("m", JSONArray().also { a -> h.maal.forEach { a.put(lj(it)) } })
@@ -134,8 +140,16 @@ object Store {
             mudiName = o.optString("mn"), mudiMobile = o.optString("mm"), mudiPctText = o.optString("mp"),
             khedName = o.optString("kn"), khedMobile = o.optString("km"), khedPctText = o.optString("kp"),
             coMode = o.optBoolean("cmo"), mudiAddCo = o.optBoolean("mac"), khedAddCo = o.optBoolean("kac"), finalAt = o.optLong("fin"))
-        o.optJSONArray("vh")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let {
-            h.vehicles.add(Veh(it.optString("b"), it.optString("v"), it.optString("t"), it.optString("y"), it.optString("n"), it.optString("p"))) } }
+        o.optJSONArray("vh")?.let { h.vehicles.addAll(jv(it)) }
+        o.optJSONArray("lt")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { t ->
+            val lot = Lot(t.optString("n"), t.optString("p"))
+            t.optJSONArray("vh")?.let { lot.vehicles.addAll(jv(it)) }
+            t.optJSONArray("it")?.let { b -> for (j in 0 until b.length()) lot.items.add(jl(b.getJSONObject(j))) }
+            h.lots.add(lot) } }
+        // older lot hisab (vehicles directly in the hisab) → "Lot 1"
+        if (h.isLot && h.lots.isEmpty() && h.vehicles.isNotEmpty()) {
+            h.lots.add(Lot("Lot 1", h.priceText, h.vehicles.toMutableList())); h.vehicles.clear(); h.priceText = ""
+        }
         o.optJSONArray("pa")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { h.partners.add(Partner(it.optString("n"), it.optString("s"))) } }
         o.optJSONArray("k")?.let { a -> for (i in 0 until a.length()) h.kharch.add(jl(a.getJSONObject(i))) }
         o.optJSONArray("m")?.let { a -> for (i in 0 until a.length()) h.maal.add(jl(a.getJSONObject(i))) }

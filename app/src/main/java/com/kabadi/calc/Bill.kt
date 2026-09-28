@@ -94,9 +94,13 @@ object Bill {
         fun rule() { c?.drawLine(pad, y, W - pad, y, lineP); y += 5 * u }
 
         // lot: every vehicle
-        if (h.isLot && h.vehicles.isNotEmpty()) {
-            section(L.t("lot_veh") + " (" + h.vehicles.size + ")")
-            h.vehicles.forEachIndexed { i, v -> row("${i + 1}. " + v.info().ifBlank { "—" }, if (v.priceText.isNotBlank()) money(v.price) else "") }
+        if (h.isLot) h.lots.forEachIndexed { li, t ->
+            section("${li + 1}. " + t.name.ifBlank { L.t("lot") })
+            t.vehicles.forEach { v -> row("   🚚 " + v.info().ifBlank { "—" }, if (v.priceText.isNotBlank()) money(v.price) else "") }
+            t.items.forEach { l -> row("   📦 " + l.name + if (!l.fixed) "  " + plain(l.kg) + (if (l.litre) " L" else " kg") + (if (l.rate != 0.0) " × " + plain(l.rate) else "") else "",
+                if (l.value() != 0.0) money(l.value()) else "") }
+            rule()
+            row(L.t("this_lot_price"), money(t.price), true)
             y += 4 * u
         }
         // 1. vehicle price
@@ -336,7 +340,13 @@ object Bill {
         if (h.mudiName.isNotBlank() || h.mudiPct > 0) sb.append(L.t("mudi_h")).append(": ").append(h.mudiName).append(" (").append(plain(h.mudiPct)).append("%)\n")
         if (h.khedName.isNotBlank() || h.khedPct > 0) sb.append(L.t("khed_h")).append(": ").append(h.khedName).append(" (").append(plain(h.khedPct)).append("%)\n")
         if (h.vehicleInfo().isNotBlank()) sb.append(h.vehicleInfo()).append("\n")
-        if (h.isLot) h.vehicles.forEachIndexed { i, v -> sb.append(i + 1).append(". ").append(v.info()).append(if (v.priceText.isNotBlank()) " – " + money(v.price) else "").append("\n") }
+        if (h.isLot) h.lots.forEachIndexed { li, t ->
+            sb.append("\n*").append(li + 1).append(". ").append(t.name.ifBlank { L.t("lot") }).append("*\n")
+            t.vehicles.forEach { v -> sb.append("🚚 ").append(v.info()).append(if (v.priceText.isNotBlank()) " – " + money(v.price) else "").append("\n") }
+            t.items.forEach { l -> sb.append("📦 ").append(l.name).append(if (!l.fixed) " " + plain(l.kg) + (if (l.litre) " L" else " kg") else "")
+                .append(if (l.value() != 0.0) " – " + money(l.value()) else "").append("\n") }
+            sb.append(L.t("this_lot_price")).append(": ").append(money(t.price)).append("\n")
+        }
         if (h.finalAt > 0) sb.append("✅ ").append(L.t("final_s")).append(": ").append(dateText(h.finalAt)).append("\n")
         if (h.vehicle.isNotBlank()) sb.append(L.t("vehicle")).append(": ").append(h.vehicle).append("\n")
         if (h.place.isNotBlank()) sb.append(L.t("place").substringBefore(" (")).append(": ").append(h.place).append("\n")

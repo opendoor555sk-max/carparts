@@ -652,7 +652,8 @@ class MainActivity : Activity() {
     private var scrollTo: View? = null
 
     private fun hasContent(h: Hisab) = h.party.isNotBlank() || h.mudiName.isNotBlank() || h.khedName.isNotBlank() || h.vehicle.isNotBlank() || h.priceText.isNotBlank() ||
-        h.kharch.isNotEmpty() || h.maal.isNotEmpty() || h.saleText.isNotBlank() || h.partners.isNotEmpty()
+        h.kharch.isNotEmpty() || h.maal.isNotEmpty() || h.saleText.isNotBlank() || h.partners.isNotEmpty() ||
+        h.lots.any { it.vehicles.isNotEmpty() || it.items.isNotEmpty() || it.priceText.isNotBlank() }
 
     private fun autoSave() {
         val h = editing ?: return
@@ -689,6 +690,11 @@ class MainActivity : Activity() {
 
     private fun refreshTotals() {
         val h = editing ?: return
+        lotTotals.forEach { (t, tv) ->
+            val parts = listOfNotNull(if (t.vehicles.isNotEmpty()) t.vehicles.size.toString() + " 🚚" else null,
+                if (t.kg() > 0) plain(t.kg()) + " kg" else null)
+            tv.text = parts.joinToString(" • ").let { if (it.isEmpty()) "" else "$it   " } + L.t("lot") + ": " + money(t.price)
+        }
         sumPrice.text = money(h.price)
         sumKharch.text = money(h.kharchTotal())
         sumLagat.text = money(h.lagat())
@@ -813,37 +819,74 @@ class MainActivity : Activity() {
         top.addView(more)
         body.addView(top, cardLp())
 
-        // ---- lot: many vehicles + one total price ----
+        // ---- lot hisab: one or more lots, each with vehicles + any items, own name and price ----
+        lotTotals.clear()
         if (h.isLot) {
-            val lc = card()
-            lc.addView(heading("🚚 " + L.t("lot_veh"), 0xFF1565C0.toInt()).apply { textSize = 15f })
-            val vLines = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            fun drawV() {
-                vLines.removeAllViews()
-                h.vehicles.forEachIndexed { i, v ->
-                    val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = round(0xFFF1F6FC.toInt(), 10f, 0xFFBBDEFB.toInt()); setPadding(dpi(8f), dpi(4f), dpi(4f), dpi(6f)) }
-                    val bIn = input(L.t("brand"), v.brand, false) { v.brand = it }.apply { tag = "focus" }
-                    val pk = pill("▾", false, 0xFF455A64.toInt()) { AlertDialog.Builder(this).setItems(BRANDS.toTypedArray()) { _, w -> bIn.setText(BRANDS[w]) }.show() }
-                    box.addView(row(small("${i + 1}.", INK).apply { typeface = Typeface.DEFAULT_BOLD } to 0f, bIn to 1.2f, pk to 0f,
-                        input(L.t("variant").substringBefore(" ("), v.variant, false) { v.variant = it } to 1f,
-                        xBtn { confirmRemove { h.vehicles.remove(v); drawV(); refreshTotals() } } to 0f))
-                    box.addView(row(input(L.t("vehicle").substringBefore(" /"), v.no, false) { v.no = it } to 1.3f,
-                        input(L.t("year"), v.year, true) { v.year = it } to 0.7f,
-                        input(L.t("tyres"), v.tyres, true) { v.tyres = it } to 0.6f))
-                    box.addView(row(small(L.t("veh_price")) to 1f,
-                        input("₹", v.priceText, true) { v.priceText = it; refreshTotals() }.apply { gravity = Gravity.END } to 1.2f))
-                    vLines.addView(box, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
+            if (h.lots.isEmpty()) h.lots.add(Lot("Lot 1").also { t ->
+                if (h.vehicles.isNotEmpty()) { t.vehicles.addAll(h.vehicles); h.vehicles.clear(); t.priceText = h.priceText; h.priceText = "" }
+            })
+            val lotsBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            lateinit var drawLots: () -> Unit
+            drawLots = {
+                lotsBox.removeAllViews(); lotTotals.clear()
+                h.lots.forEachIndexed { li, t ->
+                    val lc = card().apply { background = round(Color.WHITE, 12f, 0xFF90CAF9.toInt()) }
+                    lc.addView(row(small("${li + 1}.", 0xFF1565C0.toInt()).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD } to 0f,
+                        input(L.t("lot_name"), t.name, false) { t.name = it }.apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD } to 1f,
+                        xBtn { confirmRemove { h.lots.remove(t); drawLots(); refreshTotals() } } to 0f))
+                    // vehicles of this lot
+                    val vLines = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                    fun drawV() {
+                        vLines.removeAllViews()
+                        t.vehicles.forEachIndexed { i, v ->
+                            val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = round(0xFFF1F6FC.toInt(), 10f, 0xFFBBDEFB.toInt()); setPadding(dpi(8f), dpi(4f), dpi(4f), dpi(6f)) }
+                            val bIn = input(L.t("brand"), v.brand, false) { v.brand = it }.apply { tag = "focus" }
+                            val pk = pill("▾", false, 0xFF455A64.toInt()) { AlertDialog.Builder(this).setItems(BRANDS.toTypedArray()) { _, w -> bIn.setText(BRANDS[w]) }.show() }
+                            box.addView(row(small("🚚 ${i + 1}", INK).apply { typeface = Typeface.DEFAULT_BOLD } to 0f, bIn to 1.2f, pk to 0f,
+                                input(L.t("variant").substringBefore(" ("), v.variant, false) { v.variant = it } to 1f,
+                                xBtn { confirmRemove { t.vehicles.remove(v); drawV(); refreshTotals() } } to 0f))
+                            box.addView(row(input(L.t("vehicle").substringBefore(" /"), v.no, false) { v.no = it } to 1.3f,
+                                input(L.t("year"), v.year, true) { v.year = it } to 0.7f,
+                                input(L.t("tyres"), v.tyres, true) { v.tyres = it } to 0.6f))
+                            box.addView(row(small(L.t("veh_price")) to 1f,
+                                input("₹", v.priceText, true) { v.priceText = it; refreshTotals() }.apply { gravity = Gravity.END } to 1.2f))
+                            vLines.addView(box, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
+                        }
+                    }
+                    // other things in this lot (scrap, tyres … any name)
+                    val iLines = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                    fun drawI() {
+                        iLines.removeAllViews()
+                        t.items.forEach { l -> iLines.addView(lotItemRow(t, l) { drawI(); refreshTotals() }) }
+                    }
+                    lc.addView(vLines); lc.addView(iLines)
+                    drawV(); drawI()
+                    lc.addView(row(pill("＋ 🚚 " + L.t("add_veh1"), false, 0xFF1565C0.toInt()) { t.vehicles.add(Veh()); drawV(); refreshTotals(); focusLast(vLines) }
+                            .apply { textSize = 14f; setPadding(dpi(6f), dpi(9f), dpi(6f), dpi(9f)) } to 1f,
+                        pill("＋ 📦 " + L.t("add_item"), false, GREEN) {
+                            val names = Store.parts.map { it.label() } + ("✎ " + L.t("other"))
+                            AlertDialog.Builder(this).setTitle(L.t("add_item")).setItems(names.toTypedArray()) { _, w ->
+                                val b = Store.parts.getOrNull(w)
+                                val nm = b?.label() ?: ""
+                                t.items.add(Line(b?.key ?: "", nm, b?.fixed ?: false, rateText = Store.lastRate[nm] ?: "", litre = b?.litre ?: false))
+                                drawI(); refreshTotals(); focusLast(iLines)
+                            }.show()
+                        }.apply { textSize = 14f; setPadding(dpi(6f), dpi(9f), dpi(6f), dpi(9f)) } to 1f).apply { setPadding(0, dpi(6f), 0, dpi(4f)) })
+                    lc.addView(row(TextView(this).apply { text = L.t("this_lot_price"); textSize = 15f; setTextColor(BLUE); typeface = Typeface.DEFAULT_BOLD } to 1f,
+                        input(L.t("lot_price_h"), t.priceText, true) { t.priceText = it; refreshTotals() }.apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.END } to 1.2f))
+                    val tot = small("").apply { gravity = Gravity.END; typeface = Typeface.DEFAULT_BOLD; setTextColor(0xFF1565C0.toInt()) }
+                    lc.addView(tot, llp(MATCH_PARENT, WRAP_CONTENT))
+                    lotTotals.add(t to tot)
+                    lotsBox.addView(lc, cardLp())
                 }
             }
-            lc.addView(vLines)
-            lc.addView(bigButton(L.t("add_veh"), 0xFF1565C0.toInt()) { h.vehicles.add(Veh()); drawV(); refreshTotals(); focusLast(vLines) }
-                .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT))
-            drawV()
-            lc.addView(row(input(L.t("place").substringBefore(" ("), h.place, false) { h.place = it } to 1f).apply { setPadding(0, dpi(8f), 0, 0) })
-            val lp = input(L.t("lot_price_h"), h.priceText, true) { h.priceText = it; refreshTotals() }.apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.END }
-            lc.addView(row(TextView(this).apply { text = L.t("lot_price"); textSize = 15f; setTextColor(BLUE); typeface = Typeface.DEFAULT_BOLD } to 1f, lp to 1.2f)
-                .apply { setPadding(0, dpi(8f), 0, 0) })
-            body.addView(lc, cardLp())
+            body.addView(lotsBox)
+            drawLots()
+            body.addView(bigButton(L.t("add_lot"), 0xFF1565C0.toInt()) { h.lots.add(Lot("Lot " + (h.lots.size + 1))); drawLots(); refreshTotals() }
+                .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
+            val pc = card()
+            pc.addView(row(input(L.t("place").substringBefore(" ("), h.place, false) { h.place = it } to 1f))
+            body.addView(pc, cardLp())
         }
 
         // ---- vehicle details + price ----
@@ -1045,6 +1088,30 @@ class MainActivity : Activity() {
         act(L.t("pdf"), RED) { exportPdf(h) }
         act(L.t("share"), GREEN) { shareText(h) }
         if (Store.hisabs.any { it === h } && h.finalAt == 0L) act("🗑", 0xFF78909C.toInt()) { askDelete(h) { editing = null; showHome() } }
+    }
+
+    /** each lot's total line in the editor (updated with the totals) */
+    private val lotTotals = mutableListOf<Pair<Lot, TextView>>()
+
+    /** a thing inside a lot: name (any), kg × rate / litre × rate / fixed */
+    private fun lotItemRow(t: Lot, l: Line, redraw: () -> Unit): View {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = round(0xFFF7FAF7.toInt(), 10f, 0xFFC8E6C9.toInt()); setPadding(dpi(8f), dpi(4f), dpi(4f), dpi(6f)) }
+        val mode = when { l.fixed -> L.t("fix"); l.litre -> L.t("ltr"); else -> L.t("kg") }
+        box.addView(row(small("📦", INK) to 0f, input(L.t("item_name"), l.name, false) { l.name = it }.apply { tag = "focus" } to 1f,
+            pill(mode + " ⇄", false, GREEN) {
+                when { l.fixed -> { l.fixed = false; l.litre = false }; l.litre -> { l.fixed = true; l.litre = false }; else -> l.litre = true }
+                redraw()
+            }.apply { textSize = 12f } to 0f,
+            xBtn { confirmRemove { t.items.remove(l); redraw() } } to 0f))
+        val res = small("").apply { typeface = Typeface.DEFAULT_BOLD; setTextColor(GREEN); gravity = Gravity.END }
+        fun upd() { res.text = "= " + money(l.value()); refreshTotals() }
+        if (l.fixed) box.addView(row(small(L.t("fixamt")) to 1f, input("₹", l.amountText, true) { l.amountText = it; upd() }.apply { gravity = Gravity.END } to 1.2f))
+        else {
+            box.addView(row(input(if (l.litre) L.t("ltr") else L.t("kg"), l.kgText, true) { l.kgText = it; upd() } to 1f, small("×") to 0f,
+                input(L.t("rate"), l.rateText, true) { l.rateText = it; upd() } to 1f, res to 1f))
+        }
+        res.text = "= " + money(l.value())
+        return box
     }
 
     /** hisab ids opened by admin PIN (only while the app is open) */

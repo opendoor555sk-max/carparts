@@ -191,4 +191,19 @@ class ModelTest {
         assertEquals(1, lockState(a, now + 47L * 3600000L))
         assertEquals(2, lockState(a, now + 49L * 3600000L))
     }
+
+    @Test fun manyLots() {
+        val h = Hisab(1, 0, type = "lot")
+        val a = Lot("GSRTC Lot 1"); a.vehicles.add(Veh("Tata", priceText = "100000")); a.items.add(Line("", "Lokhand scrap", false, kgText = "1000", rateText = "30"))
+        val b = Lot("Bus lot", priceText = "250000"); b.vehicles.add(Veh("Ashok Leyland")); b.items.add(Line("", "Tyre", true, amountText = "5000"))
+        h.lots.add(a); h.lots.add(b)
+        assertEquals(130000.0, a.price, 1e-9)            // no price = vehicles + items
+        assertEquals(380000.0, h.price, 1e-9)
+        h.saleText = "400000"
+        assertEquals(20000.0, h.munafa(), 1e-9)
+        assertTrue(h.verify().isEmpty())
+        assertTrue(RFilter(brand = "Ashok Leyland").matches(h))
+        assertTrue(RFilter(who = "lokhand").matches(h))
+        assertEquals(2, h.allVehicles().size)
+    }
 }

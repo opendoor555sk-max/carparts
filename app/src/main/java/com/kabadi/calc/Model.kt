@@ -52,6 +52,14 @@ class Veh(var brand: String = "", var variant: String = "", var tyres: String = 
     fun info() = listOf(brand, variant, if (tyres.isNotBlank()) tyres + " tyre" else "", year, no).filter { it.isNotBlank() }.joinToString(" • ")
 }
 
+/** one lot: its own name, vehicles and any other things (scrap …), one price */
+class Lot(var name: String = "", var priceText: String = "", val vehicles: MutableList<Veh> = mutableListOf(), val items: MutableList<Line> = mutableListOf()) {
+    fun itemsValue() = items.sumOf { it.value() }
+    /** no price written = vehicles' prices + items' value */
+    val price get() = if (priceText.isBlank()) vehicles.sumOf { it.price } + itemsValue() else evalExpr(priceText).let { if (it.isFinite()) it else 0.0 }
+    fun kg() = items.filter { !it.fixed && !it.litre }.sumOf { it.kg }
+}
+
 class Partner(var name: String, var shareText: String = "") {
     val share get() = evalExpr(shareText).let { if (it.isFinite() && it > 0) it else 0.0 }
 }
@@ -87,6 +95,8 @@ class Hisab(
     var khedPctText: String = "",
     /** lot: many vehicles bought together */
     val vehicles: MutableList<Veh> = mutableListOf(),
+    /** lot hisab: one or more lots */
+    val lots: MutableList<Lot> = mutableListOf(),
     /** haraji "Rit B": the whole vehicle given to the company at a fixed price (saleText) */
     var coMode: Boolean = false,
     /** mudi malik / khedut want their company share added into their own hisab */
@@ -97,6 +107,7 @@ class Hisab(
 ) {
     val isLot get() = type == "lot"
     val isCo get() = type == "haraji" && coMode
+    fun allVehicles() = vehicles + lots.flatMap { it.vehicles }
     val mudiPct get() = evalExpr(mudiPctText).let { if (it.isFinite() && it > 0) it else 0.0 }
     val khedPct get() = evalExpr(khedPctText).let { if (it.isFinite() && it > 0) it else 0.0 }
     fun hasSplit() = mudiName.isNotBlank() || khedName.isNotBlank() || mudiPct > 0 || khedPct > 0
@@ -127,15 +138,21 @@ class Hisab(
             if (off(munafa(), bd(sale).subtract(bd(price)).subtract(k))) bad.add("munafa")
             if (off(companyResult() + commission(), m.subtract(bd(sale)))) bad.add("company")
         } else if (off(munafa() + commission(), bd(sale).add(m).subtract(bd(price)).subtract(k))) bad.add("munafa")
-        if (isLot && priceText.isBlank() && off(price, vehicles.fold(BigDecimal.ZERO) { a, v -> a.add(bd(v.price)) })) bad.add("lot")
+        if (isLot && lots.isNotEmpty() && off(price, lots.fold(BigDecimal.ZERO) { a, t ->
+                a.add(if (t.priceText.isBlank()) t.vehicles.fold(BigDecimal.ZERO) { b, v -> b.add(bd(v.price)) }.add(t.items.fold(BigDecimal.ZERO) { b, l -> b.add(lineBd(l)) }) else bd(t.price)) })) bad.add("lot")
         return bad
     }
     fun rokadBikri() = maal.filter { !it.udhaar }.sumOf { it.value() }
-    fun vehicleInfo() = if (isLot) "Lot: " + vehicles.size + " 🚚" + vehicles.map { it.brand }.filter { it.isNotBlank() }.distinct().let { if (it.isEmpty()) "" else " (" + it.joinToString(", ") + ")" }
+    fun vehicleInfo() = if (isLot) (if (lots.size > 1) lots.size.toString() + " Lot • " else "Lot • ") + allVehicles().size + " 🚚" +
+            allVehicles().map { it.brand }.filter { it.isNotBlank() }.distinct().let { if (it.isEmpty()) "" else " (" + it.joinToString(", ") + ")" }
         else listOf(brand, variant, if (tyres.isNotBlank()) tyres + " tyre" else "", year).filter { it.isNotBlank() }.joinToString(" • ")
     private fun ev(t: String) = evalExpr(t).let { if (it.isFinite()) it else 0.0 }
     /** lot with no total written = sum of the vehicles' prices */
-    val price get() = if (isLot && priceText.isBlank()) vehicles.sumOf { it.price } else ev(priceText)
+    val price get() = when {
+        isLot && lots.isNotEmpty() -> lots.sumOf { it.price }
+        isLot && priceText.isBlank() -> vehicles.sumOf { it.price }
+        else -> ev(priceText)
+    }
     val sale get() = ev(saleText)
     fun kharchTotal() = kharch.sumOf { it.value() }
     fun lagat() = price + kharchTotal()
@@ -353,12 +370,12 @@ class RFilter(var who: String = "", var mudi: String = "", var year: Int = 0, va
     fun matches(h: Hisab): Boolean {
         val c = java.util.Calendar.getInstance().apply { timeInMillis = h.time }
         val q = norm(who)
-        return (q.isEmpty() || listOf(h.mudiName, h.khedName, h.party, h.vehicle, h.brand, h.variant, h.place, h.note).plus(h.vehicles.flatMap { listOf(it.brand, it.variant, it.no) }).any { norm(it).contains(q) }) &&
+        return (q.isEmpty() || listOf(h.mudiName, h.khedName, h.party, h.vehicle, h.brand, h.variant, h.place, h.note).plus(h.allVehicles().flatMap { listOf(it.brand, it.variant, it.no) }).plus(h.lots.flatMap { t -> listOf(t.name) + t.items.map { it.name } }).any { norm(it).contains(q) }) &&
             (mudi.isBlank() || norm(h.mudiName) == norm(mudi) || norm(h.khedName) == norm(mudi) || h.partners.any { norm(it.name) == norm(mudi) }) &&
             (year == 0 || c.get(java.util.Calendar.YEAR) == year) &&
             (month == 0 || c.get(java.util.Calendar.MONTH) + 1 == month) &&
-            (brand.isBlank() || norm(h.brand) == norm(brand) || h.vehicles.any { norm(it.brand) == norm(brand) }) &&
-            (tyres.isBlank() || h.tyres.trim() == tyres.trim() || h.vehicles.any { it.tyres.trim() == tyres.trim() }) &&
+            (brand.isBlank() || norm(h.brand) == norm(brand) || h.allVehicles().any { norm(it.brand) == norm(brand) }) &&
+            (tyres.isBlank() || h.tyres.trim() == tyres.trim() || h.allVehicles().any { it.tyres.trim() == tyres.trim() }) &&
             (type.isBlank() || h.type == type)
     }
 }
