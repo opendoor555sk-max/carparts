@@ -15,7 +15,7 @@ import java.security.MessageDigest
  */
 object Account {
     /** login / OTP on or off (off for now: the app opens straight away) */
-    const val ENABLED = false
+    const val ENABLED = true
     private const val FILE = "kabadi_acct"
     /** admin's WhatsApp number (can be changed without an app update) */
     private const val ADMIN_URL = "https://raw.githubusercontent.com/opendoor555sk-max/carparts/kabadi-calc/kabadi-admin.txt"
@@ -79,12 +79,19 @@ object Account {
     }
 
     // ---- admin: list of approved / rejected requests ----
-    fun log(c: Context, ok: Boolean, name: String, mobile: String, dev: String = "") {
+    /** status: "ok" approved, "no" cancelled, "block" blocked */
+    fun log(c: Context, ok: Boolean, name: String, mobile: String, dev: String = "", status: String = if (ok) "ok" else "no") {
         val a = try { JSONArray(p(c).getString("log", "[]")) } catch (_: Exception) { JSONArray() }
-        a.put(JSONObject().put("t", System.currentTimeMillis()).put("ok", ok).put("n", name).put("m", mobile).put("d", dev))
+        a.put(JSONObject().put("t", System.currentTimeMillis()).put("ok", ok).put("n", name).put("m", mobile).put("d", dev).put("s", status))
         while (a.length() > 300) a.remove(0)
         p(c).edit().putString("log", a.toString()).apply()
     }
+    /** every user once, with his latest status (newest first) */
+    fun users(c: Context): List<JSONObject> = logs(c).distinctBy { it.optString("m") + ":" + it.optString("d") }
+
+    /** blocked by admin: must ask for a new OTP (hisab stays) */
+    fun unverify(c: Context) = p(c).edit().remove("ok").putBoolean("in", false).apply()
+
     fun logs(c: Context): List<JSONObject> {
         val a = try { JSONArray(p(c).getString("log", "[]")) } catch (_: Exception) { JSONArray() }
         return (0 until a.length()).map { a.getJSONObject(it) }.reversed()

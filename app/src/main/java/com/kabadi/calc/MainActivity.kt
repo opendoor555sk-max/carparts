@@ -93,6 +93,12 @@ class MainActivity : Activity() {
         fun start() {
             bar.visibility = View.VISIBLE
             showHome()
+            if (LOGIN_ON && !Account.isAdmin(this) && Account.verified(this)) {
+                val m = Account.mobile(this); val d = Account.device(this)
+                Thread {
+                    if (Relay.status(m, d) == "block") ui.post { Account.unverify(this); toast("🚫 " + L.t("blocked")); route() }
+                }.start()
+            }
             autoBackup()
             if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
                 requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 9)
@@ -184,32 +190,32 @@ class MainActivity : Activity() {
         gravity = Gravity.CENTER; textSize = 15f; setPadding(0, dpi(14f), 0, 0); setOnClickListener { act() }
     }
 
-    /** 1) first time: name + mobile + PIN → ask OTP */
-    private fun showSignup() {
+    /** 1) Create new account: user name + contact number → request to the owner on WhatsApp */
+    private fun showSignup(prefill: String = "") {
         var name = Account.name(this).ifBlank { Store.owner }
-        var mob = Account.mobile(this).ifBlank { Store.mobile.filter { it.isDigit() }.takeLast(10) }
-        val p1 = pinInput(L.t("acc_pin")); val p2 = pinInput(L.t("acc_pin2"))
-        fun save(): Boolean {
-            val a = p1.text.toString()
-            return when {
-                name.isBlank() -> { toast(L.t("acc_name")); false }
-                mob.length != 10 -> { toast(L.t("acc_bad_mobile")); false }
-                a.length != 4 || a != p2.text.toString() -> { toast(L.t("acc_bad_pin")); false }
+        var mob = prefill.ifBlank { Account.mobile(this).ifBlank { Store.mobile.filter { it.isDigit() }.takeLast(10) } }
+        val body = loginScreen(L.t("su_title")) { if (name.isNotBlank() && mob.length == 10) { Account.create(this, name.trim(), mob, ""); Account.approveAsAdmin(this); Reminders.schedule(this); startApp() } else toast(L.t("adm_fill_first")) }
+        body.addView(small(L.t("su_sub")).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, dpi(12f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(langRow { showSignup(prefill) }, gap())
+        body.addView(small(L.t("u_name").uppercase(), INK).apply { typeface = Typeface.DEFAULT_BOLD })
+        body.addView(input(L.t("u_name"), name, false) { name = it }.apply { textSize = 17f }, gap())
+        body.addView(small(L.t("u_mobile").uppercase(), INK).apply { typeface = Typeface.DEFAULT_BOLD })
+        body.addView(mobileInput("98xxxxxxxx", mob) { mob = it }.apply { textSize = 18f }, gap())
+        body.addView(bigButton("💬 " + L.t("su_send"), 0xFF25D366.toInt()) {
+            when {
+                name.isBlank() -> toast(L.t("u_name"))
+                mob.length != 10 -> toast(L.t("acc_bad_mobile"))
                 else -> {
-                    Account.create(this, name.trim(), mob, a)
+                    Account.create(this, name.trim(), mob, "")
                     if (Store.owner.isBlank()) Store.owner = name.trim()
                     if (Store.mobile.isBlank()) Store.mobile = mob
-                    Store.save(this); hideKeyboard(); true
+                    Store.save(this); hideKeyboard()
+                    sendOtpRequest()
+                    showOtp(true)
                 }
             }
-        }
-        val body = loginScreen(L.t("acc_new")) { if (save()) { Account.approveAsAdmin(this); Reminders.schedule(this); startApp() } else toast(L.t("adm_fill_first")) }
-        body.addView(langRow { showSignup() }, gap())
-        body.addView(input(L.t("acc_name"), name, false) { name = it }, gap())
-        body.addView(mobileInput("📞 " + L.t("acc_mobile"), mob) { mob = it }.apply { textSize = 18f }, gap())
-        body.addView(p1, gap()); body.addView(p2, gap())
-        body.addView(bigButton(L.t("otp_ask"), GREEN) { if (save()) showOtp(true) }, gap())
-        body.addView(small(L.t("otp_why")).apply { gravity = Gravity.CENTER }, llp(MATCH_PARENT, WRAP_CONTENT))
+        }, gap())
+        body.addView(link(L.t("have_acc")) { showSignin() }, llp(MATCH_PARENT, WRAP_CONTENT))
     }
 
     private fun otpRequestText() = "🔐 " + L.t("app") + " – OTP request\nName: " + Account.name(this) +
@@ -219,63 +225,65 @@ class MainActivity : Activity() {
         val admin = Account.adminNumber(this)
         if (admin.isNotEmpty()) whatsapp(admin, otpRequestText())
         else {
-            val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, otpRequestText())
-            try { startActivity(Intent.createChooser(i, "WhatsApp")) } catch (_: Exception) {}
+            val i = Intent(Intent.ACTION_SEND).setType("text/plain").setPackage("com.whatsapp").putExtra(Intent.EXTRA_TEXT, otpRequestText())
+            try { startActivity(i) } catch (_: Exception) {
+                try { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, otpRequestText()), "WhatsApp")) } catch (_: Exception) {}
+            }
         }
     }
 
-    /** 2) request goes to admin online; admin accepts → OTP comes here by itself → "Open app" */
+    /** 2) Waiting for OTP from the owner (comes by itself when he approves, or type it) */
     private fun showOtp(send: Boolean = false) {
-        val body = loginScreen(L.t("otp_title")) { Account.approveAsAdmin(this); Reminders.schedule(this); startApp() }
-        val info = card()
-        info.addView(small(Account.name(this), INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD })
-        info.addView(small("📞 " + Account.mobile(this) + "     " + L.t("otp_code") + ": #" + Account.device(this), INK).apply { textSize = 15f })
+        val body = loginScreen(L.t("su_title")) { Account.approveAsAdmin(this); Reminders.schedule(this); startApp() }
+        val info = card().apply { background = round(0xFFE8F5E9.toInt(), 12f, 0xFFA5D6A7.toInt()) }
+        info.addView(small(Account.name(this) + "  " + Account.mobile(this), INK).apply { textSize = 18f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER }, llp(MATCH_PARENT, WRAP_CONTENT))
         body.addView(info, gap())
-        val status = small("⏳ " + L.t("otp_wait"), ORANGE).apply { gravity = Gravity.CENTER; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(4f), 0, dpi(12f)) }
+        val status = small("⏳ " + L.t("wait_t"), ORANGE).apply { gravity = Gravity.CENTER; textSize = 16f; typeface = Typeface.DEFAULT_BOLD }
         body.addView(status, llp(MATCH_PARENT, WRAP_CONTENT))
-        val e = pinInput(L.t("otp_enter")).apply { filters = arrayOf(android.text.InputFilter.LengthFilter(6)); textSize = 24f }
+        body.addView(small(L.t("wait_h")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(2f), 0, dpi(12f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(small("OTP", INK).apply { typeface = Typeface.DEFAULT_BOLD })
+        val e = pinInput("• • • • • •").apply { filters = arrayOf(android.text.InputFilter.LengthFilter(6)); textSize = 24f }
         body.addView(e, gap())
-        val open = bigButton(L.t("otp_open"), GREEN) {
+        val open = bigButton(L.t("verify"), GREEN) {
             if (Account.approve(this, e.text.toString())) { hideKeyboard(); toast(L.t("otp_ok")); startApp() }
-            else toast(if (e.text.isEmpty()) L.t("otp_wait") else L.t("otp_bad"))
+            else toast(if (e.text.isEmpty()) L.t("wait_t") else L.t("otp_bad"))
         }
         body.addView(open, gap())
         val mob = Account.mobile(this); val dev = Account.device(this); val nm = Account.name(this)
         fun listen() = every(5000L, { Relay.answer(mob, dev) }) { ans ->
             when {
-                ans == null -> { status.text = "📶 " + L.t("otp_net"); status.setTextColor(RED); true }
+                ans == null -> { status.text = "⏳ " + L.t("wait_t"); true }
                 ans.isEmpty() -> { status.text = "❌ " + L.t("otp_rejected"); status.setTextColor(RED); false }
-                ans.length == 6 -> {
-                    e.setText(ans); status.text = "✅ " + L.t("otp_got"); status.setTextColor(GREEN)
-                    open.background = round(GREEN, 10f); false
-                }
-                else -> { status.text = "⏳ " + L.t("otp_wait"); status.setTextColor(ORANGE); true }
+                ans.length == 6 -> { e.setText(ans); status.text = "✅ " + L.t("otp_got"); status.setTextColor(GREEN); false }
+                else -> true
             }
         }
-        fun sendNow() {
-            status.text = "⏳ " + L.t("otp_sending"); status.setTextColor(ORANGE)
+        if (send) {
             val g = gen
-            Thread {
-                val ok = Relay.sendRequest(nm, mob, dev)
-                ui.post {
-                    if (g != gen) return@post
-                    if (ok) { status.text = "⏳ " + L.t("otp_wait"); listen() } else { status.text = "📶 " + L.t("otp_net"); status.setTextColor(RED) }
-                }
-            }.start()
-        }
-        if (send) sendNow() else listen()
-        body.addView(link("🔄 " + L.t("otp_again")) { showOtp(true) }, llp(MATCH_PARENT, WRAP_CONTENT))
-        body.addView(link("💬 " + L.t("otp_send")) { sendOtpRequest() }, llp(MATCH_PARENT, WRAP_CONTENT))
-        body.addView(link(L.t("otp_change")) { showSignup() }, llp(MATCH_PARENT, WRAP_CONTENT))
+            Thread { Relay.sendRequest(nm, mob, dev); ui.post { if (g == gen) listen() } }.start()
+        } else listen()
+        body.addView(link("💬 " + L.t("resend")) { sendOtpRequest(); Thread { Relay.sendRequest(nm, mob, dev) }.start() }, llp(MATCH_PARENT, WRAP_CONTENT))
+        Account.adminNumber(this).let { an -> if (an.isNotEmpty()) body.addView(link("📞 " + L.t("call_owner")) {
+            try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + an))) } catch (_: Exception) {} }, llp(MATCH_PARENT, WRAP_CONTENT)) }
+        body.addView(link("✎ " + L.t("change_acc")) { showSignup() }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(link(L.t("have_acc")) { showSignin() }, llp(MATCH_PARENT, WRAP_CONTENT))
     }
 
-    /** 3) approved before but signed out → PIN to sign in */
+    /** 3) Sign in: contact number (approved on this phone before) */
     private fun showSignin() {
-        val body = loginScreen(L.t("signin"))
-        body.addView(small(Account.name(this) + "\n📞 " + Account.mobile(this), INK).apply { gravity = Gravity.CENTER; textSize = 16f; setPadding(0, 0, 0, dpi(12f)) },
-            llp(MATCH_PARENT, WRAP_CONTENT))
-        pinBox(body) { Account.signIn(this); startApp() }
-        body.addView(link(L.t("other_acc")) { showSignup() }, llp(MATCH_PARENT, WRAP_CONTENT))
+        val body = loginScreen(L.t("si_title")) { if (Account.exists(this)) { Account.approveAsAdmin(this); Reminders.schedule(this); startApp() } else showSignup() }
+        var mob = Account.mobile(this)
+        body.addView(small(L.t("u_mobile").uppercase(), INK).apply { typeface = Typeface.DEFAULT_BOLD })
+        body.addView(mobileInput("98xxxxxxxx", mob) { mob = it }.apply { textSize = 18f }, gap())
+        body.addView(bigButton(L.t("si_title"), GREEN) {
+            when {
+                mob.length != 10 -> toast(L.t("acc_bad_mobile"))
+                mob == Account.mobile(this) && Account.verified(this) -> { Account.signIn(this); hideKeyboard(); startApp() }
+                mob == Account.mobile(this) -> showOtp()
+                else -> { toast(L.t("si_bad")); showSignup(mob) }
+            }
+        }, gap())
+        body.addView(link(L.t("no_acc")) { showSignup() }, llp(MATCH_PARENT, WRAP_CONTENT))
     }
 
     /** 4) signed in, PIN lock on */
@@ -340,13 +348,64 @@ class MainActivity : Activity() {
                     box.alpha = 0.4f
                     Thread { val sent = Relay.decide(this, r, ok); ui.post { toast(if (sent) (if (ok) "✅ " + r.name else "❌ " + r.name) else L.t("otp_net")); if (sent) showAdmin() else box.alpha = 1f } }.start()
                 }
-                box.addView(row(bigButton(L.t("adm_accept"), GREEN) { act(true) }.apply { textSize = 15f; setPadding(0, dpi(10f), 0, dpi(10f)) } to 1f,
+                box.addView(row(bigButton("🔑 " + L.t("gen_otp"), GREEN) { act(true) }.apply { textSize = 15f; setPadding(0, dpi(10f), 0, dpi(10f)) } to 1f,
                     bigButton(L.t("adm_no"), RED) { act(false) }.apply { textSize = 15f; setPadding(0, dpi(10f), 0, dpi(10f)) } to 1f))
                 reqList.addView(box, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
             }
         }
         reqList.addView(small("⏳ …"))
         every(10000L, { Relay.pending(this) }) { drawReqs(it); true }
+        // ---- all users: search, filter, block / approve again ----
+        val uc = card()
+        uc.addView(heading("👥 " + L.t("adm_users")))
+        val uList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        var uq = ""; var uf = ""
+        val fRow = LinearLayout(this)
+        fun drawUsers() {
+            uList.removeAllViews()
+            val all = Account.users(this)
+            fRow.removeAllViews()
+            listOf("" to L.t("f_all"), "ok" to "✅ " + L.t("f_ok"), "no" to "❌ " + L.t("f_no"), "block" to "🚫 " + L.t("f_block")).forEach { (k, t) ->
+                val n = if (k.isEmpty()) all.size else all.count { (it.optString("s").ifEmpty { if (it.optBoolean("ok")) "ok" else "no" }) == k }
+                fRow.addView(pill("$t ($n)", uf == k, 0xFF6A1B9A.toInt()) { uf = k; drawUsers() }.apply { textSize = 12f; setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(6f)) },
+                    llp(0, WRAP_CONTENT, 1f).apply { setMargins(dpi(2f), 0, dpi(2f), 0) })
+            }
+            all.filter { u ->
+                val st = u.optString("s").ifEmpty { if (u.optBoolean("ok")) "ok" else "no" }
+                (uf.isEmpty() || st == uf) && (uq.isBlank() || norm(u.optString("n")).contains(norm(uq)) || u.optString("m").contains(uq.filter { it.isDigit() }.ifEmpty { "~" }))
+            }.forEach { u ->
+                val st = u.optString("s").ifEmpty { if (u.optBoolean("ok")) "ok" else "no" }
+                val nm = u.optString("n"); val m = u.optString("m"); val d = u.optString("d")
+                val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(6f)) }
+                box.addView(row(small(nm.ifBlank { "—" }, INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD } to 1f,
+                    small(when (st) { "ok" -> "✅ " + L.t("f_ok"); "block" -> "🚫 " + L.t("f_block"); else -> "❌ " + L.t("f_no") },
+                        when (st) { "ok" -> GREEN; "block" -> RED; else -> MUTED }).apply { typeface = Typeface.DEFAULT_BOLD } to 0f))
+                box.addView(small("📞 " + m + "   #" + d + "   •  " + Bill.dateText(u.optLong("t"))))
+                val acts = LinearLayout(this).apply { setPadding(0, dpi(4f), 0, 0) }
+                fun act(t: String, color: Int, a: () -> Unit) = acts.addView(TextView(this).apply {
+                    text = t; textSize = 13f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = round(color, 14f)
+                    setPadding(dpi(6f), dpi(7f), dpi(6f), dpi(7f)); setOnClickListener { a() }
+                }, llp(0, WRAP_CONTENT, 1f).apply { setMargins(dpi(2f), 0, dpi(2f), 0) })
+                act("💬", 0xFF25D366.toInt()) { whatsapp(m, "") }
+                act("📞", BLUE) { try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$m"))) } catch (_: Exception) {} }
+                if (st == "ok") act("🚫 " + L.t("block_btn"), RED) {
+                    AlertDialog.Builder(this).setTitle("🚫 " + nm).setMessage(L.t("block_q"))
+                        .setPositiveButton(L.t("yes")) { _, _ -> Thread { val ok = Relay.block(this, nm, m, d); ui.post { toast(if (ok) "🚫 $nm" else L.t("otp_net")); drawUsers() } }.start() }
+                        .setNegativeButton(L.t("no"), null).show()
+                } else if (d.length == 6) act("🔑 " + L.t("gen_otp"), GREEN) {
+                    Thread { val ok = Relay.decide(this, Relay.Req("", 0, nm, m, d), true); ui.post { toast(if (ok) "✅ $nm" else L.t("otp_net")); if (ok) whatsapp(m, "✅ " + L.t("app") + "\nOTP: " + Otp.code(m, d)); drawUsers() } }.start()
+                }
+                box.addView(acts)
+                uList.addView(box)
+                uList.addView(View(this).apply { setBackgroundColor(0xFFE0E0E0.toInt()) }, llp(MATCH_PARENT, dpi(1f)))
+            }
+            if (uList.childCount == 0) uList.addView(small(L.t("none")))
+        }
+        uc.addView(input("🔍 " + L.t("f_search"), "", false) { uq = it; drawUsers() }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
+        uc.addView(fRow, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
+        uc.addView(uList)
+        drawUsers()
+        body.addView(uc, cardLp())
         body.addView(small(L.t("adm_manual")).apply { setPadding(dpi(4f), dpi(4f), 0, dpi(6f)) })
         var mob = ""; var dev = ""; var name = ""
         val otpTv = TextView(this).apply { textSize = 40f; gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; setTextColor(GREEN); letterSpacing = 0.2f }
@@ -617,6 +676,8 @@ class MainActivity : Activity() {
         }, llp(MATCH_PARENT, WRAP_CONTENT))
 
         if (LOGIN_ON && Account.isAdmin(this)) {
+            body.addView(bigButton("👑 " + L.t("adm_btn"), 0xFF4A148C.toInt()) { showAdmin() }.apply { textSize = 15f },
+                llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             val banner = bigButton("", 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
             body.addView(banner, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
             every(30000L, { Relay.pending(this) }) { p ->

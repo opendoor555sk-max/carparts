@@ -56,13 +56,37 @@ object Relay {
         return if (last.optBoolean("ok")) last.optString("otp") else ""
     }
 
+    /** latest word from admin for this phone: "ok", "no", "block" (null = nothing / no internet) */
+    fun status(mobile: String, dev: String): String? {
+        val last = poll(userTopic(mobile, dev))?.lastOrNull()?.second ?: return null
+        return when { last.optBoolean("block") -> "block"; last.optBoolean("ok") -> "ok"; else -> "no" }
+    }
+
+    /** admin: block a user (his app stops until approved again) */
+    fun block(ctx: Context, name: String, mobile: String, dev: String): Boolean {
+        val ok = post(userTopic(mobile, dev), JSONObject().put("block", true))
+        if (ok) { Account.log(ctx, false, name, mobile, dev, "block"); ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE).edit().putLong("rb_$mobile:$dev", System.currentTimeMillis()).apply() }
+        return ok
+    }
+
+    /** server keeps messages 12 h: repeat the block for blocked users every 6 h (admin phone) */
+    fun reBlock(ctx: Context) {
+        val sp = ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE)
+        Account.users(ctx).filter { it.optString("s") == "block" }.forEach { u ->
+            val k = u.optString("m") + ":" + u.optString("d")
+            if (System.currentTimeMillis() - sp.getLong("rb_$k", 0) > 6L * 3600_000L &&
+                post(userTopic(u.optString("m"), u.optString("d")), JSONObject().put("block", true))) sp.edit().putLong("rb_$k", System.currentTimeMillis()).apply()
+        }
+    }
+
     // ---- admin side ----
     /** requests of the last 12 h that are not accepted / rejected yet (newest first) */
     fun pending(ctx: Context): List<Req>? {
-        val done = Account.logs(ctx).map { it.optString("m") + ":" + it.optString("d") }.toSet()
+        // decided after the request = done (a blocked / cancelled user can ask again)
+        val done = Account.users(ctx).associate { (it.optString("m") + ":" + it.optString("d")) to it.optLong("t") }
         val all = poll(REQ) ?: return null
         return all.map { (o, m) -> Req(o.optString("id"), o.optLong("time") * 1000, m.optString("n"), m.optString("m"), m.optString("d")) }
-            .filter { it.mobile.length == 10 && it.dev.length == 6 && (it.mobile + ":" + it.dev) !in done }
+            .filter { it.mobile.length == 10 && it.dev.length == 6 && (done[it.mobile + ":" + it.dev] ?: 0L) < it.time }
             .distinctBy { it.mobile + ":" + it.dev }.reversed()
     }
 
@@ -77,6 +101,7 @@ object Relay {
     /** admin phone, every ~15 min: notification for new requests */
     fun notifyAdmin(ctx: Context) {
         if (!Account.isAdmin(ctx)) return
+        try { reBlock(ctx) } catch (_: Exception) {}
         val p = pending(ctx) ?: return
         val sp = ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE)
         val seen = sp.getString("seenReq", "").orEmpty().split(",").toSet()
