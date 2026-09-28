@@ -527,9 +527,63 @@ class EngineTest {
         val nr = formRows(vals + ("W" to "6'6\""), "Ghar|6 Open-well")
         assertTrue(nr.first { it.label.endsWith("5 Dog-legged") }.value.startsWith("✓"))
         assertTrue(nr.first { it.label.endsWith("6 Open-well") }.value.startsWith("✗"))
-        // high-rise ranking picks open-well first when it fits
+        // high-rise: the scissor stair (two separate exits) is suggested first when it fits
         val hr = formRows(vals + ("L" to "30'") + ("W" to "12'"), "High-rise|6 Open-well")
-        assertTrue(hr.first { it.label.endsWith("6 Open-well") }.label.startsWith("⭐"))
+        assertTrue(hr.first { it.label.endsWith("14 Scissor") }.label.startsWith("⭐"))
+        assertTrue(hr.first { it.label.endsWith("6 Open-well") }.value.startsWith("✓"))
+    }
+
+    private fun flightSum(r: List<Row>) = r.filter { it.label.startsWith("Flight ") && !it.label.contains("stringer") }
+        .sumOf { it.value.substringBefore(' ').toInt() }
+
+    @Test fun stairPlannerAllTypes() {
+        e.stairPlanner()
+        val vals = mapOf("L" to "12'", "W" to "12'", "H" to "10'", "sw" to "3'", "dr" to "7\"", "dt" to "10\"", "wg" to "1'")
+        // three-quarter turn: 4 flights, 3 landings, fits a 12' x 12' room
+        val tq = formRows(vals, "Ghar|7 Three-quarter")
+        assertEquals(18, flightSum(tq))
+        assertEquals(3, tq.v("Landing (3)").let { 3 })
+        assertTrue(tq.first { it.label.endsWith("7 Three-quarter") }.value.startsWith("✓"))
+        // L-winder: 3 winders of 30° in the corner, flights carry the other 15 risers
+        val lw = formRows(vals, "Ghar|8 L-Winder")
+        assertEquals("3 nag × 30.00°", lw.v("Winder pagthiya"))
+        assertEquals(15, flightSum(lw))
+        assertTrue(lw.first { it.label.endsWith("8 L-Winder") }.value.startsWith("✓"))
+        assertTrue(lw.any { it.label.startsWith("Andar") } && lw.any { it.label.startsWith("Bahar") } && lw.any { it.label.startsWith("Chalvani line") })
+        // two-quarter winder: two corners of 3 winders
+        val w2 = formRows(vals, "Ghar|9 Two-quarter winder")
+        assertEquals(2, w2.count { it.label == "Winder pagthiya" })
+        assertEquals(12, flightSum(w2))
+        // U-winder: 6 winders of 30° in the half turn
+        val uw = formRows(vals, "Ghar|10 U-Winder")
+        assertEquals("6 nag × 30.00°", uw.v("Winder pagthiya"))
+        assertEquals(12, flightSum(uw))
+        // winders are not allowed for commercial exits
+        val cw = formRows(vals, "Commercial|8 L-Winder")
+        assertTrue(cw.any { it.warn && it.label.startsWith("Winder: Commercial") })
+        // spiral: 30" wide by default -> 5'6" circle, fits a 6' x 6' room
+        val sp = formRows(vals + ("sw" to "") + ("L" to "6'") + ("W" to "6'"), "Ghar|11 Spiral")
+        assertEquals("5ft 6in", sp.v("Gol (diameter)"))
+        assertTrue(sp.first { it.label.endsWith("11 Spiral") }.value.startsWith("✓"))
+        assertTrue(sp.any { it.label.startsWith("Pag ni pohlai — pole paase") })
+        // helical: inner / walk line / outer going shown
+        val hl = formRows(vals + ("L" to "16'") + ("W" to "16'"), "Ghar|12 Helical (gol)")
+        assertTrue(hl.any { it.label == "Kul ghumav" })
+        assertTrue(hl.any { it.label == "Pag ni pohlai — andar ni kinaar" })
+        // bifurcated: wide middle flight + two side flights
+        val bf = formRows(vals + ("L" to "20'"), "Ghar|13 Bifurcated")
+        assertTrue(bf.v("Flight 2"), bf.v("Flight 2").contains("× 2"))
+        assertEquals("12ft 8in × 12ft", bf.v("Jagya chahiye (lambai × pohlai)"))
+        // scissor: two stairs of 9 + 9 with mid landings, 6'8" wide
+        val sc = formRows(vals + ("L" to "30'"), "High-rise|14 Scissor")
+        assertEquals("22ft 4in × 6ft 8in", sc.v("Jagya chahiye (lambai × pohlai)"))
+        assertTrue(sc.first { it.label.endsWith("14 Scissor") }.label.startsWith("⭐"))
+        // all types on one screen (for the PDF): 14 plan drawings
+        val all = formRows(vals, "Ghar|★ Badhi sidi (PDF)")
+        assertEquals(14, all.count { it.plan != null })
+        // no room given: nothing crashes, fit shows —
+        val nr = formRows(vals + ("L" to "") + ("W" to ""), "Ghar|7 Three-quarter")
+        assertTrue(nr.first { it.label.endsWith("7 Three-quarter") }.value.startsWith("—"))
     }
 
     @Test fun stairKeyLinksToPlanner() {

@@ -36,7 +36,7 @@ object KeyHelp {
         "Slope" to "Slope: number ko rise ÷ run maan kar pitch banata hai (jaise 0.5 = 26.57°).",
         "Diag" to "Diagonal (rafter length). Rise + Run ke baad [Diag]. Dobara dabane par poori Common Rafter screen (ridge deduction, birdsmouth, overhang).",
         "Polygon" to "Polygon: pehle Diameter [Circle], phir sides ka number (jaise 6) aur Conv + Diag.",
-        "Stair" to "Stair: seedhi ka poora hisaab aur drawing. Rise pehle daal kar dabayein. Upar \"📐 Stair Planner\" button: jagya (lambai × pohlai) aur oonchai daalo, kaunsi seedhi bethegi, upar/baju ki drawing, pohlai aur saara maap.",
+        "Stair" to "Stair: seedhi ka poora hisaab aur drawing. Rise pehle daal kar dabayein. Upar \"📐 Stair Planner\" button: jagya (lambai × pohlai) aur oonchai daalo, kaunsi seedhi bethegi (14 prakar: Straight, L, Double-L, Dog-legged, Open-well, Three-quarter, Winder, Spiral, Helical, Bifurcated, Scissor), upar/baju ki drawing, pohlai aur saara maap. \"★ Badhi sidi\" pasand karo to badhi ek sathe — PDF mate.",
         "Baluster" to "Baluster: railing ki patti/jaali ki ginti aur spacing (Limit Opening, Evenly Space, Best Fit).",
         "Hip/V" to "Hip / Valley rafter: plumb, level, cheek, backing, dihedral, sheathing angle. Miter Saw ya Protractor.",
         "IrPitch" to "Irregular Hip/Valley: jab dono taraf ki chhat ka pitch alag ho.",
