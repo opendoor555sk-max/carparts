@@ -473,7 +473,8 @@ class EngineTest {
         val r2 = formRows(vals, "Ghar|2 Straight + landing")
         assertTrue(r2.v("Flight 1").startsWith("9 riser"))
         assertTrue(r2.v("Flight 2").startsWith("9 riser"))
-        assertTrue(r2.v("Jagya chahiye (lambai × pohlai)").startsWith("19'"))
+        val need = r2.v("Jagya chahiye (lambai × pohlai)")
+        assertTrue("need=$need", need.startsWith("19") && need.contains("4"))
         // short room: straight + landing does not fit in 15'
         val r3 = formRows(vals + ("L" to "15'"), "Ghar|1 Straight")
         assertTrue(r3.first { it.label.endsWith("2 Straight + landing") }.value.startsWith("✗"))
