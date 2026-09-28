@@ -1,3 +1,5 @@
+Admin panel: '⚪ बंद 7 दिन' filter (kon vaparta nathi), user ne '🚫 बंद करें' (deactive: eni app band, hisab salamat) ane '✅ चालू करें', '🗑' list mathi kadhvo.
+
 Sudharo: juna hisab ma pehla thi lakhelo vechan maal bamnu nahi aave; Final hisab aapmele badlay nahi.
 
 Home par nava 8 sundar chitra vala button: Gaadi hisab, Haraji/company, Lot, Kharid-bikri khata, Mudi malik, Khedut, Udhaar khata, Report. Mudi malik / Khedut button thi darek vyakti, eno number, hisab ane nafo/nuksan.

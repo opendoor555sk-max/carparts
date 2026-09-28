@@ -39,6 +39,20 @@ object Account {
     fun signOut(c: Context) = p(c).edit().putBoolean("in", false).apply()
     fun signIn(c: Context) = p(c).edit().putBoolean("in", true).apply()
 
+    /** this phone was switched off by the admin */
+    fun blocked(c: Context) = p(c).getBoolean("blk", false)
+    fun setBlocked(c: Context, on: Boolean) = p(c).edit().putBoolean("blk", on).apply()
+
+    /** admin: users removed from the list (key "mobile:device" → when) */
+    fun hidden(c: Context): Map<String, Long> {
+        val o = try { JSONObject(p(c).getString("hid", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
+        return o.keys().asSequence().associateWith { o.optLong(it) }
+    }
+    fun hide(c: Context, key: String) {
+        val o = try { JSONObject(p(c).getString("hid", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
+        p(c).edit().putString("hid", o.put(key, System.currentTimeMillis()).toString()).apply()
+    }
+
     fun isAdmin(c: Context) = p(c).getString("adm", "") == hash("admin", device(c))
     fun makeAdmin(c: Context) = p(c).edit().putString("adm", hash("admin", device(c))).apply()
 

@@ -107,6 +107,13 @@ class MainActivity : Activity() {
                 val n = try { Share.fetch(this) } catch (_: Exception) { 0 }
                 if (n > 0) ui.post { Store.save(this); toast("👁 $n " + L.t("sh_new")); if (screen == "home") showHome() }
             }.start()
+            // admin can switch a phone off (deactive) and on again
+            if (LOGIN_ON && !Account.REQUIRED && !Account.isAdmin(this)) {
+                val m = myMobile(); val d = Account.device(this)
+                if (m.length == 10) Thread {
+                    if (Relay.status(m, d) == "block") ui.post { Account.setBlocked(this, true); showBlocked() }
+                }.start()
+            }
             if (LOGIN_ON && Account.REQUIRED && !Account.isAdmin(this) && Account.verified(this)) {
                 val m = Account.mobile(this); val d = Account.device(this)
                 Thread {
@@ -153,6 +160,7 @@ class MainActivity : Activity() {
     private fun myMobile() = Account.mobile(this).ifBlank { Store.mobile }.filter { it.isDigit() }.takeLast(10)
 
     private fun route() {
+        if (LOGIN_ON && !Account.isAdmin(this) && Account.blocked(this)) return showBlocked()
         if (!LOGIN_ON || !Account.REQUIRED) {
             // the phone's own contact number is required, so it shows in the admin's user list
             if (LOGIN_ON && !Account.isAdmin(this) && (myMobile().length != 10 || Account.name(this).ifBlank { Store.owner }.isBlank())) return showNeedMobile()
@@ -211,6 +219,21 @@ class MainActivity : Activity() {
 
     private fun link(t: String, act: () -> Unit) = small(t, BLUE).apply {
         gravity = Gravity.CENTER; textSize = 15f; setPadding(0, dpi(14f), 0, 0); setOnClickListener { act() }
+    }
+
+    /** switched off by the admin: nothing opens until he switches it on again (hisab stays on the phone) */
+    private fun showBlocked() {
+        val body = loginScreen("🚫 " + L.t("blk_title"))
+        body.addView(small(L.t("blk_msg"), INK).apply { gravity = Gravity.CENTER; textSize = 16f; setPadding(0, 0, 0, dpi(16f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        val st = small("⏳ …").apply { gravity = Gravity.CENTER }
+        body.addView(st, llp(MATCH_PARENT, WRAP_CONTENT))
+        Account.adminNumber(this).let { an -> if (an.isNotEmpty()) body.addView(link("📞 " + L.t("call_owner")) {
+            try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + an))) } catch (_: Exception) {} }, llp(MATCH_PARENT, WRAP_CONTENT)) }
+        val m = myMobile(); val d = Account.device(this)
+        every(20000L, { Relay.status(m, d) }) { s ->
+            if (s == "ok") { Account.setBlocked(this, false); toast("✅ " + L.t("blk_on")); startApp(); false }
+            else { st.text = if (s == null) "📶 …" else "🚫"; true }
+        }
     }
 
     /** first open: user name + own contact number (required), no OTP */
@@ -492,23 +515,27 @@ class MainActivity : Activity() {
             val seen = Relay.seen(this)
             val approved = Account.users(this)
             // everyone: approved / cancelled / blocked + phones that only sent usage
-            val all = approved + seen.filterKeys { k -> approved.none { (it.optString("m") + ":" + it.optString("d")) == k } }.values
-                .filter { !it.optBoolean("adm") }.map { org.json.JSONObject().put("n", it.optString("n")).put("m", it.optString("m")).put("d", it.optString("d")).put("s", "ok").put("t", it.optLong("first")) }
+            val hid = Account.hidden(this)
+            val all = (approved + seen.filterKeys { k -> approved.none { (it.optString("m") + ":" + it.optString("d")) == k } }.values
+                .filter { !it.optBoolean("adm") }.map { org.json.JSONObject().put("n", it.optString("n")).put("m", it.optString("m")).put("d", it.optString("d")).put("s", "ok").put("t", it.optLong("first")) })
+                // deleted by admin: hidden until that phone uses the app again
+                .filter { u -> val k = u.optString("m") + ":" + u.optString("d"); val t = hid[k] ?: return@filter true; (seen[k]?.optLong("at") ?: 0L) > t }
             val week = System.currentTimeMillis() - 7L * 86400000L
             val today = System.currentTimeMillis() - 86400000L
             sumTv.text = L.t("u_total") + ": " + all.size + "   •   🟢 " + L.t("u_week") + ": " + seen.values.count { !it.optBoolean("adm") && it.optLong("at") > week } +
                 "   •   " + L.t("u_today") + ": " + seen.values.count { !it.optBoolean("adm") && it.optLong("at") > today } +
                 "\n📋 " + L.t("u_hisab") + ": " + seen.values.filter { !it.optBoolean("adm") }.sumOf { it.optInt("h") }
             fRow.removeAllViews()
-            listOf("" to L.t("f_all"), "act" to "🟢 7d", "ok" to "✅", "no" to "❌", "block" to "🚫").forEach { (k, t) ->
-                val n = when (k) { "" -> all.size; "act" -> all.count { (seen[it.optString("m") + ":" + it.optString("d")]?.optLong("at") ?: 0L) > week }
+            fun lastUse(u: org.json.JSONObject) = seen[u.optString("m") + ":" + u.optString("d")]?.optLong("at") ?: 0L
+            listOf("" to L.t("f_all"), "act" to "🟢 7d", "idle" to "⚪ " + L.t("f_idle"), "ok" to "✅", "block" to "🚫").forEach { (k, t) ->
+                val n = when (k) { "" -> all.size; "act" -> all.count { lastUse(it) > week }; "idle" -> all.count { lastUse(it) <= week }
                     else -> all.count { (it.optString("s").ifEmpty { if (it.optBoolean("ok")) "ok" else "no" }) == k } }
                 fRow.addView(pill("$t ($n)", uf == k, 0xFF6A1B9A.toInt()) { uf = k; drawUsers() }.apply { textSize = 12f; setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(6f)) },
                     llp(0, WRAP_CONTENT, 1f).apply { setMargins(dpi(2f), 0, dpi(2f), 0) })
             }
             all.filter { u ->
                 val st = u.optString("s").ifEmpty { if (u.optBoolean("ok")) "ok" else "no" }
-                (uf.isEmpty() || st == uf || (uf == "act" && (seen[u.optString("m") + ":" + u.optString("d")]?.optLong("at") ?: 0L) > week)) && (uq.isBlank() || norm(u.optString("n")).contains(norm(uq)) || u.optString("m").contains(uq.filter { it.isDigit() }.ifEmpty { "~" }))
+                (uf.isEmpty() || st == uf || (uf == "act" && lastUse(u) > week) || (uf == "idle" && lastUse(u) <= week)) && (uq.isBlank() || norm(u.optString("n")).contains(norm(uq)) || u.optString("m").contains(uq.filter { it.isDigit() }.ifEmpty { "~" }))
             }.forEach { u ->
                 val st = u.optString("s").ifEmpty { if (u.optBoolean("ok")) "ok" else "no" }
                 val nm = u.optString("n"); val m = u.optString("m"); val d = u.optString("d")
@@ -534,12 +561,17 @@ class MainActivity : Activity() {
                 }, llp(0, WRAP_CONTENT, 1f).apply { setMargins(dpi(2f), 0, dpi(2f), 0) })
                 act("💬", 0xFF25D366.toInt()) { whatsapp(m, "") }
                 act("📞", BLUE) { try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$m"))) } catch (_: Exception) {} }
-                if (st == "ok") act("🚫 " + L.t("block_btn"), RED) {
-                    AlertDialog.Builder(this).setTitle("🚫 " + nm).setMessage(L.t("block_q"))
+                if (st == "ok") act("🚫 " + L.t("deact_btn"), RED) {
+                    AlertDialog.Builder(this).setTitle("🚫 " + nm).setMessage(L.t("deact_q"))
                         .setPositiveButton(L.t("yes")) { _, _ -> Thread { val ok = Relay.block(this, nm, m, d); ui.post { toast(if (ok) "🚫 $nm" else L.t("otp_net")); drawUsers() } }.start() }
                         .setNegativeButton(L.t("no"), null).show()
-                } else if (d.length == 6) act("🔑 " + L.t("gen_otp"), GREEN) {
-                    Thread { val ok = Relay.decide(this, Relay.Req("", 0, nm, m, d), true); ui.post { toast(if (ok) "✅ $nm" else L.t("otp_net")); if (ok) whatsapp(m, "✅ " + L.t("app") + "\nOTP: " + Otp.code(m, d)); drawUsers() } }.start()
+                } else if (d.length == 6) act("✅ " + L.t("act_btn"), GREEN) {
+                    Thread { val ok = Relay.decide(this, Relay.Req("", 0, nm, m, d), true); ui.post { toast(if (ok) "✅ $nm" else L.t("otp_net")); drawUsers() } }.start()
+                }
+                act("🗑", 0xFF78909C.toInt()) {
+                    AlertDialog.Builder(this).setTitle("🗑 " + nm).setMessage(L.t("udel_q"))
+                        .setPositiveButton(L.t("yes")) { _, _ -> Account.hide(this, "$m:$d"); toast("🗑 $nm"); drawUsers() }
+                        .setNegativeButton(L.t("no"), null).show()
                 }
                 box.addView(acts)
                 uList.addView(box)
