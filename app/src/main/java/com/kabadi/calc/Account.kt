@@ -14,6 +14,8 @@ import java.security.MessageDigest
  * First time the mobile must be approved with an OTP that the admin sends on WhatsApp.
  */
 object Account {
+    /** login / OTP on or off (off for now: the app opens straight away) */
+    const val ENABLED = false
     private const val FILE = "kabadi_acct"
     /** admin's WhatsApp number (can be changed without an app update) */
     private const val ADMIN_URL = "https://raw.githubusercontent.com/opendoor555sk-max/carparts/kabadi-calc/kabadi-admin.txt"

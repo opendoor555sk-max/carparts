@@ -27,7 +27,7 @@ object Reminders {
         // admin phone: look for new OTP requests about every 15 minutes
         val rq = PendingIntent.getBroadcast(ctx, 13, Intent(ctx, DueReceiver::class.java).setAction("com.kabadi.calc.REQ"),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        if (Account.isAdmin(ctx)) am.setInexactRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 60_000, AlarmManager.INTERVAL_FIFTEEN_MINUTES, rq)
+        if (Account.ENABLED && Account.isAdmin(ctx)) am.setInexactRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 60_000, AlarmManager.INTERVAL_FIFTEEN_MINUTES, rq)
         else am.cancel(rq)
     }
 

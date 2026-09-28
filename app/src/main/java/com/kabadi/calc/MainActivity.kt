@@ -124,7 +124,11 @@ class MainActivity : Activity() {
     private var startApp: () -> Unit = {}
 
     /** which screen to show when the app opens */
+    /** login / OTP switched off for now: the app opens straight away. Set true to bring it back. */
+    private val LOGIN_ON = Account.ENABLED
+
     private fun route() {
+        if (!LOGIN_ON) return startApp()
         when {
             !Account.exists(this) -> showSignup()
             !Account.verified(this) -> showOtp()
@@ -572,7 +576,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(4f), 0, dpi(8f))
         }, llp(MATCH_PARENT, WRAP_CONTENT))
 
-        if (Account.isAdmin(this)) {
+        if (LOGIN_ON && Account.isAdmin(this)) {
             val banner = bigButton("", 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
             body.addView(banner, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
             every(30000L, { Relay.pending(this) }) { p ->
@@ -1437,7 +1441,7 @@ class MainActivity : Activity() {
         o.addView(labeled(L.t("address"), input(L.t("address"), Store.address, false) { Store.address = it; Store.save(this) }))
         body.addView(o, cardLp())
 
-        if (Account.exists(this)) {
+        if (LOGIN_ON && Account.exists(this)) {
             val ac = card()
             ac.addView(heading(L.t("acc_sec")))
             ac.addView(small(Account.name(this) + "   📞 " + Account.mobile(this) + (if (Account.isAdmin(this)) "   👑" else ""), INK).apply { textSize = 15f; setPadding(0, 0, 0, dpi(8f)) })
