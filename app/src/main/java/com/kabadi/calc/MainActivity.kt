@@ -336,8 +336,8 @@ class MainActivity : Activity() {
 
     // ================= ADMIN: make OTP / reject =================
     private fun showAdmin() {
-        val body = setScreen("admin", "👑 Admin – OTP", { showSettings() })
-        val rc = card()
+        val body = setScreen("admin", if (Account.REQUIRED) "👑 Admin – OTP" else "👑 Admin", { showHome() })
+        val rc = card().apply { if (!Account.REQUIRED) visibility = View.GONE }
         rc.addView(heading("📥 " + L.t("adm_req")))
         val reqList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         rc.addView(reqList)
@@ -360,7 +360,7 @@ class MainActivity : Activity() {
             }
         }
         reqList.addView(small("⏳ …"))
-        every(10000L, { Relay.pending(this) }) { drawReqs(it); true }
+        if (Account.REQUIRED) every(10000L, { Relay.pending(this) }) { drawReqs(it); true }
         // ---- all users: search, filter, block / approve again ----
         val uc = card()
         uc.addView(heading("👥 " + L.t("adm_users")))
@@ -451,6 +451,7 @@ class MainActivity : Activity() {
             try { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, sb.toString()), "")) } catch (_: Exception) {}
         }.apply { textSize = 14f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
         body.addView(uc, cardLp())
+        if (!Account.REQUIRED) return
         body.addView(small(L.t("adm_manual")).apply { setPadding(dpi(4f), dpi(4f), 0, dpi(6f)) })
         var mob = ""; var dev = ""; var name = ""
         val otpTv = TextView(this).apply { textSize = 40f; gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; setTextColor(GREEN); letterSpacing = 0.2f }
@@ -722,7 +723,7 @@ class MainActivity : Activity() {
 
         if (LOGIN_ON && Account.isAdmin(this)) {
             val nUsers = Relay.seen(this).values.count { !it.optBoolean("adm") }
-            body.addView(bigButton("👑 " + L.t("adm_btn") + (if (nUsers > 0) "   •   👥 $nUsers" else ""), 0xFF4A148C.toInt()) { showAdmin() }.apply { textSize = 15f },
+            body.addView(bigButton("👑 " + L.t(if (Account.REQUIRED) "adm_btn" else "adm_users_btn") + (if (nUsers > 0) "   •   👥 $nUsers" else ""), 0xFF4A148C.toInt()) { showAdmin() }.apply { textSize = 15f },
                 llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             val banner = bigButton("", 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
             body.addView(banner, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })

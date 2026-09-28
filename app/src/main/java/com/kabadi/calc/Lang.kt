@@ -355,6 +355,7 @@ object L {
         "u_lasth" to arrayOf("last hisab", "आखिरी हिसाब", "છેલ્લો હિસાબ"),
         "u_nodata" to arrayOf("No usage info yet (app not opened with internet)", "अभी जानकारी नहीं (इंटरनेट के साथ ऐप नहीं खुली)", "હજી માહિતી નથી (ઇન્ટરનેટ સાથે એપ ખૂલી નથી)"),
         "u_share" to arrayOf("Share user list", "यूज़र लिस्ट भेजें", "યુઝર યાદી મોકલો"),
+        "adm_users_btn" to arrayOf("Admin: user list", "एडमिन: यूज़र लिस्ट", "એડમિન: યુઝરની યાદી"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 
