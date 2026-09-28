@@ -434,11 +434,16 @@ fun monthly(all: List<Hisab>, f: RFilter): List<MonthSum> {
 
 /** one buyer (party) across all hisab: everything he took from us */
 class Party(val key: String, var name: String, var mobile: String) {
+    /** what he took from us (we get money) */
     val items = mutableListOf<Pair<Hisab, Line>>()
+    /** what we took from him: vehicle bought (we pay) */
+    val buys = mutableListOf<Pair<Hisab, Line>>()
+    fun buyTotal() = buys.sumOf { it.second.value() }
+    fun dena() = buys.sumOf { it.second.remaining() }
     fun total() = items.sumOf { it.second.value() }
     fun left() = items.sumOf { it.second.remaining() }
     fun got() = total() - left()
-    fun nextDue(): Long? = items.filter { it.second.remaining() > 0.004 }.mapNotNull { dueTime(it.first, it.second) }.minOrNull()
+    fun nextDue(): Long? = (items + buys).filter { it.second.remaining() > 0.004 }.mapNotNull { dueTime(it.first, it.second) }.minOrNull()
 }
 
 fun digits10(m: String) = m.filter { it.isDigit() }.takeLast(10)
@@ -449,19 +454,20 @@ fun partyKey(name: String, mobile: String): String = digits10(mobile).let { if (
 /** every buyer: parts sold (seller hisab) + vehicle sold in auction / to company. Most money due first. */
 fun parties(all: List<Hisab>): List<Party> {
     val map = linkedMapOf<String, Party>()
-    fun add(h: Hisab, l: Line) {
+    fun add(h: Hisab, l: Line, buy: Boolean = false) {
         val k = partyKey(l.cName, l.cMobile)
         if (k.isEmpty() || l.value() == 0.0) return
         val p = map.getOrPut(k) { Party(k, l.cName.trim(), digits10(l.cMobile)) }
         if (p.name.isBlank()) p.name = l.cName.trim()
         if (p.mobile.isBlank()) p.mobile = digits10(l.cMobile)
-        p.items.add(h to l)
+        if (buy) p.buys.add(h to l) else p.items.add(h to l)
     }
     all.sortedByDescending { it.time }.forEach { h ->
         if (h.role == "seller") h.maal.forEach { add(h, it) }
         if (h.type == "haraji" || h.isLot) add(h, h.saleLine)
+        add(h, h.buyLine, buy = true)
     }
-    return map.values.sortedWith(compareByDescending<Party> { it.left() }.thenByDescending { it.items.firstOrNull()?.first?.time ?: 0L })
+    return map.values.sortedWith(compareByDescending<Party> { it.left() + it.dena() }.thenByDescending { it.items.firstOrNull()?.first?.time ?: 0L })
 }
 
 /** lines of one hisab that went to this buyer */

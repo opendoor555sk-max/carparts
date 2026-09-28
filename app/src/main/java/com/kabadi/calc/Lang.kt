@@ -299,8 +299,8 @@ object L {
         "comm_mudi_h" to arrayOf("Commission is the mudi malik's expense (cut from the vehicle hisab).", "कमीशन मुडी मालिक का खर्च (गाड़ी के हिसाब से कटेगा)।", "કમિશન મૂડી માલિકનો ખર્ચ (ગાડીના હિસાબમાંથી કપાશે)."),
         "contacts" to arrayOf("Phone contacts", "फ़ोन कॉन्टैक्ट", "ફોન કોન્ટેક્ટ"),
         "pick_buyer" to arrayOf("Choose buyer", "खरीदार चुनें", "ખરીદનાર પસંદ કરો"),
-        "party_t" to arrayOf("Party", "पार्टी", "પાર્ટી"),
-        "party_n" to arrayOf("Buyers", "खरीदार", "ખરીદનાર"),
+        "party_t" to arrayOf("Buy-Sell khata book", "खरीद-बिक्री खाता बुक", "ખરીદ-વેચાણની ખાતા બુક"),
+        "party_n" to arrayOf("Parties", "पार्टी", "પાર્ટી"),
         "party_stmt" to arrayOf("Pending statement", "बाकी का हिसाब", "બાકીનો હિસાબ"),
         "party_send" to arrayOf("Send pending", "बाकी भेजें", "બાકી મોકલો"),
         "items_s" to arrayOf("items", "चीज़ें", "વસ્તુ"),
@@ -318,6 +318,9 @@ object L {
         "rem_set_h" to arrayOf("Every day at 10 AM a notification comes. With auto SMS on, the phone also sends the SMS itself (normal SMS charges of your plan).", "रोज़ सुबह 10 बजे नोटिफिकेशन आएगा। ऑटो SMS चालू हो तो फ़ोन खुद SMS भेजेगा (आपके प्लान का SMS चार्ज)।", "રોજ સવારે 10 વાગે નોટિફિકેશન આવશે. ઓટો SMS ચાલુ હોય તો ફોન જાતે SMS મોકલશે (તમારા પ્લાનનો SMS ચાર્જ)."),
         "rem_auto_on" to arrayOf("Auto SMS: ON (tap to turn off)", "ऑटो SMS: चालू (बंद करने के लिए दबाएँ)", "ઓટો SMS: ચાલુ (બંધ કરવા દબાવો)"),
         "rem_auto_off" to arrayOf("Auto SMS: OFF (tap to turn on)", "ऑटो SMS: बंद (चालू करने के लिए दबाएँ)", "ઓટો SMS: બંધ (ચાલુ કરવા દબાવો)"),
+        "party_tile" to arrayOf("Buy-Sell khata", "खरीद-बिक्री खाता", "ખરીદ-વેચાણ ખાતું"),
+        "p_sold" to arrayOf("We sold him", "हमने उसे बेचा", "અમે તેને વેચ્યું"),
+        "p_bought" to arrayOf("We bought from him", "हमने उससे खरीदा", "અમે તેની પાસેથી ખરીદ્યું"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 

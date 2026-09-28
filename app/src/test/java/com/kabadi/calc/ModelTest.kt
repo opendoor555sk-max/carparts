@@ -257,6 +257,10 @@ class ModelTest {
         assertEquals("n:rafik", p[1].key)
         val buyer = Hisab(3, 3000, role = "buyer"); buyer.maal.add(Line("body", "Body", true, amountText = "1", cName = "X"))
         assertEquals(2, parties(listOf(a, b, buyer)).size)     // buyer hisab: not our sales
+        val v = Hisab(4, 4000, priceText = "200000"); v.buyLine.cName = "Rafik"; v.buyLine.pay = "udhaar"
+        val r = parties(listOf(a, v)).first { it.key == "n:rafik" }
+        assertEquals(200000.0, r.dena(), 1e-9)                    // we owe him for the vehicle
+        assertEquals(1, r.items.size); assertEquals(1, r.buys.size)
     }
 
     @Test fun harajiMobilesAndReminders() {

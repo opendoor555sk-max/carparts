@@ -575,7 +575,7 @@ class MainActivity : Activity() {
             tile(L.t("new_lot"), 0xFF1565C0.toInt()) { newHisab("lot") } to 1f))
         body.addView(row(tile(L.t("khata_btn") + (if (late > 0) "  ⚠$late" else ""), if (late > 0) RED else 0xFF455A64.toInt()) { showKhata() } to 1f,
             tile(L.t("report_btn"), 0xFF00695C.toInt()) { showReport() } to 1f,
-            tile("👥 " + L.t("party_t"), 0xFF5D4037.toInt()) { showParties() } to 1f))
+            tile("📒 " + L.t("party_tile"), 0xFF5D4037.toInt()) { showParties() } to 1f))
         val rem = reminders(Store.hisabs)
         if (rem.isNotEmpty()) body.addView(bigButton("🔔 " + rem.map { it.key.ifEmpty { it.name } }.distinct().size + " " + L.t("rem_banner"), 0xFFE65100.toInt()) { showReminders() }
             .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
@@ -1601,11 +1601,12 @@ class MainActivity : Activity() {
     // ================= PARTY (buyers) =================
     private fun showParties() {
         autoSave(); editing = null
-        val body = setScreen("party", "👥 " + L.t("party_t"), null)
+        val body = setScreen("party", "📒 " + L.t("party_t"), null)
         val all = parties(Store.hisabs)
         val tot = card()
         tot.addView(small(L.t("party_n") + ": " + all.size, INK).apply { textSize = 15f })
         tot.addView(TextView(this).apply { text = "⬇ " + L.t("lena") + ": " + money(all.sumOf { it.left() }); textSize = 18f; setTextColor(GREEN); typeface = Typeface.DEFAULT_BOLD })
+        tot.addView(TextView(this).apply { text = "⬆ " + L.t("dena") + ": " + money(all.sumOf { it.dena() }); textSize = 18f; setTextColor(RED); typeface = Typeface.DEFAULT_BOLD })
         body.addView(tot, cardLp())
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun fill(q: String) {
@@ -1613,11 +1614,14 @@ class MainActivity : Activity() {
             val today = Reminders.endOfToday()
             all.filter { q.isBlank() || norm(it.name).contains(norm(q)) || it.mobile.contains(q.filter { c -> c.isDigit() }.ifEmpty { "~" }) }.forEach { p ->
                 val c = card()
-                val left = p.left()
+                val left = p.left(); val dn = p.dena()
                 c.addView(row(TextView(this).apply { text = p.name.ifBlank { p.mobile }; textSize = 17f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD; maxLines = 1 } to 1f,
-                    TextView(this).apply { text = if (left > 0.004) money(left) else "✓"; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (left > 0.004) RED else GREEN) } to 0f))
+                    TextView(this).apply {
+                        text = listOfNotNull(if (left > 0.004) "⬇ " + money(left) else null, if (dn > 0.004) "⬆ " + money(dn) else null).joinToString("  ").ifEmpty { "✓" }
+                        textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (left > 0.004) GREEN else if (dn > 0.004) RED else GREEN) } to 0f))
                 val nd = p.nextDue()
-                c.addView(small(listOf(p.mobile, p.items.size.toString() + " " + L.t("items_s"), L.t("book_total") + " " + money(p.total()),
+                c.addView(small(listOf(p.mobile, (p.items.size + p.buys.size).toString() + " " + L.t("items_s"),
+                    if (p.items.isNotEmpty()) L.t("p_sold") + " " + money(p.total()) else "", if (p.buys.isNotEmpty()) L.t("p_bought") + " " + money(p.buyTotal()) else "",
                     nd?.let { (if (it <= today) "⚠ " else "⏳ ") + Bill.dateText(it).substringBefore("  ") } ?: "").filter { it.isNotBlank() }.joinToString("  •  "),
                     if (nd != null && nd <= today) RED else MUTED))
                 c.setOnClickListener { showParty(p.key) }
@@ -1636,14 +1640,21 @@ class MainActivity : Activity() {
         val body = setScreen("party1", p.name.ifBlank { p.mobile }, { editorBack = null; showParties() })
         val top = card()
         top.addView(small("📞 " + p.mobile.ifBlank { "—" }, INK).apply { textSize = 15f })
-        top.addView(small(L.t("book_total") + ": " + money(p.total()) + "   •   " + L.t("got") + ": " + money(p.got()), INK).apply { textSize = 15f })
-        top.addView(TextView(this).apply { text = L.t("left") + ": " + money(p.left()); textSize = 20f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (p.left() > 0.004) RED else GREEN) })
+        if (p.items.isNotEmpty()) {
+            top.addView(small(L.t("p_sold") + ": " + money(p.total()) + "   •   " + L.t("got") + ": " + money(p.got()), INK).apply { textSize = 15f })
+            top.addView(TextView(this).apply { text = "⬇ " + L.t("lena") + ": " + money(p.left()); textSize = 19f; typeface = Typeface.DEFAULT_BOLD; setTextColor(GREEN) })
+        }
+        if (p.buys.isNotEmpty()) {
+            top.addView(small(L.t("p_bought") + ": " + money(p.buyTotal()) + "   •   " + L.t("gave") + ": " + money(p.buyTotal() - p.dena()), INK).apply { textSize = 15f; setPadding(0, dpi(4f), 0, 0) })
+            top.addView(TextView(this).apply { text = "⬆ " + L.t("dena") + ": " + money(p.dena()); textSize = 19f; typeface = Typeface.DEFAULT_BOLD; setTextColor(RED) })
+        }
         if (p.mobile.length == 10) top.addView(row(
             bigButton("💬 " + L.t("party_send"), 0xFF25D366.toInt()) { whatsapp(p.mobile, partyMessage(p)) }.apply { textSize = 15f } to 1f,
             bigButton("📞", BLUE) { try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + p.mobile))) } catch (_: Exception) {} }.apply { textSize = 15f } to 0f))
         body.addView(top, cardLp())
-        p.items.forEach { (h, l) ->
+        (p.items.map { Triple(it.first, it.second, false) } + p.buys.map { Triple(it.first, it.second, true) }).sortedByDescending { it.first.time }.forEach { (h, l, buy) ->
             val c = card()
+            c.addView(small(if (buy) "⬆ " + L.t("p_bought") else "⬇ " + L.t("p_sold"), if (buy) RED else GREEN).apply { typeface = Typeface.DEFAULT_BOLD })
             c.addView(row(small(L.ln(l), INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD } to 1f,
                 small(money(l.value()), INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD } to 0f))
             val det = listOfNotNull(Bill.dateText(h.time).substringBefore("  "), h.vehicleInfo().ifBlank { null },
