@@ -594,8 +594,8 @@ class EngineTest {
         assertTrue(riser.value, riser.value.startsWith("8in × 15"))
         assertTrue(!riser.warn && !r.first { it.label == "Tread (pag ki jagah)" }.warn)
         assertTrue(r.any { it.value == "salah" && it.label.contains("riser") })
-        // code width rounded to a whole inch: 1.0 m -> 3ft 3in
-        assertTrue(r.v("Seedhi ki pohlai"), r.v("Seedhi ki pohlai").startsWith("3ft 3in"))
+        // code width rounded UP to a whole inch: 1.0 m (39.37in) -> 3ft 4in, never below the code
+        assertTrue(r.v("Seedhi ki pohlai"), r.v("Seedhi ki pohlai").startsWith("3ft 4in"))
         // flight uses 8" treads: 15 risers -> 14 treads -> 9ft 4in
         assertTrue(r.v("Flight 1"), r.v("Flight 1").contains("9ft 4in"))
     }
