@@ -431,3 +431,45 @@ fun monthly(all: List<Hisab>, f: RFilter): List<MonthSum> {
         }
     return map.values.toList()
 }
+
+/** one buyer (party) across all hisab: everything he took from us */
+class Party(val key: String, var name: String, var mobile: String) {
+    val items = mutableListOf<Pair<Hisab, Line>>()
+    fun total() = items.sumOf { it.second.value() }
+    fun left() = items.sumOf { it.second.remaining() }
+    fun got() = total() - left()
+    fun nextDue(): Long? = items.filter { it.second.remaining() > 0.004 }.mapNotNull { dueTime(it.first, it.second) }.minOrNull()
+}
+
+fun digits10(m: String) = m.filter { it.isDigit() }.takeLast(10)
+
+/** same buyer = same 10-digit mobile, else same name */
+fun partyKey(name: String, mobile: String): String = digits10(mobile).let { if (it.length == 10) it else if (norm(name).isEmpty()) "" else "n:" + norm(name) }
+
+/** every buyer: parts sold (seller hisab) + vehicle sold in auction / to company. Most money due first. */
+fun parties(all: List<Hisab>): List<Party> {
+    val map = linkedMapOf<String, Party>()
+    fun add(h: Hisab, l: Line) {
+        val k = partyKey(l.cName, l.cMobile)
+        if (k.isEmpty() || l.value() == 0.0) return
+        val p = map.getOrPut(k) { Party(k, l.cName.trim(), digits10(l.cMobile)) }
+        if (p.name.isBlank()) p.name = l.cName.trim()
+        if (p.mobile.isBlank()) p.mobile = digits10(l.cMobile)
+        p.items.add(h to l)
+    }
+    all.sortedByDescending { it.time }.forEach { h ->
+        if (h.role == "seller") h.maal.forEach { add(h, it) }
+        if (h.type == "haraji" || h.isLot) add(h, h.saleLine)
+    }
+    return map.values.sortedWith(compareByDescending<Party> { it.left() }.thenByDescending { it.items.firstOrNull()?.first?.time ?: 0L })
+}
+
+/** lines of one hisab that went to this buyer */
+fun buyerLines(h: Hisab, key: String): List<Line> =
+    (h.maal + h.saleLine).filter { partyKey(it.cName, it.cMobile) == key && it.value() != 0.0 }
+
+/** this month's totals (null = nothing this month) */
+fun thisMonth(all: List<Hisab>, now: Long = System.currentTimeMillis()): MonthSum? {
+    val c = java.util.Calendar.getInstance().apply { timeInMillis = now }
+    return monthly(all, RFilter(year = c.get(java.util.Calendar.YEAR), month = c.get(java.util.Calendar.MONTH) + 1)).firstOrNull()
+}

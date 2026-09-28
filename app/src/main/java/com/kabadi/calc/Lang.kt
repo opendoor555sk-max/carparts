@@ -297,6 +297,14 @@ object L {
         "comm_co" to arrayOf("Company (in its purchase)", "कंपनी (अपनी खरीदी में)", "કંપની (પોતાની ખરીદીમાં)"),
         "comm_co_h" to arrayOf("Company adds the commission to its purchase cost, then starts the haraji.", "कंपनी कमीशन अपनी खरीदी में जोड़ कर हराजी शुरू करती है।", "કંપની કમિશન પોતાની ખરીદીમાં જોડીને હરાજી શરૂ કરે છે."),
         "comm_mudi_h" to arrayOf("Commission is the mudi malik's expense (cut from the vehicle hisab).", "कमीशन मुडी मालिक का खर्च (गाड़ी के हिसाब से कटेगा)।", "કમિશન મૂડી માલિકનો ખર્ચ (ગાડીના હિસાબમાંથી કપાશે)."),
+        "contacts" to arrayOf("Phone contacts", "फ़ोन कॉन्टैक्ट", "ફોન કોન્ટેક્ટ"),
+        "pick_buyer" to arrayOf("Choose buyer", "खरीदार चुनें", "ખરીદનાર પસંદ કરો"),
+        "party_t" to arrayOf("Party", "पार्टी", "પાર્ટી"),
+        "party_n" to arrayOf("Buyers", "खरीदार", "ખરીદનાર"),
+        "party_stmt" to arrayOf("Pending statement", "बाकी का हिसाब", "બાકીનો હિસાબ"),
+        "party_send" to arrayOf("Send pending", "बाकी भेजें", "બાકી મોકલો"),
+        "items_s" to arrayOf("items", "चीज़ें", "વસ્તુ"),
+        "this_month" to arrayOf("This month", "इस महीने", "આ મહિને"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 

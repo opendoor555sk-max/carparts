@@ -239,4 +239,23 @@ class ModelTest {
         h.finalAt = day
         assertEquals(1, lockState(h, day + 3600000L))
     }
+
+    @Test fun buyers() {
+        val a = Hisab(1, 1000)
+        a.maal.add(Line("body", "Body", true, amountText = "30000", cName = "Asif", cMobile = "98765 43210", pay = "udhaar"))
+        a.maal.add(Line("alu", "Alu", true, amountText = "5000", cName = "asif bhai", cMobile = "+919876543210"))
+        a.maal.add(Line("tyre", "Tyre", true, amountText = "2000", cName = "Rafik"))
+        val b = Hisab(2, 2000, type = "haraji", saleText = "100000")
+        b.saleLine.cName = "Asif"; b.saleLine.cMobile = "9876543210"; b.saleLine.pay = "udhaar"; b.saleLine.pays.add(Pay(2000, "40000"))
+        val p = parties(listOf(a, b))
+        assertEquals(2, p.size)
+        val asif = p.first()
+        assertEquals("9876543210", asif.key)
+        assertEquals(135000.0, asif.total(), 1e-9)
+        assertEquals(90000.0, asif.left(), 1e-9)              // 30000 + 60000
+        assertEquals(2, buyerLines(a, asif.key).size)
+        assertEquals("n:rafik", p[1].key)
+        val buyer = Hisab(3, 3000, role = "buyer"); buyer.maal.add(Line("body", "Body", true, amountText = "1", cName = "X"))
+        assertEquals(2, parties(listOf(a, b, buyer)).size)     // buyer hisab: not our sales
+    }
 }

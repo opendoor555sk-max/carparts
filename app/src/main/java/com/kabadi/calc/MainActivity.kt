@@ -93,6 +93,7 @@ class MainActivity : Activity() {
         fun start() {
             bar.visibility = View.VISIBLE
             showHome()
+            autoBackup()
             if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
                 requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 9)
             if (toKhata) showKhata()
@@ -571,7 +572,17 @@ class MainActivity : Activity() {
         body.addView(row(tile(L.t("new_gaadi"), GREEN) { newHisab("gaadi") } to 1f, tile(L.t("new_haraji"), 0xFF6A1B9A.toInt()) { newHisab("haraji") } to 1f,
             tile(L.t("new_lot"), 0xFF1565C0.toInt()) { newHisab("lot") } to 1f))
         body.addView(row(tile(L.t("khata_btn") + (if (late > 0) "  ⚠$late" else ""), if (late > 0) RED else 0xFF455A64.toInt()) { showKhata() } to 1f,
-            tile(L.t("report_btn"), 0xFF00695C.toInt()) { showReport() } to 1f))
+            tile(L.t("report_btn"), 0xFF00695C.toInt()) { showReport() } to 1f,
+            tile("👥 " + L.t("party_t"), 0xFF5D4037.toInt()) { showParties() } to 1f))
+        thisMonth(Store.hisabs)?.let { m ->
+            val mc = card().apply { background = round(0xFFE8F5E9.toInt(), 12f, 0xFFA5D6A7.toInt()) }
+            mc.addView(row(small("📅 " + L.t("this_month"), INK).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD } to 1f,
+                small((if (m.munafa >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(m.munafa)), if (m.munafa >= 0) GREEN else RED).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD } to 0f))
+            mc.addView(small(listOfNotNull(m.count.toString() + " " + L.t("vehicles"), L.t("bikri") + " " + money(m.bikri),
+                if (m.kg > 0) plain(m.kg) + " kg" else null).joinToString("  •  ")))
+            mc.setOnClickListener { val c = Calendar.getInstance(); rf.year = c.get(Calendar.YEAR); rf.month = c.get(Calendar.MONTH) + 1; showReport() }
+            body.addView(mc, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f); bottomMargin = dpi(4f) })
+        }
         if (dues.isNotEmpty()) body.addView(small("⬇ " + L.t("lena") + " " + money(dues.filter { it.lena }.sumOf { it.left }) +
             "     ⬆ " + L.t("dena") + " " + money(dues.filter { !it.lena }.sumOf { it.left })).apply {
             gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(4f), 0, dpi(8f))
@@ -1433,9 +1444,18 @@ class MainActivity : Activity() {
     /** seller: who took this item (name, mobile), cash / credit, credit days, installments; auction: guarantor + shop */
     private fun sellerBlock(h: Hisab, l: Line, box: LinearLayout, redraw: () -> Unit) {
         val who = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dpi(2f), 0, 0) }
-        who.addView(row(input("👤 " + L.t("cname"), l.cName, false) { l.cName = it }.apply { textSize = 15f } to 1.2f,
-            mobileInput("📞 " + L.t("cmobile"), l.cMobile) { l.cMobile = it } to 1f,
-            pill(L.t("udhaar"), l.udhaar, ORANGE) { l.pay = if (l.udhaar) "rokad" else "udhaar"; redraw(); refreshTotals() } to 0f))
+        val nm = input("👤 " + L.t("cname"), l.cName, false) { l.cName = it }.apply { textSize = 15f }
+        val mob = mobileInput("📞 " + L.t("cmobile"), l.cMobile) { l.cMobile = it }
+        val pick = pill("👥", false, BLUE) { pickBuyer { n, m -> nm.setText(n); mob.setText(m) } }.apply { textSize = 16f; setPadding(dpi(8f), dpi(4f), dpi(8f), dpi(4f)) }
+        val send = pill("💬", true, 0xFF25D366.toInt()) {
+            val k = partyKey(l.cName, l.cMobile)
+            if (digits10(l.cMobile).length != 10) return@pill toast(L.t("acc_bad_mobile"))
+            autoSave(); Store.save(this)
+            whatsapp(l.cMobile, buyerMessage(h, k))
+        }.apply { textSize = 16f; setPadding(dpi(8f), dpi(4f), dpi(8f), dpi(4f)) }
+        who.addView(row(nm to 1.2f, mob to 1f, pick to 0f, send to 0f))
+        who.addView(row(pill(L.t("rokad_s"), !l.udhaar, GREEN) { l.pay = "rokad"; redraw(); refreshTotals() } to 0f,
+            pill(L.t("udhaar"), l.udhaar, ORANGE) { l.pay = "udhaar"; redraw(); refreshTotals() } to 0f, View(this) to 1f))
         if (l.udhaar) {
             who.addView(muddatRow(h, l))
             kistBlock(l, who, true, redraw)
@@ -1446,6 +1466,125 @@ class MainActivity : Activity() {
             who.addView(row(input(L.t("shop"), l.shop, false) { l.shop = it }.apply { textSize = 15f } to 1f))
         }
         box.addView(who)
+    }
+
+    /** choose a buyer: from earlier buyers or the phone's contacts */
+    private var contactCb: ((String, String) -> Unit)? = null
+    private fun pickBuyer(done: (String, String) -> Unit) {
+        val ps = parties(Store.hisabs)
+        val items = listOf("📇 " + L.t("contacts")) + ps.map { p -> p.name.ifBlank { "—" } + (if (p.mobile.isNotBlank()) "  •  " + p.mobile else "") }
+        AlertDialog.Builder(this).setTitle(L.t("pick_buyer")).setItems(items.toTypedArray()) { _, w ->
+            if (w == 0) {
+                contactCb = done
+                try { startActivityForResult(Intent(Intent.ACTION_PICK, android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI), 31) }
+                catch (_: Exception) { toast("✕") }
+            } else ps[w - 1].let { done(it.name, it.mobile) }
+        }.show()
+    }
+
+    /** WhatsApp message for one buyer: only what he took from us in this hisab (no cost / profit) */
+    private fun buyerMessage(h: Hisab, key: String): String {
+        val lines = buyerLines(h, key)
+        val sb = StringBuilder()
+        sb.append("*").append(Store.owner.ifBlank { L.t("app") }).append("*\n")
+        sb.append(Bill.dateText(h.time).substringBefore("  ")).append("\n")
+        if (h.vehicleInfo().isNotBlank()) sb.append("🚚 ").append(h.vehicleInfo()).append(if (h.vehicle.isNotBlank()) " • " + h.vehicle else "").append("\n")
+        lines.firstOrNull()?.cName?.let { if (it.isNotBlank()) sb.append("👤 ").append(it).append("\n") }
+        sb.append("\n")
+        lines.forEach { l ->
+            sb.append("• ").append(L.ln(l)).append(": ")
+            if (!l.fixed && l.calc == null) sb.append(plain(l.kg)).append(if (l.litre) " L × ₹" else " kg × ₹").append(plain(l.rate)).append(" = ")
+            sb.append(money(l.value()))
+            sb.append(if (l.udhaar) "  (" + L.t("udhaar") + ")" else "  (" + L.t("rokad_s") + ")").append("\n")
+        }
+        val tot = lines.sumOf { it.value() }; val left = lines.sumOf { it.remaining() }
+        sb.append("\n*").append(L.t("book_total")).append(": ").append(money(tot)).append("*\n")
+        if (left > 0.004) {
+            if (tot - left > 0.004) sb.append(L.t("got")).append(": ").append(money(tot - left)).append("\n")
+            sb.append("*").append(L.t("left")).append(": ").append(money(left)).append("*\n")
+            lines.filter { it.remaining() > 0.004 }.mapNotNull { dueTime(h, it) }.minOrNull()?.let {
+                sb.append("⏳ ").append(L.t("due")).append(": ").append(Bill.dateText(it).substringBefore("  ")).append("\n") }
+        }
+        if (Store.mobile.isNotBlank()) sb.append("\n📞 ").append(Store.mobile)
+        return sb.toString()
+    }
+
+    /** one message with everything a buyer still owes (all hisab) */
+    private fun partyMessage(p: Party): String {
+        val sb = StringBuilder()
+        sb.append("*").append(Store.owner.ifBlank { L.t("app") }).append("*\n")
+        sb.append(L.t("party_stmt")).append(" – ").append(p.name).append("\n\n")
+        p.items.filter { it.second.remaining() > 0.004 }.forEach { (h, l) ->
+            sb.append("• ").append(Bill.dateText(h.time).substringBefore("  ")).append("  ").append(L.ln(l))
+            if (h.vehicleInfo().isNotBlank()) sb.append(" (").append(h.vehicleInfo()).append(")")
+            sb.append(": ").append(money(l.remaining()))
+            dueTime(h, l)?.let { sb.append("  ⏳ ").append(Bill.dateText(it).substringBefore("  ")) }
+            sb.append("\n")
+        }
+        sb.append("\n*").append(L.t("left")).append(": ").append(money(p.left())).append("*\n")
+        if (Store.mobile.isNotBlank()) sb.append("📞 ").append(Store.mobile)
+        return sb.toString()
+    }
+
+    // ================= PARTY (buyers) =================
+    private fun showParties() {
+        autoSave(); editing = null
+        val body = setScreen("party", "👥 " + L.t("party_t"), null)
+        val all = parties(Store.hisabs)
+        val tot = card()
+        tot.addView(small(L.t("party_n") + ": " + all.size, INK).apply { textSize = 15f })
+        tot.addView(TextView(this).apply { text = "⬇ " + L.t("lena") + ": " + money(all.sumOf { it.left() }); textSize = 18f; setTextColor(GREEN); typeface = Typeface.DEFAULT_BOLD })
+        body.addView(tot, cardLp())
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun fill(q: String) {
+            list.removeAllViews()
+            val today = Reminders.endOfToday()
+            all.filter { q.isBlank() || norm(it.name).contains(norm(q)) || it.mobile.contains(q.filter { c -> c.isDigit() }.ifEmpty { "~" }) }.forEach { p ->
+                val c = card()
+                val left = p.left()
+                c.addView(row(TextView(this).apply { text = p.name.ifBlank { p.mobile }; textSize = 17f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD; maxLines = 1 } to 1f,
+                    TextView(this).apply { text = if (left > 0.004) money(left) else "✓"; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (left > 0.004) RED else GREEN) } to 0f))
+                val nd = p.nextDue()
+                c.addView(small(listOf(p.mobile, p.items.size.toString() + " " + L.t("items_s"), L.t("book_total") + " " + money(p.total()),
+                    nd?.let { (if (it <= today) "⚠ " else "⏳ ") + Bill.dateText(it).substringBefore("  ") } ?: "").filter { it.isNotBlank() }.joinToString("  •  "),
+                    if (nd != null && nd <= today) RED else MUTED))
+                c.setOnClickListener { showParty(p.key) }
+                list.addView(c, cardLp())
+            }
+            if (list.childCount == 0) list.addView(small(L.t("none")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        }
+        body.addView(input("🔍 " + L.t("f_search"), "", false) { fill(it) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+        body.addView(list)
+        fill("")
+    }
+
+    private fun showParty(key: String) {
+        val p = parties(Store.hisabs).firstOrNull { it.key == key } ?: return showParties()
+        editorBack = { showParty(key) }
+        val body = setScreen("party1", p.name.ifBlank { p.mobile }, { editorBack = null; showParties() })
+        val top = card()
+        top.addView(small("📞 " + p.mobile.ifBlank { "—" }, INK).apply { textSize = 15f })
+        top.addView(small(L.t("book_total") + ": " + money(p.total()) + "   •   " + L.t("got") + ": " + money(p.got()), INK).apply { textSize = 15f })
+        top.addView(TextView(this).apply { text = L.t("left") + ": " + money(p.left()); textSize = 20f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (p.left() > 0.004) RED else GREEN) })
+        if (p.mobile.length == 10) top.addView(row(
+            bigButton("💬 " + L.t("party_send"), 0xFF25D366.toInt()) { whatsapp(p.mobile, partyMessage(p)) }.apply { textSize = 15f } to 1f,
+            bigButton("📞", BLUE) { try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + p.mobile))) } catch (_: Exception) {} }.apply { textSize = 15f } to 0f))
+        body.addView(top, cardLp())
+        p.items.forEach { (h, l) ->
+            val c = card()
+            c.addView(row(small(L.ln(l), INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD } to 1f,
+                small(money(l.value()), INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD } to 0f))
+            val det = listOfNotNull(Bill.dateText(h.time).substringBefore("  "), h.vehicleInfo().ifBlank { null },
+                if (!l.fixed && l.calc == null) plain(l.kg) + (if (l.litre) " L" else " kg") + " × " + plain(l.rate) else null).joinToString("  •  ")
+            c.addView(small(det))
+            if (l.udhaar) {
+                val st = if (l.remaining() < 0.005) "✓ " + L.t("chukaya") else L.t("left") + " " + money(l.remaining()) + (dueTime(h, l)?.let { "  ⏳ " + Bill.dateText(it).substringBefore("  ") } ?: "")
+                c.addView(row(small(L.t("udhaar") + " • " + st, if (l.remaining() < 0.005) GREEN else RED).apply { typeface = Typeface.DEFAULT_BOLD } to 1f,
+                    if (l.remaining() > 0.004) pill(L.t("kist"), true, BLUE) { askKist(l) { Store.save(this); showParty(key) } } to 0f else View(this) to 0f))
+            } else c.addView(small(L.t("rokad_s"), GREEN))
+            c.setOnClickListener { showEditor(h) }
+            body.addView(c, cardLp())
+        }
     }
 
     private fun sellMessage(h: Hisab, l: Line): String {
@@ -1679,6 +1818,32 @@ class MainActivity : Activity() {
         } catch (e: Exception) { toast("Backup ✕ " + e.message) }
     }
 
+    /** once a day, silently: Downloads/KabadiCalc/KabadiCalc_auto_backup.json (same file, overwritten) */
+    private fun autoBackup() {
+        if (Build.VERSION.SDK_INT < 29 || Store.hisabs.isEmpty()) return
+        val sp = getSharedPreferences("kabadi_calc", MODE_PRIVATE)
+        if (System.currentTimeMillis() - sp.getLong("autoBackup", 0) < 20L * 3600_000L) return
+        val data = Store.toJson().toString().toByteArray()
+        Thread {
+            try {
+                val name = "KabadiCalc_auto_backup.json"
+                val col = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                var uri: Uri? = null
+                contentResolver.query(col, arrayOf(android.provider.MediaStore.MediaColumns._ID),
+                    android.provider.MediaStore.MediaColumns.DISPLAY_NAME + "=?", arrayOf(name), null)?.use { c ->
+                    if (c.moveToFirst()) uri = android.content.ContentUris.withAppendedId(col, c.getLong(0))
+                }
+                if (uri == null) uri = contentResolver.insert(col, android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json")
+                    put(android.provider.MediaStore.Downloads.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/KabadiCalc")
+                })
+                uri?.let { u -> contentResolver.openOutputStream(u, "wt")?.use { it.write(data) } }
+                sp.edit().putLong("autoBackup", System.currentTimeMillis()).apply()
+            } catch (_: Exception) {}
+        }.start()
+    }
+
     private fun pickBackup() {
         val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
         try { startActivityForResult(i, 21) } catch (_: Exception) {}
@@ -1687,6 +1852,18 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(req: Int, res: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(req, res, data)
+        if (req == 31 && res == RESULT_OK) {
+            val cb = contactCb; contactCb = null
+            try {
+                data?.data?.let { u ->
+                    contentResolver.query(u, arrayOf(android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                        android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER), null, null, null)?.use { cur ->
+                        if (cur.moveToFirst()) cb?.invoke(cur.getString(0) ?: "", digits10(cur.getString(1) ?: ""))
+                    }
+                }
+            } catch (_: Exception) { toast("✕") }
+            return
+        }
         if (req != 21 || res != RESULT_OK) return
         val uri = data?.data ?: return
         try {
