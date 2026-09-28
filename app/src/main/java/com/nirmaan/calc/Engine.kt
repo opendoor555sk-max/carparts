@@ -85,7 +85,10 @@ class StairPlan(
     val floorTh: Double = 0.0,
     val tt: Double = 0.0,
     val nose: Double = 0.0,
-    val rt: Double = 0.0
+    val rt: Double = 0.0,
+    /** installation view: height of every step from the floor, and run of every tread (for marking) */
+    val riseMarks: List<String> = emptyList(),
+    val runMarks: List<String> = emptyList()
 )
 
 fun sec(t: String) = Row(t, section = true)
@@ -1296,7 +1299,8 @@ class Engine(val ui: Ui) {
                     rows.add(Row("", stair = StairPlan(n, ur, ut, if (bw > 0) bw else notch * 2, emptyList(),
                         listOf("Top: header ke face se", "Bottom: floor par, " + fL(tt, 1, sm) + " kaat kar",
                             if (below > 0) "Stringer header se " + fL(below, 1, sm) + " neeche: hanger lagayein" else "Stringer header par poora baithta hai"),
-                        tt = tt, install = true, floorTh = if (th > 0) th else 0.0)))
+                        tt = tt, install = true, floorTh = if (th > 0) th else 0.0,
+                        riseMarks = (1..n).map { k -> fL(k * ur, 1, sm) }, runMarks = (1..tr).map { k -> fL(k * ut, 1, sm) })))
                 }
                 if (fromRun) rows.add(Row("Rise Run se nikala (" + fL(rise) + ")", "i"))
                 rows.addAll(listOf(
@@ -1325,6 +1329,31 @@ class Engine(val ui: Ui) {
                         pos(v["sw"]).let { w -> if (w > 0) (ceil(w / (if (m) 0.4 else 16 * IN) - 1e-9).toInt() + 1).toString() + " nag" else "—" }),
                     Row("Top par stringer lagayein", "floor se " + fL(ur, 1, sm) + " neeche pehla notch")
                 ))
+                // ---- other ways to build the same stair (marking table, RCC, steel) ----
+                val sw = pos(v["sw"])
+                val flight = hypot(rise, tot)
+                rows.add(sec("Deewar / zameen par marking (har step)"))
+                rows.add(Row("Kaise: pehle riser ki line se aage, floor se upar naapein", ""))
+                for (k in 1..n) rows.add(Row("Step $k", "upar " + fL(k * ur, 1, sm) + "   •   aage " + fL((k - 1) * ut, 1, sm)))
+                rows.add(Row("Aakhri riser landing par", "aage " + fL(tot, 1, sm)))
+                rows.add(sec("RCC / concrete seedhi"))
+                val waist = max(flight / 25, if (m) 0.10 else 4 * IN)
+                rows.add(Row("Tircchi lambai (flight)", fL(flight)))
+                rows.add(Row("Waist slab motai (lagbhag L/25)", fL(waist, 1, sm)))
+                rows.add(Row("Shuttering (neeche ki patti)", fL(flight) + " × chaudai"))
+                if (sw > 0) {
+                    val vol = flight * waist * sw + tr * (ur * ut / 2) * sw
+                    val dry = vol * 1.54
+                    rows.add(Row("Concrete (seedhi chaudai " + fL(sw, 1, sm) + ")", num(rnd(vol, 3)) + " m³  (" + num(rnd(vol / CFT, 1)) + " cft)"))
+                    rows.add(Row("M20 cement (1:1.5:3)", num(rnd(dry / 5.5 / BAG, 1)) + " bag"))
+                    rows.add(Row("Ret (sand)", num(rnd(dry * 1.5 / 5.5 / CFT, 1)) + " cft"))
+                    rows.add(Row("Kapchi (20 mm)", num(rnd(dry * 3 / 5.5 / CFT, 1)) + " cft"))
+                    rows.add(Row("Sariya (lagbhag 90 kg/m³)", num(rnd(vol * 90, 0)) + " kg"))
+                } else rows.add(Row("Concrete ke liye seedhi ki chaudai bharein", "—"))
+                rows.add(sec("Steel (MS) seedhi"))
+                rows.add(Row("Stringer (channel) lambai", fL(flight + ut) + " × 2"))
+                rows.add(Row("Tread plate / angle", tr.toString() + " nag" + (if (sw > 0) " × " + fL(sw, 1, sm) else "")))
+                rows.add(Row("Tread bracket (angle) ki oonchai-ghair", fL(ur, 1, sm) + " × " + fL(ut, 1, sm)))
                 if (ang > 42) rows.add(Row("Seedhi bahut steep hai", "⚠", true))
                 if (throat.isFinite() && throat < 3.5 * IN) rows.add(Row("Throat kam hai — chaudi patiya lein", "⚠", true))
                 rows

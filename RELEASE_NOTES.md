@@ -1,3 +1,5 @@
+Stair: Installation drawing mein ab rise/run map (har step ki oonchai aur aage ki doori). Naye naap: deewar par marking table, RCC seedhi (waist slab, concrete, cement, ret, kapchi, sariya), Steel (MS) seedhi.
+
 Machinist Calc ab asli Machinist Calc Pro jaisa: value + key = save ($), sirf key = hisaab, dobara dabane par agla (RPM → CUT → DIA...). Thread Size (8-32, 1/4-28, M5×0.75) → tap drill, roll-tap, close/free drill, pitch/minor/major dia; Thread Class 1A–3B, metric 3–9 G/H/e/f/g/h; Alpha letter drills; Bolt Pattern X/Y; Wire Size; 3-Wire; RCT.
 
 Naya: Machinist Calculator! Conv button ke neeche-daayein hisse (SWITCH) ko dabayein. Cut Speed, RPM, Feed Rate, #Teeth, Feed/Tooth, Cut Feed, Diam, Drill Size/Point, Bolt Pattern, Thread Size (UNC/UNF/Metric), %Thread, Wire Size, 3-Wire, RCT, Right triangle.

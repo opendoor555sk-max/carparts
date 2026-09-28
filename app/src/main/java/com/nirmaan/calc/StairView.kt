@@ -205,9 +205,11 @@ class StairView(ctx: Context, private val p: StairPlan) : View(ctx) {
         val drop = bw / cos(th)
         val xb = (drop - ur) / m
         val fth = if (p.floorTh > 0) p.floorTh else 0.6 * ur
-        val xmin = min(-ut, xb) - 0.3 * ut
+        val hasMap = p.riseMarks.isNotEmpty()
+        // extra room on the left (height marks) and under the floor (run marks)
+        val xmin = min(-ut, xb) - (if (hasMap) 3.2 else 0.3) * ut
         val xmax = xEnd + 2.2 * ut
-        val ymin = -0.12 * top
+        val ymin = -(if (hasMap) 0.30 else 0.12) * top
         val ymax = top * 1.06
         val pad = dp(10f)
         val W = width.toFloat()
@@ -241,6 +243,7 @@ class StairView(ctx: Context, private val p: StairPlan) : View(ctx) {
         c.drawLine(X(xb), Y(0.0) + dp(2f), X(0.0), Y(0.0) + dp(2f), red)
 
         val lbl = Paint(dimTxt).apply { textAlign = Paint.Align.LEFT; textSize = sp(11f) }
+        if (hasMap) drawRiseRunMap(c, ::X, ::Y, xmin, s)
         c.drawText("Header", X(xEnd + 0.3 * ut), Y(top - fth / 2) + lbl.textSize / 2, lbl)
         c.drawText("Upar ka floor", X(xEnd + 0.3 * ut), Y(top) - dp(4f), lbl)
         c.drawText("Neeche ka floor", X(xmin) + dp(4f), Y(0.0) + lbl.textSize + dp(3f), lbl)
@@ -253,5 +256,46 @@ class StairView(ctx: Context, private val p: StairPlan) : View(ctx) {
             y -= info.textSize * 1.3f
         }
         c.drawText("Installation", W - pad, y - sp(2f), title)
+    }
+
+    /** Rise / run map: height of every step on a vertical scale (left), run of every tread on the floor (bottom). */
+    private fun drawRiseRunMap(c: Canvas, X: (Double) -> Float, Y: (Double) -> Float, xmin: Double, s: Float) {
+        val n = p.n
+        val ur = p.ur
+        val ut = p.ut
+        val green = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0x2E, 0x7D, 0x32); style = Paint.Style.STROKE; strokeWidth = dp(1f) }
+        val guide = Paint(green).apply { alpha = 90; pathEffect = android.graphics.DashPathEffect(floatArrayOf(dp(3f), dp(3f)), 0f) }
+        val txt = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0x1B, 0x5E, 0x20); textSize = sp(9.5f); textAlign = Paint.Align.LEFT }
+
+        // vertical scale: floor to each step top
+        val ax = X(xmin) + dp(6f)
+        c.drawLine(ax, Y(0.0), ax, Y(n * ur), green)
+        val every = max(1, kotlin.math.ceil(txt.textSize * 1.15 / (ur * s)).toInt())
+        for (k in 1..n) {
+            val y = Y(k * ur)
+            c.drawLine(ax - dp(3f), y, ax + dp(3f), y, green)
+            c.drawLine(ax, y, X((k - 1) * ut), y, guide)
+            if (k % every == 0 || k == n) c.drawText("$k: " + p.riseMarks.getOrElse(k - 1) { "" }, ax + dp(5f), y - dp(2f), txt)
+        }
+        c.drawText("Oonchai (floor se)", ax, Y(n * ur) - txt.textSize * 1.4f, txt)
+
+        // horizontal scale under the floor: first riser to each tread edge
+        val fy = Y(0.0) + dp(12f)
+        val tr = p.runMarks.size
+        c.drawLine(X(0.0), fy, X(tr * ut), fy, green)
+        c.drawLine(X(0.0), fy - dp(3f), X(0.0), fy + dp(3f), green)
+        val rot = Paint(txt).apply { textAlign = Paint.Align.RIGHT }
+        val everyX = max(1, kotlin.math.ceil(txt.textSize * 1.15 / (ut * s)).toInt())
+        for (k in 1..tr) {
+            val x = X(k * ut)
+            c.drawLine(x, fy - dp(3f), x, fy + dp(3f), green)
+            if (k % everyX == 0 || k == tr) {
+                c.save()
+                c.rotate(-90f, x + txt.textSize * 0.35f, fy + dp(5f))
+                c.drawText("$k: " + p.runMarks[k - 1], x + txt.textSize * 0.35f, fy + dp(5f), rot)
+                c.restore()
+            }
+        }
+        c.drawText("Aage (pehle riser se)", X(0.0), fy - dp(5f), txt)
     }
 }
