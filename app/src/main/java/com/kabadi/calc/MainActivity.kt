@@ -570,12 +570,35 @@ class MainActivity : Activity() {
         val body = setScreen("home", L.t("app"), null)
         val dues = openDues(Store.hisabs)
         val late = dues.count { it.due != null && it.due <= Reminders.endOfToday() }
-        fun tile(t: String, color: Int, a: () -> Unit) = bigButton(t, color, a).apply { textSize = 15f; setPadding(dpi(6f), dpi(16f), dpi(6f), dpi(16f)) }
-        body.addView(row(tile(L.t("new_gaadi"), GREEN) { newHisab("gaadi") } to 1f, tile(L.t("new_haraji"), 0xFF6A1B9A.toInt()) { newHisab("haraji") } to 1f,
-            tile(L.t("new_lot"), 0xFF1565C0.toInt()) { newHisab("lot") } to 1f))
-        body.addView(row(tile(L.t("khata_btn") + (if (late > 0) "  ⚠$late" else ""), if (late > 0) RED else 0xFF455A64.toInt()) { showKhata() } to 1f,
-            tile(L.t("report_btn"), 0xFF00695C.toInt()) { showReport() } to 1f,
-            tile("📒 " + L.t("party_tile"), 0xFF5D4037.toInt()) { showParties() } to 1f))
+        // ---- 6 big round buttons: about 80% of the screen ----
+        val dm = resources.displayMetrics
+        val rowH = ((dm.heightPixels * 0.8f - dp(70f)) / 3f).toInt()
+        val d = minOf(rowH - dpi(12f), (dm.widthPixels - dpi(20f)) / 2 - dpi(16f))
+        fun circle(icon: String, label: String, color: Int, act: () -> Unit): View {
+            val txt = android.text.SpannableString(icon + "\n" + label).apply {
+                setSpan(android.text.style.RelativeSizeSpan(2.1f), 0, icon.length, 0)
+            }
+            val oval = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(color); setStroke(dpi(4f), 0x33FFFFFF) }
+            val b = TextView(this).apply {
+                text = txt; textSize = if (d < dpi(130f)) 13.5f else 16f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
+                maxLines = 4; setPadding(dpi(14f), dpi(10f), dpi(14f), dpi(10f))
+                background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x55FFFFFF), oval, null)
+                elevation = dp(6f); setOnClickListener { act() }
+            }
+            return FrameLayout(this).apply { addView(b, FrameLayout.LayoutParams(d, d, Gravity.CENTER)) }
+        }
+        fun gridRow(a1: View, a2: View) = LinearLayout(this).apply {
+            addView(a1, llp(0, rowH, 1f)); addView(a2, llp(0, rowH, 1f))
+        }
+        body.addView(gridRow(
+            circle("🚚", L.t("new_gaadi").removePrefix("+ "), GREEN) { newHisab("gaadi") },
+            circle("🔨", L.t("new_haraji").removePrefix("+ "), 0xFF6A1B9A.toInt()) { newHisab("haraji") }))
+        body.addView(gridRow(
+            circle("📦", L.t("new_lot").removePrefix("+ "), 0xFF1565C0.toInt()) { newHisab("lot") },
+            circle("🤝", L.t("party_tile"), 0xFF5D4037.toInt()) { showParties() }))
+        body.addView(gridRow(
+            circle("📒", L.t("khata_btn").substringAfter(" ") + (if (late > 0) "\n⚠ $late" else ""), if (late > 0) RED else 0xFF455A64.toInt()) { showKhata() },
+            circle("📊", L.t("report_btn").substringAfter(" "), 0xFF00695C.toInt()) { showReport() }))
         val rem = reminders(Store.hisabs)
         if (rem.isNotEmpty()) body.addView(bigButton("🔔 " + rem.map { it.key.ifEmpty { it.name } }.distinct().size + " " + L.t("rem_banner"), 0xFFE65100.toInt()) { showReminders() }
             .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
