@@ -2526,7 +2526,8 @@ class MainActivity : Activity() {
         body.addView(o, cardLp())
 
         // the admin phone does not need this card (admin has its own button on the home page)
-        if (LOGIN_ON && Account.exists(this) && !Account.isAdmin(this)) {
+        // "Account & PIN lock" card removed from settings (not needed)
+        if (false) {
             val ac = card()
             ac.addView(heading(L.t("acc_sec")))
             ac.addView(small(Account.name(this) + "   📞 " + Account.mobile(this) + (if (Account.isAdmin(this)) "   👑" else ""), INK).apply { textSize = 15f; setPadding(0, 0, 0, dpi(8f)) })

@@ -1,3 +1,5 @@
+Settings mathi 'खाता और PIN लॉक' (naam + number) puru kadhi nakhyu — badha phone ma.
+
 Settings mathi '👑 Admin login' link kadhi nakhi.
 
 Admin phone ni Settings mathi 'Account & PIN lock' (naam/number + 'Admin: make OTP') kadhi nakhyu. Admin tamara phone par j raheshe.
