@@ -117,6 +117,9 @@ object Store {
             .put("ro", h.role).put("br", h.brand).put("va", h.variant).put("tr", h.tyres).put("yr", h.year).put("pl", h.place)
             .put("mn", h.mudiName).put("mm", h.mudiMobile).put("mp", h.mudiPctText)
             .put("kn", h.khedName).put("km", h.khedMobile).put("kp", h.khedPctText)
+            .put("cmo", h.coMode).put("mac", h.mudiAddCo).put("kac", h.khedAddCo).put("fin", h.finalAt)
+        o.put("vh", JSONArray().also { a -> h.vehicles.forEach { v ->
+            a.put(JSONObject().put("b", v.brand).put("v", v.variant).put("t", v.tyres).put("y", v.year).put("n", v.no).put("p", v.priceText)) } })
         o.put("pa", JSONArray().also { a -> h.partners.forEach { a.put(JSONObject().put("n", it.name).put("s", it.shareText)) } })
         o.put("k", JSONArray().also { a -> h.kharch.forEach { a.put(lj(it)) } })
         o.put("m", JSONArray().also { a -> h.maal.forEach { a.put(lj(it)) } })
@@ -129,7 +132,10 @@ object Store {
             role = o.optString("ro", "seller"), brand = o.optString("br"), variant = o.optString("va"), tyres = o.optString("tr"),
             year = o.optString("yr"), place = o.optString("pl"),
             mudiName = o.optString("mn"), mudiMobile = o.optString("mm"), mudiPctText = o.optString("mp"),
-            khedName = o.optString("kn"), khedMobile = o.optString("km"), khedPctText = o.optString("kp"))
+            khedName = o.optString("kn"), khedMobile = o.optString("km"), khedPctText = o.optString("kp"),
+            coMode = o.optBoolean("cmo"), mudiAddCo = o.optBoolean("mac"), khedAddCo = o.optBoolean("kac"), finalAt = o.optLong("fin"))
+        o.optJSONArray("vh")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let {
+            h.vehicles.add(Veh(it.optString("b"), it.optString("v"), it.optString("t"), it.optString("y"), it.optString("n"), it.optString("p"))) } }
         o.optJSONArray("pa")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { h.partners.add(Partner(it.optString("n"), it.optString("s"))) } }
         o.optJSONArray("k")?.let { a -> for (i in 0 until a.length()) h.kharch.add(jl(a.getJSONObject(i))) }
         o.optJSONArray("m")?.let { a -> for (i in 0 until a.length()) h.maal.add(jl(a.getJSONObject(i))) }

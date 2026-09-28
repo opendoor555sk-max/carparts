@@ -146,4 +146,49 @@ class ModelTest {
         assertEquals(20, Otp.topic("requests").length); assertTrue(Otp.topic("a") != Otp.topic("b"))
         assertTrue(Otp.isAdminCode("219977")); assertFalse(Otp.isAdminCode("123456"))
     }
+
+    @Test fun lotHisab() {
+        val h = Hisab(1, 0, type = "lot")
+        h.vehicles.add(Veh("Tata", priceText = "200000")); h.vehicles.add(Veh("Mahindra", priceText = "150000"))
+        assertEquals(350000.0, h.price, 1e-9)           // no total written = sum of vehicles
+        h.kharch.add(Line("crane", "Crane", true, amountText = "10000"))
+        h.maal.add(Line("", "Lokhand", false, kgText = "10000", rateText = "30"))
+        h.saleText = "100000"                            // one vehicle sold whole
+        assertEquals(40000.0, h.munafa(), 1e-9)          // 300000+100000 − 360000
+        assertTrue(h.verify().isEmpty())
+        h.priceText = "340000"
+        assertEquals(340000.0, h.price, 1e-9)
+        assertTrue(RFilter(brand = "mahindra").matches(h))
+    }
+
+    @Test fun companyRitB() {
+        val h = Hisab(1, 0, type = "haraji", coMode = true, priceText = "300000", saleText = "350000", mudiName = "Salam", mudiPctText = "60", khedName = "Rafik", khedPctText = "40")
+        h.kharch.add(Line("crane", "Crane", true, amountText = "10000"))
+        h.maal.add(Line("body", "Body", true, amountText = "400000"))
+        h.commText = "1"                                 // 1% of company sales = 4000
+        h.partners.add(Partner("Salam", "50")); h.partners.add(Partner("Asif", "50"))
+        assertEquals(40000.0, h.munafa(), 1e-9)          // owner: 350000 − 310000
+        assertEquals(46000.0, h.companyResult(), 1e-9)   // company: 400000 − 350000 − 4000
+        assertEquals(24000.0, h.mudiShare(), 1e-9)
+        assertEquals(23000.0, h.coShareOf("salam"), 1e-9)
+        assertEquals(175000.0, h.partnerLagat(h.partners[1]), 1e-9)
+        assertTrue(h.verify().isEmpty())
+        val book = personBook(listOf(h), "Salam")
+        assertEquals(listOf("mudi", "co"), book.map { it.role })
+        assertEquals(47000.0, book.sumOf { it.amount }, 1e-9)
+        assertTrue(RFilter(mudi = "Asif").matches(h))
+    }
+
+    @Test fun finalLock() {
+        val now = 10L * 86400000L
+        val h = Hisab(1, now - 86400000L)
+        assertEquals(0, lockState(h, now))
+        h.finalAt = now - 1000
+        assertEquals(1, lockState(h, now))
+        h.maal.add(Line("body", "Body", true, amountText = "100", pay = "udhaar", daysText = "0"))
+        assertEquals(2, lockState(h, now))               // credit time over
+        val a = Hisab(2, now, type = "haraji"); a.finalAt = now
+        assertEquals(1, lockState(a, now + 47L * 3600000L))
+        assertEquals(2, lockState(a, now + 49L * 3600000L))
+    }
 }

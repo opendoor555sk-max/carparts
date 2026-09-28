@@ -57,7 +57,7 @@ object Bill {
         c?.drawText(TextUtils.ellipsize(Store.owner.ifBlank { L.t("app") }, tp(19 * u, true, white), W * 0.62f, TextUtils.TruncateAt.END).toString(), pad, 28 * u, tp(19 * u, true, white))
         val sub = listOf(Store.mobile, Store.address).filter { it.isNotBlank() }.joinToString("  •  ")
         if (sub.isNotEmpty()) c?.drawText(TextUtils.ellipsize(sub, tp(11 * u, false, white), W * 0.62f, TextUtils.TruncateAt.END).toString(), pad, 47 * u, tp(11 * u, false, Color.rgb(0xCF, 0xD8, 0xDC)))
-        c?.drawText(if (h.type == "haraji") L.t("haraji") else L.t("hisab"), W - pad, 28 * u, tp(16 * u, true, Color.rgb(0xFF, 0xB7, 0x4D), Paint.Align.RIGHT))
+        c?.drawText(when { h.isLot -> L.t("lot"); h.type == "haraji" -> L.t("haraji"); else -> L.t("hisab") } + (if (h.finalAt > 0) "  ✅" else ""), W - pad, 28 * u, tp(16 * u, true, Color.rgb(0xFF, 0xB7, 0x4D), Paint.Align.RIGHT))
         c?.drawText(dateText(h.time), W - pad, 47 * u, tp(11 * u, false, white, Paint.Align.RIGHT))
         c?.drawText("#" + (h.id % 100000), W - pad, 64 * u, tp(10 * u, false, Color.rgb(0xB0, 0xBE, 0xC5), Paint.Align.RIGHT))
         y = headH + 8 * u
@@ -78,6 +78,7 @@ object Bill {
         info("vehicle", h.vehicle)
         info("place", h.place)
         info("note", h.note)
+        if (h.finalAt > 0) info("final_s", dateText(h.finalAt))
         y += 4 * u
 
         fun section(t: String) {
@@ -92,8 +93,14 @@ object Bill {
         }
         fun rule() { c?.drawLine(pad, y, W - pad, y, lineP); y += 5 * u }
 
+        // lot: every vehicle
+        if (h.isLot && h.vehicles.isNotEmpty()) {
+            section(L.t("lot_veh") + " (" + h.vehicles.size + ")")
+            h.vehicles.forEachIndexed { i, v -> row("${i + 1}. " + v.info().ifBlank { "—" }, if (v.priceText.isNotBlank()) money(v.price) else "") }
+            y += 4 * u
+        }
         // 1. vehicle price
-        section((if (h.type == "haraji") L.t("buy_price") else L.t("price")).removePrefix("1. "))
+        section(when { h.isLot -> L.t("lot_price"); h.type == "haraji" -> L.t("buy_price"); else -> L.t("price") }.removePrefix("1. "))
         row(L.t("sum_price"), money(h.price), true)
         y += 4 * u
 
@@ -161,7 +168,16 @@ object Bill {
             y += 6 * u
         }
 
-        if (h.type == "haraji") {
+        if (h.isLot && h.sale != 0.0) {
+            section(L.t("lot_sale"))
+            row(L.t("lot_sale"), money(h.sale), true, green)
+            y += 6 * u
+        }
+        if (h.isCo) {
+            section(L.t("co_give"))
+            row(L.t("co_give"), money(h.sale), true, green)
+            y += 6 * u
+        } else if (h.type == "haraji") {
             section(L.t("sale").removePrefix("4. ").substringBefore(" ("))
             row(L.t("sale_s"), money(h.sale))
             if (h.maal.isNotEmpty()) row(L.t("sum_maal"), money(h.maalTotal()))
@@ -179,9 +195,15 @@ object Bill {
         c?.drawText(money(Math.abs(m)), W - pad - 12 * u, y + 34 * u, tp(22 * u, true, Color.WHITE, Paint.Align.RIGHT))
         y += boxH + 6 * u
         if (h.hasSplit()) {
-            listOf(h.mudiName.ifBlank { L.t("mudi") } to h.mudiPct, h.khedName.ifBlank { L.t("khed") } to h.khedPct).forEach { (n, p) ->
+            listOf(Triple(h.mudiName.ifBlank { L.t("mudi") } to h.mudiPct, h.mudiName, h.mudiAddCo), Triple(h.khedName.ifBlank { L.t("khed") } to h.khedPct, h.khedName, h.khedAddCo)).forEach { (np, raw, add) ->
+                val (n, p) = np
                 val v = m * p / 100
                 row(n + "  (" + plain(p) + "%)", (if (v >= 0) L.t("profit") else L.t("loss")) + "  " + money(Math.abs(v)), true, if (v >= 0) green else red)
+                if (h.inCompany(raw)) {
+                    val co = h.coShareOf(raw)
+                    row("    🏢 " + L.t("co_part"), (if (co >= 0) L.t("profit") else L.t("loss")) + "  " + money(Math.abs(co)), false, if (co >= 0) green else red)
+                    if (add) row("    = " + L.t("co_total"), money(v + co), true, if (v + co >= 0) green else red)
+                }
             }
             y += 4 * u
         }
@@ -190,7 +212,14 @@ object Bill {
         y += 18 * u
         if (h.type == "haraji" && h.partners.isNotEmpty()) {
             section(L.t("company").removePrefix("6. "))
-            val m2 = h.munafa()
+            val m2 = h.companyResult()
+            if (h.isCo) {
+                row(L.t("sum_maal"), money(h.maalTotal()))
+                row(L.t("co_give"), "- " + money(h.sale))
+                if (h.commission() != 0.0) row(L.t("comm_s"), "- " + money(h.commission()), false, Color.rgb(0xEF, 0x6C, 0x00))
+                row(L.t("co_result") + ": " + (if (m2 >= 0) L.t("profit") else L.t("loss")), money(Math.abs(m2)), true, if (m2 >= 0) green else red)
+                y += 4 * u
+            }
             val list = h.partners.map { Triple(it.name.ifBlank { "—" }, it.share, it) }
             val cSh = W * 0.42f
             val cIn = W * 0.64f
@@ -202,7 +231,7 @@ object Bill {
             y += 16 * u
             rule()
             val all = list.map { Triple(it.first, it.second, h.partnerLagat(it.third) to h.partnerMunafa(it.third)) } +
-                (if (h.ownerShare() > 0) listOf(Triple(L.t("owner_share"), h.ownerShare(), h.lagat() * h.ownerShare() / 100 to m2 * h.ownerShare() / 100)) else emptyList())
+                (if (h.ownerShare() > 0) listOf(Triple(L.t("owner_share"), h.ownerShare(), h.companyLagat() * h.ownerShare() / 100 to m2 * h.ownerShare() / 100)) else emptyList())
             all.forEach { (n, sh, v) ->
                 c?.drawText(TextUtils.ellipsize(n, tp(12.5f * u), cSh - pad - 30 * u, TextUtils.TruncateAt.END).toString(), pad, y + 13 * u, tp(12.5f * u))
                 c?.drawText(plain(sh), cSh, y + 13 * u, tp(12.5f * u, false, Color.rgb(0x21, 0x21, 0x21), Paint.Align.RIGHT))
@@ -307,6 +336,8 @@ object Bill {
         if (h.mudiName.isNotBlank() || h.mudiPct > 0) sb.append(L.t("mudi_h")).append(": ").append(h.mudiName).append(" (").append(plain(h.mudiPct)).append("%)\n")
         if (h.khedName.isNotBlank() || h.khedPct > 0) sb.append(L.t("khed_h")).append(": ").append(h.khedName).append(" (").append(plain(h.khedPct)).append("%)\n")
         if (h.vehicleInfo().isNotBlank()) sb.append(h.vehicleInfo()).append("\n")
+        if (h.isLot) h.vehicles.forEachIndexed { i, v -> sb.append(i + 1).append(". ").append(v.info()).append(if (v.priceText.isNotBlank()) " – " + money(v.price) else "").append("\n") }
+        if (h.finalAt > 0) sb.append("✅ ").append(L.t("final_s")).append(": ").append(dateText(h.finalAt)).append("\n")
         if (h.vehicle.isNotBlank()) sb.append(L.t("vehicle")).append(": ").append(h.vehicle).append("\n")
         if (h.place.isNotBlank()) sb.append(L.t("place").substringBefore(" (")).append(": ").append(h.place).append("\n")
         sb.append("\n").append(L.t("sum_price")).append(": ").append(money(h.price)).append("\n")
@@ -336,7 +367,10 @@ object Bill {
             if (h.maal.any { !it.fixed && it.litre }) sb.append(L.t("sum_ltr")).append(": ").append(plain(h.litre())).append(" litre\n")
             sb.append("*").append(L.t("sum_maal")).append(": ").append(money(h.maalTotal())).append("*\n")
         }
-        if (h.type == "haraji") {
+        if (h.isLot && h.sale != 0.0) sb.append("\n").append(L.t("lot_sale")).append(": ").append(money(h.sale)).append("\n")
+        if (h.isCo) {
+            sb.append("\n").append(L.t("co_give")).append(": ").append(money(h.sale)).append("\n")
+        } else if (h.type == "haraji") {
             sb.append("\n").append(L.t("sale_s")).append(": ").append(money(h.sale)).append("\n")
             sb.append(L.t("bikri")).append(": ").append(money(h.bikri())).append("\n")
             sb.append(L.t("comm_s")).append(": -").append(money(h.commission())).append("\n")
@@ -353,6 +387,8 @@ object Bill {
         if (h.denaBaaki() > 0) sb.append(L.t("dena_baaki")).append(": ").append(money(h.denaBaaki())).append("\n")
         if (h.type == "haraji" && h.partners.isNotEmpty()) {
             sb.append("\n_").append(L.t("company").removePrefix("6. ")).append("_\n")
+            val cr = h.companyResult()
+            if (h.isCo) sb.append(L.t("co_result")).append(": ").append(if (cr >= 0) L.t("profit") else L.t("loss")).append(" ").append(money(Math.abs(cr))).append("\n")
             h.partners.forEach { p ->
                 sb.append("• ").append(p.name).append(" (").append(plain(p.share)).append("%): ")
                     .append(L.t("invest")).append(" ").append(money(h.partnerLagat(p))).append(", ")
