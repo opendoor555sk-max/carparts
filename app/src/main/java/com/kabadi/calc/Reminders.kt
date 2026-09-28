@@ -44,7 +44,7 @@ object Reminders {
         val lena = due.filter { it.lena }
         val title = L.t("n_title") + " (" + due.size + ")"
         val text = due.take(6).joinToString("\n") { d ->
-            (if (d.lena) "⬇ " else "⬆ ") + (d.l.cName.ifBlank { d.h.party }) + " • " + d.l.name + " • " + money(d.left)
+            (if (d.lena) "⬇ " else "⬆ ") + (d.l.cName.ifBlank { d.h.party }) + " • " + L.ln(d.l) + " • " + money(d.left)
         }
         val open = PendingIntent.getActivity(ctx, 12, Intent(ctx, MainActivity::class.java).putExtra("khata", true)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)

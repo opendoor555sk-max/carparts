@@ -819,6 +819,27 @@ class MainActivity : Activity() {
         top.addView(more)
         body.addView(top, cardLp())
 
+        // ---- haraji / lot: credit time for everything, from the haraji day ----
+        if (h.type == "haraji" || h.isLot) {
+            val mc0 = card().apply { background = round(0xFFFFF3E0.toInt(), 12f, 0xFFFFCC80.toInt()) }
+            mc0.addView(heading(L.t("muddat_h"), ORANGE).apply { textSize = 15f })
+            var months = h.muddatText.endsWith("m")
+            val due = small("", ORANGE).apply { typeface = Typeface.DEFAULT_BOLD; textSize = 15f }
+            fun upd() { due.text = muddatEnd(h.time, h.muddatText)?.let { "→ " + L.t("due") + ": " + java.text.SimpleDateFormat("dd-MM-yyyy", java.util.Locale.US).format(java.util.Date(it)) } ?: "" }
+            val num = input("0", h.muddatText.removeSuffix("m"), true) { v -> h.muddatText = if (v.isBlank()) "" else v.trim() + (if (months) "m" else ""); upd() }
+                .apply { gravity = Gravity.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
+            val tog = toggle(listOf(L.t("din"), L.t("mahina")), if (months) 1 else 0, ORANGE) { i ->
+                months = i == 1
+                val v = num.text.toString().trim()
+                h.muddatText = if (v.isBlank()) "" else v + (if (months) "m" else ""); upd()
+            }
+            mc0.addView(row(num to 0.7f, tog to 1.4f))
+            mc0.addView(due)
+            mc0.addView(small(L.t("muddat_hint")))
+            upd()
+            body.addView(mc0, cardLp())
+        }
+
         // ---- lot hisab: one or more lots, each with vehicles + any items, own name and price ----
         lotTotals.clear()
         if (h.isLot) {
@@ -886,6 +907,10 @@ class MainActivity : Activity() {
                 .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
             val pc = card()
             pc.addView(row(input(L.t("place").substringBefore(" ("), h.place, false) { h.place = it } to 1f))
+            pc.addView(small(L.t("lot_price") + " – " + L.t("udhaar") + " / " + L.t("rokad_s")).apply { setPadding(0, dpi(6f), 0, 0) })
+            val lb = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            fun drawLb() { lb.removeAllViews(); payBlock(h, h.buyLine, false, lb) { drawLb() } }
+            drawLb(); pc.addView(lb)
             body.addView(pc, cardLp())
         }
 
@@ -908,7 +933,9 @@ class MainActivity : Activity() {
             text = (if (h.type == "haraji") L.t("buy_price") else L.t("price")).removePrefix("1. ")
             textSize = 15f; setTextColor(BLUE); typeface = Typeface.DEFAULT_BOLD
         } to 1f, priceIn to 1.2f).apply { setPadding(0, dpi(8f), 0, 0) })
-        if (!h.isLot) body.addView(vc, cardLp())
+        val buyBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun drawBuy() { buyBox.removeAllViews(); payBlock(h, h.buyLine, false, buyBox) { drawBuy() } }
+        if (!h.isLot) { drawBuy(); vc.addView(buyBox); body.addView(vc, cardLp()) }
 
         // 2. expenses
         val kc = card()
@@ -958,6 +985,9 @@ class MainActivity : Activity() {
             sc.addView(heading(L.t("lot_sale"), GREEN).apply { textSize = 15f })
             sc.addView(small(L.t("lot_sale_h")))
             sc.addView(input("₹", h.saleText, true) { h.saleText = it; refreshTotals() }, llp(MATCH_PARENT, WRAP_CONTENT))
+            val sb2 = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            fun drawS() { sb2.removeAllViews(); payBlock(h, h.saleLine, true, sb2) { drawS() } }
+            drawS(); sc.addView(sb2)
             body.addView(sc, cardLp())
         }
         if (h.type == "haraji") {
@@ -968,6 +998,9 @@ class MainActivity : Activity() {
             sc.addView(heading(if (h.coMode) L.t("co_give") else L.t("sale"), GREEN).apply { textSize = 15f; setPadding(0, dpi(8f), 0, dpi(4f)) })
             if (h.coMode) sc.addView(small(L.t("co_give_h")))
             sc.addView(input("₹", h.saleText, true) { h.saleText = it; refreshTotals() }, llp(MATCH_PARENT, WRAP_CONTENT))
+            val sb3 = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            fun drawS3() { sb3.removeAllViews(); payBlock(h, h.saleLine, true, sb3) { drawS3() } }
+            drawS3(); sc.addView(sb3)
             body.addView(sc, cardLp())
 
             // 5. market commission: % or fixed
@@ -1226,6 +1259,28 @@ class MainActivity : Activity() {
         return r
     }
 
+    /** credit days of one line (empty = the haraji's common time) and its due date */
+    private fun muddatRow(h: Hisab, l: Line): View {
+        val due = small("", ORANGE).apply { typeface = Typeface.DEFAULT_BOLD }
+        fun upd() { due.text = Bill.dueOf(h, l).let { if (it.isEmpty()) "" else "→ $it" } }
+        val hint = h.muddatText.let { if (it.isBlank()) "30" else if (it.endsWith("m")) it.dropLast(1) + " " + L.t("mahina") else it + " " + L.t("din") }
+        val r = row(small(if (h.type == "haraji" || h.isLot) L.t("muddat_own") else L.t("days")) to 1.2f,
+            input(hint, l.daysText, true) { l.daysText = it; upd() }.apply { gravity = Gravity.CENTER } to 0.8f, due to 1f)
+        upd()
+        return r
+    }
+
+    /** cash / credit for the vehicle price (we pay) or the sale (we get): name, mobile, credit time, installments */
+    private fun payBlock(h: Hisab, l: Line, lena: Boolean, box: LinearLayout, redraw: () -> Unit) {
+        box.addView(row(pill(L.t("rokad_s"), !l.udhaar, GREEN) { l.pay = "rokad"; redraw(); refreshTotals() } to 0f,
+            pill(L.t("udhaar"), l.udhaar, ORANGE) { l.pay = "udhaar"; redraw(); refreshTotals() } to 0f, View(this) to 1f).apply { setPadding(0, dpi(6f), 0, 0) })
+        if (!l.udhaar) return
+        box.addView(row(input("👤 " + L.t(if (lena) "get_from" else "pay_to"), l.cName, false) { l.cName = it }.apply { textSize = 15f } to 1.2f,
+            mobileInput("📞 " + L.t("cmobile"), l.cMobile) { l.cMobile = it } to 1f))
+        box.addView(muddatRow(h, l))
+        kistBlock(l, box, lena, redraw)
+    }
+
     /** installments on a credit line: list, + Kist, received / left */
     private fun kistBlock(l: Line, box: LinearLayout, lena: Boolean, redraw: () -> Unit) {
         val k = LinearLayout(this).apply {
@@ -1255,7 +1310,7 @@ class MainActivity : Activity() {
     private fun askKist(l: Line, done: () -> Unit) {
         val et = input(L.t("kist_amt"), plain(l.remaining()), true) {}
         val pad = LinearLayout(this).apply { setPadding(dpi(20f), dpi(8f), dpi(20f), 0); addView(et, llp(MATCH_PARENT, WRAP_CONTENT)) }
-        AlertDialog.Builder(this).setTitle(l.name + "  •  " + L.t("left") + " " + money(l.remaining())).setView(pad)
+        AlertDialog.Builder(this).setTitle(L.ln(l) + "  •  " + L.t("left") + " " + money(l.remaining())).setView(pad)
             .setPositiveButton(L.t("add")) { _, _ ->
                 val a = evalExpr(et.text.toString())
                 if (a.isFinite() && a > 0) { l.pays.add(Pay(System.currentTimeMillis(), et.text.toString())); done() }
@@ -1277,8 +1332,8 @@ class MainActivity : Activity() {
         if (dues.isNotEmpty()) body.addView(bigButton(L.t("send_list"), GREEN) {
             val sb = StringBuilder(Store.owner.ifBlank { L.t("app") }).append("\n").append(L.t("khata")).append("\n\n")
             dues.forEach { d ->
-                sb.append(if (d.lena) "⬇ " else "⬆ ").append(if (d.lena) d.l.cName.ifBlank { hTitle(d.h) } else d.l.name)
-                    .append(" • ").append(d.l.name).append(" • ").append(money(d.left))
+                sb.append(if (d.lena) "⬇ " else "⬆ ").append(d.l.cName.ifBlank { if (d.lena) hTitle(d.h) else L.ln(d.l) })
+                    .append(" • ").append(L.ln(d.l)).append(" • ").append(money(d.left))
                 d.due?.let { sb.append(" • ").append(L.t("due")).append(" ").append(Bill.dateText(it).substringBefore("  ")) }
                 sb.append("\n")
             }
@@ -1293,7 +1348,7 @@ class MainActivity : Activity() {
             val c = card()
             val top = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
             top.addView(TextView(this).apply {
-                text = (if (d.lena) "⬇ " else "⬆ ") + (if (d.lena) d.l.cName.ifBlank { hTitle(d.h) } else d.l.name).ifBlank { "—" }
+                text = (if (d.lena) "⬇ " else "⬆ ") + d.l.cName.ifBlank { if (d.lena) hTitle(d.h) else L.ln(d.l) }.ifBlank { "—" }
                 textSize = 17f; setTextColor(INK); typeface = Typeface.DEFAULT_BOLD; maxLines = 1
             }, llp(0, WRAP_CONTENT, 1f))
             top.addView(TextView(this).apply { text = money(d.left); textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (d.lena) GREEN else RED) })
@@ -1304,7 +1359,7 @@ class MainActivity : Activity() {
                 d.due <= today -> "⚠ " + L.t("today")
                 else -> L.t("due") + ": " + Bill.dateText(d.due).substringBefore("  ")
             }
-            c.addView(small(listOf(d.l.name, hTitle(d.h), status).filter { it.isNotBlank() }.joinToString("  •  "),
+            c.addView(small(listOf(L.ln(d.l), hTitle(d.h), status).filter { it.isNotBlank() }.joinToString("  •  "),
                 if (status.startsWith("⚠")) RED else MUTED))
             val acts = LinearLayout(this).apply { setPadding(0, dpi(6f), 0, 0) }
             fun act(t: String, color: Int, a: () -> Unit) = acts.addView(TextView(this).apply {
@@ -1323,7 +1378,8 @@ class MainActivity : Activity() {
     private fun reminderText(d: Due): String {
         val sb = StringBuilder()
         sb.append(Store.owner.ifBlank { L.t("app") }).append("\n")
-        sb.append(d.l.name).append(": ").append(money(d.l.value())).append("\n")
+        sb.append(L.ln(d.l)).append(": ").append(money(d.l.value())).append("\n")
+        if (d.h.vehicleInfo().isNotBlank()) sb.append(d.h.vehicleInfo()).append("\n")
         if (d.l.pays.isNotEmpty()) sb.append(L.t("got")).append(": ").append(money(d.l.received())).append("\n")
         sb.append("*").append(L.t("left")).append(": ").append(money(d.left)).append("*\n")
         d.due?.let { sb.append(L.t("due")).append(": ").append(Bill.dateText(it).substringBefore("  ")).append("\n") }
@@ -1375,7 +1431,7 @@ class MainActivity : Activity() {
             mobileInput("📞 " + L.t("cmobile"), l.cMobile) { l.cMobile = it } to 1f,
             pill(L.t("udhaar"), l.udhaar, ORANGE) { l.pay = if (l.udhaar) "rokad" else "udhaar"; redraw(); refreshTotals() } to 0f))
         if (l.udhaar) {
-            who.addView(row(small(L.t("days")) to 1f, input("30", l.daysText, true) { l.daysText = it }.apply { gravity = Gravity.CENTER } to 0.6f))
+            who.addView(muddatRow(h, l))
             kistBlock(l, who, true, redraw)
         }
         if (h.type == "haraji") {
@@ -1396,7 +1452,7 @@ class MainActivity : Activity() {
         sb.append(money(l.value())).append("\n")
         if (l.udhaar) {
             sb.append(L.t("udhaar"))
-            if (l.daysText.isNotBlank()) sb.append(" • ").append(L.t("due")).append(": ").append(Bill.dueDate(h.time, l.daysText))
+            if (Bill.dueOf(h, l).isNotEmpty()) sb.append(" • ").append(L.t("due")).append(": ").append(Bill.dueOf(h, l))
             sb.append("\n")
         } else sb.append(L.t("rokad")).append("\n")
         return sb.toString()

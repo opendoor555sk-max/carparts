@@ -206,4 +206,29 @@ class ModelTest {
         assertTrue(RFilter(who = "lokhand").matches(h))
         assertEquals(2, h.allVehicles().size)
     }
+
+    @Test fun harajiMuddat() {
+        val day = java.util.Calendar.getInstance().apply { set(2026, 8, 28, 10, 0, 0) }.timeInMillis
+        val h = Hisab(1, day, type = "haraji", priceText = "300000", saleText = "350000", muddatText = "2m")
+        val body = Line("body", "Body", true, amountText = "50000", pay = "udhaar")
+        val oil = Line("oil", "Oil", true, amountText = "1000", pay = "udhaar", daysText = "15")
+        h.maal.add(body); h.maal.add(oil)
+        val c = java.util.Calendar.getInstance().apply { timeInMillis = dueTime(h, body)!! }
+        assertEquals(10, c.get(java.util.Calendar.MONTH))             // 28 Sep + 2 months = 28 Nov
+        assertEquals(28, c.get(java.util.Calendar.DAY_OF_MONTH))
+        assertEquals(day + 15L * 86400000L, dueTime(h, oil))           // own time wins
+        assertEquals(day + 30L * 86400000L, muddatEnd(day, "30"))
+        // vehicle bought on credit, auction sale on credit
+        h.buyLine.pay = "udhaar"; h.saleLine.pay = "udhaar"; h.saleLine.cName = "Asif"
+        assertEquals(300000.0, h.buyLine.value(), 1e-9)
+        h.priceText = "310000"
+        assertEquals(310000.0, h.buyLine.remaining(), 1e-9)          // follows the price
+        h.saleLine.pays.add(Pay(day, "100000"))
+        val d = openDues(listOf(h))
+        assertEquals(250000.0, d.first { it.l.key == "sale" }.left, 1e-9)
+        assertTrue(d.first { it.l.key == "sale" }.lena)
+        assertFalse(d.first { it.l.key == "veh" }.lena)
+        h.finalAt = day
+        assertEquals(1, lockState(h, day + 3600000L))
+    }
 }

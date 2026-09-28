@@ -29,6 +29,8 @@ class Line(
     /** installments received / paid on a credit line */
     val pays: MutableList<Pay> = mutableListOf()
 ) {
+    /** for the vehicle price / auction sale lines: value comes from the hisab */
+    var calc: (() -> Double)? = null
     /** money already received / paid on this credit line */
     fun received(): Double = if (paid) value() else pays.sumOf { it.amount }
     /** still to receive / to pay (0 for cash lines) */
@@ -37,7 +39,7 @@ class Line(
     val kg get() = evalExpr(kgText).let { if (it.isFinite()) it else 0.0 }
     val rate get() = evalExpr(rateText).let { if (it.isFinite()) it else 0.0 }
     val amount get() = evalExpr(amountText).let { if (it.isFinite()) it else 0.0 }
-    fun value(): Double = if (fixed) amount else kg * rate
+    fun value(): Double = calc?.invoke() ?: if (fixed) amount else kg * rate
 }
 
 /** a partner in the "company": share in paise (1 paisa = 1 %) */
@@ -103,8 +105,15 @@ class Hisab(
     var mudiAddCo: Boolean = false,
     var khedAddCo: Boolean = false,
     /** when "Final" was pressed (0 = still open) */
-    var finalAt: Long = 0L
+    var finalAt: Long = 0L,
+    /** haraji / lot: credit time for everything, counted from the haraji day: "30" days or "2m" months */
+    var muddatText: String = ""
 ) {
+    /** vehicle bought on credit (we pay) and auction / company sale on credit (we get) */
+    var buyLine = Line("veh", "", true)
+    var saleLine = Line("sale", "", true)
+    fun bind() { buyLine.calc = { price }; saleLine.calc = { sale } }
+    init { bind() }
     val isLot get() = type == "lot"
     val isCo get() = type == "haraji" && coMode
     fun allVehicles() = vehicles + lots.flatMap { it.vehicles }
@@ -315,10 +324,22 @@ val BRANDS = listOf("Tata", "Ashok Leyland", "Mahindra", "Eicher", "BharatBenz",
 val TYRES = listOf("4", "6", "8", "10", "12", "14", "16")
 
 /** credit due date: entry time + credit days (null when no days given) */
+/** "30" = 30 days, "2m" / "2 mahina" = 2 months (calendar), from [start] */
+fun muddatEnd(start: Long, text: String): Long? {
+    val t = text.trim().lowercase()
+    if (t.isEmpty()) return null
+    val months = t.endsWith("m") || t.contains("mah") || t.contains("मही") || t.contains("મહિ")
+    val n = evalExpr(t.filter { it.isDigit() || it == '.' })
+    if (!n.isFinite() || n < 0) return null
+    if (months) return java.util.Calendar.getInstance().apply { timeInMillis = start; add(java.util.Calendar.MONTH, n.toInt()) }.timeInMillis
+    return start + (n * 86400000L).toLong()
+}
+
+/** a line's own credit time, else the haraji's common one */
+fun lineMuddat(h: Hisab, l: Line) = l.daysText.ifBlank { if (l.udhaar) h.muddatText else "" }
+
 fun dueTime(h: Hisab, l: Line): Long? {
-    val d = evalExpr(l.daysText)
-    if (l.daysText.isBlank() || !d.isFinite()) return null
-    return h.time + (d * 86400000L).toLong()
+    return muddatEnd(h.time, lineMuddat(h, l))
 }
 
 /** one open credit: who owes whom, how much is left, when it is due */
@@ -329,6 +350,8 @@ fun openDues(all: List<Hisab>): List<Due> {
     val out = mutableListOf<Due>()
     all.forEach { h ->
         h.maal.filter { it.udhaar && it.remaining() > 0.004 }.forEach { out.add(Due(h, it, true, it.remaining(), dueTime(h, it))) }
+        h.buyLine.let { if (it.udhaar && it.remaining() > 0.004) out.add(Due(h, it, false, it.remaining(), dueTime(h, it))) }
+        h.saleLine.let { if (it.udhaar && it.remaining() > 0.004) out.add(Due(h, it, true, it.remaining(), dueTime(h, it))) }
         h.kharch.filter { it.udhaar && it.remaining() > 0.004 }.forEach { out.add(Due(h, it, false, it.remaining(), dueTime(h, it))) }
     }
     return out.sortedWith(compareBy({ it.due ?: Long.MAX_VALUE }, { -it.left }))
@@ -337,7 +360,7 @@ fun openDues(all: List<Hisab>): List<Due> {
 /** 0 = open, 1 = final (admin PIN can open it), 2 = locked for ever (credit time over / haraji after 48 h) */
 fun lockState(h: Hisab, now: Long = System.currentTimeMillis()): Int {
     if (h.finalAt == 0L) return 0
-    val dueOver = (h.maal + h.kharch).any { l -> l.udhaar && (dueTime(h, l) ?: Long.MAX_VALUE) < now }
+    val dueOver = (h.maal + h.kharch + h.buyLine + h.saleLine).any { l -> l.udhaar && (dueTime(h, l) ?: Long.MAX_VALUE) < now }
     if (dueOver) return 2
     if (h.type == "haraji" && now > h.finalAt + 48L * 3600_000L) return 2
     return 1

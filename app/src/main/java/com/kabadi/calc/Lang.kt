@@ -282,8 +282,22 @@ object L {
         "item_name" to arrayOf("Item name (scrap, tyre …)", "चीज़ का नाम (भंगार, टायर …)", "વસ્તુનું નામ (ભંગાર, ટાયર …)"),
         "this_lot_price" to arrayOf("This lot's price", "इस लॉट की कीमत", "આ લોટની કિંમત"),
         "add_lot" to arrayOf("+ Add another lot", "+ दूसरा लॉट जोड़ें", "+ બીજો લોટ ઉમેરો"),
+        "due_veh" to arrayOf("Vehicle purchase", "गाड़ी खरीदी", "ગાડી ખરીદી"),
+        "due_sale" to arrayOf("Auction / company sale", "हराजी / कंपनी बिक्री", "હરાજી / કંપની વેચાણ"),
+        "muddat_h" to arrayOf("⏳ Credit time (from the haraji day)", "⏳ उधार की मुद्दत (हराजी के दिन से)", "⏳ ઉધારની મુદત (હરાજીના દિવસથી)"),
+        "muddat_hint" to arrayOf("Applies to every credit item that has no own time", "जिस माल की अपनी मुद्दत नहीं, उस पर यही लगेगी", "જે માલની પોતાની મુદત નથી, તેના પર આ જ લાગશે"),
+        "muddat_s" to arrayOf("Credit time", "उधार मुद्दत", "ઉધાર મુદત"),
+        "din" to arrayOf("Days", "दिन", "દિવસ"),
+        "mahina" to arrayOf("Months", "महीने", "મહિના"),
+        "pay_to" to arrayOf("Pay to (name)", "किसको देना (नाम)", "કોને આપવાના (નામ)"),
+        "get_from" to arrayOf("Get from (name)", "किससे लेना (नाम)", "કોની પાસેથી લેવાના (નામ)"),
+        "rokad_s" to arrayOf("Cash", "रोकड़", "રોકડ"),
+        "muddat_own" to arrayOf("Days (empty = haraji time)", "दिन (खाली = हराजी मुद्दत)", "દિવસ (ખાલી = હરાજી મુદત)"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 
     fun t(k: String): String = T[k]?.get(lang) ?: k
+
+    /** name of a credit line (vehicle price / auction sale have no typed name) */
+    fun ln(l: Line): String = when (l.key) { "veh" -> "🚚 " + t("due_veh"); "sale" -> "🔨 " + t("due_sale"); else -> l.name }
 }

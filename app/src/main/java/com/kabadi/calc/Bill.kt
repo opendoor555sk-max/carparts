@@ -26,6 +26,13 @@ object Bill {
 
     fun dateText(t: Long): String = SimpleDateFormat("dd-MM-yyyy  hh:mm a", Locale.US).format(Date(t))
 
+    /** due date of a credit line ("" if none) */
+    fun dueOf(h: Hisab, l: Line): String = dueTime(h, l)?.let { SimpleDateFormat("dd-MM-yyyy", Locale.US).format(Date(it)) } ?: ""
+
+    /** "Udhaar • name • due 28-10-2026 • left ₹" for the vehicle price / sale line */
+    fun credit(h: Hisab, l: Line): String = if (!l.udhaar) "" else listOf(L.t("udhaar"), l.cName, dueOf(h, l).let { if (it.isEmpty()) "" else L.t("due") + " " + it },
+        if (l.remaining() < 0.005) L.t("chukaya") else if (l.received() > 0) L.t("left") + " " + money(l.remaining()) else "").filter { it.isNotBlank() }.joinToString(" • ")
+
     /** sale date + credit days */
     fun dueDate(t: Long, days: String): String {
         val d = evalExpr(days).let { if (it.isFinite()) it else 0.0 }
@@ -79,6 +86,8 @@ object Bill {
         info("place", h.place)
         info("note", h.note)
         if (h.finalAt > 0) info("final_s", dateText(h.finalAt))
+        if (h.muddatText.isNotBlank()) info("muddat_s", h.muddatText.let { t -> if (t.endsWith("m")) t.dropLast(1) + " " + L.t("mahina") else t + " " + L.t("din") } +
+            (muddatEnd(h.time, h.muddatText)?.let { "  →  " + SimpleDateFormat("dd-MM-yyyy", Locale.US).format(Date(it)) } ?: ""))
         y += 4 * u
 
         fun section(t: String) {
@@ -106,6 +115,7 @@ object Bill {
         // 1. vehicle price
         section(when { h.isLot -> L.t("lot_price"); h.type == "haraji" -> L.t("buy_price"); else -> L.t("price") }.removePrefix("1. "))
         row(L.t("sum_price"), money(h.price), true)
+        credit(h, h.buyLine).let { if (it.isNotEmpty()) row("   ⏳ " + it, "", false, red, 11f) }
         y += 4 * u
 
         // 2. expenses
@@ -150,7 +160,7 @@ object Bill {
                 if (h.role == "seller") {
                     val mob = l.cMobile.filter { it.isDigit() }
                     val plainRokad = !l.udhaar && l.cName.isBlank() && mob.length < 10 && l.gName.isBlank() && l.gMobile.isBlank() && l.shop.isBlank()
-                    val who = if (plainRokad) "" else listOf(l.cName, if (mob.length >= 10) "📞 " + mob else "", if (l.udhaar) L.t("udhaar") + (if (l.daysText.isNotBlank()) " • " + L.t("due") + " " + dueDate(h.time, l.daysText) else "") +
+                    val who = if (plainRokad) "" else listOf(l.cName, if (mob.length >= 10) "📞 " + mob else "", if (l.udhaar) L.t("udhaar") + (if (dueOf(h, l).isNotEmpty()) " • " + L.t("due") + " " + dueOf(h, l) else "") +
                         (if (l.pays.isNotEmpty()) " • " + L.t("got") + " " + money(l.received()) + " • " + L.t("left") + " " + money(l.remaining()) else "") else L.t("rokad"),
                         if (l.gName.isNotBlank() || l.gMobile.isNotBlank()) L.t("gname").substringBefore(" (") + ": " + (l.gName + " " + l.gMobile).trim() else "",
                         if (l.shop.isNotBlank()) L.t("shop") + " " + l.shop else "").filter { it.isNotBlank() }.joinToString("  •  ")
@@ -175,15 +185,18 @@ object Bill {
         if (h.isLot && h.sale != 0.0) {
             section(L.t("lot_sale"))
             row(L.t("lot_sale"), money(h.sale), true, green)
+            credit(h, h.saleLine).let { if (it.isNotEmpty()) row("   ⏳ " + it, "", false, Color.rgb(0xEF, 0x6C, 0x00), 11f) }
             y += 6 * u
         }
         if (h.isCo) {
             section(L.t("co_give"))
             row(L.t("co_give"), money(h.sale), true, green)
+            credit(h, h.saleLine).let { if (it.isNotEmpty()) row("   ⏳ " + it, "", false, Color.rgb(0xEF, 0x6C, 0x00), 11f) }
             y += 6 * u
         } else if (h.type == "haraji") {
             section(L.t("sale").removePrefix("4. ").substringBefore(" ("))
             row(L.t("sale_s"), money(h.sale))
+            credit(h, h.saleLine).let { if (it.isNotEmpty()) row("   ⏳ " + it, "", false, Color.rgb(0xEF, 0x6C, 0x00), 11f) }
             if (h.maal.isNotEmpty()) row(L.t("sum_maal"), money(h.maalTotal()))
             row(L.t("bikri"), money(h.bikri()), true, green)
             row(L.t("comm_s") + (if (h.commPct) " (" + plain(evalExpr(h.commText).let { if (it.isFinite()) it else 0.0 }) + "%)" else ""), "- " + money(h.commission()), false, Color.rgb(0xEF, 0x6C, 0x00))
@@ -351,6 +364,7 @@ object Bill {
         if (h.vehicle.isNotBlank()) sb.append(L.t("vehicle")).append(": ").append(h.vehicle).append("\n")
         if (h.place.isNotBlank()) sb.append(L.t("place").substringBefore(" (")).append(": ").append(h.place).append("\n")
         sb.append("\n").append(L.t("sum_price")).append(": ").append(money(h.price)).append("\n")
+        credit(h, h.buyLine).let { if (it.isNotEmpty()) sb.append("⏳ ").append(it).append("\n") }
         if (h.kharch.isNotEmpty()) {
             sb.append("\n_").append(L.t("kharch").substringBefore(" (").removePrefix("2. ")).append("_\n")
             h.kharch.forEach {
@@ -369,7 +383,7 @@ object Bill {
                 sb.append(money(it.value()))
                 if (h.role == "seller" && (it.cName.isNotBlank() || it.udhaar)) {
                     sb.append(" → ").append(it.cName)
-                    if (it.udhaar) sb.append(" (").append(L.t("udhaar")).append(if (it.daysText.isNotBlank()) ", " + L.t("due") + " " + dueDate(h.time, it.daysText) else "").append(")")
+                    if (it.udhaar) sb.append(" (").append(L.t("udhaar")).append(if (dueOf(h, it).isNotEmpty()) ", " + L.t("due") + " " + dueOf(h, it) else "").append(")")
                 }
                 sb.append("\n")
             }
@@ -380,8 +394,10 @@ object Bill {
         if (h.isLot && h.sale != 0.0) sb.append("\n").append(L.t("lot_sale")).append(": ").append(money(h.sale)).append("\n")
         if (h.isCo) {
             sb.append("\n").append(L.t("co_give")).append(": ").append(money(h.sale)).append("\n")
+            credit(h, h.saleLine).let { if (it.isNotEmpty()) sb.append("⏳ ").append(it).append("\n") }
         } else if (h.type == "haraji") {
             sb.append("\n").append(L.t("sale_s")).append(": ").append(money(h.sale)).append("\n")
+            credit(h, h.saleLine).let { if (it.isNotEmpty()) sb.append("⏳ ").append(it).append("\n") }
             sb.append(L.t("bikri")).append(": ").append(money(h.bikri())).append("\n")
             sb.append(L.t("comm_s")).append(": -").append(money(h.commission())).append("\n")
         }

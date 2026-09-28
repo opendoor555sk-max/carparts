@@ -122,6 +122,7 @@ object Store {
             .put("ro", h.role).put("br", h.brand).put("va", h.variant).put("tr", h.tyres).put("yr", h.year).put("pl", h.place)
             .put("mn", h.mudiName).put("mm", h.mudiMobile).put("mp", h.mudiPctText)
             .put("kn", h.khedName).put("km", h.khedMobile).put("kp", h.khedPctText)
+            .put("mu", h.muddatText).put("bl", lj(h.buyLine)).put("sl", lj(h.saleLine))
             .put("cmo", h.coMode).put("mac", h.mudiAddCo).put("kac", h.khedAddCo).put("fin", h.finalAt)
         o.put("vh", vj(h.vehicles))
         o.put("lt", JSONArray().also { a -> h.lots.forEach { t ->
@@ -139,7 +140,10 @@ object Store {
             year = o.optString("yr"), place = o.optString("pl"),
             mudiName = o.optString("mn"), mudiMobile = o.optString("mm"), mudiPctText = o.optString("mp"),
             khedName = o.optString("kn"), khedMobile = o.optString("km"), khedPctText = o.optString("kp"),
-            coMode = o.optBoolean("cmo"), mudiAddCo = o.optBoolean("mac"), khedAddCo = o.optBoolean("kac"), finalAt = o.optLong("fin"))
+            muddatText = o.optString("mu"), coMode = o.optBoolean("cmo"), mudiAddCo = o.optBoolean("mac"), khedAddCo = o.optBoolean("kac"), finalAt = o.optLong("fin"))
+        o.optJSONObject("bl")?.let { h.buyLine = jl(it) }
+        o.optJSONObject("sl")?.let { h.saleLine = jl(it) }
+        h.bind()
         o.optJSONArray("vh")?.let { h.vehicles.addAll(jv(it)) }
         o.optJSONArray("lt")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { t ->
             val lot = Lot(t.optString("n"), t.optString("p"))
