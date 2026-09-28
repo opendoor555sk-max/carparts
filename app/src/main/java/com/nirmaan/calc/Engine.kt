@@ -153,6 +153,8 @@ class Engine(val ui: Ui) {
     var mach = false                          // true = Machinist calculator keypad (Switch key)
     val mv = mutableMapOf<String, Double>()   // machinist memories (SI units: m, m/min, m/rev ...)
     val triOrder = mutableListOf<String>()    // machinist triangle: order values were entered
+    /** last hidden crash inside a key (shown as Error); used by the self-test */
+    var lastError: Throwable? = null
     var mKey = ""                             // machinist: key pressed last (for repeated-press cycles)
     var mStep = 0
     val sizes = mutableMapOf<String, MutableList<Pair<Double, Double>>>()
@@ -1479,6 +1481,7 @@ class Engine(val ui: Ui) {
         try {
             handle(n, md)
         } catch (ex: Exception) {
+            lastError = ex
             set(Q.ERR)
         }
         after(n)

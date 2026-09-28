@@ -443,4 +443,80 @@ class EngineTest {
         e.mach = false
         assertEquals("Rise", e.keyText(0, 0))
     }
+
+    // ---------------- Self-test: every key, both calculators, many situations ----------------
+    private fun typeSeq(seq: String) {
+        for (t in seq.split(' ')) {
+            if (t.isEmpty()) continue
+            if (t.startsWith("^")) { pressLabel("Conv"); pressLabel(t.substring(1).replace('_', ' ')) }
+            else if (t.length > 1 && t.all { it.isDigit() || it == '.' }) t.forEach { pressLabel(it.toString()) }
+            else pressLabel(t.replace('_', ' '))
+        }
+    }
+
+    /** runs a form's calculation with its default values and with every option */
+    private fun checkForm(where: String, errors: MutableList<String>) {
+        val sp = ui.spec ?: return
+        val segs = sp.seg ?: listOf(null)
+        val segs2 = sp.seg2 ?: listOf(null)
+        for (a in segs) for (b in segs2) {
+            val sel = if (sp.seg2 != null) (a ?: "") + "|" + (b ?: "") else a
+            try {
+                val rows = formRows(null, sel)
+                if (rows.isEmpty()) errors.add("$where [form ${sp.title} / $sel]: khali result")
+            } catch (t: Throwable) {
+                errors.add("$where [form ${sp.title} / $sel]: " + t)
+            }
+        }
+    }
+
+    @Test fun selfTestEveryKey() {
+        val errors = mutableListOf<String>()
+        val nirmaanStarts = listOf("", "5", "3 Feet 6 Inches", "1 2 Feet Rise 1 5 Feet Run 1 0 Feet Length 8 Feet Width 9 Feet Height 7",
+            "2 ^m Circle 4 5 Arc 3", "1 0 Yards Yards Yards", "2 5 %", "1 0 +")
+        val machStarts = listOf("", "5", "3 Inch", ".5 Diam 300 Cut_Speed 4 #Teeth .002 Feed/Tooth",
+            "8 Thread_Size 32 Thread_Size", "3 Adj_(x) 4 Opp_(y) 20 Angle_(Ø) 3.5 Diam 6 Bolt_Pattern", "1 / 4 Inch Thread_Size 20 Thread_Size ^Thread_Class ^Thread_Class",
+            "10 + ")
+        var checked = 0
+        for (mach in listOf(false, true)) for (metric in listOf(false, true)) {
+            val starts = if (mach) machStarts else nirmaanStarts
+            for (start in starts) for (conv in listOf(false, true)) for (r in 0 until 8) for (c in 0 until 5) {
+                ui = FakeUi(); e = Engine(ui)
+                e.mach = mach; e.metric = metric
+                val where = (if (mach) "Machinist" else "Nirmaan") + (if (metric) "/Metric" else "/US") + " start='" + start + "'"
+                try {
+                    if (!mach && metric) { /* metric keypad shows m/cm/mm on the unit row */ }
+                    typeSeq(if (mach || !metric) start else start.replace("^m", "m").replace("Feet", "m").replace("Inches", "cm").replace("Yards", "m"))
+                } catch (t: Throwable) {
+                    errors.add("$where: start failed: $t"); continue
+                }
+                val label = e.keyDef(r, c).let { if (conv && it.conv.isNotEmpty()) it.conv else it.main }
+                if (conv && e.keyDef(r, c).conv.isEmpty()) continue
+                if (label == "Conv") continue
+                val w = "$where key=" + (if (conv) "Conv+" else "") + label
+                try {
+                    repeat(3) { i ->
+                        ui.spec = null
+                        e.lastError = null
+                        if (conv) e.conv = true
+                        e.press(r, c)
+                        e.lastError?.let { errors.add("$w (press ${i + 1}): $it") }
+                        e.display(); e.displayLabel(); e.tag()
+                        for (rr in 0 until 8) for (cc in 0 until 5) { e.keyText(rr, cc); e.keyTop(rr, cc) }
+                        checkForm(w, errors)
+                    }
+                    // then use the result in a sum
+                    e.lastError = null
+                    typeSeq("+ 2 =")
+                    e.lastError?.let { errors.add("$w (+2=): $it") }
+                    checked++
+                } catch (t: Throwable) {
+                    errors.add("$w CRASH: $t")
+                }
+            }
+        }
+        println("SELFTEST checked=$checked errors=${errors.size}")
+        errors.take(60).forEach { println("SELFTEST ERR: $it") }
+        assertTrue("Self-test found ${errors.size} problems:\n" + errors.take(40).joinToString("\n"), errors.isEmpty())
+    }
 }
