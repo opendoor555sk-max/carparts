@@ -62,7 +62,7 @@ class Lot(var name: String = "", var priceText: String = "", val vehicles: Mutab
     fun kg() = items.filter { !it.fixed && !it.litre }.sumOf { it.kg }
 }
 
-class Partner(var name: String, var shareText: String = "") {
+class Partner(var name: String, var shareText: String = "", var mobile: String = "", var done: Boolean = false) {
     val share get() = evalExpr(shareText).let { if (it.isFinite() && it > 0) it else 0.0 }
 }
 
@@ -472,4 +472,39 @@ fun buyerLines(h: Hisab, key: String): List<Line> =
 fun thisMonth(all: List<Hisab>, now: Long = System.currentTimeMillis()): MonthSum? {
     val c = java.util.Calendar.getInstance().apply { timeInMillis = now }
     return monthly(all, RFilter(year = c.get(java.util.Calendar.YEAR), month = c.get(java.util.Calendar.MONTH) + 1)).firstOrNull()
+}
+
+/** haraji: names whose 10-digit mobile is missing (buyers of items / vehicle, company partners) */
+fun missingMobile(h: Hisab): List<String> {
+    if (h.type != "haraji") return emptyList()
+    val out = mutableListOf<String>()
+    h.maal.filter { it.value() != 0.0 && digits10(it.cMobile).length != 10 }.forEach { out.add(it.name.ifBlank { "?" } + " → " + it.cName.ifBlank { "?" }) }
+    if (!h.isCo && h.sale != 0.0 && digits10(h.saleLine.cMobile).length != 10) out.add("sale → " + h.saleLine.cName.ifBlank { "?" })
+    h.partners.filter { (it.name.isNotBlank() || it.share > 0) && digits10(it.mobile).length != 10 }.forEach { out.add("🏢 " + it.name.ifBlank { "?" }) }
+    return out
+}
+
+/** one person to remind today: money to collect (buyer) or a partner's share to settle */
+class Remind(val h: Hisab, val name: String, val mobile: String, val amount: Double, val due: Long,
+             val line: Line? = null, val partner: Partner? = null) {
+    val key get() = partyKey(name, mobile)
+}
+
+/** everything whose credit time ends within [before] days (or is over) and is not paid: remind every day */
+fun reminders(all: List<Hisab>, now: Long = System.currentTimeMillis(), before: Int = 3): List<Remind> {
+    val limit = now + before * 86400000L
+    val out = mutableListOf<Remind>()
+    all.forEach { h ->
+        if (h.role == "seller" || h.type == "haraji" || h.isLot) (h.maal + h.saleLine).forEach { l ->
+            val d = dueTime(h, l)
+            if (l.udhaar && l.remaining() > 0.004 && d != null && d <= limit) out.add(Remind(h, l.cName, digits10(l.cMobile), l.remaining(), d, line = l))
+        }
+        if (h.type == "haraji" && h.partners.isNotEmpty()) {
+            val d = muddatEnd(h.time, h.muddatText)
+            if (d != null && d <= limit) h.partners.filter { !it.done && Math.abs(h.partnerMunafa(it)) > 0.004 }.forEach { p ->
+                out.add(Remind(h, p.name, digits10(p.mobile), h.partnerMunafa(p), d, partner = p))
+            }
+        }
+    }
+    return out.sortedBy { it.due }
 }

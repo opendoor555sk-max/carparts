@@ -127,7 +127,7 @@ object Store {
         o.put("vh", vj(h.vehicles))
         o.put("lt", JSONArray().also { a -> h.lots.forEach { t ->
             a.put(JSONObject().put("n", t.name).put("p", t.priceText).put("vh", vj(t.vehicles)).put("it", JSONArray().also { b -> t.items.forEach { b.put(lj(it)) } })) } })
-        o.put("pa", JSONArray().also { a -> h.partners.forEach { a.put(JSONObject().put("n", it.name).put("s", it.shareText)) } })
+        o.put("pa", JSONArray().also { a -> h.partners.forEach { a.put(JSONObject().put("n", it.name).put("s", it.shareText).put("m", it.mobile).put("d", it.done)) } })
         o.put("k", JSONArray().also { a -> h.kharch.forEach { a.put(lj(it)) } })
         o.put("m", JSONArray().also { a -> h.maal.forEach { a.put(lj(it)) } })
         return o
@@ -154,7 +154,7 @@ object Store {
         if (h.isLot && h.lots.isEmpty() && h.vehicles.isNotEmpty()) {
             h.lots.add(Lot("Lot 1", h.priceText, h.vehicles.toMutableList())); h.vehicles.clear(); h.priceText = ""
         }
-        o.optJSONArray("pa")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { h.partners.add(Partner(it.optString("n"), it.optString("s"))) } }
+        o.optJSONArray("pa")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { h.partners.add(Partner(it.optString("n"), it.optString("s"), it.optString("m"), it.optBoolean("d"))) } }
         o.optJSONArray("k")?.let { a -> for (i in 0 until a.length()) h.kharch.add(jl(a.getJSONObject(i))) }
         o.optJSONArray("m")?.let { a -> for (i in 0 until a.length()) h.maal.add(jl(a.getJSONObject(i))) }
         return h

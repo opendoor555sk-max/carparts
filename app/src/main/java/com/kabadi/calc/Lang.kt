@@ -305,6 +305,19 @@ object L {
         "party_send" to arrayOf("Send pending", "बाकी भेजें", "બાકી મોકલો"),
         "items_s" to arrayOf("items", "चीज़ें", "વસ્તુ"),
         "this_month" to arrayOf("This month", "इस महीने", "આ મહિને"),
+        "mob_need" to arrayOf("Mobile number is required", "मोबाइल नंबर ज़रूरी है", "મોબાઇલ નંબર ફરજિયાત છે"),
+        "rem_t" to arrayOf("Collection reminders", "वसूली याद", "વસૂલી યાદ"),
+        "rem_h" to arrayOf("From 3 days before the credit time, every day until paid.", "मुद्दत के 3 दिन पहले से, रोज़, जब तक चुकता न हो।", "મુદતના 3 દિવસ પહેલાથી, રોજ, ચૂકતે ન થાય ત્યાં સુધી."),
+        "rem_banner" to arrayOf("to remind today (vasuli)", "को आज याद दिलाना (वसूली)", "ને આજે યાદ આપવાની (વસૂલી)"),
+        "rem_tap" to arrayOf("Tap to send WhatsApp / SMS", "WhatsApp / SMS भेजने के लिए दबाएँ", "WhatsApp / SMS મોકલવા દબાવો"),
+        "rem_sms_all" to arrayOf("Send SMS to everyone now", "सभी को अभी SMS भेजें", "બધાને હમણાં SMS મોકલો"),
+        "rem_done" to arrayOf("Settled", "चुकता", "ચૂકતે"),
+        "rem_hello" to arrayOf("Hello", "नमस्ते", "નમસ્તે"),
+        "rem_share" to arrayOf("your share", "आपका हिस्सा", "તમારો ભાગ"),
+        "loss_pay" to arrayOf("loss to pay", "नुकसान भरना", "નુકસાન ભરવાનું"),
+        "rem_set_h" to arrayOf("Every day at 10 AM a notification comes. With auto SMS on, the phone also sends the SMS itself (normal SMS charges of your plan).", "रोज़ सुबह 10 बजे नोटिफिकेशन आएगा। ऑटो SMS चालू हो तो फ़ोन खुद SMS भेजेगा (आपके प्लान का SMS चार्ज)।", "રોજ સવારે 10 વાગે નોટિફિકેશન આવશે. ઓટો SMS ચાલુ હોય તો ફોન જાતે SMS મોકલશે (તમારા પ્લાનનો SMS ચાર્જ)."),
+        "rem_auto_on" to arrayOf("Auto SMS: ON (tap to turn off)", "ऑटो SMS: चालू (बंद करने के लिए दबाएँ)", "ઓટો SMS: ચાલુ (બંધ કરવા દબાવો)"),
+        "rem_auto_off" to arrayOf("Auto SMS: OFF (tap to turn on)", "ऑटो SMS: बंद (चालू करने के लिए दबाएँ)", "ઓટો SMS: બંધ (ચાલુ કરવા દબાવો)"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 

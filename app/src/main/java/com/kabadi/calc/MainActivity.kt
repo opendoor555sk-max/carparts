@@ -96,7 +96,8 @@ class MainActivity : Activity() {
             autoBackup()
             if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
                 requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 9)
-            if (toKhata) showKhata()
+            if (intent?.getBooleanExtra("remind", false) == true) showReminders()
+            else if (toKhata) showKhata()
             else if (intent?.getBooleanExtra("admin", false) == true && Account.isAdmin(this)) showAdmin()
         }
         Account.refreshAdminNumber(this)
@@ -403,7 +404,8 @@ class MainActivity : Activity() {
     override fun onNewIntent(i: Intent?) {
         super.onNewIntent(i)
         if (screen == "login") return
-        if (i?.getBooleanExtra("khata", false) == true) { autoSave(); showKhata() }
+        if (i?.getBooleanExtra("remind", false) == true) { autoSave(); showReminders() }
+        else if (i?.getBooleanExtra("khata", false) == true) { autoSave(); showKhata() }
         else if (i?.getBooleanExtra("admin", false) == true && Account.isAdmin(this)) { autoSave(); showAdmin() }
     }
 
@@ -574,6 +576,9 @@ class MainActivity : Activity() {
         body.addView(row(tile(L.t("khata_btn") + (if (late > 0) "  ⚠$late" else ""), if (late > 0) RED else 0xFF455A64.toInt()) { showKhata() } to 1f,
             tile(L.t("report_btn"), 0xFF00695C.toInt()) { showReport() } to 1f,
             tile("👥 " + L.t("party_t"), 0xFF5D4037.toInt()) { showParties() } to 1f))
+        val rem = reminders(Store.hisabs)
+        if (rem.isNotEmpty()) body.addView(bigButton("🔔 " + rem.map { it.key.ifEmpty { it.name } }.distinct().size + " " + L.t("rem_banner"), 0xFFE65100.toInt()) { showReminders() }
+            .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         thisMonth(Store.hisabs)?.let { m ->
             val mc = card().apply { background = round(0xFFE8F5E9.toInt(), 12f, 0xFFA5D6A7.toInt()) }
             mc.addView(row(small("📅 " + L.t("this_month"), INK).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD } to 1f,
@@ -682,6 +687,7 @@ class MainActivity : Activity() {
         val d = duplicates(h.maal) + duplicates(h.kharch)
         fun go() {
             autoSave(); Store.save(this)
+            if (missingMobile(h).isNotEmpty()) toast("📞 " + L.t("mob_need") + ": " + missingMobile(h).size)
             toast(L.t("saved_ok") + if (lastLearned.isNotEmpty()) "\n" + L.t("learned") + ": " + lastLearned.joinToString(", ") else "")
         }
         if (d.isEmpty()) return go()
@@ -1047,12 +1053,15 @@ class MainActivity : Activity() {
             fun drawP() {
                 pLines.removeAllViews()
                 h.partners.forEach { p ->
-                    val r = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dpi(3f), 0, dpi(3f)) }
-                    r.addView(input(L.t("partner"), p.name, false) { p.name = it; refreshTotals() }.apply { textSize = 15f; tag = "focus" }, llp(0, WRAP_CONTENT, 1.6f))
-                    r.addView(input(L.t("pshare"), p.shareText, true) { p.shareText = it; refreshTotals() }.apply { gravity = Gravity.END },
-                        llp(0, WRAP_CONTENT, 1f).apply { leftMargin = dpi(6f) })
-                    r.addView(xBtn { confirmRemove { h.partners.remove(p); drawP(); refreshTotals() } })
-                    pLines.addView(r)
+                    val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = round(0xFFF8F3FB.toInt(), 10f, 0xFFD1C4E9.toInt()); setPadding(dpi(6f), dpi(4f), dpi(4f), dpi(4f)) }
+                    val pn = input(L.t("partner"), p.name, false) { p.name = it; refreshTotals() }.apply { textSize = 15f; tag = "focus" }
+                    box.addView(row(pn to 1.6f,
+                        input(L.t("pshare"), p.shareText, true) { p.shareText = it; refreshTotals() }.apply { gravity = Gravity.END } to 1f,
+                        xBtn { confirmRemove { h.partners.remove(p); drawP(); refreshTotals() } } to 0f))
+                    val pm = reqMobile("📞 " + L.t("cmobile") + " *", p.mobile) { p.mobile = it }
+                    box.addView(row(pm to 1f, pill("👥", false, BLUE) { pickBuyer { n, m -> if (pn.text.isBlank()) pn.setText(n); pm.setText(m) } }
+                        .apply { textSize = 16f; setPadding(dpi(8f), dpi(4f), dpi(8f), dpi(4f)) } to 0f))
+                    pLines.addView(box, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
                 }
             }
             pcd.addView(pLines)
@@ -1119,6 +1128,9 @@ class MainActivity : Activity() {
         } else if (h.finalAt == 0L) {
             body.addView(bigButton(L.t("final_btn"), 0xFF1B5E20.toInt()) {
                 if (!hasContent(h)) return@bigButton toast(L.t("none"))
+                val miss = missingMobile(h)
+                if (miss.isNotEmpty()) return@bigButton AlertDialog.Builder(this).setTitle("📞 " + L.t("mob_need"))
+                    .setMessage(miss.joinToString("\n") { "• $it" }).setPositiveButton("OK", null).show().let { }
                 AlertDialog.Builder(this).setTitle(L.t("final_btn")).setMessage(L.t("final_q"))
                     .setPositiveButton(L.t("yes")) { _, _ -> h.finalAt = System.currentTimeMillis(); autoSave(); Store.save(this); unlocked.remove(h.id); showEditor(h) }
                     .setNegativeButton(L.t("no"), null).show()
@@ -1276,6 +1288,16 @@ class MainActivity : Activity() {
         return r
     }
 
+    /** mobile that must be filled (red border until 10 digits) */
+    private fun reqMobile(hint: String, value: String, onChange: (String) -> Unit): EditText {
+        lateinit var e: EditText
+        fun mark() { val ok = digits10(e.text.toString()).length == 10
+            e.background = round(if (ok) 0xFFF7F9FA.toInt() else 0xFFFFEBEE.toInt(), 8f, if (ok) 0xFFCFD8DC.toInt() else RED) }
+        e = mobileInput(hint, value) { onChange(it); mark() }
+        mark()
+        return e
+    }
+
     /** credit days of one line (empty = the haraji's common time) and its due date */
     private fun muddatRow(h: Hisab, l: Line): View {
         val due = small("", ORANGE).apply { typeface = Typeface.DEFAULT_BOLD }
@@ -1291,9 +1313,13 @@ class MainActivity : Activity() {
     private fun payBlock(h: Hisab, l: Line, lena: Boolean, box: LinearLayout, redraw: () -> Unit) {
         box.addView(row(pill(L.t("rokad_s"), !l.udhaar, GREEN) { l.pay = "rokad"; redraw(); refreshTotals() } to 0f,
             pill(L.t("udhaar"), l.udhaar, ORANGE) { l.pay = "udhaar"; redraw(); refreshTotals() } to 0f, View(this) to 1f).apply { setPadding(0, dpi(6f), 0, 0) })
+        if (!l.udhaar && !(lena && h.type == "haraji" && !h.isCo)) return
+        val req = lena && h.type == "haraji" && !h.isCo
+        val pn = input("👤 " + L.t(if (lena) "get_from" else "pay_to"), l.cName, false) { l.cName = it }.apply { textSize = 15f }
+        val pm = if (req) reqMobile("📞 " + L.t("cmobile") + " *", l.cMobile) { l.cMobile = it } else mobileInput("📞 " + L.t("cmobile"), l.cMobile) { l.cMobile = it }
+        box.addView(row(pn to 1.2f, pm to 1f, pill("👥", false, BLUE) { pickBuyer { n, m -> pn.setText(n); pm.setText(m) } }
+            .apply { textSize = 16f; setPadding(dpi(8f), dpi(4f), dpi(8f), dpi(4f)) } to 0f))
         if (!l.udhaar) return
-        box.addView(row(input("👤 " + L.t(if (lena) "get_from" else "pay_to"), l.cName, false) { l.cName = it }.apply { textSize = 15f } to 1.2f,
-            mobileInput("📞 " + L.t("cmobile"), l.cMobile) { l.cMobile = it } to 1f))
         box.addView(muddatRow(h, l))
         kistBlock(l, box, lena, redraw)
     }
@@ -1445,7 +1471,8 @@ class MainActivity : Activity() {
     private fun sellerBlock(h: Hisab, l: Line, box: LinearLayout, redraw: () -> Unit) {
         val who = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dpi(2f), 0, 0) }
         val nm = input("👤 " + L.t("cname"), l.cName, false) { l.cName = it }.apply { textSize = 15f }
-        val mob = mobileInput("📞 " + L.t("cmobile"), l.cMobile) { l.cMobile = it }
+        val mob = if (h.type == "haraji") reqMobile("📞 " + L.t("cmobile") + " *", l.cMobile) { l.cMobile = it }
+            else mobileInput("📞 " + L.t("cmobile"), l.cMobile) { l.cMobile = it }
         val pick = pill("👥", false, BLUE) { pickBuyer { n, m -> nm.setText(n); mob.setText(m) } }.apply { textSize = 16f; setPadding(dpi(8f), dpi(4f), dpi(8f), dpi(4f)) }
         val send = pill("💬", true, 0xFF25D366.toInt()) {
             val k = partyKey(l.cName, l.cMobile)
@@ -1524,6 +1551,51 @@ class MainActivity : Activity() {
         sb.append("\n*").append(L.t("left")).append(": ").append(money(p.left())).append("*\n")
         if (Store.mobile.isNotBlank()) sb.append("📞 ").append(Store.mobile)
         return sb.toString()
+    }
+
+    // ================= VASULI: daily reminders from 3 days before the credit time =================
+    private fun showReminders() {
+        autoSave(); editing = null
+        val body = setScreen("remind", "🔔 " + L.t("rem_t"), null)
+        val groups = reminders(Store.hisabs).groupBy { it.key.ifEmpty { "x:" + it.name } }
+        body.addView(small(L.t("rem_h")).apply { setPadding(dpi(4f), 0, 0, dpi(8f)) })
+        if (groups.isEmpty()) body.addView(small(L.t("no_due")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        val canSms = Build.VERSION.SDK_INT < 23 || checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+        if (groups.isNotEmpty() && canSms) body.addView(bigButton("📩 " + L.t("rem_sms_all"), 0xFF455A64.toInt()) {
+            val n = Reminders.sendSms(this, force = true); toast("📩 $n")
+        }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
+        val today = Reminders.endOfToday()
+        groups.values.forEach { list ->
+            val f = list.first()
+            val c = card().apply { if (list.any { it.due <= today }) background = round(0xFFFFEBEE.toInt(), 12f, 0xFFEF9A9A.toInt()) }
+            c.addView(row(small(f.name.ifBlank { "—" }, INK).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD } to 1f,
+                small(f.mobile.ifBlank { "📞 ?" }, if (f.mobile.isBlank()) RED else MUTED).apply { textSize = 14f } to 0f))
+            list.forEach { r ->
+                val what = if (r.partner != null) "🏢 " + L.t("role_co") + " (" + plain(r.partner.share) + "%) – " + (if (r.amount >= 0) L.t("profit") else L.t("loss_pay"))
+                    else L.ln(r.line!!) + " – " + L.t("left")
+                val days = ((r.due - System.currentTimeMillis()) / 86400000L).toInt()
+                val when_ = if (r.due <= today) "⚠ " + L.t("overdue") else "⏳ " + (days + 1) + " " + L.t("din")
+                c.addView(small(what + ": " + money(Math.abs(r.amount)) + "   " + when_ + " (" + Bill.dateText(r.due).substringBefore("  ") + ")",
+                    if (r.due <= today) RED else INK).apply { textSize = 14f; setPadding(0, dpi(3f), 0, 0) })
+                c.addView(small(listOf(r.h.vehicleInfo(), r.h.vehicle).filter { it.isNotBlank() }.joinToString(" • ")))
+            }
+            val acts = LinearLayout(this).apply { setPadding(0, dpi(6f), 0, 0) }
+            fun act(t: String, color: Int, a: () -> Unit) = acts.addView(TextView(this).apply {
+                text = t; textSize = 14f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = round(color, 14f)
+                setPadding(dpi(8f), dpi(8f), dpi(8f), dpi(8f)); setOnClickListener { a() }
+            }, llp(0, WRAP_CONTENT, 1f).apply { setMargins(dpi(3f), 0, dpi(3f), 0) })
+            val msg = Reminders.message(list)
+            if (f.mobile.length == 10) {
+                act("💬 WhatsApp", 0xFF25D366.toInt()) { whatsapp(f.mobile, msg) }
+                act("📩 SMS", BLUE) { try { startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + f.mobile)).putExtra("sms_body", msg)) } catch (_: Exception) {} }
+            }
+            if (list.any { it.partner != null }) act("✓ " + L.t("rem_done"), GREEN) {
+                list.forEach { it.partner?.done = true }; Store.save(this); showReminders()
+            }
+            act(L.t("open"), 0xFF78909C.toInt()) { editorBack = { showReminders() }; showEditor(f.h) }
+            c.addView(acts)
+            body.addView(c, cardLp())
+        }
     }
 
     // ================= PARTY (buyers) =================
@@ -1849,6 +1921,11 @@ class MainActivity : Activity() {
         try { startActivityForResult(i, 21) } catch (_: Exception) {}
     }
 
+    override fun onRequestPermissionsResult(req: Int, perms: Array<out String>, res: IntArray) {
+        super.onRequestPermissionsResult(req, perms, res)
+        if (req == 41 && res.firstOrNull() == PackageManager.PERMISSION_GRANTED) { Reminders.setAutoSms(this, true); if (screen == "settings") showSettings() }
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(req: Int, res: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(req, res, data)
@@ -1913,6 +1990,18 @@ class MainActivity : Activity() {
             sp(L.t("signout"), false, RED, true) { signOut() }
             body.addView(ac, cardLp())
         }
+
+        val sc = card()
+        sc.addView(heading("🔔 " + L.t("rem_t")))
+        sc.addView(small(L.t("rem_set_h")).apply { setPadding(0, 0, 0, dpi(8f)) })
+        val auto = Reminders.autoSms(this)
+        sc.addView(pill(if (auto) "✓ " + L.t("rem_auto_on") else L.t("rem_auto_off"), auto, 0xFFE65100.toInt()) {
+            if (auto) { Reminders.setAutoSms(this, false); showSettings() }
+            else if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.SEND_SMS), 41)
+            } else { Reminders.setAutoSms(this, true); showSettings() }
+        }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(sc, cardLp())
 
         val ap = card()
         ap.addView(heading("🔐 " + L.t("adm_pin")))

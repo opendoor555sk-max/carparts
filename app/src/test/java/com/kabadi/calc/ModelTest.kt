@@ -258,4 +258,22 @@ class ModelTest {
         val buyer = Hisab(3, 3000, role = "buyer"); buyer.maal.add(Line("body", "Body", true, amountText = "1", cName = "X"))
         assertEquals(2, parties(listOf(a, b, buyer)).size)     // buyer hisab: not our sales
     }
+
+    @Test fun harajiMobilesAndReminders() {
+        val day = 100L * 86400000L
+        val h = Hisab(1, day, type = "haraji", priceText = "300000", saleText = "250000", muddatText = "10")
+        h.maal.add(Line("body", "Body", true, amountText = "80000", cName = "Asif", cMobile = "9876543210", pay = "udhaar"))
+        h.maal.add(Line("tyre", "Tyre", true, amountText = "5000", cName = "Rafik"))
+        h.partners.add(Partner("Salam", "50", "9000000001")); h.partners.add(Partner("Imran", "50"))
+        assertEquals(3, missingMobile(h).size)                 // tyre buyer, vehicle buyer, Imran
+        assertTrue(missingMobile(Hisab(2, day)).isEmpty())     // only haraji
+        // day 5: nothing yet; day 7 (3 days before): body buyer + partners
+        assertTrue(reminders(listOf(h), day + 5 * 86400000L).isEmpty())
+        val r = reminders(listOf(h), day + 7 * 86400000L)
+        assertEquals(listOf("Asif", "Salam", "Imran"), r.map { it.name })
+        assertEquals(17500.0, r[1].amount, 1e-9)               // profit 35000 → 50%
+        h.partners[0].done = true
+        h.maal[0].pays.add(Pay(day, "80000"))
+        assertEquals(listOf("Imran"), reminders(listOf(h), day + 20 * 86400000L).map { it.name })   // overdue: every day until done
+    }
 }
