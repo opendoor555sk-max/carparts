@@ -961,26 +961,33 @@ class MainActivity : Activity() {
         fun pctIn(v: String, set: (String) -> Unit) = input("%", v, true) { set(it); refreshTotals() }.apply { gravity = Gravity.CENTER; textSize = 15f }
         top.addView(row(nameIn(h.mudiName) { h.mudiName = it } to 1.5f, pctIn(h.mudiPctText) { h.mudiPctText = it } to 0.55f,
             nameIn(h.khedName) { h.khedName = it } to 1.5f, pctIn(h.khedPctText) { h.khedPctText = it } to 0.55f))
-        // date + seller / buyer in one line
+        // mobile under each name (required for a new hisab)
+        val need = h.writer.isNotBlank()
+        fun mobHint(v: String) = if (need && digits10(v).length != 10) "📞 " + L.t("mob_need") else ""
+        val mudiWarn = small(mobHint(h.mudiMobile), RED).apply { textSize = 11.5f }
+        val khedWarn = small(mobHint(h.khedMobile), RED).apply { textSize = 11.5f }
+        val mudiMob = mobileInput(L.t("mudi_h") + " " + L.t("cmobile") + if (need) " *" else "", h.mudiMobile) { h.mudiMobile = it; mudiWarn.text = mobHint(it) }
+        val khedMob = mobileInput(L.t("khed_h") + " " + L.t("cmobile") + if (need) " *" else "", h.khedMobile) { h.khedMobile = it; khedWarn.text = mobHint(it) }
+        top.addView(row(mudiMob to 2.05f, khedMob to 2.05f))
+        if (need) top.addView(row(mudiWarn to 2.05f, khedWarn to 2.05f))
+        // then date + time (tap to change) and seller / buyer
         val dt = small("🕒 " + Bill.dateText(h.time) + "  ✎", BLUE).apply { textSize = 14f; setPadding(0, dpi(6f), 0, dpi(6f)) }
         dt.setOnClickListener { pickDate(h) { dt.text = "🕒 " + Bill.dateText(h.time) + "  ✎" } }
         top.addView(row(dt to 1f,
             pill(L.t("seller_s"), h.role != "buyer", BLUE) { if (h.role == "buyer") { h.role = "seller"; showEditor(h) } } to 0f,
             pill(L.t("buyer_s"), h.role == "buyer", BLUE) { if (h.role != "buyer") { h.role = "buyer"; showEditor(h) } } to 0f))
-        // mobiles + note only when wanted
+        top.addView(small("🔗 " + L.t("sh_hint"), BLUE).apply { textSize = 12.5f })
+        // note only when wanted (anything extra: where the vehicle came from, who sent it, conditions...)
         val more = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun drawMore(open: Boolean) {
             more.removeAllViews()
             if (!open) {
-                more.addView(small("＋ " + L.t("more"), BLUE).apply { setPadding(0, dpi(2f), 0, 0); setOnClickListener { drawMore(true) } })
+                more.addView(small("＋ " + L.t("note"), BLUE).apply { setPadding(0, dpi(2f), 0, 0); setOnClickListener { drawMore(true) } })
                 return
             }
-            more.addView(row(mobileInput(L.t("mudi_h") + " " + L.t("cmobile"), h.mudiMobile) { h.mudiMobile = it } to 1f,
-                mobileInput(L.t("khed_h") + " " + L.t("cmobile"), h.khedMobile) { h.khedMobile = it } to 1f))
-            more.addView(small("🔗 " + L.t("sh_hint"), BLUE).apply { textSize = 12.5f })
-            more.addView(row(input(L.t("note"), h.note, false) { h.note = it } to 1f))
+            more.addView(row(input(L.t("note_hint"), h.note, false) { h.note = it } to 1f))
         }
-        drawMore(h.mudiMobile.isNotBlank() || h.khedMobile.isNotBlank() || h.note.isNotBlank())
+        drawMore(h.note.isNotBlank())
         top.addView(more)
         body.addView(top, cardLp())
 

@@ -17,6 +17,7 @@ object L {
         "party" to arrayOf("Party name", "पार्टी का नाम", "પાર્ટીનું નામ"),
         "vehicle" to arrayOf("Vehicle no. / model", "गाड़ी नंबर / मॉडल", "ગાડી નંબર / મોડલ"),
         "note" to arrayOf("Note", "नोट", "નોંધ"),
+        "note_hint" to arrayOf("Note: anything extra (where from, who sent, conditions…)", "नोट: कोई भी ज़्यादा बात (कहाँ से, किसने भेजा, शर्त…)", "નોંધ: કોઈ પણ વધારાની વાત (ક્યાંથી, કોણે મોકલ્યું, શરત…)"),
         "date" to arrayOf("Date & time", "तारीख और समय", "તારીખ અને સમય"),
         "price" to arrayOf("1. Vehicle price", "1. गाड़ी की कीमत", "1. ગાડીની કિંમત"),
         "kharch" to arrayOf("2. Expenses (tap to add)", "2. खर्च (दबाकर जोड़ें)", "2. ખર્ચ (દબાવીને ઉમેરો)"),

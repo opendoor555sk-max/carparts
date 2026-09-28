@@ -290,4 +290,15 @@ class ModelTest {
         assertEquals(null, Codec.open(sealed, Otp.shareKey("9876543211")))   // other number cannot read
         for (n in 0..5) { val b = ByteArray(n) { (it * 37).toByte() }; assertTrue(b.contentEquals(Codec.unb64(Codec.b64(b)))) }
     }
+
+    @Test fun writerNeedsBothMobiles() {
+        val h = Hisab(9, 9000, writer = "mudi")
+        assertEquals(2, missingMobile(h).size)
+        h.mudiMobile = "98765 43210"
+        assertEquals(1, missingMobile(h).size)
+        h.khedMobile = "9123456789"
+        assertEquals(0, missingMobile(h).size)
+        // old hisab (no writer chosen) is not forced
+        assertEquals(0, missingMobile(Hisab(10, 9000)).size)
+    }
 }

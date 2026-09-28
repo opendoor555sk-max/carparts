@@ -484,8 +484,13 @@ fun thisMonth(all: List<Hisab>, now: Long = System.currentTimeMillis()): MonthSu
 
 /** haraji: names whose 10-digit mobile is missing (buyers of items / vehicle, company partners) */
 fun missingMobile(h: Hisab): List<String> {
-    if (h.type != "haraji") return emptyList()
     val out = mutableListOf<String>()
+    // new hisab (writer chosen): mudi malik and khedut mobile are required
+    if (h.writer.isNotBlank()) {
+        if (digits10(h.mudiMobile).length != 10) out.add("💰 " + L.t("mudi_h") + " " + h.mudiName)
+        if (digits10(h.khedMobile).length != 10) out.add("🚚 " + L.t("khed_h") + " " + h.khedName)
+    }
+    if (h.type != "haraji") return out
     h.maal.filter { it.value() != 0.0 && digits10(it.cMobile).length != 10 }.forEach { out.add(it.name.ifBlank { "?" } + " → " + it.cName.ifBlank { "?" }) }
     if (!h.isCo && h.sale != 0.0 && digits10(h.saleLine.cMobile).length != 10) out.add("sale → " + h.saleLine.cName.ifBlank { "?" })
     h.partners.filter { (it.name.isNotBlank() || it.share > 0) && digits10(it.mobile).length != 10 }.forEach { out.add("🏢 " + it.name.ifBlank { "?" }) }
