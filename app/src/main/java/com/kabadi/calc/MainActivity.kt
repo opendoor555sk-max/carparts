@@ -788,9 +788,10 @@ class MainActivity : Activity() {
 
     private fun newHisab(type: String) {
         val now = System.currentTimeMillis()
-        AlertDialog.Builder(this).setTitle(L.t("role_q"))
-            .setItems(arrayOf(L.t("seller"), L.t("buyer"))) { _, w ->
-                showEditor(Hisab(now, now, type = type, role = if (w == 1) "buyer" else "seller"))
+        // first choice on every new hisab: who is writing it (mudi malik or khedut)
+        AlertDialog.Builder(this).setTitle(L.t("writer_q"))
+            .setItems(arrayOf(L.t("mudi_h"), L.t("khed_h"))) { _, w ->
+                showEditor(Hisab(now, now, type = type, writer = if (w == 1) "khed" else "mudi"))
             }.show()
     }
 
@@ -952,7 +953,9 @@ class MainActivity : Activity() {
         fun hl(t: String, w: Float, end: Boolean = false) = lab.addView(small(t).apply {
             typeface = Typeface.DEFAULT_BOLD; setTextColor(0xFF00695C.toInt()); if (end) gravity = Gravity.CENTER
         }, llp(0, WRAP_CONTENT, w).apply { leftMargin = dpi(6f) })
-        hl(L.t("mudi_h"), 1.5f); hl("%", 0.55f, true); hl(L.t("khed_h"), 1.5f); hl("%", 0.55f, true)
+        // ✍ marks who is writing this hisab
+        hl((if (h.writer == "mudi") "✍ " else "") + L.t("mudi_h"), 1.5f); hl("%", 0.55f, true)
+        hl((if (h.writer == "khed") "✍ " else "") + L.t("khed_h"), 1.5f); hl("%", 0.55f, true)
         top.addView(lab)
         fun nameIn(v: String, set: (String) -> Unit) = input(L.t("name_q"), v, false) { set(it); titleTv.text = hTitle(editing ?: return@input) }.apply { textSize = 15f }
         fun pctIn(v: String, set: (String) -> Unit) = input("%", v, true) { set(it); refreshTotals() }.apply { gravity = Gravity.CENTER; textSize = 15f }

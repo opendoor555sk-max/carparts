@@ -121,7 +121,7 @@ object Store {
         val o = JSONObject().put("id", h.id).put("t", h.time).put("p", h.party).put("v", h.vehicle)
             .put("no", h.note).put("pr", h.priceText)
             .put("ty", h.type).put("sa", h.saleText).put("co", h.commText).put("cp", h.commPct)
-            .put("ro", h.role).put("br", h.brand).put("va", h.variant).put("tr", h.tyres).put("yr", h.year).put("pl", h.place)
+            .put("ro", h.role).put("wr", h.writer).put("br", h.brand).put("va", h.variant).put("tr", h.tyres).put("yr", h.year).put("pl", h.place)
             .put("mn", h.mudiName).put("mm", h.mudiMobile).put("mp", h.mudiPctText)
             .put("kn", h.khedName).put("km", h.khedMobile).put("kp", h.khedPctText)
             .put("mu", h.muddatText).put("bl", lj(h.buyLine)).put("sl", lj(h.saleLine))
@@ -138,7 +138,7 @@ object Store {
     fun jh(o: JSONObject): Hisab {
         val h = Hisab(o.optLong("id"), o.optLong("t"), o.optString("p"), o.optString("v"), o.optString("no"), o.optString("pr"),
             type = o.optString("ty", "gaadi"), saleText = o.optString("sa"), commText = o.optString("co"), commPct = o.optBoolean("cp", true),
-            role = o.optString("ro", "seller"), brand = o.optString("br"), variant = o.optString("va"), tyres = o.optString("tr"),
+            role = o.optString("ro", "seller"), writer = o.optString("wr"), brand = o.optString("br"), variant = o.optString("va"), tyres = o.optString("tr"),
             year = o.optString("yr"), place = o.optString("pl"),
             mudiName = o.optString("mn"), mudiMobile = o.optString("mm"), mudiPctText = o.optString("mp"),
             khedName = o.optString("kn"), khedMobile = o.optString("km"), khedPctText = o.optString("kp"),

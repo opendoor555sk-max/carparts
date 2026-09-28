@@ -83,6 +83,8 @@ class Hisab(
     val partners: MutableList<Partner> = mutableListOf(),
     /** "buyer" or "seller" */
     var role: String = "seller",
+    /** who is writing this hisab: "mudi" (mudi malik) or "khed" (khedut); "" = old hisab */
+    var writer: String = "",
     var brand: String = "",
     var variant: String = "",
     var tyres: String = "",

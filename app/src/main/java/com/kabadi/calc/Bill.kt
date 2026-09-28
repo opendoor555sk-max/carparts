@@ -80,6 +80,7 @@ object Bill {
             info("mudi_h", h.mudiName + "   " + plain(h.mudiPct) + "%")
             info("khed_h", h.khedName + "   " + plain(h.khedPct) + "%")
         }
+        if (h.writer.isNotBlank()) info("writer_s", if (h.writer == "khed") L.t("khed_h") else L.t("mudi_h"))
         info("role_s", if (h.role == "buyer") L.t("buyer_s") else L.t("seller_s"))
         info("vinfo", h.vehicleInfo())
         info("vehicle", h.vehicle)

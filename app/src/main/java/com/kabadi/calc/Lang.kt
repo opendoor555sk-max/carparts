@@ -98,6 +98,8 @@ object L {
         "removed" to arrayOf("Removed", "हटाया", "કાઢ્યું"),
         "restore" to arrayOf("Reset (bring back deleted)", "रीसेट (हटाए हुए वापस)", "રીસેટ (કાઢેલા પાછા)"),
         "role_q" to arrayOf("Whose hisab is this?", "यह हिसाब किसका है?", "આ હિસાબ કોનો છે?"),
+        "writer_q" to arrayOf("Who is writing this hisab?", "ये हिसाब कौन लिख रहा है?", "આ હિસાબ કોણ લખે છે?"),
+        "writer_s" to arrayOf("Written by", "लिखने वाला", "લખનાર"),
         "buyer" to arrayOf("Buyer (taking maal)", "बायर (माल लेने वाला)", "બાયર (માલ લેનાર)"),
         "seller" to arrayOf("Seller (selling maal)", "सेलर (माल बेचने वाला)", "સેલર (માલ વેચનાર)"),
         "buyer_s" to arrayOf("Buyer", "बायर", "બાયર"),
