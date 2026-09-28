@@ -488,12 +488,12 @@ class EngineTest {
     @Test fun stairPlannerLShapes() {
         e.stairPlanner()
         val vals = mapOf("L" to "20'", "W" to "8'", "H" to "10'", "sw" to "3'", "dr" to "7\"", "dt" to "10\"")
-        // L in a 20' x 8' room: the short arm must fit the 8' width -> 15 + 3
+        // L in a 20' x 8' room: most even split that fits is 7 + 11 (turned: short arm across the 8')
         val l = formRows(vals, "Ghar|3 L-shape")
-        assertTrue(l.v("Flight 1").startsWith("15 riser"))
-        assertTrue(l.v("Flight 2").startsWith("3 riser"))
-        assertEquals("14ft 8in × 7ft 8in", l.v("Jagya chahiye (lambai × pohlai)"))
-        assertTrue(l.first { it.label.endsWith("3 L-shape") }.value.startsWith("✓"))
+        assertTrue(l.v("Flight 1"), l.v("Flight 1").startsWith("7 riser"))
+        assertTrue(l.v("Flight 2"), l.v("Flight 2").startsWith("11 riser"))
+        assertEquals("8ft × 14ft 4in", l.v("Jagya chahiye (lambai × pohlai)"))
+        assertTrue(l.first { it.label.endsWith("3 L-shape") }.value.startsWith("✓ bethegi (ghuma kar)"))
         // Double-L: three flights adding to 18, fits
         val dl = formRows(vals, "Ghar|4 Double-L")
         val f = (1..3).map { dl.v("Flight $it").substringBefore(' ').toInt() }
