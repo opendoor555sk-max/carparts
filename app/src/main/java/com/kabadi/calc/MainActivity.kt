@@ -1166,7 +1166,7 @@ class MainActivity : Activity() {
                 dlg.dismiss()
                 val nh = Hisab(now, now, type = type, writer = w, mehtaName = mehtaN, mehtaMobile = mehtaM, step = 0)
                 // the person writing is this account: name + mobile are taken from it
-                val me = Account.name(this).ifBlank { Store.owner }
+                val me = Store.owner.ifBlank { Account.name(this) }
                 if (w == "mudi") { nh.mudiName = me; nh.mudiMobile = Share.myMobile(this) } else { nh.khedName = me; nh.khedMobile = Share.myMobile(this) }
                 showEditor(nh)
             }.apply { textSize = 24f; setPadding(0, dpi(18f), 0, dpi(18f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(12f) })
@@ -1306,7 +1306,7 @@ class MainActivity : Activity() {
                     if (add) splitBox.addView(small("   = " + L.t("co_total") + ": " + money(v + co), if (v + co >= 0) GREEN else RED).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD })
                 }
             }
-            if (Math.abs(h.mudiPct + h.khedPct - 100) > 0.001) splitBox.addView(small(L.t("not100"), RED).apply { typeface = Typeface.DEFAULT_BOLD })
+            if (h.mudiPct + h.khedPct > 0 && Math.abs(h.mudiPct + h.khedPct - 100) > 0.001) splitBox.addView(small(L.t("not100"), RED).apply { typeface = Typeface.DEFAULT_BOLD })
         }
         val bad = h.verify()
         checkTv.text = if (bad.isEmpty()) L.t("check_ok") else L.t("check_bad") + " (" + bad.joinToString() + ")"
@@ -1402,15 +1402,15 @@ class MainActivity : Activity() {
         }.apply { gravity = Gravity.CENTER; textSize = 15f }
         mudiPctEt = pctIn(h.mudiPctText, { h.mudiPctText = it }) { khedPctEt }
         khedPctEt = pctIn(h.khedPctText, { h.khedPctText = it }) { mudiPctEt }
-        top.addView(row(nameIn(h.mudiName) { h.mudiName = it } to 1.5f, mudiPctEt!! to 0.55f,
-            nameIn(h.khedName) { h.khedName = it } to 1.5f, khedPctEt!! to 0.55f))
-        // mobile under each name (required for a new hisab)
+        // mobile under each name (required for a new hisab); the reminder shows only after that person's name is written, and in a soft colour
         val need = h.writer.isNotBlank()
-        fun mobHint(v: String) = if (need && digits10(v).length != 10) "📞 " + L.t("mob_need") else ""
-        val mudiWarn = small(mobHint(h.mudiMobile), RED).apply { textSize = 11.5f }
-        val khedWarn = small(mobHint(h.khedMobile), RED).apply { textSize = 11.5f }
-        val mudiMob = mobileInput(L.t("mudi_h") + " " + L.t("cmobile") + if (need) " *" else "", h.mudiMobile) { h.mudiMobile = it; mudiWarn.text = mobHint(it) }
-        val khedMob = mobileInput(L.t("khed_h") + " " + L.t("cmobile") + if (need) " *" else "", h.khedMobile) { h.khedMobile = it; khedWarn.text = mobHint(it) }
+        fun mobHint(name: String, v: String) = if (need && name.isNotBlank() && digits10(v).length != 10) "📞 " + L.t("mob_need") else ""
+        val mudiWarn = small(mobHint(h.mudiName, h.mudiMobile), ORANGE).apply { textSize = 11.5f }
+        val khedWarn = small(mobHint(h.khedName, h.khedMobile), ORANGE).apply { textSize = 11.5f }
+        top.addView(row(nameIn(h.mudiName) { h.mudiName = it; mudiWarn.text = mobHint(it, h.mudiMobile) } to 1.5f, mudiPctEt!! to 0.55f,
+            nameIn(h.khedName) { h.khedName = it; khedWarn.text = mobHint(it, h.khedMobile) } to 1.5f, khedPctEt!! to 0.55f))
+        val mudiMob = mobileInput(L.t("mudi_h") + " " + L.t("cmobile") + if (need) " *" else "", h.mudiMobile) { h.mudiMobile = it; mudiWarn.text = mobHint(h.mudiName, it) }
+        val khedMob = mobileInput(L.t("khed_h") + " " + L.t("cmobile") + if (need) " *" else "", h.khedMobile) { h.khedMobile = it; khedWarn.text = mobHint(h.khedName, it) }
         top.addView(row(mudiMob to 2.05f, khedMob to 2.05f))
         if (need) top.addView(row(mudiWarn to 2.05f, khedWarn to 2.05f))
         if (h.type == "haraji") {
