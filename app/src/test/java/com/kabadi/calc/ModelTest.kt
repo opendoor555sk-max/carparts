@@ -293,12 +293,15 @@ class ModelTest {
     }
 
     @Test fun writerNeedsBothMobiles() {
-        val h = Hisab(9, 9000, writer = "mudi")
+        val h = Hisab(9, 9000, writer = "mudi", mudiPctText = "60", khedPctText = "40")
         assertEquals(2, missingMobile(h).size)
         h.mudiMobile = "98765 43210"
         assertEquals(1, missingMobile(h).size)
         h.khedMobile = "9123456789"
         assertEquals(0, missingMobile(h).size)
+        // mudi malik 100%: no khedut, so no khedut mobile is needed
+        val h2 = Hisab(12, 9000, writer = "mudi", mudiPctText = "100", mudiMobile = "9876543210")
+        assertEquals(0, missingMobile(h2).size)
         // old hisab (no writer chosen) is not forced
         assertEquals(0, missingMobile(Hisab(10, 9000)).size)
     }
