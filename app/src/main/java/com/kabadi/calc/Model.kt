@@ -35,7 +35,9 @@ class Line(
     /** sale line: "OK – sold" was pressed: the buyer got his message and the line is locked */
     var sold: Boolean = false,
     /** credit sale: who is the guarantor: "" = a shopkeeper (name, mobile, shop), "mudi" = the mudi malik, "khed" = the khedut */
-    var gBy: String = ""
+    var gBy: String = "",
+    /** shop guarantee (haraji): market number – the same shop number can exist in different markets */
+    var mkt: String = ""
 ) {
     /** for the vehicle price / auction sale lines: value comes from the hisab */
     var calc: (() -> Double)? = null
