@@ -84,8 +84,14 @@ object Feedback {
         saveList(ctx, l)
     }
 
+    /** ids the admin deleted: the server still holds them for 12 h, so they must never come back */
+    private fun deleted(ctx: Context): MutableSet<String> = sp(ctx).getStringSet("deleted", emptySet())!!.toMutableSet()
+
     fun delete(ctx: Context, id: String) {
         file(ctx, id).delete()
+        val d = deleted(ctx); d.add(id)
+        // keep only the newest 500 ids
+        sp(ctx).edit().putStringSet("deleted", if (d.size > 500) d.toList().takeLast(500).toSet() else d).apply()
         saveList(ctx, list(ctx).filter { it.optString("id") != id })
     }
 
@@ -96,9 +102,10 @@ object Feedback {
     fun collect(ctx: Context): Int {
         val all = Relay.poll(TOPIC) ?: return -1
         val have = list(ctx).toMutableList()
+        val gone = deleted(ctx)
         var added = 0; var changed = false
         all.groupBy { it.second.optString("id") }.forEach { (id, msgs) ->
-            if (id.isEmpty()) return@forEach
+            if (id.isEmpty() || id in gone) return@forEach
             val old = have.firstOrNull { it.optString("id") == id }
             if (old != null && !old.optBoolean("partial")) return@forEach
             val byI = msgs.map { it.second }.filter { it.has("k") }.distinctBy { it.optInt("i") }.associateBy { it.optInt("i") }
