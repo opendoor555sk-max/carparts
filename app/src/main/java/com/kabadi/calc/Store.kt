@@ -104,13 +104,13 @@ object Store {
     private fun lj(l: Line) = JSONObject().put("k", l.key).put("n", l.name).put("f", l.fixed)
         .put("kg", l.kgText).put("r", l.rateText).put("a", l.amountText).put("l", l.litre)
         .put("pay", l.pay).put("paid", l.paid).put("cn", l.cName).put("cm", l.cMobile).put("d", l.daysText)
-        .put("gn", l.gName).put("gm", l.gMobile).put("sh", l.shop).put("lk", l.link).put("sk", l.syncKg).put("so", l.sold)
+        .put("gn", l.gName).put("gm", l.gMobile).put("sh", l.shop).put("lk", l.link).put("sk", l.syncKg).put("so", l.sold).put("gb", l.gBy)
         .put("py", JSONArray().also { a -> l.pays.forEach { a.put(JSONObject().put("t", it.time).put("a", it.amountText)) } })
 
     private fun jl(o: JSONObject) = Line(o.optString("k"), o.optString("n"), o.optBoolean("f"),
         kgText = o.optString("kg"), rateText = o.optString("r"), amountText = o.optString("a"), litre = o.optBoolean("l"),
         pay = o.optString("pay", "rokad"), paid = o.optBoolean("paid"), cName = o.optString("cn"), cMobile = o.optString("cm"),
-        daysText = o.optString("d"), gName = o.optString("gn"), gMobile = o.optString("gm"), shop = o.optString("sh"),
+        daysText = o.optString("d"), gName = o.optString("gn"), gMobile = o.optString("gm"), shop = o.optString("sh"), gBy = o.optString("gb"),
         link = o.optString("lk"), syncKg = o.optString("sk"), sold = o.optBoolean("so")).also { l ->
         o.optJSONArray("py")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { l.pays.add(Pay(it.optLong("t"), it.optString("a"))) } }
     }

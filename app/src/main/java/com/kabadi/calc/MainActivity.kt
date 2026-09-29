@@ -2099,6 +2099,7 @@ class MainActivity : Activity() {
             .apply { textSize = 16f; setPadding(dpi(8f), dpi(4f), dpi(8f), dpi(4f)) } to 0f))
         if (!l.udhaar) return
         box.addView(muddatRow(h, l))
+        if (lena && h.type == "haraji" && !h.isCo && l === h.saleLine) guarantorBlock(h, l, box, redraw)
         kistBlock(l, box, lena, redraw)
     }
 
@@ -2271,6 +2272,7 @@ class MainActivity : Activity() {
     private fun confirmSold(h: Hisab, l: Line) {
         if (l.cName.isBlank() || digits10(l.cMobile).length != 10 || l.value() <= 0.0) { toast(L.t("sold_need")); return }
         if (l.udhaar && dueTime(h, l) == null) { toast(L.t("muddat_h")); return }
+        if (!guarantorOk(h, l)) { AlertDialog.Builder(this).setTitle("🤝 " + L.t("g_title")).setMessage(L.t("g_need")).setPositiveButton("OK", null).show(); return }
         AlertDialog.Builder(this).setTitle(l.name + " → " + l.cName).setMessage(L.t("sold_q"))
             .setPositiveButton(L.t("yes")) { _, _ ->
                 l.sold = true; autoSave(); Store.save(this); showEditor(h); showLineMessage(h, l)
@@ -2334,12 +2336,27 @@ class MainActivity : Activity() {
             who.addView(muddatRow(h, l))
             kistBlock(l, who, true, redraw)
         }
-        if (h.type == "haraji") {
-            who.addView(row(input(L.t("gname"), l.gName, false) { l.gName = it }.apply { textSize = 15f } to 1.2f,
-                mobileInput(L.t("gmobile"), l.gMobile) { l.gMobile = it } to 1f))
-            who.addView(row(input(L.t("shop"), l.shop, false) { l.shop = it }.apply { textSize = 15f } to 1f))
-        }
+        if (l.udhaar) guarantorBlock(h, l, who, redraw)
         box.addView(who)
+    }
+
+    /** credit sale: guarantor (jamindar) with name, mobile and shop number; the mudi malik / khedut can be the guarantor with one tap */
+    private fun guarantorBlock(h: Hisab, l: Line, box: LinearLayout, redraw: () -> Unit) {
+        val g = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; background = round(0xFFF3E5F5.toInt(), 8f, 0xFFCE93D8.toInt()); setPadding(dpi(8f), dpi(6f), dpi(8f), dpi(6f)) }
+        g.addView(small("🤝 " + L.t("g_title"), 0xFF6A1B9A.toInt()).apply { typeface = Typeface.DEFAULT_BOLD })
+        if (isMudiBuyer(h, l)) { g.addView(small(L.t("g_self"), GREEN)); box.addView(g, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) }); return }
+        val pills = ArrayList<Pair<View, Float>>()
+        if (h.mudiName.isNotBlank() && digits10(h.mudiMobile).length == 10)
+            pills.add(pill(L.t("g_by_mudi"), l.gBy == "mudi", 0xFF6A1B9A.toInt()) { l.gBy = "mudi"; l.gName = h.mudiName; l.gMobile = digits10(h.mudiMobile); l.shop = ""; redraw() } to 1f)
+        if (!isKhedBuyer(h, l) && h.khedName.isNotBlank() && digits10(h.khedMobile).length == 10)
+            pills.add(pill(L.t("g_by_khed"), l.gBy == "khed", 0xFF6A1B9A.toInt()) { l.gBy = "khed"; l.gName = h.khedName; l.gMobile = digits10(h.khedMobile); l.shop = ""; redraw() } to 1f)
+        if (pills.isNotEmpty()) g.addView(row(*pills.toTypedArray()).apply { setPadding(0, dpi(4f), 0, dpi(4f)) })
+        g.addView(row(input(L.t("gname"), l.gName, false) { l.gName = it; l.gBy = "" }.apply { textSize = 15f } to 1.2f,
+            mobileInput(L.t("gmobile"), l.gMobile) { l.gMobile = it; l.gBy = "" } to 1f))
+        g.addView(row(input(L.t("shop") + if (l.gBy.isEmpty()) " *" else "", l.shop, false) { l.shop = it }.apply { textSize = 15f } to 1f))
+        if (!guarantorOk(h, l)) g.addView(small("⚠ " + L.t("g_need"), ORANGE).apply { textSize = 11.5f })
+        box.addView(g, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
     }
 
     /** choose a buyer: from earlier buyers or the phone's contacts */

@@ -421,11 +421,39 @@ class ModelTest {
         assertTrue(stepProblems(h, 0).isEmpty())
     }
 
+    @Test fun guarantorRule() {
+        val h = Hisab(7, 1, type = "haraji", writer = "mudi", mudiName = "Salam", mudiMobile = "9876543210", mudiPctText = "70",
+            khedName = "Nauman", khedMobile = "7203960120", khedPctText = "30", mehtaName = "M", mehtaMobile = "9111111111")
+        val l = Line("body", "Body", false, kgText = "10", rateText = "10", pay = "udhaar", cName = "Rafiq", cMobile = "9333333333", daysText = "30")
+        h.maal.add(l)
+        assertFalse(guarantorOk(h, l))                       // credit and nobody guarantees
+        l.gName = "Shop"; l.gMobile = "9555555555"
+        assertFalse(guarantorOk(h, l))                       // a shopkeeper needs his shop number
+        l.shop = "12"; assertTrue(guarantorOk(h, l))
+        l.shop = ""; l.gBy = "khed"; l.gName = "Nauman"; l.gMobile = "7203960120"
+        assertTrue(guarantorOk(h, l))                        // khedut himself guarantees the trader
+        assertFalse(guarantorProblems(h).any { it.contains("Body") })
+        // the mudi malik takes goods himself: no guarantor needed
+        val m = Line("cab", "Cabin", false, kgText = "1", rateText = "100", pay = "udhaar", cName = "Salam", cMobile = "9876543210")
+        assertFalse(needsGuarantor(h, m)); assertTrue(guarantorOk(h, m))
+        // the khedut takes goods on credit: the mudi malik or a shopkeeper must guarantee
+        val k = Line("cab2", "Cabin", false, kgText = "1", rateText = "100", pay = "udhaar", cName = "Nauman", cMobile = "7203960120")
+        assertFalse(guarantorOk(h, k))
+        k.gBy = "mudi"; k.gName = "Salam"; k.gMobile = "9876543210"
+        assertTrue(guarantorOk(h, k))
+        // cash needs none
+        assertTrue(guarantorOk(h, Line("c", "C", false, kgText = "1", rateText = "5", pay = "rokad", cName = "X", cMobile = "9000000009")))
+        // the guarantor cannot be the buyer himself
+        l.gBy = ""; l.gMobile = "9333333333"; l.shop = "5"
+        assertFalse(guarantorOk(h, l))
+    }
+
     @Test fun messagesGoToEveryContact() {
         val h = Hisab(5, 1_700_000_000_000, type = "haraji", priceText = "100000", saleText = "150000", commText = "2", commPct = true,
             mudiName = "Salam", mudiMobile = "9876543210", mudiPctText = "100", mehtaName = "Mehta", mehtaMobile = "9111111111", place = "Anand", step = 3)
         h.partners.add(Partner("Partner", "100", "9222222222"))
         val body = Line("body", "Body", false, kgText = "100", rateText = "50", pay = "udhaar", cName = "Rafiq", cMobile = "9333333333", daysText = "30")
+        body.gName = "Guar"; body.gMobile = "9555555555"; body.shop = "12"
         h.maal.add(body)
         h.buyLine.pay = "udhaar"; h.buyLine.cName = "Seller"; h.buyLine.cMobile = "9444444444"
         val me = "9876543210"
@@ -441,7 +469,10 @@ class ModelTest {
         val f = Notify.recipients(h, 3, me)
         val buyer = f.first { it.mobile == "9333333333" }
         assertTrue(buyer.text.contains("Body") && buyer.text.contains("⏳"))
-        assertFalse(buyer.text.contains("Anand")) // the place the vehicle was bought is not told to buyers
+        assertFalse(buyer.text.contains("Anand"))
+        // the guarantor is written in the buyer's message (name, mobile, shop) and the guarantor is told too
+        assertTrue(buyer.text.contains("Guar") && buyer.text.contains("9555555555") && buyer.text.contains("12"))
+        assertTrue(f.first { it.mobile == "9555555555" }.text.contains("Rafiq")) // the place the vehicle was bought is not told to buyers
         assertTrue(f.first { it.mobile == "9222222222" }.text.contains("➡"))
         // mudi malik / khedut / mehta get the whole hisab (buyer line with his name is in it)
         assertTrue(f.first { it.mobile == "9111111111" }.text.contains("Body"))

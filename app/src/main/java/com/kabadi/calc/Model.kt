@@ -33,7 +33,9 @@ class Line(
     /** sale line: the bought quantity last copied in (so a changed purchase qty follows until the user types his own) */
     var syncKg: String = "",
     /** sale line: "OK – sold" was pressed: the buyer got his message and the line is locked */
-    var sold: Boolean = false
+    var sold: Boolean = false,
+    /** credit sale: who is the guarantor: "" = a shopkeeper (name, mobile, shop), "mudi" = the mudi malik, "khed" = the khedut */
+    var gBy: String = ""
 ) {
     /** for the vehicle price / auction sale lines: value comes from the hisab */
     var calc: (() -> Double)? = null
@@ -556,6 +558,30 @@ fun thisMonth(all: List<Hisab>, now: Long = System.currentTimeMillis()): MonthSu
 }
 
 /** haraji: names whose 10-digit mobile is missing (buyers of items / vehicle, company partners) */
+// ---------- guarantor (jamindar) rule for every credit sale ----------
+private fun sameParty(n1: String, m1: String, n2: String, m2: String): Boolean {
+    val a = digits10(m1); val b = digits10(m2)
+    if (a.length == 10 && b.length == 10) return a == b
+    return n1.isNotBlank() && norm(n1) == norm(n2)
+}
+/** the buyer of this line is the mudi malik / khedut himself */
+fun isMudiBuyer(h: Hisab, l: Line) = (h.mudiPct > 0 || h.mudiName.isNotBlank()) && sameParty(h.mudiName, h.mudiMobile, l.cName, l.cMobile)
+fun isKhedBuyer(h: Hisab, l: Line) = (h.khedPct > 0 || h.khedName.isNotBlank()) && sameParty(h.khedName, h.khedMobile, l.cName, l.cMobile)
+/** credit lines where we get money from somebody: goods sold, and the auction sale to a party */
+fun creditLines(h: Hisab): List<Line> =
+    h.maal.filter { it.udhaar && it.value() != 0.0 } + (if (h.type == "haraji" && !h.isCo && h.sale != 0.0 && h.saleLine.udhaar) listOf(h.saleLine) else emptyList())
+/** a credit sale needs a guarantor – only when the mudi malik himself takes the goods it is not needed */
+fun needsGuarantor(h: Hisab, l: Line) = l.udhaar && l.value() != 0.0 && !isMudiBuyer(h, l)
+/** guarantor complete: name + mobile + (shop number, or the mudi malik / khedut himself is the guarantor) */
+fun guarantorOk(h: Hisab, l: Line): Boolean {
+    if (!needsGuarantor(h, l)) return true
+    if (l.gName.isBlank() || digits10(l.gMobile).length != 10) return false
+    if (digits10(l.gMobile) == digits10(l.cMobile)) return false
+    return l.gBy == "mudi" || l.gBy == "khed" || l.shop.isNotBlank()
+}
+fun guarantorProblems(h: Hisab): List<String> =
+    creditLines(h).filter { !guarantorOk(h, it) }.map { "🤝 " + it.name.ifBlank { L.ln(it) } + " → " + it.cName.ifBlank { "?" } + ": " + L.t("g_need") }
+
 fun missingMobile(h: Hisab): List<String> {
     val out = mutableListOf<String>()
     // new hisab (writer chosen): mudi malik and khedut mobile are required
@@ -604,6 +630,7 @@ fun finalProblems(h: Hisab): List<String> {
         out.add(L.t("not100") + ": " + L.t("mudi_h") + " " + plain(h.mudiPct) + "% + " + L.t("khed_h") + " " + plain(h.khedPct) + "%")
     if (h.type == "haraji" && Math.abs(h.sharesTotal() - 100) > 0.001)
         out.add(L.t("pt_not100") + " (" + plain(h.sharesTotal()) + "%)")
+    out.addAll(guarantorProblems(h))
     return out
 }
 

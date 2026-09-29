@@ -399,6 +399,7 @@ object Bill {
                 if (h.role == "seller" && (it.cName.isNotBlank() || it.udhaar)) {
                     sb.append(" → ").append(it.cName)
                     if (it.udhaar) sb.append(" (").append(L.t("udhaar")).append(if (dueOf(h, it).isNotEmpty()) ", " + L.t("due") + " " + dueOf(h, it) else "").append(")")
+                    Notify.guarText(h, it).let { g -> if (g.isNotBlank()) sb.append("\n   ").append(g) }
                 }
                 sb.append("\n")
             }

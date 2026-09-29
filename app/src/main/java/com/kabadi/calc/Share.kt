@@ -60,7 +60,7 @@ object Share {
         if (buyOk) add(h.buyLine, false, L.ln(h.buyLine) + " " + h.vehicleMsg())
         if (kOk) h.kharch.forEach { add(it, false, it.name) }
         h.maal.filter { fin || (guard && it.sold) }.forEach { l ->
-            add(l, true, l.name + if (!l.fixed && l.kg != 0.0) " " + plain(l.kg) + (if (l.litre) " L" else " kg") + " × " + plain(l.rate) else "")
+            add(l, true, l.name + (if (!l.fixed && l.kg != 0.0) " " + plain(l.kg) + (if (l.litre) " L" else " kg") + " × " + plain(l.rate) else "") + Notify.guarText(h, l).let { if (it.isBlank()) "" else "\n" + it })
         }
         if (fin && h.sale != 0.0) add(h.saleLine, true, L.ln(h.saleLine))
         // company partners: only the vehicle (in the title), his invest, and after Final the auction price + his profit / loss. No cost, no place.

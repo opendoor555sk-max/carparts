@@ -43,6 +43,16 @@ object Notify {
         return sb.toString()
     }
 
+    /** guarantor of a credit line: name, mobile, shop – or that the mudi malik takes it himself */
+    fun guarText(h: Hisab, l: Line): String {
+        if (!l.udhaar || l.value() == 0.0) return ""
+        if (isMudiBuyer(h, l)) return "🤝 " + L.t("g_self")
+        if (l.gName.isBlank() && digits10(l.gMobile).isEmpty()) return ""
+        val by = when (l.gBy) { "mudi" -> " (" + L.t("mudi_h") + ")"; "khed" -> " (" + L.t("khed_h") + ")"; else -> "" }
+        return "🤝 " + L.t("g_lbl") + ": " + nm(l.gName).ifBlank { "?" } + by + (if (digits10(l.gMobile).isNotEmpty()) "  📞 " + digits10(l.gMobile) else "") +
+            (if (l.shop.isNotBlank()) "  🏪 " + L.t("shop") + " " + l.shop.trim() else "")
+    }
+
     /** one line: what, how much, cash or credit; credit shows the due date and what is left */
     fun lineText(h: Hisab, l: Line): String {
         val sb = StringBuilder("• ").append(L.ln(l))
@@ -53,6 +63,7 @@ object Notify {
             dueTime(h, l)?.let { sb.append(" • ").append(L.t("due")).append(" ").append(date(it)) }
             if (l.received() > 0.004) sb.append(" • ").append(L.t("got")).append(" ").append(money(l.received()))
             sb.append(" • ").append(L.t("left")).append(" ").append(money(l.remaining()))
+            guarText(h, l).let { if (it.isNotBlank()) sb.append("\n   ").append(it) }
         } else sb.append("  (").append(L.t("rokad_s")).append(")")
         return sb.toString()
     }
@@ -141,8 +152,17 @@ object Notify {
                     }
                 }
                 // buyers of the goods, one message each with all his items
+                // the goods a buyer (also a company partner) took: item by item, cash / credit, credit time, what is left and the guarantor
                 h.maal.filter { digits10(it.cMobile).length == 10 && it.value() != 0.0 }.groupBy { digits10(it.cMobile) }.forEach { (mob, ls) ->
-                    add(ls.first().cName, mob, "🛍 " + L.t("buyer"), ls.joinToString("\n") { lineText(h, it) } + "\n" + L.t("total") + ": " + money(ls.sumOf { it.value() }))
+                    val items = ls.mapIndexed { i, l -> (i + 1).toString() + ") " + lineText(h, l).removePrefix("• ") }.joinToString("\n\n")
+                    val cash = ls.filter { !it.udhaar }.sumOf { it.value() }; val cr = ls.filter { it.udhaar }.sumOf { it.value() }
+                    add(ls.first().cName, mob, "🛍 " + L.t("buyer"), "🛍 " + L.t("buyer_items") + ":\n" + items + "\n\n" + L.t("total") + ": " + money(cash + cr) +
+                        (if (cash > 0 && cr > 0) "\n💵 " + L.t("rokad_s") + ": " + money(cash) + "\n⏳ " + L.t("udhaar") + ": " + money(cr) else ""))
+                }
+                // a shopkeeper who is guarantor gets his own message (mudi malik / khedut are already told)
+                creditLines(h).filter { it.gBy.isEmpty() && digits10(it.gMobile).length == 10 && needsGuarantor(h, it) }.groupBy { digits10(it.gMobile) }.forEach { (gm, ls) ->
+                    add(ls.first().gName, gm, "🤝 " + L.t("g_lbl"), "🤝 " + L.t("g_you") + "\n\n" +
+                        ls.joinToString("\n\n") { "👤 " + nm(it.cName) + "  📞 " + digits10(it.cMobile) + "\n" + lineText(h, it) })
                 }
                 if (h.type == "haraji" && h.sale != 0.0 && digits10(h.saleLine.cMobile).length == 10)
                     add(h.saleLine.cName, h.saleLine.cMobile, "🛍 " + L.t("buyer"), lineText(h, h.saleLine))
