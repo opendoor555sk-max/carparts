@@ -102,6 +102,8 @@ object Notify {
         if (h.type == "haraji" && h.mehtaName.isNotBlank()) people.add(Triple(h.mehtaName, h.mehtaMobile, "🔨 " + L.t("mehta_h")))
         h.partners.filter { it.share > 0 || it.name.isNotBlank() }.forEach { people.add(Triple(it.name, it.mobile, "🏢 " + L.t("role_co"))) }
 
+        // mudi malik, khedut, mehta, partners: after every OK they get the WHOLE hisab written so far (not only the last step)
+        if (phase >= 1) people.forEach { (n, m, r) -> add(n, m, r, "", full = true) }
         when (phase) {
             0 -> people.forEach { (n, m, r) -> add(n, m, r, "✅ " + L.t("msg_started")) }
             1 -> {

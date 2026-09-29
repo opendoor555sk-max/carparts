@@ -435,6 +435,8 @@ class ModelTest {
         val b = Notify.recipients(h, 1, me)
         assertTrue(b.any { it.mobile == "9444444444" && it.text.contains("⏳") })
         assertTrue(b.first { it.mobile == "9222222222" }.text.contains("100%"))
+        // after every OK the partners get the whole hisab written so far
+        assertTrue(b.first { it.mobile == "9111111111" }.text.contains("Body") && b.first { it.mobile == "9111111111" }.text.contains("Salam"))
         // final: buyer gets his item, credit time + what is left; partner gets profit / loss
         val f = Notify.recipients(h, 3, me)
         val buyer = f.first { it.mobile == "9333333333" }
