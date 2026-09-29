@@ -696,11 +696,14 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         Updater.autoCheck(this) // on every open (at most every 30 min)
+        Live.start(this)
+        Live.onNew = { ui.post { when (screen) { "shared" -> showShared(); "linked" -> showLinked(); "home" -> showHome() } } }
         if (sendWaiting) { sendWaiting = false; ui.postDelayed({ nextInQueue() }, 500) }
     }
 
     override fun onPause() {
         super.onPause()
+        Live.onNew = null
         if (rec != null || player != null) { stopAudio(); if (screen == "feedback") showFeedback() }
         autoSave()
         Store.save(this)
@@ -2404,7 +2407,7 @@ class MainActivity : Activity() {
             info.addView(small(L.t("sh_need_mob"), RED).apply { textSize = 15f })
             var m = ""
             info.addView(row(mobileInput("98xxxxxxxx", "") { m = it } to 1f, pill(L.t("save"), true, GREEN) {
-                if (m.length == 10) { Store.mobile = m; Store.save(this); showShared() } else toast(L.t("acc_bad_mobile")) } to 0f))
+                if (m.length == 10) { Store.mobile = m; Store.save(this); Live.start(this); showShared() } else toast(L.t("acc_bad_mobile")) } to 0f))
         } else info.addView(small("📞 " + L.t("sh_my") + ": " + me + "\n" + L.t("sh_info"), INK).apply { textSize = 14f })
         val st = small("", MUTED)
         info.addView(row(st to 1f, pill("⟳ " + L.t("sh_refresh"), false, BLUE) {
@@ -2992,7 +2995,7 @@ class MainActivity : Activity() {
 
         val o = card()
         o.addView(labeled(L.t("owner"), input(L.t("owner"), Store.owner, false) { Store.owner = it; Store.save(this) }))
-        o.addView(labeled(L.t("mobile"), input("98xxxxxxxx", Store.mobile, true) { Store.mobile = it; Store.save(this) }))
+        o.addView(labeled(L.t("mobile"), input("98xxxxxxxx", Store.mobile, true) { Store.mobile = it; Store.save(this); if (it.length == 10) Live.start(this) }))
         o.addView(labeled(L.t("address"), input(L.t("address"), Store.address, false) { Store.address = it; Store.save(this) }))
         body.addView(o, cardLp())
 
@@ -3026,6 +3029,11 @@ class MainActivity : Activity() {
         if (hasPin && LOGIN_ON && Account.isAdmin(this)) ap.addView(pill("🔁 " + L.t("pin_forgot"), false, ORANGE) { setAdminPin { showSettings() } }
             .apply { textSize = 14f; setPadding(dpi(8f), dpi(8f), dpi(8f), dpi(8f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         if (!LOGIN_ON || Account.isAdmin(this)) body.addView(ap, cardLp())
+
+        val lv = card()
+        lv.addView(pill(if (Live.enabled(this)) "✅ " + L.t("live_set") else "⬜ " + L.t("live_set"), Live.enabled(this), GREEN) {
+            Live.setEnabled(this, !Live.enabled(this)); showSettings() }.apply { textSize = 14f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(lv, cardLp())
 
         val lc = card()
         lc.addView(heading(L.t("lists")))

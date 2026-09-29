@@ -26,9 +26,9 @@ object Store {
     var address = ""
     val hisabs = mutableListOf<Hisab>()
     /** hisab of others where this phone is mudi malik / khedut (view only) */
-    val shared = mutableListOf<Shared>()
+    val shared = java.util.concurrent.CopyOnWriteArrayList<Shared>()
     /** lines of others' hisab that concern this phone (I bought / sold / gave a service) */
-    val linked = mutableListOf<Linked>()
+    val linked = java.util.concurrent.CopyOnWriteArrayList<Linked>()
     val lastRate = mutableMapOf<String, String>()
     var parts: MutableList<Btn> = defaultParts()
     var expenses: MutableList<Btn> = defaultExpenses()

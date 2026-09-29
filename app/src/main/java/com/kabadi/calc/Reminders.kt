@@ -99,12 +99,13 @@ object Reminders {
     }
 
     /** background: hisab that others sent to this phone's number (arrives without opening the app) */
-    fun fetchShared(ctx: Context) {
+    fun fetchShared(ctx: Context, notify: Boolean = true): Int {
         if (!Store.loadedOk) Store.load(ctx)
-        if (!Store.loadedOk) return
+        if (!Store.loadedOk) return 0
         val n = try { Share.fetch(ctx) } catch (_: Exception) { 0 }
-        if (n <= 0) return
+        if (n <= 0) return 0
         Store.save(ctx)
+        if (!notify) return n
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel("shared_new", L.t("sh_title"), NotificationManager.IMPORTANCE_HIGH))
         val lastS = Store.shared.maxByOrNull { it.t }; val lastL = Store.linked.maxByOrNull { it.t }
@@ -117,6 +118,7 @@ object Reminders {
             .setContentText(if (linkedNew) (lastL!!.from.ifBlank { lastL.fromMobile }) + " • " + lastL.title else (last?.from?.ifBlank { last.fromMobile } ?: "") + (last?.let { " • " + hTitleOf(it.h) } ?: ""))
             .setContentIntent(open).setAutoCancel(true)
         try { nm.notify(10, b.build()) } catch (_: Exception) {}
+        return n
     }
     private fun hTitleOf(h: Hisab) = h.party.ifBlank { listOf(h.mudiName, h.khedName).filter { it.isNotBlank() }.joinToString(" / ") }.ifBlank { h.vehicleInfo() }
 
@@ -150,7 +152,7 @@ object Reminders {
 class DueReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, i: Intent) {
         when (i.action) {
-            Intent.ACTION_BOOT_COMPLETED -> Reminders.schedule(ctx)
+            Intent.ACTION_BOOT_COMPLETED -> { Reminders.schedule(ctx); Live.start(ctx) }
             "com.kabadi.calc.SHR" -> { val r = goAsync(); Thread { try { Reminders.fetchShared(ctx) } finally { r.finish() } }.start() }
             "com.kabadi.calc.REQ" -> { val r = goAsync(); Thread { try { Relay.notifyAdmin(ctx) } finally { r.finish() } }.start() }
             else -> Reminders.check(ctx)
