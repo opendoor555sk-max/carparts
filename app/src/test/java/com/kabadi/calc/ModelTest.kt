@@ -440,6 +440,9 @@ class ModelTest {
         val buyer = f.first { it.mobile == "9333333333" }
         assertTrue(buyer.text.contains("Body") && buyer.text.contains("⏳") && buyer.text.contains("Anand"))
         assertTrue(f.first { it.mobile == "9222222222" }.text.contains("➡"))
+        // partners get the whole hisab (buyer line with his name is in it)
+        assertTrue(f.first { it.mobile == "9222222222" }.text.contains("Rafiq"))
+        assertTrue(f.first { it.mobile == "9111111111" }.text.contains("Body"))
         assertTrue(f.none { it.mobile == me })
     }
 }

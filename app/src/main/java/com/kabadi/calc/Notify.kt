@@ -56,6 +56,7 @@ object Notify {
 
     /** one common text for all people of the deal (sent in one SMS to everybody): shares, invest, profit / loss */
     fun groupText(h: Hisab, phase: Int): String {
+        if (phase >= 3) return Bill.text(h) + "\n🙏 " + nm(Store.owner)
         val sb = StringBuilder(deal(h))
         when (phase) {
             0 -> sb.append("✅ ").append(L.t("msg_started")).append("\n")
@@ -76,16 +77,17 @@ object Notify {
         return sb.toString()
     }
 
-    private class Acc(var name: String) { val roles = mutableListOf<String>(); val parts = mutableListOf<String>() }
+    private class Acc(var name: String) { val roles = mutableListOf<String>(); val parts = mutableListOf<String>(); var full = false }
 
     /** who to tell after [phase]; [me] = this phone's own number (never messaged) */
     fun recipients(h: Hisab, phase: Int, me: String): List<Rcpt> {
         val map = LinkedHashMap<String, Acc>()
-        fun add(name: String, mob: String, role: String, piece: String) {
+        fun add(name: String, mob: String, role: String, piece: String, full: Boolean = false) {
             val m = digits10(mob)
             if (m.length != 10 || m == me) return
             val a = map.getOrPut(m) { Acc(name) }
             if (a.name.isBlank()) a.name = name
+            if (full) a.full = true
             if (role !in a.roles) a.roles.add(role)
             if (piece.isNotBlank() && piece !in a.parts) a.parts.add(piece)
         }
@@ -109,7 +111,8 @@ object Notify {
             }
             else -> {
                 val m = h.munafa()
-                people.forEach { (n, mob, r) -> add(n, mob, r, "✅ " + L.t("final_s")) }
+                // every partner (mudi malik, khedut, mehta, company partners) gets the WHOLE hisab of the auction
+                people.forEach { (n, mob, r) -> add(n, mob, r, "", full = true) }
                 fun mine(pct: Double, amount: Double) = "📌 " + L.t("your_share") + ": " + plain(pct) + "%\n➡ " + (if (amount >= 0) L.t("your_profit") else L.t("your_loss")) + ": " + money(Math.abs(amount))
                 val total = "📊 " + L.t("total_result") + ": " + (if (m >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(m))
                 if (h.mudiPct > 0) add(h.mudiName, h.mudiMobile, "💰 " + L.t("mudi_h"), total + "\n" + mine(h.mudiPct, h.mudiShare()))
@@ -134,7 +137,8 @@ object Notify {
         return map.map { (m, a) ->
             val who = nm(a.name)
             Rcpt(who, m, a.roles.joinToString(" + "),
-                (if (who.isNotBlank()) "🙏 " + L.t("rem_hello") + " " + who + ",\n" else "") + deal(h) + "\n" + a.parts.joinToString("\n\n") + "\n\n🙏 " + nm(Store.owner))
+                (if (who.isNotBlank()) "🙏 " + L.t("rem_hello") + " " + who + ",\n" else "") + (if (a.full) Bill.text(h) else deal(h)) + "\n" +
+                    a.parts.joinToString("\n\n") + "\n\n🙏 " + nm(Store.owner))
         }
     }
 }
