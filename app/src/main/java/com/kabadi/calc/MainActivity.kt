@@ -1008,14 +1008,17 @@ class MainActivity : Activity() {
             pic(R.drawable.home_gaadi, L.t("new_gaadi")) { newHisab("gaadi") },
             pic(R.drawable.home_haraji, L.t("new_haraji")) { newHisab("haraji") }))
         body.addView(gridRow(
-            pic(R.drawable.home_lot, L.t("new_lot")) { newHisab("lot") },
-            pic(R.drawable.home_party, L.t("party_tile")) { showParties() }))
-        body.addView(gridRow(
             pic(R.drawable.home_mudi, L.t("mudi_h")) { showRole("mudi") },
             pic(R.drawable.home_khed, L.t("khed_h")) { showRole("khed") }))
         body.addView(gridRow(
-            pic(R.drawable.home_khata, L.t("khata_btn"), if (late > 0) "⚠ $late" else "") { showKhata() },
-            pic(R.drawable.home_report, L.t("report_btn")) { showReport() }))
+            pic(R.drawable.home_party, L.t("party_tile")) { showParties() },
+            pic(R.drawable.home_khata, L.t("khata_btn"), if (late > 0) "⚠ $late" else "") { showKhata() }))
+        // 7 tiles: the last one sits in the middle
+        body.addView(LinearLayout(this).apply {
+            addView(View(this@MainActivity), llp(0, rowH, 0.5f))
+            addView(pic(R.drawable.home_report, L.t("report_btn")) { showReport() }, llp(0, rowH, 1f))
+            addView(View(this@MainActivity), llp(0, rowH, 0.5f))
+        })
         if (Store.shared.isNotEmpty()) body.addView(bigButton("👁 " + L.t("sh_title") + " (" + Store.shared.size + ")", BLUE) { showShared() }
             .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         val rem = reminders(Store.hisabs)
@@ -1085,7 +1088,7 @@ class MainActivity : Activity() {
                 val m = h.munafa()
                 top.addView(TextView(this).apply { text = money(m); textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (m >= 0) GREEN else RED) })
                 c.addView(top)
-                c.addView(small(listOf(if (h.finalAt > 0) "✅" else "", if (h.isLot) "🚚 " + L.t("lot") else if (h.isCo) "🏢 " + L.t("mode_co") else if (h.type == "haraji") "🔨 " + L.t("haraji") else "",
+                c.addView(small(listOf(if (h.finalAt > 0) "✅" else "", if (h.type == "lot") "🚚 " + L.t("lot") else if (h.isCo) "🏢 " + L.t("mode_co") + (if (h.lotMode) " 📦" else "") else if (h.type == "haraji") "🔨 " + L.t("haraji") + (if (h.lotMode) " 📦 " + L.t("lot") else "") else "",
                     h.vehicleInfo(), h.vehicle, Bill.dateText(h.time)).filter { it.isNotBlank() }.joinToString("  •  ")))
                 c.setOnClickListener { showEditor(h) }
                 c.setOnLongClickListener { askDelete(h) { fill(q) }; true }
@@ -1290,8 +1293,8 @@ class MainActivity : Activity() {
             sumSale.text = money(h.sale)
             sumBikri.text = money(h.bikri())
             sumComm.text = "- " + money(h.commission())
-            (sumSale.parent as? View)?.visibility = if (h.isLot && h.sale == 0.0) View.GONE else View.VISIBLE
-            (sumBikri.parent as? View)?.visibility = if (h.isLot) View.GONE else View.VISIBLE
+            (sumSale.parent as? View)?.visibility = if (h.type == "lot" && h.sale == 0.0) View.GONE else View.VISIBLE
+            (sumBikri.parent as? View)?.visibility = if (h.type == "lot") View.GONE else View.VISIBLE
             (sumComm.parent as? View)?.visibility = if (h.commission() == 0.0) View.GONE else View.VISIBLE
         }
         if (h.type == "haraji") {
@@ -1418,6 +1421,27 @@ class MainActivity : Activity() {
             mc0.addView(small(L.t("muddat_hint")))
             upd()
             body.addView(mc0, cardLp())
+        }
+
+        // ---- haraji: one vehicle or a lot (many vehicles / goods) ----
+        if (h.type == "haraji" && h.finalAt == 0L && viewOnly == null) {
+            val lc0 = card()
+            lc0.addView(toggle(listOf("🚚 " + L.t("one_veh"), "📦 " + L.t("lot")), if (h.lotMode) 1 else 0, 0xFF1565C0.toInt()) { i ->
+                if (i == 1 && !h.lotMode) {
+                    // move the single vehicle + goods into "Lot 1"
+                    val t = Lot("Lot 1")
+                    if (h.hasVehicle()) t.vehicles.add(Veh(h.brand, h.variant, h.tyres, h.year, h.vehicle, h.priceText))
+                    t.items.addAll(h.buyItems); h.buyItems.clear()
+                    h.brand = ""; h.variant = ""; h.tyres = ""; h.year = ""; h.vehicle = ""; h.priceText = ""
+                    h.lots.clear(); h.lots.add(t); h.lotMode = true
+                } else if (i == 0 && h.lotMode) {
+                    if (h.lots.all { it.vehicles.isEmpty() && it.items.isEmpty() && it.priceText.isBlank() }) { h.lots.clear(); h.lotMode = false }
+                    else toast(L.t("lot_back_no"))
+                }
+                showEditor(h)
+            })
+            lc0.addView(small(L.t("lot_mode_h")).apply { textSize = 12f })
+            body.addView(lc0, cardLp())
         }
 
         // ---- lot hisab: one or more lots, each with vehicles + any items, own name and price ----
@@ -1593,7 +1617,7 @@ class MainActivity : Activity() {
         drawMaal()
         body.addView(mc, cardLp())
 
-        if (h.isLot) {
+        if (h.type == "lot") {
             val sc = card()
             sc.addView(heading(L.t("lot_sale"), GREEN).apply { textSize = 15f })
             sc.addView(small(L.t("lot_sale_h")))
@@ -1689,7 +1713,7 @@ class MainActivity : Activity() {
         sumDena = sumRow(L.t("dena_baaki"), false, RED)
         sumLena = sumRow(L.t("lena_baaki"), false, ORANGE)
         if (h.type == "haraji" || h.isLot) {
-            sumSale = sumRow(when { h.isLot -> L.t("lot_sale"); h.isCo -> L.t("co_give"); else -> L.t("sale_s") })
+            sumSale = sumRow(when { h.type == "lot" -> L.t("lot_sale"); h.isCo -> L.t("co_give"); else -> L.t("sale_s") })
             sumBikri = sumRow(if (h.isCo) L.t("co_sales") else L.t("bikri"), true, GREEN)
             sumComm = sumRow(L.t("comm_s") + if (h.isCo) "  (" + (if (h.commByCo) "🏢" else "💰 " + L.t("mudi_h")) + ")" else "", false, ORANGE)
         }

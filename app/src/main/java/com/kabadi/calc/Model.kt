@@ -120,14 +120,16 @@ class Hisab(
     var commByCo: Boolean = false,
     /** haraji: the mehta who runs the auction (name + mobile are required) */
     var mehtaName: String = "",
-    var mehtaMobile: String = ""
+    var mehtaMobile: String = "",
+    /** haraji with lots: many vehicles / goods bought together (the old separate "lot" hisab feature) */
+    var lotMode: Boolean = false
 ) {
     /** vehicle bought on credit (we pay) and auction / company sale on credit (we get) */
     var buyLine = Line("veh", "", true)
     var saleLine = Line("sale", "", true)
     fun bind() { buyLine.calc = { price }; saleLine.calc = { sale } }
     init { bind() }
-    val isLot get() = type == "lot"
+    val isLot get() = type == "lot" || (type == "haraji" && lotMode)
     val isCo get() = type == "haraji" && coMode
     fun allVehicles() = vehicles + lots.flatMap { it.vehicles }
     val mudiPct get() = evalExpr(mudiPctText).let { if (it.isFinite() && it > 0) it else 0.0 }

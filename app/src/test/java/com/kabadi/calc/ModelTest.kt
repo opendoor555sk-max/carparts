@@ -382,4 +382,15 @@ class ModelTest {
         assertTrue(finalProblems(h).isEmpty())
         assertEquals(setOf("9000000001", "9000000002", "9000000003", "9000000004", "9876543210"), Share.targetsOf(h).toSet())
     }
+
+    @Test fun harajiWithLots() {
+        val h = Hisab(1, 1, type = "haraji", lotMode = true, saleText = "200000", commText = "2", commPct = true)
+        val t = Lot("Lot 1"); t.vehicles.add(Veh("Tata", priceText = "80000")); t.vehicles.add(Veh("Eicher", priceText = "50000")); h.lots.add(t)
+        assertTrue(h.isLot)
+        assertEquals(130000.0, h.price, 1e-9)
+        assertEquals(4000.0, h.commission(), 1e-9)
+        assertEquals(66000.0, h.munafa(), 1e-9)
+        assertTrue(h.verify().isEmpty())
+        assertTrue(Hisab(2, 1, type = "lot").isLot); assertFalse(Hisab(3, 1, type = "haraji").isLot)
+    }
 }

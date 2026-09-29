@@ -65,7 +65,7 @@ object Bill {
         c?.drawText(TextUtils.ellipsize(Store.owner.ifBlank { L.t("app") }, tp(19 * u, true, white), W * 0.62f, TextUtils.TruncateAt.END).toString(), pad, 28 * u, tp(19 * u, true, white))
         val sub = listOf(Store.mobile, Store.address).filter { it.isNotBlank() }.joinToString("  •  ")
         if (sub.isNotEmpty()) c?.drawText(TextUtils.ellipsize(sub, tp(11 * u, false, white), W * 0.62f, TextUtils.TruncateAt.END).toString(), pad, 47 * u, tp(11 * u, false, Color.rgb(0xCF, 0xD8, 0xDC)))
-        c?.drawText(when { h.isLot -> L.t("lot"); h.type == "haraji" -> L.t("haraji"); else -> L.t("hisab") } + (if (h.finalAt > 0) "  ✅" else ""), W - pad, 28 * u, tp(16 * u, true, Color.rgb(0xFF, 0xB7, 0x4D), Paint.Align.RIGHT))
+        c?.drawText(when { h.type == "lot" -> L.t("lot"); h.type == "haraji" -> L.t("haraji") + (if (h.lotMode) " • " + L.t("lot") else ""); else -> L.t("hisab") } + (if (h.finalAt > 0) "  ✅" else ""), W - pad, 28 * u, tp(16 * u, true, Color.rgb(0xFF, 0xB7, 0x4D), Paint.Align.RIGHT))
         c?.drawText(dateText(h.time), W - pad, 47 * u, tp(11 * u, false, white, Paint.Align.RIGHT))
         c?.drawText("#" + (h.id % 100000), W - pad, 64 * u, tp(10 * u, false, Color.rgb(0xB0, 0xBE, 0xC5), Paint.Align.RIGHT))
         y = headH + 8 * u
@@ -193,7 +193,7 @@ object Bill {
             y += 6 * u
         }
 
-        if (h.isLot && h.sale != 0.0) {
+        if (h.type == "lot" && h.sale != 0.0) {
             section(L.t("lot_sale"))
             row(L.t("lot_sale"), money(h.sale), true, green)
             credit(h, h.saleLine).let { if (it.isNotEmpty()) row("   ⏳ " + it, "", false, Color.rgb(0xEF, 0x6C, 0x00), 11f) }
@@ -406,7 +406,7 @@ object Bill {
             if (h.maal.any { !it.fixed && it.litre }) sb.append(L.t("sum_ltr")).append(": ").append(plain(h.litre())).append(" litre\n")
             sb.append("*").append(L.t("sum_maal")).append(": ").append(money(h.maalTotal())).append("*\n")
         }
-        if (h.isLot && h.sale != 0.0) sb.append("\n").append(L.t("lot_sale")).append(": ").append(money(h.sale)).append("\n")
+        if (h.type == "lot" && h.sale != 0.0) sb.append("\n").append(L.t("lot_sale")).append(": ").append(money(h.sale)).append("\n")
         if (h.isCo) {
             sb.append("\n").append(L.t("co_give")).append(": ").append(money(h.sale)).append("\n")
             if (h.commission() != 0.0) sb.append(L.t("comm_s")).append(" (").append(if (h.commByCo) "🏢" else L.t("mudi_h")).append("): -").append(money(h.commission())).append("\n")
