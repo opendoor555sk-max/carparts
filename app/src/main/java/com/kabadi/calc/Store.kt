@@ -25,6 +25,9 @@ object Store {
     var mobile = ""
     var address = ""
     val hisabs = mutableListOf<Hisab>()
+    /** haraji: shops that may guarantee credit (written by the admin, copied to every phone); shopsT = version time */
+    val shops = java.util.concurrent.CopyOnWriteArrayList<Shop>()
+    var shopsT = 0L
     /** hisab of others where this phone is mudi malik / khedut (view only) */
     val shared = java.util.concurrent.CopyOnWriteArrayList<Shared>()
     /** lines of others' hisab that concern this phone (I bought / sold / gave a service) */
@@ -179,6 +182,7 @@ object Store {
         o.put("sh", JSONArray().also { a -> shared.forEach { a.put(JSONObject().put("f", it.from).put("fm", it.fromMobile).put("t", it.t).put("h", hj(it.h))) } })
         o.put("lkd", JSONArray().also { a -> linked.forEach { k -> a.put(JSONObject().put("f", k.from).put("fm", k.fromMobile).put("hid", k.hid).put("ti", k.title).put("tm", k.time).put("t", k.t)
             .put("ln", JSONArray().also { b -> k.lines.forEach { l -> b.put(JSONObject().put("n", l.name).put("a", l.amount).put("cr", l.credit).put("du", l.due).put("gt", l.got).put("lf", l.left).put("yp", l.youPay).put("in", l.info)) } })) } })
+        o.put("shp", JSONArray().also { a -> shops.forEach { a.put(JSONObject().put("no", it.no).put("ow", it.owner).put("mb", it.mobile).put("lm", it.limit)) } }).put("shpT", shopsT)
         o.put("rates", JSONObject(lastRate as Map<*, *>))
         o.put("parts", bj(parts)).put("exp", bj(expenses)).put("tp", bj(trashParts)).put("te", bj(trashExp))
         return o
@@ -226,6 +230,8 @@ object Store {
             o.optJSONArray("h")?.let { a -> for (i in 0 until a.length()) hisabs.add(jh(a.getJSONObject(i))) }
             shared.clear()
             o.optJSONArray("sh")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { shared.add(Shared(it.optString("f"), it.optString("fm"), it.optLong("t"), jh(it.getJSONObject("h")))) } }
+            shops.clear(); shopsT = o.optLong("shpT")
+            o.optJSONArray("shp")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { shops.add(Shop(it.optString("no"), it.optString("ow"), it.optString("mb"), it.optDouble("lm", Shops.LIMIT))) } }
             linked.clear()
             o.optJSONArray("lkd")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { k ->
                 val ln = k.optJSONArray("ln")

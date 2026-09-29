@@ -102,6 +102,7 @@ object Reminders {
     fun fetchShared(ctx: Context, notify: Boolean = true): Int {
         if (!Store.loadedOk) Store.load(ctx)
         if (!Store.loadedOk) return 0
+        try { if (Shops.fetch(ctx)) Store.save(ctx); Shops.republishIfDue(ctx) } catch (_: Exception) {}
         val n = try { Share.fetch(ctx) } catch (_: Exception) { 0 }
         if (n <= 0) return 0
         Store.save(ctx)

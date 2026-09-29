@@ -120,6 +120,7 @@ class MainActivity : Activity() {
             Thread {
                 try { Feedback.resendPending(this) } catch (_: Exception) {}
                 try { Share.republish(this) } catch (_: Exception) {}
+                try { if (Shops.fetch(this)) ui.post { Store.save(this) } } catch (_: Exception) {}
                 val n = try { Share.fetch(this) } catch (_: Exception) { 0 }
                 if (n > 0) ui.post { Store.save(this); toast("👁 $n " + L.t("sh_new")); if (screen == "home") showHome() }
             }.start()
@@ -2273,6 +2274,7 @@ class MainActivity : Activity() {
         if (l.cName.isBlank() || digits10(l.cMobile).length != 10 || l.value() <= 0.0) { toast(L.t("sold_need")); return }
         if (l.udhaar && dueTime(h, l) == null) { toast(L.t("muddat_h")); return }
         if (!guarantorOk(h, l)) { AlertDialog.Builder(this).setTitle("🤝 " + L.t("g_title")).setMessage(L.t("g_need")).setPositiveButton("OK", null).show(); return }
+        shopProblem(h, l)?.let { AlertDialog.Builder(this).setTitle("🏪 " + L.t("g_title")).setMessage(it).setPositiveButton("OK", null).show(); return }
         AlertDialog.Builder(this).setTitle(l.name + " → " + l.cName).setMessage(L.t("sold_q"))
             .setPositiveButton(L.t("yes")) { _, _ ->
                 l.sold = true; autoSave(); Store.save(this); showEditor(h); showLineMessage(h, l)
@@ -2340,21 +2342,51 @@ class MainActivity : Activity() {
         box.addView(who)
     }
 
-    /** credit sale: guarantor (jamindar) with name, mobile and shop number; the mudi malik / khedut can be the guarantor with one tap */
+    /** credit sale: guarantor (jamindar). Haraji: the shop number brings the owner's name + mobile (written by the admin) and uses the shop's limit. */
     private fun guarantorBlock(h: Hisab, l: Line, box: LinearLayout, redraw: () -> Unit) {
+        val PUR = 0xFF6A1B9A.toInt()
         val g = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; background = round(0xFFF3E5F5.toInt(), 8f, 0xFFCE93D8.toInt()); setPadding(dpi(8f), dpi(6f), dpi(8f), dpi(6f)) }
-        g.addView(small("🤝 " + L.t("g_title"), 0xFF6A1B9A.toInt()).apply { typeface = Typeface.DEFAULT_BOLD })
+        g.addView(small("🤝 " + L.t("g_title"), PUR).apply { typeface = Typeface.DEFAULT_BOLD })
         if (isMudiBuyer(h, l)) { g.addView(small(L.t("g_self"), GREEN)); box.addView(g, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) }); return }
+        fun by(w: String, name: String, mob: String) {
+            if (l.gBy == w) { l.gBy = ""; l.gName = ""; l.gMobile = "" } else { l.gBy = w; l.gName = name; l.gMobile = digits10(mob); l.shop = "" }
+            redraw()
+        }
         val pills = ArrayList<Pair<View, Float>>()
         if (h.mudiName.isNotBlank() && digits10(h.mudiMobile).length == 10)
-            pills.add(pill(L.t("g_by_mudi"), l.gBy == "mudi", 0xFF6A1B9A.toInt()) { l.gBy = "mudi"; l.gName = h.mudiName; l.gMobile = digits10(h.mudiMobile); l.shop = ""; redraw() } to 1f)
+            pills.add(pill(L.t("g_by_mudi"), l.gBy == "mudi", PUR) { by("mudi", h.mudiName, h.mudiMobile) } to 1f)
         if (!isKhedBuyer(h, l) && h.khedName.isNotBlank() && digits10(h.khedMobile).length == 10)
-            pills.add(pill(L.t("g_by_khed"), l.gBy == "khed", 0xFF6A1B9A.toInt()) { l.gBy = "khed"; l.gName = h.khedName; l.gMobile = digits10(h.khedMobile); l.shop = ""; redraw() } to 1f)
+            pills.add(pill(L.t("g_by_khed"), l.gBy == "khed", PUR) { by("khed", h.khedName, h.khedMobile) } to 1f)
         if (pills.isNotEmpty()) g.addView(row(*pills.toTypedArray()).apply { setPadding(0, dpi(4f), 0, dpi(4f)) })
-        g.addView(row(input(L.t("gname"), l.gName, false) { l.gName = it; l.gBy = "" }.apply { textSize = 15f } to 1.2f,
-            mobileInput(L.t("gmobile"), l.gMobile) { l.gMobile = it; l.gBy = "" } to 1f))
-        g.addView(row(input(L.t("shop") + if (l.gBy.isEmpty()) " *" else "", l.shop, false) { l.shop = it }.apply { textSize = 15f } to 1f))
+        if (h.type == "haraji" && l.gBy.isEmpty()) {
+            // shop guarantee: type the shop number, the owner comes by himself
+            val info = small("", MUTED).apply { textSize = 13f }
+            fun upd() {
+                if (l.shop.isBlank()) { l.gName = ""; l.gMobile = ""; info.text = ""; return }
+                val s = Shops.find(l.shop)
+                if (s == null) { l.gName = ""; l.gMobile = ""; info.text = "✗ " + L.t("shop_unknown"); info.setTextColor(RED); return }
+                l.gName = s.owner; l.gMobile = digits10(s.mobile)
+                val left = Shops.left(s, l); val ok = l.remaining() <= left + 0.004
+                info.text = "🏪 " + s.no + " • " + s.owner + "  📞 " + s.mobile + "\n" + L.t("shop_limit_w") + " " + money(s.limit) + " • " + L.t("shop_used") + " " + money(Shops.used(s.no, l)) +
+                    " • " + L.t("shop_left") + " " + money(left) + (if (!ok) "\n⚠ " + L.t("shop_limit") else "")
+                info.setTextColor(if (ok) GREEN else RED)
+            }
+            val shopIn = input(L.t("shop") + " *", l.shop, false) { l.shop = it; upd() }.apply { textSize = 15f }
+            g.addView(row(shopIn to 1f, pill("🏪 ▾", false, PUR) {
+                if (Store.shops.isEmpty()) return@pill toast(L.t("shop_none"))
+                val ss = Store.shops.toList()
+                AlertDialog.Builder(this).setTitle(L.t("shop_pick")).setItems(ss.map { it.no + " – " + it.owner + "  (" + money(Shops.left(it, l)) + ")" }.toTypedArray()) { _, w -> l.shop = ss[w].no; redraw() }.show()
+            }.apply { textSize = 16f; setPadding(dpi(10f), dpi(4f), dpi(10f), dpi(4f)) } to 0f))
+            g.addView(info)
+            upd()
+        } else if (h.type == "haraji") {
+            g.addView(small("🤝 " + Notify.guarText(h, l).removePrefix("🤝 "), INK))
+        } else {
+            g.addView(row(input(L.t("gname"), l.gName, false) { l.gName = it; l.gBy = "" }.apply { textSize = 15f } to 1.2f,
+                mobileInput(L.t("gmobile"), l.gMobile) { l.gMobile = it; l.gBy = "" } to 1f))
+            g.addView(row(input(L.t("shop") + if (l.gBy.isEmpty()) " *" else "", l.shop, false) { l.shop = it }.apply { textSize = 15f } to 1f))
+        }
         if (!guarantorOk(h, l)) g.addView(small("⚠ " + L.t("g_need"), ORANGE).apply { textSize = 11.5f })
         box.addView(g, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
     }
@@ -2470,6 +2502,56 @@ class MainActivity : Activity() {
             c.addView(small(listOfNotNull(if (h.mudiName.isNotBlank()) "💰 " + h.mudiName else null, if (h.khedName.isNotBlank()) "🚚 " + h.khedName else null).joinToString("   "), INK))
             c.addView(small(L.t("sh_by") + ": " + sh.from.ifBlank { "—" } + "  📞 " + sh.fromMobile))
             c.setOnClickListener { showEditor(h, sh) }
+            body.addView(c, cardLp())
+        }
+    }
+
+    // ================= SHOPS: who may guarantee credit, with limit (admin writes, all phones see) =================
+    private var shopEdit: Shop? = null
+    private fun showShops() {
+        autoSave(); editing = null; viewOnly = null
+        val canEdit = !LOGIN_ON || Account.isAdmin(this)
+        val body = setScreen("shops", "🏪 " + L.t("shops_t"), { showSettings() })
+        val info = card()
+        info.addView(small(L.t("shops_info"), INK).apply { textSize = 13f })
+        val st = small("", MUTED)
+        info.addView(row(st to 1f, pill("⟳ " + L.t("sh_refresh"), false, BLUE) {
+            st.text = "⏳"
+            Thread { val ch = try { Shops.fetch(this) } catch (_: Exception) { false }; ui.post { if (ch) Store.save(this); showShops() } }.start()
+        } to 0f))
+        body.addView(info, cardLp())
+        if (canEdit) {
+            val e = shopEdit
+            var no = e?.no ?: ""; var ow = e?.owner ?: ""; var mb = e?.mobile ?: ""; var lm = e?.limit ?: Shops.LIMIT
+            val f = card()
+            f.addView(heading(if (e == null) "＋ " + L.t("shop") else "✎ " + L.t("shop") + " " + e.no))
+            f.addView(row(input(L.t("shop") + " *", no, false) { no = it }.apply { textSize = 15f } to 1f, input(L.t("shop_owner") + " *", ow, false) { ow = it }.apply { textSize = 15f } to 1.6f))
+            f.addView(row(mobileInput(L.t("mobile"), mb) { mb = it } to 1f, input(L.t("shop_limit_in"), plain(lm), true) { lm = evalExpr(it).let { v -> if (v.isFinite() && v > 0) v else Shops.LIMIT } }.apply { textSize = 15f } to 1f))
+            f.addView(pill("✅ " + L.t("save"), true, GREEN) {
+                if (no.isBlank() || ow.isBlank() || mb.length != 10) return@pill toast(L.t("mob_need"))
+                val old = Shops.find(no)
+                if (old != null && old !== e) { old.owner = ow.trim(); old.mobile = mb; old.limit = lm } // same number: update it
+                else if (e != null) { e.no = no.trim(); e.owner = ow.trim(); e.mobile = mb; e.limit = lm }
+                else Store.shops.add(Shop(no.trim(), ow.trim(), mb, lm))
+                Store.shopsT = System.currentTimeMillis(); Store.save(this); shopEdit = null
+                Thread { val ok = try { Shops.publish(this) } catch (_: Exception) { false }; ui.post { toast(if (ok) "✓ " + L.t("shop_saved") else "📶 " + L.t("otp_net")); showShops() } }.start()
+            }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+            body.addView(f, cardLp())
+        }
+        if (Store.shops.isEmpty()) body.addView(small(L.t("shop_none")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        Store.shops.toList().forEach { s ->
+            val c = card()
+            val used = Shops.used(s.no); val left = s.limit - used
+            c.addView(small("🏪 " + s.no + "  •  " + s.owner, INK).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD })
+            c.addView(small("📞 " + s.mobile))
+            c.addView(small(L.t("shop_limit_w") + " " + money(s.limit) + "   •   " + L.t("shop_used") + " " + money(used), INK).apply { textSize = 14f })
+            c.addView(small(L.t("shop_left") + ": " + money(left), if (left > 0) GREEN else RED).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD })
+            Shops.lines(s.no).filter { it.second.remaining() > 0.004 }.forEach { (h, l) ->
+                c.addView(small("• " + Notify.nm(l.cName) + " – " + l.name + ": " + money(l.remaining()) + "  (" + Bill.dateText(h.time).substringBefore("  ") + ")", INK).apply { textSize = 13f })
+            }
+            if (canEdit) c.addView(row(pill("✎", false, BLUE) { shopEdit = s; showShops() } to 1f,
+                pill("🗑", false, RED) { confirmRemove { Store.shops.remove(s); Store.shopsT = System.currentTimeMillis(); Store.save(this)
+                    Thread { try { Shops.publish(this) } catch (_: Exception) {}; ui.post { showShops() } }.start() } } to 1f))
             body.addView(c, cardLp())
         }
     }
@@ -2987,6 +3069,7 @@ class MainActivity : Activity() {
             if (Account.isAdmin(this)) {
                 ad.addView(heading("👑 Admin ✓ (AbdulSalam)"))
                 ad.addView(pill("👑 " + L.t("adm_users_btn"), true, 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+                ad.addView(pill("🏪 " + L.t("shops_t"), true, 0xFF00695C.toInt()) { showShops() }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             } else {
                 ad.addView(heading("👑 Admin login"))
                 ad.addView(small("Fakt malik (AbdulSalam) mate – code nakho.").apply { setPadding(0, 0, 0, dpi(8f)) })

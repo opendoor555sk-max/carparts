@@ -580,7 +580,10 @@ fun guarantorOk(h: Hisab, l: Line): Boolean {
     return l.gBy == "mudi" || l.gBy == "khed" || l.shop.isNotBlank()
 }
 fun guarantorProblems(h: Hisab): List<String> =
-    creditLines(h).filter { !guarantorOk(h, it) }.map { "🤝 " + it.name.ifBlank { L.ln(it) } + " → " + it.cName.ifBlank { "?" } + ": " + L.t("g_need") }
+    creditLines(h).mapNotNull { l ->
+        val why = if (!guarantorOk(h, l)) L.t("g_need") else shopProblem(h, l)
+        if (why == null) null else "🤝 " + l.name.ifBlank { L.ln(l) } + " → " + l.cName.ifBlank { "?" } + ": " + why
+    }
 
 fun missingMobile(h: Hisab): List<String> {
     val out = mutableListOf<String>()

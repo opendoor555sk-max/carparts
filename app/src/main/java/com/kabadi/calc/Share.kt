@@ -118,6 +118,7 @@ object Share {
 
     /** on app start: send again what changed, or what was sent more than 6 h ago (last 90 days) */
     fun republish(ctx: Context) {
+        try { Shops.republishIfDue(ctx) } catch (_: Exception) {}
         val now = System.currentTimeMillis()
         Store.hisabs.toList().filter { now - it.time < 90L * 86400000L && anyone(ctx, it) }.forEach { h ->
             val changed = sp(ctx).getInt("x_${h.id}", 0) != Store.hj(h).toString().hashCode()
