@@ -118,6 +118,7 @@ class MainActivity : Activity() {
                 }
             }.start()
             Thread {
+                try { Feedback.resendPending(this) } catch (_: Exception) {}
                 try { Share.republish(this) } catch (_: Exception) {}
                 val n = try { Share.fetch(this) } catch (_: Exception) { 0 }
                 if (n > 0) ui.post { Store.save(this); toast("👁 $n " + L.t("sh_new")); if (screen == "home") showHome() }
@@ -499,6 +500,7 @@ class MainActivity : Activity() {
                     small(Bill.dateText(o.optLong("at"))) to 0f))
                 box.addView(small("📞 " + m.ifBlank { "—" }))
                 if (o.optString("t").isNotBlank()) box.addView(small("✍ " + o.optString("t"), INK).apply { textSize = 15f; setPadding(0, dpi(4f), 0, dpi(2f)) })
+                if (o.optBoolean("partial")) box.addView(small("⚠ 🎤 " + L.t("fb_partial") + " (" + o.optInt("got") + "/" + o.optInt("of") + ")", RED).apply { textSize = 14f; typeface = Typeface.DEFAULT_BOLD })
                 val acts = LinearLayout(this).apply { setPadding(0, dpi(6f), 0, 0) }
                 fun act(t: String, color: Int, w: Float, a: () -> Unit) = acts.addView(TextView(this).apply {
                     text = t; textSize = 14f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = round(color, 14f)
@@ -942,10 +944,10 @@ class MainActivity : Activity() {
             val ms = if (recorded) dur else 0L
             val t = text.trim()
             Thread {
-                val ok = try { Feedback.send(nm, mob, dev, t, bytes, ms) } catch (_: Exception) { false }
+                val ok = try { Feedback.send(this, nm, mob, dev, t, bytes, ms) } catch (_: Exception) { false }
                 ui.post {
-                    if (ok) { f.delete(); toast("✅ " + L.t("fb_sent")); if (screen == "feedback") showHome() }
-                    else { toast(L.t("otp_net")); sendBtn.isEnabled = true; sendBtn.alpha = 1f }
+                    // a copy stays on the phone: what did not go is sent later, by itself
+                    f.delete(); toast(if (ok) "✅ " + L.t("fb_sent") else "⏳ " + L.t("fb_later")); if (screen == "feedback") showHome()
                 }
             }.start()
         }

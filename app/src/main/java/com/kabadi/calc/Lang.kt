@@ -364,6 +364,8 @@ object L {
         "fb_empty" to arrayOf("First speak or write", "पहले बोलें या लिखें", "પહેલા બોલો કે લખો"),
         "fb_sending" to arrayOf("Sending…", "भेज रहे हैं…", "મોકલી રહ્યા છીએ…"),
         "fb_sent" to arrayOf("Reached the admin", "एडमिन को पहुँच गया", "એડમિનને પહોંચી ગયું"),
+        "fb_later" to arrayOf("Internet is slow – saved, it will be sent by itself", "इंटरनेट धीमा है – सेव हुआ, अपने आप भेज दिया जाएगा", "ઇન્ટરનેટ ધીમું છે – સેવ થયું, આપોઆપ મોકલાઈ જશે"),
+        "fb_partial" to arrayOf("Voice not fully received – ask the user to open the app with internet", "आवाज़ पूरी नहीं आई – यूज़र से इंटरनेट के साथ ऐप खोलने को कहें", "અવાજ પૂરો આવ્યો નથી – યુઝરને ઇન્ટરનેટ સાથે app ખોલવા કહો"),
         "fb_perm" to arrayOf("Allow the microphone, then press again", "माइक की इजाज़त दें, फिर दोबारा दबाएँ", "માઇકની પરવાનગી આપો, પછી ફરી દબાવો"),
         "fb_admin" to arrayOf("Users' problems (voice / text)", "यूज़र की परेशानी (आवाज़ / लिखा)", "યુઝરની તકલીફ (અવાજ / લખેલું)"),
         "fb_none" to arrayOf("No message yet", "अभी कोई संदेश नहीं", "હજી કોઈ સંદેશ નથી"),
