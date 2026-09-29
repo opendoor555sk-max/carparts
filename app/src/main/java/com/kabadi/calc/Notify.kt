@@ -16,6 +16,10 @@ class Rcpt(val name: String, val mobile: String, val role: String, val text: Str
 object Notify {
     private fun date(t: Long) = SimpleDateFormat("dd-MM-yyyy", Locale.US).format(Date(t))
 
+    const val BISM = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"
+    /** first lines of every message: Bismillah, then the greeting with the full name */
+    fun opening(name: String): String = BISM + "\n🙏 " + L.t("salam") + (if (nm(name).isNotBlank()) " " + nm(name) else "") + ",\n"
+
     /** a name written properly: no double spaces, first letter capital for English words (riyan → Riyan) */
     fun nm(x: String): String = x.replace(Regex("\\s+"), " ").trim().trim('.', ',', '-', '_').split(" ").filter { it.isNotEmpty() }.joinToString(" ") { w ->
         if (w[0].isLowerCase() && w.all { it.code < 128 }) w.replaceFirstChar { it.uppercaseChar() } else w
@@ -52,12 +56,12 @@ object Notify {
 
     /** message for the one buyer of one line, right after "OK – sold" */
     fun soldText(h: Hisab, l: Line): String =
-        (if (nm(l.cName).isNotBlank()) "🙏 " + L.t("rem_hello") + " " + nm(l.cName) + ",\n" else "") + deal(h) + "\n" + lineText(h, l) + "\n\n🙏 " + nm(Store.owner)
+        opening(l.cName) + deal(h) + "\n" + lineText(h, l) + "\n\n🙏 " + nm(Store.owner)
 
     /** one common text for all people of the deal (sent in one SMS to everybody): shares, invest, profit / loss */
     fun groupText(h: Hisab, phase: Int): String {
-        if (phase >= 3) return Bill.text(h) + "\n🙏 " + nm(Store.owner)
-        val sb = StringBuilder(deal(h))
+        if (phase >= 3) return BISM + "\n🙏 " + L.t("salam") + ",\n" + Bill.text(h) + "\n🙏 " + nm(Store.owner)
+        val sb = StringBuilder(BISM + "\n🙏 " + L.t("salam") + ",\n" + deal(h))
         when (phase) {
             0 -> sb.append("✅ ").append(L.t("msg_started")).append("\n")
             1 -> sb.append("🛒 ").append(L.t("msg_buy")).append(": ").append(money(h.price)).append("\n")
@@ -137,7 +141,7 @@ object Notify {
         return map.map { (m, a) ->
             val who = nm(a.name)
             Rcpt(who, m, a.roles.joinToString(" + "),
-                (if (who.isNotBlank()) "🙏 " + L.t("rem_hello") + " " + who + ",\n" else "") + (if (a.full) Bill.text(h) else deal(h)) + "\n" +
+                opening(who) + (if (a.full) Bill.text(h) else deal(h)) + "\n" +
                     a.parts.joinToString("\n\n") + "\n\n🙏 " + nm(Store.owner))
         }
     }

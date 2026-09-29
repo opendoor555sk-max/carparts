@@ -1,7 +1,13 @@
 package com.kabadi.calc
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
+
+/** one line of another person's hisab that concerns this phone's number (he sold us / we owe / we get) */
+class LinkLine(val name: String, val amount: Double, val credit: Boolean, val due: Long, val got: Double, val left: Double, val youPay: Boolean)
+/** the lines of one hisab of someone else that concern this phone (a buyer, a seller, a service) – not the whole hisab */
+class Linked(var from: String, var fromMobile: String, var hid: Long, var title: String, var time: Long, var t: Long, var lines: List<LinkLine>)
 
 /** a hisab someone else made, where this phone's number is mudi malik / khedut (view only) */
 class Shared(var from: String, var fromMobile: String, var t: Long, var h: Hisab)
@@ -25,21 +31,64 @@ object Share {
 
     private fun sp(ctx: Context) = ctx.getSharedPreferences("kabadi_share", Context.MODE_PRIVATE)
 
-    /** send one hisab to its mudi malik / khedut; returns how many phones */
-    fun publish(ctx: Context, h: Hisab): Int {
-        val to = targets(ctx, h)
-        if (to.isEmpty()) return 0
-        val payload = JSONObject().put("f", Store.owner.ifBlank { Account.name(ctx) }).put("fm", myMobile(ctx))
-            .put("t", System.currentTimeMillis()).put("h", Store.hj(h)).toString()
-        var n = 0
-        to.forEach { m ->
-            val sealed = Codec.seal(payload, Otp.shareKey(m))
-            val parts = sealed.chunked(PART)
-            val k = h.id.toString() + "-" + System.currentTimeMillis()
-            var ok = true
-            parts.forEachIndexed { i, p -> if (!Relay.post(topic(m), JSONObject().put("k", k).put("i", i).put("n", parts.size).put("p", p))) ok = false }
-            if (ok) n++
+    private fun post(ctx: Context, m: String, payload: String, id: String): Boolean {
+        val parts = Codec.seal(payload, Otp.shareKey(m)).chunked(PART)
+        val k = id + "-" + System.currentTimeMillis()
+        var ok = true
+        parts.forEachIndexed { i, p -> if (!Relay.post(topic(m), JSONObject().put("k", k).put("i", i).put("n", parts.size).put("p", p))) ok = false }
+        return ok
+    }
+
+    /**
+     * Others in this hisab who are not partners (buyers, the one we bought from, service givers): each gets only
+     * HIS lines, once they are confirmed (sold OK / buying OK / expenses OK / final).
+     */
+    fun contacts(ctx: Context, h: Hisab): Map<String, List<LinkLine>> {
+        val skip = targetsOf(h).toSet() + myMobile(ctx)
+        val guard = h.step >= 0; val fin = h.finalAt > 0
+        val buyOk = fin || (guard && h.step >= 2); val kOk = fin || (guard && h.step >= 3)
+        val out = LinkedHashMap<String, MutableList<LinkLine>>()
+        fun add(l: Line, youPay: Boolean, name: String) {
+            val m = Otp.mobile10(l.cMobile)
+            if (m.length != 10 || m in skip || l.value() == 0.0) return
+            out.getOrPut(m) { mutableListOf() }.add(LinkLine(name, l.value(), l.udhaar, dueTime(h, l) ?: 0L, l.received(), l.remaining(), youPay))
         }
+        if (buyOk) add(h.buyLine, false, L.ln(h.buyLine) + " " + h.vehicleInfo())
+        if (kOk) h.kharch.forEach { add(it, false, it.name) }
+        h.maal.filter { fin || (guard && it.sold) }.forEach { l ->
+            add(l, true, l.name + if (!l.fixed && l.kg != 0.0) " " + plain(l.kg) + (if (l.litre) " L" else " kg") + " × " + plain(l.rate) else "")
+        }
+        if (fin && h.sale != 0.0) add(h.saleLine, true, L.ln(h.saleLine))
+        return out
+    }
+
+    /** somebody must be told (partners and / or contacts) */
+    fun anyone(ctx: Context, h: Hisab) = targets(ctx, h).isNotEmpty() || contacts(ctx, h).isNotEmpty()
+
+    private fun publishContacts(ctx: Context, h: Hisab): Int {
+        var n = 0
+        val title = h.party.ifBlank { listOf(h.mudiName, h.khedName).filter { it.isNotBlank() }.joinToString(" / ") }.ifBlank { h.vehicleInfo() }
+        contacts(ctx, h).forEach { (m, lines) ->
+            val c = JSONObject().put("hid", h.id).put("ti", title).put("tm", h.time).put("ln", JSONArray().also { a -> lines.forEach { l ->
+                a.put(JSONObject().put("n", l.name).put("a", l.amount).put("cr", l.credit).put("du", l.due).put("gt", l.got).put("lf", l.left).put("yp", l.youPay)) } })
+            val hash = c.toString().hashCode()
+            if (sp(ctx).getInt("cx_${h.id}_$m", 0) == hash) return@forEach
+            val payload = JSONObject().put("f", Store.owner.ifBlank { Account.name(ctx) }).put("fm", myMobile(ctx)).put("t", System.currentTimeMillis()).put("c", c).toString()
+            if (post(ctx, m, payload, "c" + h.id)) { sp(ctx).edit().putInt("cx_${h.id}_$m", hash).apply(); n++ }
+        }
+        return n
+    }
+
+    /** send one hisab to its partners (whole hisab) and each contact (his lines); returns how many phones */
+    fun publish(ctx: Context, h: Hisab): Int {
+        var n = 0
+        val to = targets(ctx, h)
+        if (to.isNotEmpty()) {
+            val payload = JSONObject().put("f", Store.owner.ifBlank { Account.name(ctx) }).put("fm", myMobile(ctx))
+                .put("t", System.currentTimeMillis()).put("h", Store.hj(h)).toString()
+            to.forEach { m -> if (post(ctx, m, payload, h.id.toString())) n++ }
+        }
+        n += publishContacts(ctx, h)
         if (n > 0) sp(ctx).edit().putLong("t_${h.id}", System.currentTimeMillis()).putInt("x_${h.id}", Store.hj(h).toString().hashCode()).apply()
         return n
     }
@@ -53,9 +102,9 @@ object Share {
     /** on app start: send again what changed, or what was sent more than 6 h ago (last 90 days) */
     fun republish(ctx: Context) {
         val now = System.currentTimeMillis()
-        Store.hisabs.toList().filter { now - it.time < 90L * 86400000L && targets(ctx, it).isNotEmpty() }.forEach { h ->
+        Store.hisabs.toList().filter { now - it.time < 90L * 86400000L && anyone(ctx, it) }.forEach { h ->
             val changed = sp(ctx).getInt("x_${h.id}", 0) != Store.hj(h).toString().hashCode()
-            if (changed || now - sp(ctx).getLong("t_${h.id}", 0) > 6L * 3600_000L) publish(ctx, h)
+            if (changed || now - sp(ctx).getLong("t_${h.id}", 0) > 6L * 3600_000L) publish(ctx, h) else publishContacts(ctx, h)
         }
     }
 
@@ -72,8 +121,17 @@ object Share {
             if (byI.size < total) return@forEach
             val text = Codec.open((0 until total).joinToString("") { byI[it]!!.optString("p") }, key) ?: return@forEach
             val o = JSONObject(text)
-            val h = Store.jh(o.getJSONObject("h"))
             val fm = o.optString("fm"); val t = o.optLong("t")
+            o.optJSONObject("c")?.let { c ->
+                val hid = c.optLong("hid")
+                val ln = c.optJSONArray("ln")
+                val lines = (0 until (ln?.length() ?: 0)).map { i -> ln!!.getJSONObject(i).let { LinkLine(it.optString("n"), it.optDouble("a"), it.optBoolean("cr"), it.optLong("du"), it.optDouble("gt"), it.optDouble("lf"), it.optBoolean("yp")) } }
+                val old = Store.linked.firstOrNull { it.hid == hid && it.fromMobile == fm }
+                if (old == null) { Store.linked.add(Linked(o.optString("f"), fm, hid, c.optString("ti"), c.optLong("tm"), t, lines)); n++ }
+                else if (old.t < t) { old.t = t; old.lines = lines; old.title = c.optString("ti"); old.from = o.optString("f"); n++ }
+                return@forEach
+            }
+            val h = Store.jh(o.getJSONObject("h"))
             val old = Store.shared.firstOrNull { it.h.id == h.id && it.fromMobile == fm }
             if (old == null) { Store.shared.add(Shared(o.optString("f"), fm, t, h)); n++ }
             else if (old.t < t) { old.t = t; old.h = h; old.from = o.optString("f"); n++ }

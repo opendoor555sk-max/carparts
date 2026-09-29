@@ -107,12 +107,14 @@ object Reminders {
         Store.save(ctx)
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel("shared_new", L.t("sh_title"), NotificationManager.IMPORTANCE_HIGH))
-        val open = PendingIntent.getActivity(ctx, 16, Intent(ctx, MainActivity::class.java).putExtra("shared", true)
+        val lastS = Store.shared.maxByOrNull { it.t }; val lastL = Store.linked.maxByOrNull { it.t }
+        val linkedNew = lastL != null && (lastS == null || lastL.t > lastS.t)
+        val open = PendingIntent.getActivity(ctx, 16, Intent(ctx, MainActivity::class.java).putExtra(if (linkedNew) "linked" else "shared", true)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val b = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(ctx, "shared_new") else @Suppress("DEPRECATION") Notification.Builder(ctx)
-        val last = Store.shared.maxByOrNull { it.t }
-        b.setSmallIcon(R.drawable.ic_launcher).setContentTitle("👁 $n " + L.t("sh_new"))
-            .setContentText((last?.from?.ifBlank { last.fromMobile } ?: "") + (last?.let { " • " + hTitleOf(it.h) } ?: ""))
+        val last = lastS
+        b.setSmallIcon(R.drawable.ic_launcher).setContentTitle((if (linkedNew) "🔗 " else "👁 ") + "$n " + L.t("sh_new"))
+            .setContentText(if (linkedNew) (lastL!!.from.ifBlank { lastL.fromMobile }) + " • " + lastL.title else (last?.from?.ifBlank { last.fromMobile } ?: "") + (last?.let { " • " + hTitleOf(it.h) } ?: ""))
             .setContentIntent(open).setAutoCancel(true)
         try { nm.notify(10, b.build()) } catch (_: Exception) {}
     }

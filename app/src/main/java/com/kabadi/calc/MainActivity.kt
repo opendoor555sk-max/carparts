@@ -142,6 +142,7 @@ class MainActivity : Activity() {
             if (intent?.getBooleanExtra("remind", false) == true) showReminders()
             else if (toKhata) showKhata()
             else if (intent?.getBooleanExtra("shared", false) == true) showShared()
+            else if (intent?.getBooleanExtra("linked", false) == true) showLinked()
             else if (intent?.getBooleanExtra("admin", false) == true && Account.isAdmin(this)) showAdmin()
         }
         Account.refreshAdminNumber(this)
@@ -688,6 +689,7 @@ class MainActivity : Activity() {
         if (i?.getBooleanExtra("remind", false) == true) { autoSave(); showReminders() }
         else if (i?.getBooleanExtra("khata", false) == true) { autoSave(); showKhata() }
         else if (i?.getBooleanExtra("shared", false) == true) { autoSave(); showShared() }
+        else if (i?.getBooleanExtra("linked", false) == true) { autoSave(); showLinked() }
         else if (i?.getBooleanExtra("admin", false) == true && Account.isAdmin(this)) { autoSave(); showAdmin() }
     }
 
@@ -1029,6 +1031,8 @@ class MainActivity : Activity() {
         })
         if (Store.shared.isNotEmpty()) body.addView(bigButton("👁 " + L.t("sh_title") + " (" + Store.shared.size + ")", BLUE) { showShared() }
             .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+        if (Store.linked.isNotEmpty()) body.addView(bigButton("🔗 " + L.t("lk_title") + " (" + Store.linked.size + ")", GREEN) { showLinked() }
+            .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         val rem = reminders(Store.hisabs)
         if (rem.isNotEmpty()) body.addView(bigButton("🔔 " + rem.map { it.key.ifEmpty { it.name } }.distinct().size + " " + L.t("rem_banner"), 0xFFE65100.toInt()) { showReminders() }
             .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
@@ -1208,7 +1212,7 @@ class MainActivity : Activity() {
         lastLearned = Store.learn(h)
         h.variant.trim().let { v -> if (v.isNotEmpty() && Store.variants.none { norm(it) == norm(v) }) Store.variants.add(0, v) }
         // mudi malik / khedut / mehta / partners see every change by themselves (after the names are OK)
-        if (h.step != 0 && Share.targets(this, h).isNotEmpty()) Thread { try { Share.publishIfChanged(this, h) } catch (_: Exception) {} }.start()
+        if (h.step != 0 && Share.anyone(this, h)) Thread { try { Share.publishIfChanged(this, h) } catch (_: Exception) {} }.start()
     }
 
     private var lastLearned: List<String> = emptyList()
@@ -1218,7 +1222,7 @@ class MainActivity : Activity() {
         val d = duplicates(h.maal) + duplicates(h.kharch)
         fun go() {
             autoSave(); Store.save(this)
-            if (Share.targets(this, h).isNotEmpty()) Thread { val n = try { Share.publish(this, h) } catch (_: Exception) { 0 }; if (n > 0) ui.post { toast("🔗 " + L.t("sh_sent") + ": $n") } }.start()
+            if (Share.anyone(this, h)) Thread { val n = try { Share.publish(this, h) } catch (_: Exception) { 0 }; if (n > 0) ui.post { toast("🔗 " + L.t("sh_sent") + ": $n") } }.start()
             if (missingMobile(h).isNotEmpty()) toast("📞 " + L.t("mob_need") + ": " + missingMobile(h).size)
             toast(L.t("saved_ok") + if (lastLearned.isNotEmpty()) "\n" + L.t("learned") + ": " + lastLearned.joinToString(", ") else "")
         }
@@ -1888,7 +1892,7 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this).setTitle(L.t("st_t$s0")).setMessage(L.t("st_q"))
             .setPositiveButton(L.t("yes")) { _, _ ->
                 h.step = s0 + 1; autoSave(); Store.save(this)
-                if (Share.targets(this, h).isNotEmpty()) Thread { try { Share.publishIfChanged(this, h) } catch (_: Exception) {} }.start()
+                if (Share.anyone(this, h)) Thread { try { Share.publishIfChanged(this, h) } catch (_: Exception) {} }.start()
                 showEditor(h); showMessages(h, s0, true)
             }
             .setNegativeButton(L.t("no"), null).show()
@@ -2443,6 +2447,46 @@ class MainActivity : Activity() {
             c.addView(small(listOfNotNull(if (h.mudiName.isNotBlank()) "💰 " + h.mudiName else null, if (h.khedName.isNotBlank()) "🚚 " + h.khedName else null).joinToString("   "), INK))
             c.addView(small(L.t("sh_by") + ": " + sh.from.ifBlank { "—" } + "  📞 " + sh.fromMobile))
             c.setOnClickListener { showEditor(h, sh) }
+            body.addView(c, cardLp())
+        }
+    }
+
+    // ================= LINKED: lines of other people's hisab where this phone is buyer / seller / service =================
+    private fun showLinked() {
+        autoSave(); editing = null; viewOnly = null
+        val body = setScreen("linked", "🔗 " + L.t("lk_title"), null)
+        val all = Store.linked.sortedByDescending { it.t }
+        val pay = all.flatMap { it.lines }.filter { it.youPay }.sumOf { it.left }
+        val recv = all.flatMap { it.lines }.filter { !it.youPay }.sumOf { it.left }
+        val tc = card()
+        tc.addView(small(L.t("lk_info"), INK).apply { textSize = 13f })
+        tc.addView(small(L.t("lk_pay") + ": " + money(pay), RED).apply { textSize = 18f; typeface = Typeface.DEFAULT_BOLD })
+        tc.addView(small(L.t("lk_recv") + ": " + money(recv), GREEN).apply { textSize = 18f; typeface = Typeface.DEFAULT_BOLD })
+        val st = small("", MUTED)
+        tc.addView(row(st to 1f, pill("⟳ " + L.t("sh_refresh"), false, BLUE) {
+            st.text = "⏳"
+            Thread { val n = try { Share.fetch(this) } catch (_: Exception) { -1 }; ui.post { if (n > 0) Store.save(this); if (n >= 0) showLinked() else st.text = "📶 " + L.t("otp_net") } }.start()
+        } to 0f))
+        body.addView(tc, cardLp())
+        if (all.isEmpty()) body.addView(small(L.t("none")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        all.forEach { lk ->
+            val c = card()
+            c.addView(small(lk.title.ifBlank { "—" } + "  •  " + Bill.dayText(lk.time).substringBefore("  "), INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD })
+            c.addView(small(L.t("lk_from") + ": " + Notify.nm(lk.from).ifBlank { "—" } + "  📞 " + lk.fromMobile))
+            lk.lines.forEach { l ->
+                val col = if (l.youPay) RED else GREEN
+                c.addView(small((if (l.youPay) "⬆ " + L.t("lk_pay") else "⬇ " + L.t("lk_recv")) + ": " + l.name + "  " + money(l.amount), col).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD })
+                if (l.credit) {
+                    val sb = StringBuilder("⏳ " + L.t("udhaar"))
+                    if (l.due > 0) sb.append(" • ").append(L.t("due")).append(" ").append(Bill.dateText(l.due).substringBefore("  "))
+                    if (l.got > 0.004) sb.append(" • ").append(L.t("got")).append(" ").append(money(l.got))
+                    sb.append(" • ").append(L.t("left")).append(" ").append(money(l.left))
+                    c.addView(small(sb.toString(), INK))
+                } else c.addView(small(L.t("rokad_s"), MUTED))
+            }
+            if (lk.fromMobile.length == 10) c.addView(row(
+                pill("💬 WhatsApp", false, GREEN) { whatsapp(lk.fromMobile, Notify.opening(lk.from)) } to 1f,
+                pill("📞", false, BLUE) { try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + lk.fromMobile))) } catch (_: Exception) {} } to 0f))
             body.addView(c, cardLp())
         }
     }

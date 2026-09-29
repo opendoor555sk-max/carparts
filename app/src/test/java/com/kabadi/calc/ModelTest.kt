@@ -444,5 +444,8 @@ class ModelTest {
         assertTrue(f.first { it.mobile == "9222222222" }.text.contains("Rafiq"))
         assertTrue(f.first { it.mobile == "9111111111" }.text.contains("Body"))
         assertTrue(f.none { it.mobile == me })
+        // every message starts with Bismillah, then the salam greeting with the full name
+        assertTrue(f.all { it.text.startsWith(Notify.BISM) })
+        assertTrue(buyer.text.contains("Rafiq") && !buyer.text.contains("નમસ્તે") && !buyer.text.contains("Namaste"))
     }
 }
