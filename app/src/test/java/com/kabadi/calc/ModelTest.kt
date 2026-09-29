@@ -393,4 +393,28 @@ class ModelTest {
         assertTrue(h.verify().isEmpty())
         assertTrue(Hisab(2, 1, type = "lot").isLot); assertFalse(Hisab(3, 1, type = "haraji").isLot)
     }
+
+    @Test fun stepsNamesThenBuying() {
+        val h = Hisab(1, 0, step = 0)
+        assertTrue(stepProblems(h, 0).isNotEmpty())                      // nothing written yet
+        h.mudiName = "Salam"; h.mudiMobile = "9876543210"; h.mudiPctText = "100"
+        assertTrue(stepProblems(h, 0).isEmpty())                         // mudi malik 100% = no khedut needed
+        h.mudiPctText = "60"; h.khedPctText = "40"
+        assertTrue(stepProblems(h, 0).isNotEmpty())                      // khedut needs name + mobile
+        h.khedName = "Asif"; h.khedMobile = "9000000001"
+        assertTrue(stepProblems(h, 0).isEmpty())
+        h.khedPctText = "30"
+        assertTrue(stepProblems(h, 0).isNotEmpty())                      // 60 + 30 is not 100
+        assertTrue(stepProblems(h, 1).isNotEmpty())                      // no buying amount
+        h.priceText = "200000"
+        assertTrue(stepProblems(h, 1).isEmpty())
+    }
+
+    @Test fun harajiStepNeedsMehtaAndPartners() {
+        val h = Hisab(1, 0, type = "haraji", step = 0, mudiName = "S", mudiMobile = "9876543210", mudiPctText = "100")
+        assertEquals(2, stepProblems(h, 0).size)                          // mehta + partners not 100
+        h.mehtaName = "M"; h.mehtaMobile = "9111111111"
+        h.partners.add(Partner("P", "100", "9222222222"))
+        assertTrue(stepProblems(h, 0).isEmpty())
+    }
 }

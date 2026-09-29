@@ -1115,7 +1115,7 @@ class MainActivity : Activity() {
     private fun askDelete(h: Hisab, after: () -> Unit) {
         // admin phone may delete anything, even a final hisab
         val admin = LOGIN_ON && Account.isAdmin(this)
-        if (h.finalAt > 0 && !admin) return toast(L.t("locked_del"))
+        if ((h.finalAt > 0 || h.step > 0) && !admin) return toast(L.t("locked_del"))
         AlertDialog.Builder(this).setMessage((if (h.finalAt > 0) "👑 ✅ " + L.t("final_s") + "\n" else "") + L.t("del_q") + "\n" + hTitle(h) + "  " + money(h.munafa()))
             .setPositiveButton(L.t("yes")) { _, _ -> Store.hisabs.remove(h); Store.save(this); after() }
             .setNegativeButton(L.t("no"), null).show()
@@ -1153,7 +1153,12 @@ class MainActivity : Activity() {
             llp(MATCH_PARENT, WRAP_CONTENT))
         listOf("mudi" to ("💰  " + L.t("mudi_h")), "khed" to ("🚚  " + L.t("khed_h"))).forEach { (w, t) ->
             box.addView(bigButton(t, if (w == "mudi") 0xFFE65100.toInt() else GREEN) {
-                dlg.dismiss(); showEditor(Hisab(now, now, type = type, writer = w, mehtaName = mehtaN, mehtaMobile = mehtaM))
+                dlg.dismiss()
+                val nh = Hisab(now, now, type = type, writer = w, mehtaName = mehtaN, mehtaMobile = mehtaM, step = 0)
+                // the person writing is this account: name + mobile are taken from it
+                val me = Account.name(this).ifBlank { Store.owner }
+                if (w == "mudi") { nh.mudiName = me; nh.mudiMobile = myMobile() } else { nh.khedName = me; nh.khedMobile = myMobile() }
+                showEditor(nh)
             }.apply { textSize = 24f; setPadding(0, dpi(18f), 0, dpi(18f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(12f) })
         }
         dlg.show()
@@ -1186,7 +1191,8 @@ class MainActivity : Activity() {
     private lateinit var resultBox: LinearLayout
     private var scrollTo: View? = null
 
-    private fun hasContent(h: Hisab) = h.party.isNotBlank() || h.mudiName.isNotBlank() || h.khedName.isNotBlank() || h.vehicle.isNotBlank() || h.priceText.isNotBlank() ||
+    private fun hasContent(h: Hisab) = if (h.step == 0) (h.party.isNotBlank() || h.mudiPctText.isNotBlank() || h.khedPctText.isNotBlank() || h.partners.isNotEmpty() || h.priceText.isNotBlank())
+        else h.party.isNotBlank() || h.mudiName.isNotBlank() || h.khedName.isNotBlank() || h.vehicle.isNotBlank() || h.priceText.isNotBlank() ||
         h.kharch.isNotEmpty() || h.maal.isNotEmpty() || h.saleText.isNotBlank() || h.partners.isNotEmpty() ||
         h.lots.any { it.vehicles.isNotEmpty() || it.items.isNotEmpty() || it.priceText.isNotBlank() }
 
@@ -1346,6 +1352,20 @@ class MainActivity : Activity() {
         editing = h
         val body = setScreen("edit", hTitle(h), { if (viewOnly != null) { viewOnly = null; editing = null; showShared() } else { autoSave(); Store.save(this); editorBack?.invoke() ?: showHome() } })
 
+        // ---- step by step: names → buying → expenses → selling. Every step is locked with OK, later steps stay hidden until then ----
+        val g = h.step >= 0 && view == null
+        val opened = h.id in unlocked                       // admin opened it with his PIN
+        fun shown(min: Int) = !g || opened || h.step >= min
+        fun frozenAt(min: Int) = g && !opened && h.step >= min
+        fun put(c: View, min: Int, freezeFrom: Int) { if (!shown(min)) return; if (frozenAt(freezeFrom)) freeze(c); body.addView(c, cardLp()) }
+        fun okBtn(s0: Int, into: LinearLayout? = null) {
+            if (!(g && !opened && h.step == s0 && h.finalAt == 0L)) return
+            val b = bigButton(L.t("st_ok$s0"), 0xFF1B5E20.toInt()) { confirmStep(h, s0) }.apply { textSize = 17f }
+            val lp = llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(4f); bottomMargin = dpi(12f) }
+            if (into != null) into.addView(b, lp) else body.addView(b, lp)
+        }
+        val slot0 = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
         // ---- top: Mudi malik | %   Khedut | %  (profit / loss share) ----
         val top = card()
         val lab = LinearLayout(this)
@@ -1407,7 +1427,8 @@ class MainActivity : Activity() {
         }
         drawMore(h.note.isNotBlank())
         top.addView(more)
-        body.addView(top, cardLp())
+        put(top, 0, 1)
+        if (g) body.addView(slot0)
 
         // ---- haraji / lot: credit time for everything, from the haraji day ----
         if (h.type == "haraji" || h.isLot) {
@@ -1427,11 +1448,11 @@ class MainActivity : Activity() {
             mc0.addView(due)
             mc0.addView(small(L.t("muddat_hint")))
             upd()
-            body.addView(mc0, cardLp())
+            put(mc0, 3, 99)
         }
 
         // ---- haraji: one vehicle or a lot (many vehicles / goods) ----
-        if (h.type == "haraji" && h.finalAt == 0L && viewOnly == null) {
+        if (h.type == "haraji" && h.finalAt == 0L && viewOnly == null && (!g || opened || h.step == 1)) {
             val lc0 = card()
             lc0.addView(toggle(listOf("🚚 " + L.t("one_veh"), "📦 " + L.t("lot")), if (h.lotMode) 1 else 0, 0xFF1565C0.toInt()) { i ->
                 if (i == 1 && !h.lotMode) {
@@ -1512,9 +1533,10 @@ class MainActivity : Activity() {
                     lotsBox.addView(lc, cardLp())
                 }
             }
-            body.addView(lotsBox)
+            if (shown(1)) body.addView(lotsBox)
             drawLots()
-            body.addView(bigButton(L.t("add_lot"), 0xFF1565C0.toInt()) { h.lots.add(Lot("Lot " + (h.lots.size + 1))); drawLots(); refreshTotals() }
+            if (frozenAt(2)) freeze(lotsBox)
+            if (shown(1) && !frozenAt(2)) body.addView(bigButton(L.t("add_lot"), 0xFF1565C0.toInt()) { h.lots.add(Lot("Lot " + (h.lots.size + 1))); drawLots(); refreshTotals() }
                 .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
             val pc = card()
             pc.addView(row(input(L.t("place").substringBefore(" ("), h.place, false) { h.place = it } to 1f))
@@ -1522,7 +1544,7 @@ class MainActivity : Activity() {
             val lb = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             fun drawLb() { lb.removeAllViews(); payBlock(h, h.buyLine, false, lb) { drawLb() } }
             drawLb(); pc.addView(lb)
-            body.addView(pc, cardLp())
+            put(pc, 1, 2)
         }
 
         // ---- vehicle details + price ----
@@ -1571,7 +1593,8 @@ class MainActivity : Activity() {
         }
         val buyBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun drawBuy() { buyBox.removeAllViews(); payBlock(h, h.buyLine, false, buyBox) { drawBuy() } }
-        if (!h.isLot) { drawBuy(); vc.addView(buyBox); body.addView(vc, cardLp()) }
+        if (!h.isLot) { drawBuy(); vc.addView(buyBox); put(vc, 1, 2) }
+        okBtn(1)
 
         // 2. expenses
         val kc = card()
@@ -1592,7 +1615,8 @@ class MainActivity : Activity() {
             focusLast(kLines)
         }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         drawKharch()
-        body.addView(kc, cardLp())
+        put(kc, 2, 3)
+        okBtn(2)
 
         // 3. parts
         val mc = card()
@@ -1622,7 +1646,7 @@ class MainActivity : Activity() {
         partChips = partBtns
         partBtns.visibility = if (h.hasVehicle()) View.VISIBLE else View.GONE
         drawMaal()
-        body.addView(mc, cardLp())
+        put(mc, 3, 99)
 
         if (h.type == "lot") {
             val sc = card()
@@ -1632,7 +1656,7 @@ class MainActivity : Activity() {
             val sb2 = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             fun drawS() { sb2.removeAllViews(); payBlock(h, h.saleLine, true, sb2) { drawS() } }
             drawS(); sc.addView(sb2)
-            body.addView(sc, cardLp())
+            put(sc, 3, 99)
         }
         if (h.type == "haraji") {
             // 4. how it is sold: auction (Rit A) or the whole vehicle to the company (Rit B)
@@ -1645,7 +1669,7 @@ class MainActivity : Activity() {
             val sb3 = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             fun drawS3() { sb3.removeAllViews(); payBlock(h, h.saleLine, true, sb3) { drawS3() } }
             drawS3(); sc.addView(sb3)
-            body.addView(sc, cardLp())
+            put(sc, 3, 99)
 
             // 5. market commission: % or fixed
             val cc = card()
@@ -1671,7 +1695,7 @@ class MainActivity : Activity() {
                     pill("🏢 " + L.t("comm_co"), h.commByCo, ORANGE) { if (!h.commByCo) { h.commByCo = true; showEditor(h) } } to 1f))
                 cc.addView(small(if (h.commByCo) L.t("comm_co_h") else L.t("comm_mudi_h")))
             }
-            body.addView(cc, cardLp())
+            put(cc, 3, 99)
 
             // 6. company partners
             val pcd = card()
@@ -1697,8 +1721,11 @@ class MainActivity : Activity() {
             }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             pcd.addView(small("1 " + L.t("pshare").substringBefore(" (") + " = 1%"))
             drawP()
-            body.addView(pcd, cardLp())
+            if (g) { if (frozenAt(1)) freeze(pcd); slot0.addView(pcd, cardLp()) } else body.addView(pcd, cardLp())
         }
+
+        if (g) okBtn(0, slot0)
+        if (g && !opened && h.step in 0..2 && h.finalAt == 0L) body.addView(small(L.t("st_hidden")).apply { gravity = Gravity.CENTER; setPadding(dpi(8f), dpi(4f), dpi(8f), dpi(8f)) })
 
         // totals
         val tc = card()
@@ -1776,7 +1803,10 @@ class MainActivity : Activity() {
             }
             body.addView(ban, 0, cardLp())
         } else if (h.finalAt == 0L) {
-            body.addView(bigButton(L.t("final_btn"), 0xFF1B5E20.toInt()) {
+            if (g && opened) body.addView(pill("🔒 " + L.t("lock_again"), true, GREEN) { autoSave(); Store.save(this); unlocked.remove(h.id); showEditor(h) }
+                .apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, 0, cardLp())
+            if (g && !opened && h.step in 1..3) stepBanner(h, body)
+            if (!g || opened || h.step >= 3) body.addView(bigButton(L.t("final_btn"), 0xFF1B5E20.toInt()) {
                 if (!hasContent(h)) return@bigButton toast(L.t("none"))
                 val prob = finalProblems(h)
                 if (prob.isNotEmpty()) return@bigButton AlertDialog.Builder(this).setTitle("❌ " + L.t("final_no"))
@@ -1803,7 +1833,39 @@ class MainActivity : Activity() {
         act(L.t("jpg"), ORANGE) { exportJpg(h) }
         act(L.t("pdf"), RED) { exportPdf(h) }
         act(L.t("share"), GREEN) { shareText(h) }
-        if (view == null && Store.hisabs.any { it === h } && (h.finalAt == 0L || (LOGIN_ON && Account.isAdmin(this)))) act("🗑", 0xFF78909C.toInt()) { askDelete(h) { editing = null; showHome() } }
+        if (view == null && Store.hisabs.any { it === h } && ((h.finalAt == 0L && h.step <= 0) || (LOGIN_ON && Account.isAdmin(this)))) act("🗑", 0xFF78909C.toInt()) { askDelete(h) { editing = null; showHome() } }
+    }
+
+    /** OK on a step: everything of that step is checked, then locked (only the admin can open it again) */
+    private fun confirmStep(h: Hisab, s0: Int) {
+        val prob = stepProblems(h, s0)
+        if (prob.isNotEmpty()) { AlertDialog.Builder(this).setTitle("❌ " + L.t("final_no")).setMessage(prob.joinToString("\n") { "• $it" }).setPositiveButton("OK", null).show(); return }
+        AlertDialog.Builder(this).setTitle(L.t("st_t$s0")).setMessage(L.t("st_q"))
+            .setPositiveButton(L.t("yes")) { _, _ -> h.step = s0 + 1; autoSave(); Store.save(this); showEditor(h) }
+            .setNegativeButton(L.t("no"), null).show()
+    }
+
+    /** banner on a hisab with locked steps: correction only with the admin's permission */
+    private fun stepBanner(h: Hisab, body: LinearLayout) {
+        val ban = card().apply { background = round(0xFFFFF3E0.toInt(), 12f, ORANGE) }
+        ban.addView(small(L.t("st_locked"), INK).apply { textSize = 14f; typeface = Typeface.DEFAULT_BOLD })
+        if (LOGIN_ON && !Account.isAdmin(this)) {
+            if (Unlock.asked(this, h.id)) {
+                ban.addView(small("⏳ " + L.t("unl_wait"), ORANGE).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(8f), 0, 0) })
+                every(10000L, { Unlock.check(this) }) { r ->
+                    if (r.isNullOrEmpty()) return@every true
+                    Store.save(this)
+                    r.firstOrNull { it.first == h.id }?.let { (_, ok) -> toast(if (ok) "✅ " + L.t("unl_yes") else "❌ " + L.t("unl_no")); showEditor(h); false } ?: true
+                }
+            } else ban.addView(pill("🙏 " + L.t("unl_ask"), false, ORANGE) {
+                Thread {
+                    val ok = try { Unlock.ask(this, h, hTitle(h).ifBlank { h.vehicleInfo() } + "  " + Bill.dateText(h.time).substringBefore("  ")) } catch (_: Exception) { false }
+                    ui.post { toast(if (ok) "📤 " + L.t("unl_sent") else L.t("otp_net")); if (ok && screen == "edit") showEditor(h) }
+                }.start()
+            }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
+        } else if (Account.isAdmin(this)) ban.addView(pill("🔓 " + L.t("lock_open"), false, BLUE) { askAdminPin { unlocked.add(h.id); showEditor(h) } }
+            .apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
+        body.addView(ban, 0, cardLp())
     }
 
     /** each lot's total line in the editor (updated with the totals) */

@@ -122,7 +122,9 @@ class Hisab(
     var mehtaName: String = "",
     var mehtaMobile: String = "",
     /** haraji with lots: many vehicles / goods bought together (the old separate "lot" hisab feature) */
-    var lotMode: Boolean = false
+    var lotMode: Boolean = false,
+    /** step by step entry: 0 names, 1 buying, 2 expenses, 3 selling open. Each step is locked when OK is pressed. -1 = older hisab (no steps) */
+    var step: Int = -1
 ) {
     /** vehicle bought on credit (we pay) and auction / company sale on credit (we get) */
     var buyLine = Line("veh", "", true)
@@ -549,8 +551,9 @@ fun missingMobile(h: Hisab): List<String> {
     val out = mutableListOf<String>()
     // new hisab (writer chosen): mudi malik and khedut mobile are required
     if (h.writer.isNotBlank()) {
-        if (digits10(h.mudiMobile).length != 10) out.add("💰 " + L.t("mudi_h") + " " + h.mudiName)
-        if (digits10(h.khedMobile).length != 10) out.add("🚚 " + L.t("khed_h") + " " + h.khedName)
+        // a person with 0% (mudi malik 100% = no khedut) needs no mobile
+        if ((h.mudiPct > 0 || h.mudiName.isNotBlank()) && digits10(h.mudiMobile).length != 10) out.add("💰 " + L.t("mudi_h") + " " + h.mudiName)
+        if ((h.khedPct > 0 || h.khedName.isNotBlank()) && digits10(h.khedMobile).length != 10) out.add("🚚 " + L.t("khed_h") + " " + h.khedName)
     }
     if (h.type != "haraji") return out
     h.maal.filter { it.value() != 0.0 && digits10(it.cMobile).length != 10 }.forEach { out.add(it.name.ifBlank { "?" } + " → " + it.cName.ifBlank { "?" }) }
@@ -592,5 +595,29 @@ fun finalProblems(h: Hisab): List<String> {
         out.add(L.t("not100") + ": " + L.t("mudi_h") + " " + plain(h.mudiPct) + "% + " + L.t("khed_h") + " " + plain(h.khedPct) + "%")
     if (h.type == "haraji" && Math.abs(h.sharesTotal() - 100) > 0.001)
         out.add(L.t("pt_not100") + " (" + plain(h.sharesTotal()) + "%)")
+    return out
+}
+
+
+/** what is still missing before step [s] (0 names, 1 buying) can be locked with OK */
+fun stepProblems(h: Hisab, s: Int): List<String> {
+    val out = mutableListOf<String>()
+    when (s) {
+        0 -> {
+            val mp = h.mudiPct; val kp = h.khedPct
+            if (mp <= 0.0 && kp <= 0.0) out.add(L.t("st_need_pct"))
+            else {
+                if (Math.abs(mp + kp - 100) > 0.001) out.add(L.t("not100") + ": " + L.t("mudi_h") + " " + plain(mp) + "% + " + L.t("khed_h") + " " + plain(kp) + "%")
+                if (mp > 0 && (h.mudiName.isBlank() || digits10(h.mudiMobile).length != 10)) out.add("💰 " + L.t("mudi_h") + ": " + L.t("st_need_nm"))
+                if (kp > 0 && (h.khedName.isBlank() || digits10(h.khedMobile).length != 10)) out.add("🚚 " + L.t("khed_h") + ": " + L.t("st_need_nm"))
+            }
+            if (h.type == "haraji") {
+                if (h.mehtaName.isBlank() || digits10(h.mehtaMobile).length != 10) out.add("🔨 " + L.t("mehta_need"))
+                if (Math.abs(h.sharesTotal() - 100) > 0.001) out.add(L.t("pt_not100") + " (" + plain(h.sharesTotal()) + "%)")
+                h.partners.filter { it.share > 0 && (it.name.isBlank() || digits10(it.mobile).length != 10) }.forEach { out.add("🏢 " + it.name.ifBlank { "?" } + ": " + L.t("st_need_nm")) }
+            }
+        }
+        1 -> if (h.price <= 0.0) out.add(L.t("st_need_buy"))
+    }
     return out
 }
