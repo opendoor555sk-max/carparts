@@ -365,7 +365,7 @@ object Bill {
         if (h.mudiName.isNotBlank() || h.mudiPct > 0) sb.append(L.t("mudi_h")).append(": ").append(h.mudiName).append(" (").append(plain(h.mudiPct)).append("%)\n")
         if (h.khedName.isNotBlank() || h.khedPct > 0) sb.append(L.t("khed_h")).append(": ").append(h.khedName).append(" (").append(plain(h.khedPct)).append("%)\n")
         if (h.type == "haraji" && h.mehtaName.isNotBlank()) sb.append("🔨 ").append(L.t("mehta_h")).append(": ").append(h.mehtaName).append("  ").append(h.mehtaMobile).append("\n")
-        if (h.vehicleInfo().isNotBlank()) sb.append(h.vehicleInfo()).append("\n")
+        if (h.vehicleMsg(false).isNotBlank()) sb.append("🚚 ").append(h.vehicleMsg(false)).append("\n")
         if (h.isLot) h.lots.forEachIndexed { li, t ->
             sb.append("\n*").append(li + 1).append(". ").append(t.name.ifBlank { L.t("lot") }).append("*\n")
             t.vehicles.forEach { v -> sb.append("🚚 ").append(v.info()).append(if (v.priceText.isNotBlank()) " – " + money(v.price) else "").append("\n") }

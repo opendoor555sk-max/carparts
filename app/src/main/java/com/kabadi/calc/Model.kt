@@ -175,6 +175,13 @@ class Hisab(
     fun vehicleInfo() = if (isLot) (if (lots.size > 1) lots.size.toString() + " Lot • " else "Lot • ") + allVehicles().size + " 🚚" +
             allVehicles().map { it.brand }.filter { it.isNotBlank() }.distinct().let { if (it.isEmpty()) "" else " (" + it.joinToString(", ") + ")" }
         else listOf(brand, variant, if (tyres.isNotBlank()) tyres + " tyre" else "", year).filter { it.isNotBlank() }.joinToString(" • ")
+    /** for messages / bill text: every part with its name so nothing is unclear (Brand: Tata • Model: 1612 • Year: 2000 • No.: GJ01…) */
+    fun vehicleMsg(withNo: Boolean = true): String {
+        if (isLot) return vehicleInfo()
+        fun lb(k: String, v: String) = if (v.isBlank()) "" else L.t(k).substringBefore(" (").substringBefore(" /").trim() + ": " + v.trim()
+        return listOf(lb("brand", brand), lb("variant", variant), if (tyres.isNotBlank()) tyres + " tyre" else "", lb("year", year), if (withNo) lb("vehicle", vehicle) else "")
+            .filter { it.isNotBlank() }.joinToString(" • ")
+    }
     private fun ev(t: String) = evalExpr(t).let { if (it.isFinite()) it else 0.0 }
     /** lot with no total written = sum of the vehicles' prices */
     val price get() = when {

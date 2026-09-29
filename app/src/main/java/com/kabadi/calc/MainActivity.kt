@@ -2200,7 +2200,7 @@ class MainActivity : Activity() {
         val sb = StringBuilder()
         sb.append(Store.owner.ifBlank { L.t("app") }).append("\n")
         sb.append(L.ln(d.l)).append(": ").append(money(d.l.value())).append("\n")
-        if (d.h.vehicleInfo().isNotBlank()) sb.append(d.h.vehicleInfo()).append("\n")
+        if (d.h.vehicleMsg().isNotBlank()) sb.append("🚚 ").append(d.h.vehicleMsg()).append("\n")
         if (d.l.pays.isNotEmpty()) sb.append(L.t("got")).append(": ").append(money(d.l.received())).append("\n")
         sb.append("*").append(L.t("left")).append(": ").append(money(d.left)).append("*\n")
         d.due?.let { sb.append(L.t("due")).append(": ").append(Bill.dateText(it).substringBefore("  ")).append("\n") }
@@ -2362,7 +2362,7 @@ class MainActivity : Activity() {
         val sb = StringBuilder()
         sb.append("*").append(Store.owner.ifBlank { L.t("app") }).append("*\n")
         sb.append(Bill.dateText(h.time).substringBefore("  ")).append("\n")
-        if (h.vehicleInfo().isNotBlank()) sb.append("🚚 ").append(h.vehicleInfo()).append(if (h.vehicle.isNotBlank()) " • " + h.vehicle else "").append("\n")
+        if (h.vehicleMsg().isNotBlank()) sb.append("🚚 ").append(h.vehicleMsg()).append("\n")
         lines.firstOrNull()?.cName?.let { if (it.isNotBlank()) sb.append("👤 ").append(it).append("\n") }
         sb.append("\n")
         lines.forEach { l ->
@@ -2671,7 +2671,7 @@ class MainActivity : Activity() {
         val sb = StringBuilder()
         sb.append(Store.owner.ifBlank { L.t("app") }).append("\n")
         sb.append(Bill.dateText(h.time)).append("\n")
-        if (h.vehicleInfo().isNotBlank()) sb.append(h.vehicleInfo()).append("\n")
+        if (h.vehicleMsg().isNotBlank()) sb.append("🚚 ").append(h.vehicleMsg()).append("\n")
         sb.append(l.name).append(": ")
         if (!l.fixed) sb.append(plain(l.kg)).append(if (l.litre) " litre × ₹" else " kg × ₹").append(plain(l.rate)).append(" = ")
         sb.append(money(l.value())).append("\n")

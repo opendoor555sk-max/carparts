@@ -57,7 +57,7 @@ object Share {
             if (m.length != 10 || m in skip || l.value() == 0.0) return
             out.getOrPut(m) { mutableListOf() }.add(LinkLine(name, l.value(), l.udhaar, dueTime(h, l) ?: 0L, l.received(), l.remaining(), youPay))
         }
-        if (buyOk) add(h.buyLine, false, L.ln(h.buyLine) + " " + h.vehicleInfo())
+        if (buyOk) add(h.buyLine, false, L.ln(h.buyLine) + " " + h.vehicleMsg())
         if (kOk) h.kharch.forEach { add(it, false, it.name) }
         h.maal.filter { fin || (guard && it.sold) }.forEach { l ->
             add(l, true, l.name + if (!l.fixed && l.kg != 0.0) " " + plain(l.kg) + (if (l.litre) " L" else " kg") + " × " + plain(l.rate) else "")
