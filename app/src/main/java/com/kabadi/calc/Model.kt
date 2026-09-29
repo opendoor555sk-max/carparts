@@ -117,7 +117,10 @@ class Hisab(
     /** haraji / lot: credit time for everything, counted from the haraji day: "30" days or "2m" months */
     var muddatText: String = "",
     /** Rit B: office commission paid by the company (added to its purchase) instead of the mudi malik */
-    var commByCo: Boolean = false
+    var commByCo: Boolean = false,
+    /** haraji: the mehta who runs the auction (name + mobile are required) */
+    var mehtaName: String = "",
+    var mehtaMobile: String = ""
 ) {
     /** vehicle bought on credit (we pay) and auction / company sale on credit (we get) */
     var buyLine = Line("veh", "", true)
@@ -577,4 +580,15 @@ fun reminders(all: List<Hisab>, now: Long = System.currentTimeMillis(), before: 
         }
     }
     return out.sortedBy { it.due }
+}
+
+/** reasons why a hisab cannot be made final yet (% totals, mehta of a haraji) */
+fun finalProblems(h: Hisab): List<String> {
+    val out = mutableListOf<String>()
+    if (h.type == "haraji" && (h.mehtaName.isBlank() || digits10(h.mehtaMobile).length != 10)) out.add("🔨 " + L.t("mehta_need"))
+    if ((h.writer.isNotBlank() || h.hasSplit()) && Math.abs(h.mudiPct + h.khedPct - 100) > 0.001)
+        out.add(L.t("not100") + ": " + L.t("mudi_h") + " " + plain(h.mudiPct) + "% + " + L.t("khed_h") + " " + plain(h.khedPct) + "%")
+    if (h.type == "haraji" && Math.abs(h.sharesTotal() - 100) > 0.001)
+        out.add(L.t("pt_not100") + " (" + plain(h.sharesTotal()) + "%)")
+    return out
 }

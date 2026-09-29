@@ -1112,6 +1112,29 @@ class MainActivity : Activity() {
     }
 
     private fun newHisab(type: String) {
+        // every haraji starts with: which mehta runs it (name + mobile are required)
+        if (type == "haraji") askMehta { n, m -> pickWriter(type, n, m) } else pickWriter(type, "", "")
+    }
+
+    private fun askMehta(then: (String, String) -> Unit) {
+        val sp = getSharedPreferences("kabadi_calc", MODE_PRIVATE)
+        val nm = input(L.t("name_q"), sp.getString("mehtaN", "").orEmpty().ifBlank { Store.owner }, false) {}.apply { textSize = 18f }
+        val mb = mobileInput(L.t("cmobile") + " *", sp.getString("mehtaM", "").orEmpty().ifBlank { digits10(Store.mobile) }) {}.apply { textSize = 18f }
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(18f), dpi(8f), dpi(18f), dpi(4f)) }
+        box.addView(TextView(this).apply { text = "🔨 " + L.t("mehta_h"); textSize = 20f; typeface = Typeface.DEFAULT_BOLD; setTextColor(INK); gravity = Gravity.CENTER; setPadding(0, dpi(6f), 0, dpi(4f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        box.addView(small(L.t("mehta_q")).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        box.addView(nm, gap()); box.addView(mb, gap())
+        val dlg = AlertDialog.Builder(this).setView(box).setPositiveButton(L.t("acc_open"), null).setNegativeButton(L.t("back"), null).create()
+        dlg.show()
+        dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val n = nm.text.toString().trim(); val m = digits10(mb.text.toString())
+            if (n.isEmpty() || m.length != 10) return@setOnClickListener toast(L.t("mehta_need"))
+            sp.edit().putString("mehtaN", n).putString("mehtaM", m).apply()
+            dlg.dismiss(); then(n, m)
+        }
+    }
+
+    private fun pickWriter(type: String, mehtaN: String, mehtaM: String) {
         val now = System.currentTimeMillis()
         // first choice on every new hisab: who is writing it (mudi malik or khedut)
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(18f), dpi(8f), dpi(18f), dpi(4f)) }
@@ -1120,7 +1143,7 @@ class MainActivity : Activity() {
             llp(MATCH_PARENT, WRAP_CONTENT))
         listOf("mudi" to ("💰  " + L.t("mudi_h")), "khed" to ("🚚  " + L.t("khed_h"))).forEach { (w, t) ->
             box.addView(bigButton(t, if (w == "mudi") 0xFFE65100.toInt() else GREEN) {
-                dlg.dismiss(); showEditor(Hisab(now, now, type = type, writer = w))
+                dlg.dismiss(); showEditor(Hisab(now, now, type = type, writer = w, mehtaName = mehtaN, mehtaMobile = mehtaM))
             }.apply { textSize = 24f; setPadding(0, dpi(18f), 0, dpi(18f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(12f) })
         }
         dlg.show()
@@ -1294,6 +1317,7 @@ class MainActivity : Activity() {
                 }
                 if (h.sharesTotal() > 100) partnerBox.addView(small(L.t("over100"), RED).apply { typeface = Typeface.DEFAULT_BOLD })
             }
+            if (h.sharesTotal() < 100 - 0.001) partnerBox.addView(small(L.t("pt_left") + ": " + plain(100 - h.sharesTotal()) + "%", RED).apply { typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(6f), 0, 0) })
         }
     }
 
@@ -1323,9 +1347,21 @@ class MainActivity : Activity() {
         hl((if (h.writer == "khed") "✍ " else "") + L.t("khed_h"), 1.5f); hl("%", 0.55f, true)
         top.addView(lab)
         fun nameIn(v: String, set: (String) -> Unit) = input(L.t("name_q"), v, false) { set(it); titleTv.text = hTitle(editing ?: return@input) }.apply { textSize = 15f }
-        fun pctIn(v: String, set: (String) -> Unit) = input("%", v, true) { set(it); refreshTotals() }.apply { gravity = Gravity.CENTER; textSize = 15f }
-        top.addView(row(nameIn(h.mudiName) { h.mudiName = it } to 1.5f, pctIn(h.mudiPctText) { h.mudiPctText = it } to 0.55f,
-            nameIn(h.khedName) { h.khedName = it } to 1.5f, pctIn(h.khedPctText) { h.khedPctText = it } to 0.55f))
+        // write one % and the other one completes itself to 100
+        var pctBusy = false
+        var mudiPctEt: EditText? = null; var khedPctEt: EditText? = null
+        fun pctIn(v: String, set: (String) -> Unit, other: () -> EditText?) = input("%", v, true) { t ->
+            set(t)
+            if (!pctBusy) {
+                val x = evalExpr(t)
+                if (t.isNotBlank() && x.isFinite() && x > 0 && x <= 100) { pctBusy = true; other()?.setText(plain(Math.round((100 - x) * 100) / 100.0)); pctBusy = false }
+            }
+            refreshTotals()
+        }.apply { gravity = Gravity.CENTER; textSize = 15f }
+        mudiPctEt = pctIn(h.mudiPctText, { h.mudiPctText = it }) { khedPctEt }
+        khedPctEt = pctIn(h.khedPctText, { h.khedPctText = it }) { mudiPctEt }
+        top.addView(row(nameIn(h.mudiName) { h.mudiName = it } to 1.5f, mudiPctEt!! to 0.55f,
+            nameIn(h.khedName) { h.khedName = it } to 1.5f, khedPctEt!! to 0.55f))
         // mobile under each name (required for a new hisab)
         val need = h.writer.isNotBlank()
         fun mobHint(v: String) = if (need && digits10(v).length != 10) "📞 " + L.t("mob_need") else ""
@@ -1335,6 +1371,15 @@ class MainActivity : Activity() {
         val khedMob = mobileInput(L.t("khed_h") + " " + L.t("cmobile") + if (need) " *" else "", h.khedMobile) { h.khedMobile = it; khedWarn.text = mobHint(it) }
         top.addView(row(mudiMob to 2.05f, khedMob to 2.05f))
         if (need) top.addView(row(mudiWarn to 2.05f, khedWarn to 2.05f))
+        if (h.type == "haraji") {
+            top.addView(small("🔨 " + L.t("mehta_h") + " *", 0xFF00695C.toInt()).apply { typeface = Typeface.DEFAULT_BOLD; setPadding(dpi(6f), dpi(8f), 0, 0) })
+            val mw = small("", RED).apply { textSize = 11.5f }
+            fun mh() { mw.text = if (h.mehtaName.isBlank() || digits10(h.mehtaMobile).length != 10) "📞 " + L.t("mehta_need") else "" }
+            mh()
+            top.addView(row(input(L.t("name_q"), h.mehtaName, false) { h.mehtaName = it; mh() }.apply { textSize = 15f } to 2.05f,
+                mobileInput(L.t("cmobile") + " *", h.mehtaMobile) { h.mehtaMobile = it; mh() } to 2.05f))
+            top.addView(mw)
+        }
         // then date + time (tap to change) and seller / buyer
         val dt = small("🕒 " + Bill.dateText(h.time) + "  ✎", BLUE).apply { textSize = 14f; setPadding(0, dpi(6f), 0, dpi(6f)) }
         dt.setOnClickListener { pickDate(h) { dt.text = "🕒 " + Bill.dateText(h.time) + "  ✎" } }
@@ -1702,6 +1747,9 @@ class MainActivity : Activity() {
         } else if (h.finalAt == 0L) {
             body.addView(bigButton(L.t("final_btn"), 0xFF1B5E20.toInt()) {
                 if (!hasContent(h)) return@bigButton toast(L.t("none"))
+                val prob = finalProblems(h)
+                if (prob.isNotEmpty()) return@bigButton AlertDialog.Builder(this).setTitle("❌ " + L.t("final_no"))
+                    .setMessage(prob.joinToString("\n") { "• $it" }).setPositiveButton("OK", null).show().let { }
                 val miss = missingMobile(h)
                 if (miss.isNotEmpty()) return@bigButton AlertDialog.Builder(this).setTitle("📞 " + L.t("mob_need"))
                     .setMessage(miss.joinToString("\n") { "• $it" }).setPositiveButton("OK", null).show().let { }
@@ -2161,15 +2209,38 @@ class MainActivity : Activity() {
         } to 0f))
         body.addView(info, cardLp())
         if (Store.shared.isEmpty()) body.addView(small(L.t("none")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
-        Store.shared.sortedByDescending { it.h.time }.forEach { sh ->
+        class My(val sh: Shared, val mine: Double, val invest: Double, val roles: List<String>)
+        val mys = Store.shared.sortedByDescending { it.h.time }.map { sh ->
             val h = sh.h
-            val asMudi = Otp.mobile10(h.mudiMobile) == me; val asKhed = Otp.mobile10(h.khedMobile) == me
-            val mine = (if (asMudi) h.mudiShare() else 0.0) + (if (asKhed) h.khedShare() else 0.0)
+            val roles = mutableListOf<String>(); var mine = 0.0; var inv = 0.0
+            if (Otp.mobile10(h.mudiMobile) == me) { roles.add("💰 " + L.t("mudi_h") + " " + plain(h.mudiPct) + "%"); mine += h.mudiShare() }
+            if (Otp.mobile10(h.khedMobile) == me) { roles.add("🚚 " + L.t("khed_h") + " " + plain(h.khedPct) + "%"); mine += h.khedShare() }
+            h.partners.filter { digits10(it.mobile) == me }.forEach { p ->
+                roles.add("🏢 " + L.t("role_co") + " " + plain(p.share) + "%"); mine += h.partnerMunafa(p); inv += h.partnerLagat(p) }
+            if (digits10(h.mehtaMobile) == me) roles.add("🔨 " + L.t("mehta_h"))
+            My(sh, mine, inv, roles)
+        }
+        if (mys.isNotEmpty()) {
+            val profit = mys.filter { it.mine > 0 }.sumOf { it.mine }
+            val loss = -mys.filter { it.mine < 0 }.sumOf { it.mine }
+            val net = profit - loss
+            val tc = card()
+            tc.addView(heading("📒 " + L.t("sh_tot")))
+            tc.addView(small(L.t("sh_tot_p") + ": " + money(profit), GREEN).apply { textSize = 15f })
+            tc.addView(small(L.t("sh_tot_l") + ": " + money(loss), RED).apply { textSize = 15f })
+            tc.addView(small(L.t("sh_tot_n") + ": " + (if (net >= 0) "▲ " else "▼ ") + money(Math.abs(net)), if (net >= 0) GREEN else RED).apply { textSize = 18f; typeface = Typeface.DEFAULT_BOLD })
+            body.addView(tc, cardLp())
+        }
+        mys.forEach { my ->
+            val sh = my.sh; val h = sh.h; val mine = my.mine
             val c = card()
             c.addView(row(small(hTitle(h), INK).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD } to 1f,
                 small((if (mine >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(mine)), if (mine >= 0) GREEN else RED).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD } to 0f))
-            c.addView(small(listOfNotNull(if (asMudi) "💰 " + L.t("mudi_h") + " " + plain(h.mudiPct) + "%" else null, if (asKhed) "🚚 " + L.t("khed_h") + " " + plain(h.khedPct) + "%" else null,
-                h.vehicleInfo().ifBlank { null }, Bill.dateText(h.time).substringBefore("  "), if (h.finalAt > 0) "✅" else null).joinToString("  •  "), INK))
+            c.addView(small(my.roles.joinToString("  •  "), INK).apply { typeface = Typeface.DEFAULT_BOLD })
+            if (my.invest != 0.0) c.addView(small(L.t("invest") + ": " + money(my.invest) + "   •   " + L.t("gets") + ": " + money(my.invest + mine), INK))
+            c.addView(small(listOfNotNull(h.vehicleInfo().ifBlank { null }, if (h.type == "haraji") "🔨 " + L.t("haraji") else null, Bill.dayText(h.time), if (h.finalAt > 0) "✅" else null).joinToString("  •  "), INK))
+            if (h.type == "haraji" && h.mehtaName.isNotBlank()) c.addView(small("🔨 " + L.t("mehta_h") + ": " + h.mehtaName + "  📞 " + h.mehtaMobile, INK))
+            c.addView(small(listOfNotNull(if (h.mudiName.isNotBlank()) "💰 " + h.mudiName else null, if (h.khedName.isNotBlank()) "🚚 " + h.khedName else null).joinToString("   "), INK))
             c.addView(small(L.t("sh_by") + ": " + sh.from.ifBlank { "—" } + "  📞 " + sh.fromMobile))
             c.setOnClickListener { showEditor(h, sh) }
             body.addView(c, cardLp())

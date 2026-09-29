@@ -15,9 +15,12 @@ object Share {
     private const val PART = 3000
     fun topic(m: String) = "kmh-p-" + Otp.topic("p:" + Otp.mobile10(m))
     fun myMobile(ctx: Context) = Otp.mobile10(Account.mobile(ctx).ifBlank { Store.mobile })
+    /** everybody named in the hisab with a mobile: mudi malik, khedut, mehta, company partners */
+    fun targetsOf(h: Hisab): List<String> =
+        (listOf(h.mudiMobile, h.khedMobile, h.mehtaMobile) + h.partners.map { it.mobile }).map { Otp.mobile10(it) }.filter { it.length == 10 }.distinct()
     fun targets(ctx: Context, h: Hisab): List<String> {
         val me = myMobile(ctx)
-        return listOf(h.mudiMobile, h.khedMobile).map { Otp.mobile10(it) }.filter { it.length == 10 && it != me }.distinct()
+        return targetsOf(h).filter { it != me }
     }
 
     private fun sp(ctx: Context) = ctx.getSharedPreferences("kabadi_share", Context.MODE_PRIVATE)

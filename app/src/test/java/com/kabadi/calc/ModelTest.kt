@@ -371,4 +371,15 @@ class ModelTest {
         assertFalse(f.syncSale())
         assertEquals(0, f.maal.size)
     }
+
+    @Test fun finalNeeds100AndMehta() {
+        val h = Hisab(1, 1, type = "haraji", writer = "mudi", priceText = "100000", saleText = "120000",
+            mudiName = "A", mudiMobile = "9000000001", mudiPctText = "60", khedName = "B", khedMobile = "9000000002", khedPctText = "30")
+        h.partners.add(Partner("P1", "40", "9000000003"))
+        val p = finalProblems(h)
+        assertEquals(3, p.size)                       // no mehta, 60+30 != 100, partners 40 != 100
+        h.khedPctText = "40"; h.partners.add(Partner("P2", "60", "9000000004")); h.mehtaName = "Mehta"; h.mehtaMobile = "98765 43210"
+        assertTrue(finalProblems(h).isEmpty())
+        assertEquals(setOf("9000000001", "9000000002", "9000000003", "9000000004", "9876543210"), Share.targetsOf(h).toSet())
+    }
 }

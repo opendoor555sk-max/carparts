@@ -24,6 +24,7 @@ import java.util.Locale
 /** Draws the hisab bill. Same drawing is used for the JPG and the PDF. */
 object Bill {
 
+    fun dayText(t: Long): String = SimpleDateFormat("EEE, dd-MM-yyyy  hh:mm a", Locale.US).format(Date(t))
     fun dateText(t: Long): String = SimpleDateFormat("dd-MM-yyyy  hh:mm a", Locale.US).format(Date(t))
 
     /** due date of a credit line ("" if none) */
@@ -80,6 +81,7 @@ object Bill {
             info("mudi_h", h.mudiName + "   " + plain(h.mudiPct) + "%")
             info("khed_h", h.khedName + "   " + plain(h.khedPct) + "%")
         }
+        if (h.type == "haraji" && h.mehtaName.isNotBlank()) info("mehta_h", h.mehtaName + "  " + h.mehtaMobile)
         if (h.writer.isNotBlank()) info("writer_s", if (h.writer == "khed") L.t("khed_h") else L.t("mudi_h"))
         info("vinfo", h.vehicleInfo())
         info("vehicle", h.vehicle)
@@ -362,6 +364,7 @@ object Bill {
         if (h.party.isNotBlank()) sb.append(L.t("party")).append(": ").append(h.party).append("\n")
         if (h.mudiName.isNotBlank() || h.mudiPct > 0) sb.append(L.t("mudi_h")).append(": ").append(h.mudiName).append(" (").append(plain(h.mudiPct)).append("%)\n")
         if (h.khedName.isNotBlank() || h.khedPct > 0) sb.append(L.t("khed_h")).append(": ").append(h.khedName).append(" (").append(plain(h.khedPct)).append("%)\n")
+        if (h.type == "haraji" && h.mehtaName.isNotBlank()) sb.append("🔨 ").append(L.t("mehta_h")).append(": ").append(h.mehtaName).append("  ").append(h.mehtaMobile).append("\n")
         if (h.vehicleInfo().isNotBlank()) sb.append(h.vehicleInfo()).append("\n")
         if (h.isLot) h.lots.forEachIndexed { li, t ->
             sb.append("\n*").append(li + 1).append(". ").append(t.name.ifBlank { L.t("lot") }).append("*\n")
