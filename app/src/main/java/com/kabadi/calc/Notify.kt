@@ -45,6 +45,32 @@ object Notify {
         return sb.toString()
     }
 
+    /** message for the one buyer of one line, right after "OK – sold" */
+    fun soldText(h: Hisab, l: Line): String =
+        deal(h) + lineText(h, l) + "\n🙏 " + Store.owner.ifBlank { "" }
+
+    /** one common text for all people of the deal (sent in one SMS to everybody): shares, invest, profit / loss */
+    fun groupText(h: Hisab, phase: Int): String {
+        val sb = StringBuilder(deal(h))
+        when (phase) {
+            0 -> sb.append("✅ ").append(L.t("msg_started")).append("\n")
+            1 -> sb.append("🛒 ").append(L.t("msg_buy")).append(": ").append(money(h.price)).append("\n")
+            2 -> sb.append("💸 ").append(L.t("sum_kharch")).append(": ").append(money(h.kharchTotal())).append("\n")
+            else -> {
+                val m = h.munafa()
+                sb.append("✅ ").append(L.t("final_s")).append("\n📊 ").append(if (m >= 0) L.t("profit") else L.t("loss")).append(" ").append(money(Math.abs(m))).append("\n")
+            }
+        }
+        h.partners.filter { it.share > 0 }.forEach { p ->
+            sb.append("🏢 ").append(p.name.ifBlank { "?" }).append(" (").append(plain(p.share)).append("%): ")
+            if (phase >= 3) { val pm = h.partnerMunafa(p); sb.append(L.t("invest")).append(" ").append(money(h.partnerLagat(p))).append(" ➡ ").append(if (pm >= 0) L.t("profit") else L.t("loss")).append(" ").append(money(Math.abs(pm))) }
+            else sb.append(L.t("invest")).append(" ").append(money((if (phase == 1) h.price else h.lagat()) * p.share / 100))
+            sb.append("\n")
+        }
+        sb.append("🙏 ").append(Store.owner.ifBlank { "" })
+        return sb.toString()
+    }
+
     private class Acc(var name: String) { val roles = mutableListOf<String>(); val parts = mutableListOf<String>() }
 
     /** who to tell after [phase]; [me] = this phone's own number (never messaged) */

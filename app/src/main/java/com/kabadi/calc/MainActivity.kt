@@ -694,6 +694,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         Updater.autoCheck(this) // on every open (at most every 30 min)
+        if (sendWaiting) { sendWaiting = false; ui.postDelayed({ nextInQueue() }, 500) }
     }
 
     override fun onPause() {
@@ -1851,6 +1852,15 @@ class MainActivity : Activity() {
         val sp = getSharedPreferences("kabadi_msgs", MODE_PRIVATE)
         val sent = sp.getStringSet("sent", emptySet())!!.toMutableSet()
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(14f), dpi(8f), dpi(14f), dpi(4f)) }
+        var dlgRef: AlertDialog? = null
+        if (list.size > 1 || phase >= 0) {
+            box.addView(bigButton(L.t("msg_all_wa") + " (" + list.size + ")", 0xFF25D366.toInt()) { dlgRef?.dismiss(); startQueue(h, phase, list) }.apply { textSize = 15f },
+                llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
+            val ppl = list.filter { r -> r.role.any { it == '💰' || it == '🚚' || it == '🔨' || it == '🏢' } }
+            if (ppl.isNotEmpty()) box.addView(bigButton(L.t("msg_all_sms") + " (" + ppl.size + ")", BLUE) {
+                try { startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + ppl.joinToString(";") { it.mobile })).putExtra("sms_body", Notify.groupText(h, phase))) } catch (_: Exception) { toast("✗") }
+            }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
+        }
         box.addView(small(L.t("msg_title")).apply { setPadding(0, 0, 0, dpi(8f)) })
         list.forEach { r ->
             val key = "${h.id}_${phase}_${r.mobile}"
@@ -1868,7 +1878,7 @@ class MainActivity : Activity() {
             row.addView(acts)
             box.addView(row, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
         }
-        AlertDialog.Builder(this).setTitle("📤 " + L.t("msg_btn")).setView(ScrollView(this).apply { addView(box) }).setPositiveButton("OK", null).show()
+        dlgRef = AlertDialog.Builder(this).setTitle("📤 " + L.t("msg_btn")).setView(ScrollView(this).apply { addView(box) }).setPositiveButton("OK", null).show()
     }
 
     /** OK on a step: everything of that step is checked, then locked (only the admin can open it again) */
@@ -2233,7 +2243,65 @@ class MainActivity : Activity() {
             linkViews[l.link] = Triple(nameTv, kgIn, infoTv)
         }
         if (h.role == "seller") sellerBlock(h, l, box, redraw)
+        // step-by-step hisab: "OK – sold" locks the line and sends the buyer his message at once
+        if (h.step >= 0 && viewOnly == null && h.finalAt == 0L && h.step >= 3) {
+            if (l.sold) {
+                box.addView(row(small("🔒 ✓ " + L.t("sold_done"), GREEN).apply { typeface = Typeface.DEFAULT_BOLD } to 1f,
+                    pill("📤", true, 0xFF25D366.toInt()) { showLineMessage(h, l) } to 0f).apply { setPadding(0, dpi(6f), 0, 0) })
+                if (h.id !in unlocked) freeze(box)
+                // the send button must work also on a locked line
+                (box.getChildAt(box.childCount - 1) as? LinearLayout)?.let { r -> for (i in 0 until r.childCount) { val v = r.getChildAt(i); if (v is TextView && v.text == "📤") v.setOnClickListener { showLineMessage(h, l) } } }
+            } else if (h.id !in unlocked || true) box.addView(bigButton(L.t("sold_ok"), 0xFF1B5E20.toInt()) { confirmSold(h, l) }.apply { textSize = 15f },
+                llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
+        }
         return wrap(box)
+    }
+
+    /** OK – sold: check the buyer + amount, lock the line, message the buyer */
+    private fun confirmSold(h: Hisab, l: Line) {
+        if (l.cName.isBlank() || digits10(l.cMobile).length != 10 || l.value() <= 0.0) { toast(L.t("sold_need")); return }
+        if (l.udhaar && dueTime(h, l) == null) { toast(L.t("muddat_h")); return }
+        AlertDialog.Builder(this).setTitle(l.name + " → " + l.cName).setMessage(L.t("sold_q"))
+            .setPositiveButton(L.t("yes")) { _, _ ->
+                l.sold = true; autoSave(); Store.save(this); showEditor(h); showLineMessage(h, l)
+            }.setNegativeButton(L.t("no"), null).show()
+    }
+
+    /** the buyer's message (WhatsApp + SMS) for one sold line */
+    private fun showLineMessage(h: Hisab, l: Line) {
+        val text = Notify.soldText(h, l)
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(16f), dpi(8f), dpi(16f), dpi(4f)) }
+        box.addView(small("👤 " + l.cName + "  📞 " + digits10(l.cMobile), INK).apply { typeface = Typeface.DEFAULT_BOLD; textSize = 16f })
+        box.addView(small(text).apply { setPadding(0, dpi(8f), 0, dpi(10f)) })
+        val dlg = AlertDialog.Builder(this).setView(ScrollView(this).apply { addView(box) }).setPositiveButton("OK", null).create()
+        box.addView(bigButton("💬 WhatsApp", 0xFF25D366.toInt()) { whatsapp(l.cMobile, text) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+        box.addView(bigButton("✉ SMS", BLUE) { try { startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + digits10(l.cMobile))).putExtra("sms_body", text)) } catch (_: Exception) { toast("✗") } }, llp(MATCH_PARENT, WRAP_CONTENT))
+        dlg.show()
+    }
+
+    // ---- send to everybody, one after another (WhatsApp opens for each; the app continues by itself when you come back) ----
+    private var sendQueue = ArrayDeque<Rcpt>()
+    private var sendTotal = 0
+    private var sendWaiting = false
+    private var sendKeyBase = ""
+
+    private fun startQueue(h: Hisab, phase: Int, list: List<Rcpt>) {
+        sendQueue = ArrayDeque(list); sendTotal = list.size; sendKeyBase = "${h.id}_${phase}_"
+        nextInQueue()
+    }
+
+    private fun nextInQueue() {
+        val r = sendQueue.removeFirstOrNull()
+        if (r == null) { if (sendTotal > 0) toast(L.t("msg_alldone")); sendTotal = 0; return }
+        val sp = getSharedPreferences("kabadi_msgs", MODE_PRIVATE)
+        sp.edit().putStringSet("sent", (sp.getStringSet("sent", emptySet())!! + (sendKeyBase + r.mobile))).apply()
+        val n = sendTotal - sendQueue.size
+        // small pause with a Stop button, then WhatsApp opens for the next person
+        val dlg = AlertDialog.Builder(this).setTitle("📤 $n / $sendTotal").setMessage(r.name.ifBlank { r.mobile } + " • " + r.role)
+            .setPositiveButton("▶ " + L.t("msg_next")) { _, _ -> sendWaiting = true; whatsapp(r.mobile, r.text) }
+            .setNegativeButton(L.t("msg_stop")) { _, _ -> sendQueue.clear(); sendTotal = 0 }.setCancelable(false).create()
+        dlg.show()
+        ui.postDelayed({ if (dlg.isShowing) dlg.getButton(AlertDialog.BUTTON_POSITIVE).performClick() }, 1500)
     }
 
     /** seller: who took this item (name, mobile), cash / credit, credit days, installments; auction: guarantor + shop */

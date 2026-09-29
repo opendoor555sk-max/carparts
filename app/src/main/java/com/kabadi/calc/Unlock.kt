@@ -41,7 +41,7 @@ object Unlock {
             if (s.getLong("ask_$hid", 0L) == 0L) return@forEach
             s.edit().remove("ask_$hid").apply()
             val ok = m.optBoolean("ok")
-            if (ok) Store.hisabs.firstOrNull { it.id == hid }?.let { it.finalAt = 0L; if (it.step >= 0) it.step = 0 }
+            if (ok) Store.hisabs.firstOrNull { it.id == hid }?.let { it.finalAt = 0L; if (it.step >= 0) it.step = 0; it.maal.forEach { m -> m.sold = false } }
             out.add(hid to ok)
         }
         s.edit().putStringSet("done", done).apply()

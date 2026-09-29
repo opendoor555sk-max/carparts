@@ -31,7 +31,9 @@ class Line(
     /** bought item ↔ its sale line (same id on both); "" = not linked */
     var link: String = "",
     /** sale line: the bought quantity last copied in (so a changed purchase qty follows until the user types his own) */
-    var syncKg: String = ""
+    var syncKg: String = "",
+    /** sale line: "OK – sold" was pressed: the buyer got his message and the line is locked */
+    var sold: Boolean = false
 ) {
     /** for the vehicle price / auction sale lines: value comes from the hisab */
     var calc: (() -> Double)? = null
