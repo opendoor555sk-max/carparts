@@ -107,13 +107,13 @@ object Store {
     private fun lj(l: Line) = JSONObject().put("k", l.key).put("n", l.name).put("f", l.fixed)
         .put("kg", l.kgText).put("r", l.rateText).put("a", l.amountText).put("l", l.litre)
         .put("pay", l.pay).put("paid", l.paid).put("cn", l.cName).put("cm", l.cMobile).put("d", l.daysText)
-        .put("gn", l.gName).put("gm", l.gMobile).put("sh", l.shop).put("lk", l.link).put("sk", l.syncKg).put("so", l.sold).put("gb", l.gBy)
+        .put("gn", l.gName).put("gm", l.gMobile).put("sh", l.shop).put("lk", l.link).put("sk", l.syncKg).put("so", l.sold).put("gb", l.gBy).put("mk", l.mkt)
         .put("py", JSONArray().also { a -> l.pays.forEach { a.put(JSONObject().put("t", it.time).put("a", it.amountText)) } })
 
     private fun jl(o: JSONObject) = Line(o.optString("k"), o.optString("n"), o.optBoolean("f"),
         kgText = o.optString("kg"), rateText = o.optString("r"), amountText = o.optString("a"), litre = o.optBoolean("l"),
         pay = o.optString("pay", "rokad"), paid = o.optBoolean("paid"), cName = o.optString("cn"), cMobile = o.optString("cm"),
-        daysText = o.optString("d"), gName = o.optString("gn"), gMobile = o.optString("gm"), shop = o.optString("sh"), gBy = o.optString("gb"),
+        daysText = o.optString("d"), gName = o.optString("gn"), gMobile = o.optString("gm"), shop = o.optString("sh"), gBy = o.optString("gb"), mkt = o.optString("mk"),
         link = o.optString("lk"), syncKg = o.optString("sk"), sold = o.optBoolean("so")).also { l ->
         o.optJSONArray("py")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { l.pays.add(Pay(it.optLong("t"), it.optString("a"))) } }
     }
@@ -182,7 +182,7 @@ object Store {
         o.put("sh", JSONArray().also { a -> shared.forEach { a.put(JSONObject().put("f", it.from).put("fm", it.fromMobile).put("t", it.t).put("h", hj(it.h))) } })
         o.put("lkd", JSONArray().also { a -> linked.forEach { k -> a.put(JSONObject().put("f", k.from).put("fm", k.fromMobile).put("hid", k.hid).put("ti", k.title).put("tm", k.time).put("t", k.t)
             .put("ln", JSONArray().also { b -> k.lines.forEach { l -> b.put(JSONObject().put("n", l.name).put("a", l.amount).put("cr", l.credit).put("du", l.due).put("gt", l.got).put("lf", l.left).put("yp", l.youPay).put("in", l.info)) } })) } })
-        o.put("shp", JSONArray().also { a -> shops.forEach { a.put(JSONObject().put("no", it.no).put("ow", it.owner).put("mb", it.mobile).put("lm", it.limit)) } }).put("shpT", shopsT)
+        o.put("shp", JSONArray().also { a -> shops.forEach { a.put(JSONObject().put("no", it.no).put("ow", it.owner).put("mb", it.mobile).put("lm", it.limit).put("mk", it.market)) } }).put("shpT", shopsT)
         o.put("rates", JSONObject(lastRate as Map<*, *>))
         o.put("parts", bj(parts)).put("exp", bj(expenses)).put("tp", bj(trashParts)).put("te", bj(trashExp))
         return o
@@ -231,7 +231,7 @@ object Store {
             shared.clear()
             o.optJSONArray("sh")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { shared.add(Shared(it.optString("f"), it.optString("fm"), it.optLong("t"), jh(it.getJSONObject("h")))) } }
             shops.clear(); shopsT = o.optLong("shpT")
-            o.optJSONArray("shp")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { shops.add(Shop(it.optString("no"), it.optString("ow"), it.optString("mb"), it.optDouble("lm", Shops.LIMIT))) } }
+            o.optJSONArray("shp")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { shops.add(Shop(it.optString("no"), it.optString("ow"), it.optString("mb"), it.optDouble("lm", Shops.LIMIT), it.optString("mk"))) } }
             linked.clear()
             o.optJSONArray("lkd")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { k ->
                 val ln = k.optJSONArray("ln")

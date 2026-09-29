@@ -5,7 +5,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** a shop that may guarantee credit: number ↔ owner (name + mobile) and a limit (default 10 lakh), all written by the admin */
-class Shop(var no: String, var owner: String, var mobile: String, var limit: Double = Shops.LIMIT)
+class Shop(var no: String, var owner: String, var mobile: String, var limit: Double = Shops.LIMIT, var market: String = "") {
+    /** "Market 3 • Shop 220" */
+    fun label() = (if (market.isNotBlank()) L.t("market") + " " + market.trim() + " • " else "") + L.t("shop") + " " + no.trim()
+}
 
 /**
  * Shop guarantee register (haraji / company hisab). Admin writes the shops; every phone gets the list.
@@ -18,26 +21,27 @@ object Shops {
     private val TOPIC get() = "kmh-shp-" + Otp.topic("shops")
     private val KEY get() = Otp.shareKey("1000000001")
 
-    fun find(no: String): Shop? = if (no.isBlank()) null else Store.shops.firstOrNull { norm(it.no) == norm(no) }
+    /** the same shop number can be in different markets: a shop is (market number + shop number) */
+    fun find(market: String, no: String): Shop? = if (no.isBlank()) null else Store.shops.firstOrNull { norm(it.no) == norm(no) && norm(it.market) == norm(market) }
 
     /** a credit line counts against the limit once it is confirmed ("OK – sold"), or it is in a final / old hisab */
     private fun committed(h: Hisab, l: Line) = l.sold || h.finalAt > 0 || h.step < 0
 
     /** every confirmed credit line (and its hisab) guaranteed by shop [no] */
-    fun lines(no: String, skip: Line? = null): List<Pair<Hisab, Line>> {
+    fun lines(market: String, no: String, skip: Line? = null): List<Pair<Hisab, Line>> {
         val all = Store.hisabs.toList() + Store.shared.map { it.h }
         return all.filter { it.type == "haraji" }.flatMap { h ->
-            creditLines(h).filter { it !== skip && it.gBy.isEmpty() && needsGuarantor(h, it) && norm(it.shop) == norm(no) && committed(h, it) }.map { h to it }
+            creditLines(h).filter { it !== skip && it.gBy.isEmpty() && needsGuarantor(h, it) && norm(it.shop) == norm(no) && norm(it.mkt) == norm(market) && committed(h, it) }.map { h to it }
         }
     }
     /** credit of that shop not yet paid back */
-    fun used(no: String, skip: Line? = null): Double = lines(no, skip).sumOf { it.second.remaining() }
-    fun left(s: Shop, skip: Line? = null): Double = s.limit - used(s.no, skip)
+    fun used(market: String, no: String, skip: Line? = null): Double = lines(market, no, skip).sumOf { it.second.remaining() }
+    fun left(s: Shop, skip: Line? = null): Double = s.limit - used(s.market, s.no, skip)
 
     // ---- registry to all phones (through the relay) ----
     private fun sp(ctx: Context) = ctx.getSharedPreferences("kabadi_share", Context.MODE_PRIVATE)
     private fun json(): String = JSONObject().put("t", Store.shopsT).put("s", JSONArray().also { a ->
-        Store.shops.forEach { a.put(JSONObject().put("no", it.no).put("ow", it.owner).put("mb", it.mobile).put("lm", it.limit)) } }).toString()
+        Store.shops.forEach { a.put(JSONObject().put("no", it.no).put("ow", it.owner).put("mb", it.mobile).put("lm", it.limit).put("mk", it.market)) } }).toString()
 
     fun publish(ctx: Context): Boolean {
         val parts = Codec.seal(json(), KEY).chunked(PART)
@@ -68,7 +72,7 @@ object Shops {
         if (b.optLong("t") <= Store.shopsT) return false
         val a = b.optJSONArray("s") ?: return false
         Store.shops.clear()
-        for (i in 0 until a.length()) a.getJSONObject(i).let { Store.shops.add(Shop(it.optString("no"), it.optString("ow"), it.optString("mb"), it.optDouble("lm", LIMIT))) }
+        for (i in 0 until a.length()) a.getJSONObject(i).let { Store.shops.add(Shop(it.optString("no"), it.optString("ow"), it.optString("mb"), it.optDouble("lm", LIMIT), it.optString("mk"))) }
         Store.shopsT = b.optLong("t")
         return true
     }
@@ -77,7 +81,7 @@ object Shops {
 /** haraji credit sale guaranteed by a shop: the shop must be written by the admin and must have enough limit left. null = fine */
 fun shopProblem(h: Hisab, l: Line): String? {
     if (h.type != "haraji" || !needsGuarantor(h, l) || l.gBy.isNotEmpty() || l.shop.isBlank()) return null
-    val s = Shops.find(l.shop) ?: return L.t("shop_unknown")
+    val s = Shops.find(l.mkt, l.shop) ?: return L.t("shop_unknown")
     val left = Shops.left(s, l)
-    return if (l.remaining() > left + 0.004) L.t("shop_limit") + " (" + L.t("shop") + " " + s.no + "): " + money(left.coerceAtLeast(0.0)) + " < " + money(l.remaining()) else null
+    return if (l.remaining() > left + 0.004) L.t("shop_limit") + " (" + s.label() + "): " + money(left.coerceAtLeast(0.0)) + " < " + money(l.remaining()) else null
 }

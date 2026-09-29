@@ -50,7 +50,7 @@ object Notify {
         if (l.gName.isBlank() && digits10(l.gMobile).isEmpty()) return ""
         val by = when (l.gBy) { "mudi" -> " (" + L.t("mudi_h") + ")"; "khed" -> " (" + L.t("khed_h") + ")"; else -> "" }
         return "🤝 " + L.t("g_lbl") + ": " + nm(l.gName).ifBlank { "?" } + by + (if (digits10(l.gMobile).isNotEmpty()) "  📞 " + digits10(l.gMobile) else "") +
-            (if (l.shop.isNotBlank()) "  🏪 " + L.t("shop") + " " + l.shop.trim() else "")
+            (if (l.shop.isNotBlank()) "  🏪 " + (if (l.mkt.isNotBlank()) L.t("market") + " " + l.mkt.trim() + " • " else "") + L.t("shop") + " " + l.shop.trim() else "")
     }
 
     /** one line: what, how much, cash or credit; credit shows the due date and what is left */

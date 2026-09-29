@@ -2350,7 +2350,7 @@ class MainActivity : Activity() {
         g.addView(small("🤝 " + L.t("g_title"), PUR).apply { typeface = Typeface.DEFAULT_BOLD })
         if (isMudiBuyer(h, l)) { g.addView(small(L.t("g_self"), GREEN)); box.addView(g, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) }); return }
         fun by(w: String, name: String, mob: String) {
-            if (l.gBy == w) { l.gBy = ""; l.gName = ""; l.gMobile = "" } else { l.gBy = w; l.gName = name; l.gMobile = digits10(mob); l.shop = "" }
+            if (l.gBy == w) { l.gBy = ""; l.gName = ""; l.gMobile = "" } else { l.gBy = w; l.gName = name; l.gMobile = digits10(mob); l.shop = ""; l.mkt = "" }
             redraw()
         }
         val pills = ArrayList<Pair<View, Float>>()
@@ -2364,19 +2364,20 @@ class MainActivity : Activity() {
             val info = small("", MUTED).apply { textSize = 13f }
             fun upd() {
                 if (l.shop.isBlank()) { l.gName = ""; l.gMobile = ""; info.text = ""; return }
-                val s = Shops.find(l.shop)
+                val s = Shops.find(l.mkt, l.shop)
                 if (s == null) { l.gName = ""; l.gMobile = ""; info.text = "✗ " + L.t("shop_unknown"); info.setTextColor(RED); return }
                 l.gName = s.owner; l.gMobile = digits10(s.mobile)
                 val left = Shops.left(s, l); val ok = l.remaining() <= left + 0.004
-                info.text = "🏪 " + s.no + " • " + s.owner + "  📞 " + s.mobile + "\n" + L.t("shop_limit_w") + " " + money(s.limit) + " • " + L.t("shop_used") + " " + money(Shops.used(s.no, l)) +
+                info.text = "🏪 " + s.label() + " • " + s.owner + "  📞 " + s.mobile + "\n" + L.t("shop_limit_w") + " " + money(s.limit) + " • " + L.t("shop_used") + " " + money(Shops.used(s.market, s.no, l)) +
                     " • " + L.t("shop_left") + " " + money(left) + (if (!ok) "\n⚠ " + L.t("shop_limit") else "")
                 info.setTextColor(if (ok) GREEN else RED)
             }
+            val mktIn = input(L.t("market_no"), l.mkt, false) { l.mkt = it; upd() }.apply { textSize = 15f }
             val shopIn = input(L.t("shop") + " *", l.shop, false) { l.shop = it; upd() }.apply { textSize = 15f }
-            g.addView(row(shopIn to 1f, pill("🏪 ▾", false, PUR) {
+            g.addView(row(mktIn to 1f, shopIn to 1f, pill("🏪 ▾", false, PUR) {
                 if (Store.shops.isEmpty()) return@pill toast(L.t("shop_none"))
                 val ss = Store.shops.toList()
-                AlertDialog.Builder(this).setTitle(L.t("shop_pick")).setItems(ss.map { it.no + " – " + it.owner + "  (" + money(Shops.left(it, l)) + ")" }.toTypedArray()) { _, w -> l.shop = ss[w].no; redraw() }.show()
+                AlertDialog.Builder(this).setTitle(L.t("shop_pick")).setItems(ss.map { it.label() + " – " + it.owner + "  (" + money(Shops.left(it, l)) + ")" }.toTypedArray()) { _, w -> l.mkt = ss[w].market; l.shop = ss[w].no; redraw() }.show()
             }.apply { textSize = 16f; setPadding(dpi(10f), dpi(4f), dpi(10f), dpi(4f)) } to 0f))
             g.addView(info)
             upd()
@@ -2522,17 +2523,18 @@ class MainActivity : Activity() {
         body.addView(info, cardLp())
         if (canEdit) {
             val e = shopEdit
-            var no = e?.no ?: ""; var ow = e?.owner ?: ""; var mb = e?.mobile ?: ""; var lm = e?.limit ?: Shops.LIMIT
+            var mk = e?.market ?: ""; var no = e?.no ?: ""; var ow = e?.owner ?: ""; var mb = e?.mobile ?: ""; var lm = e?.limit ?: Shops.LIMIT
             val f = card()
-            f.addView(heading(if (e == null) "＋ " + L.t("shop") else "✎ " + L.t("shop") + " " + e.no))
-            f.addView(row(input(L.t("shop") + " *", no, false) { no = it }.apply { textSize = 15f } to 1f, input(L.t("shop_owner") + " *", ow, false) { ow = it }.apply { textSize = 15f } to 1.6f))
+            f.addView(heading(if (e == null) "＋ " + L.t("shop") else "✎ " + e.label()))
+            f.addView(row(input(L.t("market_no"), mk, false) { mk = it }.apply { textSize = 15f } to 1f, input(L.t("shop") + " *", no, false) { no = it }.apply { textSize = 15f } to 1f))
+            f.addView(row(input(L.t("shop_owner") + " *", ow, false) { ow = it }.apply { textSize = 15f } to 1f))
             f.addView(row(mobileInput(L.t("mobile"), mb) { mb = it } to 1f, input(L.t("shop_limit_in"), plain(lm), true) { lm = evalExpr(it).let { v -> if (v.isFinite() && v > 0) v else Shops.LIMIT } }.apply { textSize = 15f } to 1f))
             f.addView(pill("✅ " + L.t("save"), true, GREEN) {
                 if (no.isBlank() || ow.isBlank() || mb.length != 10) return@pill toast(L.t("mob_need"))
-                val old = Shops.find(no)
-                if (old != null && old !== e) { old.owner = ow.trim(); old.mobile = mb; old.limit = lm } // same number: update it
-                else if (e != null) { e.no = no.trim(); e.owner = ow.trim(); e.mobile = mb; e.limit = lm }
-                else Store.shops.add(Shop(no.trim(), ow.trim(), mb, lm))
+                val old = Shops.find(mk, no)
+                if (old != null && old !== e) { old.owner = ow.trim(); old.mobile = mb; old.limit = lm } // same market + shop number: update it
+                else if (e != null) { e.market = mk.trim(); e.no = no.trim(); e.owner = ow.trim(); e.mobile = mb; e.limit = lm }
+                else Store.shops.add(Shop(no.trim(), ow.trim(), mb, lm, mk.trim()))
                 Store.shopsT = System.currentTimeMillis(); Store.save(this); shopEdit = null
                 Thread { val ok = try { Shops.publish(this) } catch (_: Exception) { false }; ui.post { toast(if (ok) "✓ " + L.t("shop_saved") else "📶 " + L.t("otp_net")); showShops() } }.start()
             }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
@@ -2541,13 +2543,19 @@ class MainActivity : Activity() {
         if (Store.shops.isEmpty()) body.addView(small(L.t("shop_none")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
         Store.shops.toList().forEach { s ->
             val c = card()
-            val used = Shops.used(s.no); val left = s.limit - used
-            c.addView(small("🏪 " + s.no + "  •  " + s.owner, INK).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD })
+            val used = Shops.used(s.market, s.no); val left = s.limit - used
+            c.addView(small("🏪 " + s.label() + "  •  " + s.owner, INK).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD })
             c.addView(small("📞 " + s.mobile))
             c.addView(small(L.t("shop_limit_w") + " " + money(s.limit) + "   •   " + L.t("shop_used") + " " + money(used), INK).apply { textSize = 14f })
             c.addView(small(L.t("shop_left") + ": " + money(left), if (left > 0) GREEN else RED).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD })
-            Shops.lines(s.no).filter { it.second.remaining() > 0.004 }.forEach { (h, l) ->
-                c.addView(small("• " + Notify.nm(l.cName) + " – " + l.name + ": " + money(l.remaining()) + "  (" + Bill.dateText(h.time).substringBefore("  ") + ")", INK).apply { textSize = 13f })
+            // every person this shop guarantees: name, mobile, what he still has to pay, and the items
+            val open = Shops.lines(s.market, s.no).filter { it.second.remaining() > 0.004 }
+            val byPerson = open.groupBy { digits10(it.second.cMobile).ifEmpty { norm(it.second.cName) } }
+            if (byPerson.isNotEmpty()) c.addView(small("🤝 " + byPerson.size + " " + L.t("shop_people"), 0xFF6A1B9A.toInt()).apply { typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(6f), 0, 0) })
+            byPerson.values.forEach { ls ->
+                val f0 = ls.first().second
+                c.addView(small("👤 " + Notify.nm(f0.cName) + "  📞 " + digits10(f0.cMobile) + "  =  " + money(ls.sumOf { it.second.remaining() }), INK).apply { textSize = 14f; typeface = Typeface.DEFAULT_BOLD })
+                ls.forEach { (h, l) -> c.addView(small("     • " + l.name + ": " + money(l.remaining()) + "  (" + Bill.dateText(h.time).substringBefore("  ") + ")", MUTED).apply { textSize = 12.5f }) }
             }
             if (canEdit) c.addView(row(pill("✎", false, BLUE) { shopEdit = s; showShops() } to 1f,
                 pill("🗑", false, RED) { confirmRemove { Store.shops.remove(s); Store.shopsT = System.currentTimeMillis(); Store.save(this)

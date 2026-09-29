@@ -174,7 +174,7 @@ object Bill {
                     val who = if (plainRokad) "" else listOf(l.cName, if (mob.length >= 10) "📞 " + mob else "", if (l.udhaar) L.t("udhaar") + (if (dueOf(h, l).isNotEmpty()) " • " + L.t("due") + " " + dueOf(h, l) else "") +
                         (if (l.pays.isNotEmpty()) " • " + L.t("got") + " " + money(l.received()) + " • " + L.t("left") + " " + money(l.remaining()) else "") else L.t("rokad"),
                         if (l.gName.isNotBlank() || l.gMobile.isNotBlank()) L.t("gname").substringBefore(" (") + ": " + (l.gName + " " + l.gMobile).trim() else "",
-                        if (l.shop.isNotBlank()) L.t("shop") + " " + l.shop else "").filter { it.isNotBlank() }.joinToString("  •  ")
+                        if (l.shop.isNotBlank()) (if (l.mkt.isNotBlank()) L.t("market") + " " + l.mkt + " • " else "") + L.t("shop") + " " + l.shop else "").filter { it.isNotBlank() }.joinToString("  •  ")
                     if (who.isNotEmpty()) {
                         c?.drawText(TextUtils.ellipsize("    ↳ " + who, tp(10.5f * u), W - 2 * pad, TextUtils.TruncateAt.END).toString(), pad, y + 10 * u,
                             tp(10.5f * u, false, if (l.udhaar) Color.rgb(0xEF, 0x6C, 0x00) else Color.rgb(0x60, 0x7D, 0x8B)))

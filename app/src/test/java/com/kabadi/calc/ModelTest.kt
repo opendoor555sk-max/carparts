@@ -435,11 +435,20 @@ class ModelTest {
             assertTrue(shopProblem(h, b) != null)                    // 5 lakh does not fit in the 4 lakh left
             a.pays.add(Pay(1, "200000"))                             // 2 lakh paid in the office: limit grows back
             assertTrue(shopProblem(h, b) == null)
-            assertEquals(400000.0, Shops.used("12"), 0.001)
+            assertEquals(400000.0, Shops.used("", "12"), 0.001)
             b.sold = true
-            assertEquals(900000.0, Shops.used("12"), 0.001)
+            assertEquals(900000.0, Shops.used("", "12"), 0.001)
             b.shop = "99"                                            // not written by the admin
             assertTrue(shopProblem(h, b) != null)
+            // the same shop number in another market is another shop (own limit)
+            b.shop = "12"; b.sold = false
+            Store.shops.add(Shop("12", "Other", "9666666666", 1_000_000.0, "3"))
+            b.mkt = "3"
+            assertTrue(Shops.find("3", "12")!!.owner == "Other" && Shops.find("", "12")!!.owner == "Owner")
+            assertTrue(shopProblem(h, b) == null)                    // market 3 shop 12 has its own 10 lakh
+            b.sold = true
+            assertEquals(400000.0, Shops.used("", "12"), 0.001); assertEquals(500000.0, Shops.used("3", "12"), 0.001)
+            b.mkt = ""; b.shop = "99"
             // mudi malik / khedut as guarantor do not use any shop
             b.shop = ""; b.gBy = "mudi"; assertTrue(shopProblem(h, b) == null)
         } finally { Store.shops.clear(); Store.hisabs.clear(); Store.shared.clear() }
