@@ -478,6 +478,10 @@ class ModelTest {
         assertFalse(guarantorOk(h, k))
         k.gBy = "mudi"; k.gName = "Salam"; k.gMobile = "9876543210"
         assertTrue(guarantorOk(h, k))
+        // a plain gaadi hisab does not force a guarantor
+        val g2 = Hisab(8, 1, type = "gaadi", writer = "mudi", mudiName = "Salam", mudiMobile = "9876543210", mudiPctText = "100")
+        val gl = Line("body", "Body", false, kgText = "10", rateText = "10", pay = "udhaar", cName = "Rafiq", cMobile = "9333333333", daysText = "30")
+        g2.maal.add(gl); assertTrue(guarantorOk(g2, gl))
         // cash needs none
         assertTrue(guarantorOk(h, Line("c", "C", false, kgText = "1", rateText = "5", pay = "rokad", cName = "X", cMobile = "9000000009")))
         // the guarantor cannot be the buyer himself

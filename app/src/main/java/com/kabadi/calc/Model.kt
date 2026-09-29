@@ -576,7 +576,8 @@ fun creditLines(h: Hisab): List<Line> =
 fun needsGuarantor(h: Hisab, l: Line) = l.udhaar && l.value() != 0.0 && !isMudiBuyer(h, l)
 /** guarantor complete: name + mobile + (shop number, or the mudi malik / khedut himself is the guarantor) */
 fun guarantorOk(h: Hisab, l: Line): Boolean {
-    if (!needsGuarantor(h, l)) return true
+    // compulsory in the haraji / company hisab; in a plain gaadi hisab the guarantor can be written but is not forced
+    if (h.type != "haraji" || !needsGuarantor(h, l)) return true
     if (l.gName.isBlank() || digits10(l.gMobile).length != 10) return false
     if (digits10(l.gMobile) == digits10(l.cMobile)) return false
     return l.gBy == "mudi" || l.gBy == "khed" || l.shop.isNotBlank()
