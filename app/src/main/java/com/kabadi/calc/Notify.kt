@@ -5,7 +5,8 @@ import java.util.Date
 import java.util.Locale
 
 /** one person who must be told about a hisab (WhatsApp / SMS text, ready to send) */
-class Rcpt(val name: String, val mobile: String, val role: String, val text: String)
+/** [full] = mudi malik / khedut / mehta: gets the whole hisab. Everybody else (company partners, buyers, sellers, service) gets only what concerns him */
+class Rcpt(val name: String, val mobile: String, val role: String, val text: String, val full: Boolean = false)
 
 /**
  * Messages after each OK step. Everybody whose contact number is in the hisab gets the deal details:
@@ -26,14 +27,16 @@ object Notify {
     }
 
     /** header every message starts with: who sends, what deal, vehicle, place, who is in it */
-    fun deal(h: Hisab): String {
+    fun deal(h: Hisab, lite: Boolean = false): String {
         val sb = StringBuilder()
         sb.append("*").append(nm(Store.owner).ifBlank { L.t("app") }).append("*")
         if (Store.mobile.isNotBlank()) sb.append("  ").append(Store.mobile)
         sb.append("\n").append(if (h.type == "haraji") "🔨 " + L.t("haraji") else "🚚 " + L.t("hisab")).append(" • ").append(date(h.time)).append("\n")
         val v = h.vehicleMsg()
         if (v.isNotBlank()) sb.append("🚚 ").append(v).append("\n")
-        if (h.place.isNotBlank()) sb.append("📍 ").append(h.place).append("\n")
+        // buyers / partners / service people are not told where the vehicle was bought, nor who owns it (lite)
+        if (!lite && h.place.isNotBlank()) sb.append("📍 ").append(h.place).append("\n")
+        if (lite) return sb.toString()
         if (h.mudiName.isNotBlank()) sb.append("💰 ").append(L.t("mudi_h")).append(": ").append(nm(h.mudiName)).append(" (").append(plain(h.mudiPct)).append("%)\n")
         if (h.khedName.isNotBlank() && h.khedPct > 0) sb.append("🚚 ").append(L.t("khed_h")).append(": ").append(nm(h.khedName)).append(" (").append(plain(h.khedPct)).append("%)\n")
         if (h.type == "haraji" && h.mehtaName.isNotBlank()) sb.append("🔨 ").append(L.t("mehta_h")).append(": ").append(nm(h.mehtaName)).append("  ").append(h.mehtaMobile).append("\n")
@@ -56,7 +59,7 @@ object Notify {
 
     /** message for the one buyer of one line, right after "OK – sold" */
     fun soldText(h: Hisab, l: Line): String =
-        opening(l.cName) + deal(h) + "\n" + lineText(h, l) + "\n\n🙏 " + nm(Store.owner)
+        opening(l.cName) + deal(h, true) + "\n" + lineText(h, l) + "\n\n🙏 " + nm(Store.owner)
 
     /** one common text for all people of the deal (sent in one SMS to everybody): shares, invest, profit / loss */
     fun groupText(h: Hisab, phase: Int): String {
@@ -100,24 +103,26 @@ object Notify {
         if (h.mudiPct > 0 || h.mudiName.isNotBlank()) people.add(Triple(h.mudiName, h.mudiMobile, "💰 " + L.t("mudi_h")))
         if (h.khedPct > 0 || h.khedName.isNotBlank()) people.add(Triple(h.khedName, h.khedMobile, "🚚 " + L.t("khed_h")))
         if (h.type == "haraji" && h.mehtaName.isNotBlank()) people.add(Triple(h.mehtaName, h.mehtaMobile, "🔨 " + L.t("mehta_h")))
-        h.partners.filter { it.share > 0 || it.name.isNotBlank() }.forEach { people.add(Triple(it.name, it.mobile, "🏢 " + L.t("role_co"))) }
+        val co = "🏢 " + L.t("role_co")
+        val coPartners = h.partners.filter { it.share > 0 || it.name.isNotBlank() }
 
         // mudi malik, khedut, mehta, partners: after every OK they get the WHOLE hisab written so far (not only the last step)
         if (phase >= 1) people.forEach { (n, m, r) -> add(n, m, r, "", full = true) }
         when (phase) {
-            0 -> people.forEach { (n, m, r) -> add(n, m, r, "✅ " + L.t("msg_started")) }
+            0 -> { people.forEach { (n, m, r) -> add(n, m, r, "✅ " + L.t("msg_started")) }; coPartners.forEach { p -> add(p.name, p.mobile, co, "✅ " + L.t("msg_started")) } }
             1 -> {
                 people.forEach { (n, m, r) -> add(n, m, r, "🛒 " + L.t("msg_buy") + ": " + money(h.price)) }
-                h.partners.forEach { p -> if (p.share > 0) add(p.name, p.mobile, "🏢 " + L.t("role_co"), "💰 " + L.t("your_invest") + ": " + money(h.price * p.share / 100) + "\n📌 " + L.t("your_share") + ": " + plain(p.share) + "%") }
+                coPartners.forEach { p -> if (p.share > 0) add(p.name, p.mobile, co, "💰 " + L.t("your_invest") + ": " + money(h.price * p.share / 100) + "\n📌 " + L.t("your_share") + ": " + plain(p.share) + "%") }
                 if (digits10(h.buyLine.cMobile).length == 10) add(h.buyLine.cName, h.buyLine.cMobile, "🛒 " + L.t("due_veh"), "🛒 " + L.t("msg_buy") + "\n" + lineText(h, h.buyLine))
             }
             2 -> {
                 people.forEach { (n, m, r) -> add(n, m, r, "💸 " + L.t("sum_kharch") + ": " + money(h.kharchTotal())) }
+                coPartners.forEach { p -> if (p.share > 0) add(p.name, p.mobile, co, "💰 " + L.t("your_invest") + ": " + money(h.lagat() * p.share / 100) + "\n📌 " + L.t("your_share") + ": " + plain(p.share) + "%") }
                 h.kharch.filter { digits10(it.cMobile).length == 10 }.forEach { l -> add(l.cName, l.cMobile, "🧾 " + L.t("kharch").substringAfter(". ").substringBefore(" ("), lineText(h, l)) }
             }
             else -> {
                 val m = h.munafa()
-                // every partner (mudi malik, khedut, mehta, company partners) gets the WHOLE hisab of the auction
+                // mudi malik, khedut, mehta get the WHOLE hisab
                 people.forEach { (n, mob, r) -> add(n, mob, r, "", full = true) }
                 fun mine(pct: Double, amount: Double) = "📌 " + L.t("your_share") + ": " + plain(pct) + "%\n➡ " + (if (amount >= 0) L.t("your_profit") else L.t("your_loss")) + ": " + money(Math.abs(amount))
                 val total = "📊 " + L.t("total_result") + ": " + (if (m >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(m))
@@ -125,9 +130,12 @@ object Notify {
                 if (h.khedPct > 0) add(h.khedName, h.khedMobile, "🚚 " + L.t("khed_h"), total + "\n" + mine(h.khedPct, h.khedShare()))
                 if (h.type == "haraji") {
                     val cr = h.companyResult()
+                    // company partners: only the vehicle (name, variant, year – in the header), what the auction paid, his invest, share and profit
+                    // (no purchase price, no expenses, no place, no other people's lines)
                     h.partners.filter { it.share > 0 }.forEach { p ->
                         val pm = h.partnerMunafa(p)
-                        add(p.name, p.mobile, "🏢 " + L.t("role_co"),
+                        add(p.name, p.mobile, co,
+                            (if (h.sale != 0.0) "🔨 " + L.t(if (h.isCo) "co_give" else "sale_s") + ": " + money(h.sale) + "\n" else "") +
                             "🏢 " + L.t("co_result") + ": " + (if (cr >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(cr)) + "\n" +
                                 "💰 " + L.t("your_invest") + ": " + money(h.partnerLagat(p)) + "\n" + mine(p.share, pm))
                     }
@@ -143,8 +151,8 @@ object Notify {
         return map.map { (m, a) ->
             val who = nm(a.name)
             Rcpt(who, m, a.roles.joinToString(" + "),
-                opening(who) + (if (a.full) Bill.text(h) else deal(h)) + "\n" +
-                    a.parts.joinToString("\n\n") + "\n\n🙏 " + nm(Store.owner))
+                opening(who) + (if (a.full) Bill.text(h) else deal(h, true)) + "\n" +
+                    a.parts.joinToString("\n\n") + "\n\n🙏 " + nm(Store.owner), a.full)
         }
     }
 }

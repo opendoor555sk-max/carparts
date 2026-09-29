@@ -178,7 +178,7 @@ object Store {
         o.put("h", JSONArray().also { a -> hisabs.forEach { a.put(hj(it)) } })
         o.put("sh", JSONArray().also { a -> shared.forEach { a.put(JSONObject().put("f", it.from).put("fm", it.fromMobile).put("t", it.t).put("h", hj(it.h))) } })
         o.put("lkd", JSONArray().also { a -> linked.forEach { k -> a.put(JSONObject().put("f", k.from).put("fm", k.fromMobile).put("hid", k.hid).put("ti", k.title).put("tm", k.time).put("t", k.t)
-            .put("ln", JSONArray().also { b -> k.lines.forEach { l -> b.put(JSONObject().put("n", l.name).put("a", l.amount).put("cr", l.credit).put("du", l.due).put("gt", l.got).put("lf", l.left).put("yp", l.youPay)) } })) } })
+            .put("ln", JSONArray().also { b -> k.lines.forEach { l -> b.put(JSONObject().put("n", l.name).put("a", l.amount).put("cr", l.credit).put("du", l.due).put("gt", l.got).put("lf", l.left).put("yp", l.youPay).put("in", l.info)) } })) } })
         o.put("rates", JSONObject(lastRate as Map<*, *>))
         o.put("parts", bj(parts)).put("exp", bj(expenses)).put("tp", bj(trashParts)).put("te", bj(trashExp))
         return o
@@ -230,7 +230,7 @@ object Store {
             o.optJSONArray("lkd")?.let { a -> for (i in 0 until a.length()) a.getJSONObject(i).let { k ->
                 val ln = k.optJSONArray("ln")
                 linked.add(Linked(k.optString("f"), k.optString("fm"), k.optLong("hid"), k.optString("ti"), k.optLong("tm"), k.optLong("t"),
-                    (0 until (ln?.length() ?: 0)).map { j -> ln!!.getJSONObject(j).let { LinkLine(it.optString("n"), it.optDouble("a"), it.optBoolean("cr"), it.optLong("du"), it.optDouble("gt"), it.optDouble("lf"), it.optBoolean("yp")) } })) } }
+                    (0 until (ln?.length() ?: 0)).map { j -> ln!!.getJSONObject(j).let { LinkLine(it.optString("n"), it.optDouble("a"), it.optBoolean("cr"), it.optLong("du"), it.optDouble("gt"), it.optDouble("lf"), it.optBoolean("yp"), it.optBoolean("in")) } })) } }
             o.optJSONObject("rates")?.let { r -> r.keys().forEach { k -> lastRate[k] = r.optString(k) } }
             o.optJSONArray("parts")?.let { parts = jb(it) }
             // one-time: give existing users the new litre buttons (Engine oil, Diesel)

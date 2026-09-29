@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** one line of another person's hisab that concerns this phone's number (he sold us / we owe / we get) */
-class LinkLine(val name: String, val amount: Double, val credit: Boolean, val due: Long, val got: Double, val left: Double, val youPay: Boolean)
+class LinkLine(val name: String, val amount: Double, val credit: Boolean, val due: Long, val got: Double, val left: Double, val youPay: Boolean, val info: Boolean = false)
 /** the lines of one hisab of someone else that concern this phone (a buyer, a seller, a service) – not the whole hisab */
 class Linked(var from: String, var fromMobile: String, var hid: Long, var title: String, var time: Long, var t: Long, var lines: List<LinkLine>)
 
@@ -25,9 +25,9 @@ object Share {
         val st = Otp.mobile10(Store.mobile)
         return if (st.length == 10) st else Otp.mobile10(Account.mobile(ctx))
     }
-    /** everybody named in the hisab with a mobile: mudi malik, khedut, mehta, company partners */
+    /** who gets the WHOLE hisab (view only): mudi malik, khedut, mehta. Company partners get only their own share and what concerns them (see contacts) */
     fun targetsOf(h: Hisab): List<String> =
-        (listOf(h.mudiMobile, h.khedMobile, h.mehtaMobile) + h.partners.map { it.mobile }).map { Otp.mobile10(it) }.filter { it.length == 10 }.distinct()
+        listOf(h.mudiMobile, h.khedMobile, h.mehtaMobile).map { Otp.mobile10(it) }.filter { it.length == 10 }.distinct()
     fun targets(ctx: Context, h: Hisab): List<String> {
         val me = myMobile(ctx)
         return targetsOf(h).filter { it != me }
@@ -63,6 +63,19 @@ object Share {
             add(l, true, l.name + if (!l.fixed && l.kg != 0.0) " " + plain(l.kg) + (if (l.litre) " L" else " kg") + " × " + plain(l.rate) else "")
         }
         if (fin && h.sale != 0.0) add(h.saleLine, true, L.ln(h.saleLine))
+        // company partners: only the vehicle (in the title), his invest, and after Final the auction price + his profit / loss. No cost, no place.
+        if (h.type == "haraji") h.partners.filter { it.share > 0 }.forEach { p ->
+            val m = Otp.mobile10(p.mobile)
+            if (m.length != 10 || m in skip || !buyOk) return@forEach
+            val list = out.getOrPut(m) { mutableListOf() }
+            val inv = if (kOk) h.partnerLagat(p) else h.price * p.share / 100
+            list.add(LinkLine("🏢 " + L.t("your_invest") + " (" + plain(p.share) + "%)", inv, false, 0L, 0.0, 0.0, true, true))
+            if (fin) {
+                if (h.sale != 0.0) list.add(LinkLine("🔨 " + L.t(if (h.isCo) "co_give" else "sale_s"), h.sale, false, 0L, 0.0, 0.0, false, true))
+                val pm = h.partnerMunafa(p)
+                list.add(LinkLine("📊 " + (if (pm >= 0) L.t("your_profit") else L.t("your_loss")), Math.abs(pm), false, 0L, 0.0, 0.0, pm < 0, true))
+            }
+        }
         return out
     }
 
@@ -74,7 +87,7 @@ object Share {
         val title = h.party.ifBlank { listOf(h.mudiName, h.khedName).filter { it.isNotBlank() }.joinToString(" / ") }.ifBlank { h.vehicleInfo() }
         contacts(ctx, h).forEach { (m, lines) ->
             val c = JSONObject().put("hid", h.id).put("ti", title).put("tm", h.time).put("ln", JSONArray().also { a -> lines.forEach { l ->
-                a.put(JSONObject().put("n", l.name).put("a", l.amount).put("cr", l.credit).put("du", l.due).put("gt", l.got).put("lf", l.left).put("yp", l.youPay)) } })
+                a.put(JSONObject().put("n", l.name).put("a", l.amount).put("cr", l.credit).put("du", l.due).put("gt", l.got).put("lf", l.left).put("yp", l.youPay).put("in", l.info)) } })
             val hash = c.toString().hashCode()
             if (sp(ctx).getInt("cx_${h.id}_$m", 0) == hash) return@forEach
             val payload = JSONObject().put("f", Store.owner.ifBlank { Account.name(ctx) }).put("fm", myMobile(ctx)).put("t", System.currentTimeMillis()).put("c", c).toString()
@@ -129,7 +142,7 @@ object Share {
             o.optJSONObject("c")?.let { c ->
                 val hid = c.optLong("hid")
                 val ln = c.optJSONArray("ln")
-                val lines = (0 until (ln?.length() ?: 0)).map { i -> ln!!.getJSONObject(i).let { LinkLine(it.optString("n"), it.optDouble("a"), it.optBoolean("cr"), it.optLong("du"), it.optDouble("gt"), it.optDouble("lf"), it.optBoolean("yp")) } }
+                val lines = (0 until (ln?.length() ?: 0)).map { i -> ln!!.getJSONObject(i).let { LinkLine(it.optString("n"), it.optDouble("a"), it.optBoolean("cr"), it.optLong("du"), it.optDouble("gt"), it.optDouble("lf"), it.optBoolean("yp"), it.optBoolean("in")) } }
                 val old = Store.linked.firstOrNull { it.hid == hid && it.fromMobile == fm }
                 if (old == null) { Store.linked.add(Linked(o.optString("f"), fm, hid, c.optString("ti"), c.optLong("tm"), t, lines)); n++ }
                 else if (old.t < t) { old.t = t; old.lines = lines; old.title = c.optString("ti"); old.from = o.optString("f"); n++ }

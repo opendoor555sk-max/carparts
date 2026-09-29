@@ -1863,7 +1863,7 @@ class MainActivity : Activity() {
         if (list.size > 1 || phase >= 0) {
             box.addView(bigButton(L.t("msg_all_wa") + " (" + list.size + ")", 0xFF25D366.toInt()) { dlgRef?.dismiss(); startQueue(h, phase, list) }.apply { textSize = 15f },
                 llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
-            val ppl = list.filter { r -> listOf("💰", "🚚", "🔨", "🏢").any { e -> r.role.contains(e) } }
+            val ppl = list.filter { it.full } // one common SMS carries the whole hisab: only for mudi malik / khedut / mehta
             if (ppl.isNotEmpty()) box.addView(bigButton(L.t("msg_all_sms") + " (" + ppl.size + ")", BLUE) {
                 try { startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + ppl.joinToString(";") { it.mobile })).putExtra("sms_body", Notify.groupText(h, phase))) } catch (_: Exception) { toast("✗") }
             }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
@@ -2480,8 +2480,9 @@ class MainActivity : Activity() {
             c.addView(small(lk.title.ifBlank { "—" } + "  •  " + Bill.dayText(lk.time).substringBefore("  "), INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD })
             c.addView(small(L.t("lk_from") + ": " + Notify.nm(lk.from).ifBlank { "—" } + "  📞 " + lk.fromMobile))
             lk.lines.forEach { l ->
-                val col = if (l.youPay) RED else GREEN
-                c.addView(small((if (l.youPay) "⬆ " + L.t("lk_pay") else "⬇ " + L.t("lk_recv")) + ": " + l.name + "  " + money(l.amount), col).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD })
+                val col = if (l.info) INK else if (l.youPay) RED else GREEN
+                c.addView(small((if (l.info) "" else if (l.youPay) "⬆ " + L.t("lk_pay") + ": " else "⬇ " + L.t("lk_recv") + ": ") + l.name + "  " + money(l.amount), col).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD })
+                if (l.info) return@forEach
                 if (l.credit) {
                     val sb = StringBuilder("⏳ " + L.t("udhaar"))
                     if (l.due > 0) sb.append(" • ").append(L.t("due")).append(" ").append(Bill.dateText(l.due).substringBefore("  "))

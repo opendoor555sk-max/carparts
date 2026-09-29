@@ -442,10 +442,17 @@ class ModelTest {
         val buyer = f.first { it.mobile == "9333333333" }
         assertTrue(buyer.text.contains("Body") && buyer.text.contains("⏳") && buyer.text.contains("Anand"))
         assertTrue(f.first { it.mobile == "9222222222" }.text.contains("➡"))
-        // partners get the whole hisab (buyer line with his name is in it)
-        assertTrue(f.first { it.mobile == "9222222222" }.text.contains("Rafiq"))
+        // mudi malik / khedut / mehta get the whole hisab (buyer line with his name is in it)
         assertTrue(f.first { it.mobile == "9111111111" }.text.contains("Body"))
         assertTrue(f.none { it.mobile == me })
+        // company partner: no purchase price, expenses or place; but vehicle, auction price, his invest / share / profit
+        h.partners[0].mobile = "9222222222"
+        val pt = f.first { it.mobile == "9222222222" }
+        assertFalse(pt.full)
+        assertTrue(pt.text.contains("1,35,000") || pt.text.contains("150000") || pt.text.contains("1,50,000"))
+        assertFalse(pt.text.contains("Anand") || pt.text.contains("Rafiq") || pt.text.contains("Mehta"))
+        assertFalse(pt.text.contains("1,00,000") && pt.text.contains("Seller"))
+        assertTrue(f.first { it.mobile == "9111111111" }.full)
         // vehicle: brand, model and year are all written with their names (not only "2000")
         h.brand = "Tata"; h.variant = "1612"; h.year = "2000"
         val vt = Notify.recipients(h, 3, me).first { it.mobile == "9333333333" }.text
