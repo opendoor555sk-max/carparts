@@ -3032,7 +3032,7 @@ class MainActivity : Activity() {
 
         val lv = card()
         lv.addView(pill(if (Live.enabled(this)) "✅ " + L.t("live_set") else "⬜ " + L.t("live_set"), Live.enabled(this), GREEN) {
-            Live.setEnabled(this, !Live.enabled(this)); showSettings() }.apply { textSize = 14f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+            Live.setEnabled(this, !Live.enabled(this)); showSettings() }.apply { maxLines = 3; textSize = 14f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
         body.addView(lv, cardLp())
 
         val lc = card()
