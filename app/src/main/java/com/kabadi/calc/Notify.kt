@@ -16,18 +16,23 @@ class Rcpt(val name: String, val mobile: String, val role: String, val text: Str
 object Notify {
     private fun date(t: Long) = SimpleDateFormat("dd-MM-yyyy", Locale.US).format(Date(t))
 
+    /** a name written properly: no double spaces, first letter capital for English words (riyan → Riyan) */
+    fun nm(x: String): String = x.replace(Regex("\\s+"), " ").trim().trim('.', ',', '-', '_').split(" ").filter { it.isNotEmpty() }.joinToString(" ") { w ->
+        if (w[0].isLowerCase() && w.all { it.code < 128 }) w.replaceFirstChar { it.uppercaseChar() } else w
+    }
+
     /** header every message starts with: who sends, what deal, vehicle, place, who is in it */
     fun deal(h: Hisab): String {
         val sb = StringBuilder()
-        sb.append("*").append(Store.owner.ifBlank { L.t("app") }).append("*")
+        sb.append("*").append(nm(Store.owner).ifBlank { L.t("app") }).append("*")
         if (Store.mobile.isNotBlank()) sb.append("  ").append(Store.mobile)
         sb.append("\n").append(if (h.type == "haraji") "🔨 " + L.t("haraji") else "🚚 " + L.t("hisab")).append(" • ").append(date(h.time)).append("\n")
         val v = listOf(h.vehicleInfo(), h.vehicle).filter { it.isNotBlank() }.joinToString(" • ")
         if (v.isNotBlank()) sb.append(v).append("\n")
         if (h.place.isNotBlank()) sb.append("📍 ").append(h.place).append("\n")
-        if (h.mudiName.isNotBlank()) sb.append("💰 ").append(L.t("mudi_h")).append(": ").append(h.mudiName).append(" (").append(plain(h.mudiPct)).append("%)\n")
-        if (h.khedName.isNotBlank() && h.khedPct > 0) sb.append("🚚 ").append(L.t("khed_h")).append(": ").append(h.khedName).append(" (").append(plain(h.khedPct)).append("%)\n")
-        if (h.type == "haraji" && h.mehtaName.isNotBlank()) sb.append("🔨 ").append(L.t("mehta_h")).append(": ").append(h.mehtaName).append("  ").append(h.mehtaMobile).append("\n")
+        if (h.mudiName.isNotBlank()) sb.append("💰 ").append(L.t("mudi_h")).append(": ").append(nm(h.mudiName)).append(" (").append(plain(h.mudiPct)).append("%)\n")
+        if (h.khedName.isNotBlank() && h.khedPct > 0) sb.append("🚚 ").append(L.t("khed_h")).append(": ").append(nm(h.khedName)).append(" (").append(plain(h.khedPct)).append("%)\n")
+        if (h.type == "haraji" && h.mehtaName.isNotBlank()) sb.append("🔨 ").append(L.t("mehta_h")).append(": ").append(nm(h.mehtaName)).append("  ").append(h.mehtaMobile).append("\n")
         return sb.toString()
     }
 
@@ -47,7 +52,7 @@ object Notify {
 
     /** message for the one buyer of one line, right after "OK – sold" */
     fun soldText(h: Hisab, l: Line): String =
-        deal(h) + lineText(h, l) + "\n🙏 " + Store.owner.ifBlank { "" }
+        (if (nm(l.cName).isNotBlank()) "🙏 " + L.t("rem_hello") + " " + nm(l.cName) + ",\n" else "") + deal(h) + "\n" + lineText(h, l) + "\n\n🙏 " + nm(Store.owner)
 
     /** one common text for all people of the deal (sent in one SMS to everybody): shares, invest, profit / loss */
     fun groupText(h: Hisab, phase: Int): String {
@@ -62,9 +67,9 @@ object Notify {
             }
         }
         h.partners.filter { it.share > 0 }.forEach { p ->
-            sb.append("🏢 ").append(p.name.ifBlank { "?" }).append(" (").append(plain(p.share)).append("%): ")
-            if (phase >= 3) { val pm = h.partnerMunafa(p); sb.append(L.t("invest")).append(" ").append(money(h.partnerLagat(p))).append(" ➡ ").append(if (pm >= 0) L.t("profit") else L.t("loss")).append(" ").append(money(Math.abs(pm))) }
-            else sb.append(L.t("invest")).append(" ").append(money((if (phase == 1) h.price else h.lagat()) * p.share / 100))
+            sb.append("🏢 ").append(nm(p.name).ifBlank { "?" }).append(" (").append(plain(p.share)).append("%): ")
+            if (phase >= 3) { val pm = h.partnerMunafa(p); sb.append(L.t("invest_w")).append(" ").append(money(h.partnerLagat(p))).append(" ➡ ").append(if (pm >= 0) L.t("profit") else L.t("loss")).append(" ").append(money(Math.abs(pm))) }
+            else sb.append(L.t("invest_w")).append(" ").append(money((if (phase == 1) h.price else h.lagat()) * p.share / 100))
             sb.append("\n")
         }
         sb.append("🙏 ").append(Store.owner.ifBlank { "" })
@@ -95,7 +100,7 @@ object Notify {
             0 -> people.forEach { (n, m, r) -> add(n, m, r, "✅ " + L.t("msg_started")) }
             1 -> {
                 people.forEach { (n, m, r) -> add(n, m, r, "🛒 " + L.t("msg_buy") + ": " + money(h.price)) }
-                h.partners.forEach { p -> if (p.share > 0) add(p.name, p.mobile, "🏢 " + L.t("role_co"), "🏢 " + L.t("invest") + " " + money(h.price * p.share / 100) + " (" + plain(p.share) + "%)") }
+                h.partners.forEach { p -> if (p.share > 0) add(p.name, p.mobile, "🏢 " + L.t("role_co"), "💰 " + L.t("your_invest") + ": " + money(h.price * p.share / 100) + "\n📌 " + L.t("your_share") + ": " + plain(p.share) + "%") }
                 if (digits10(h.buyLine.cMobile).length == 10) add(h.buyLine.cName, h.buyLine.cMobile, "🛒 " + L.t("due_veh"), "🛒 " + L.t("msg_buy") + "\n" + lineText(h, h.buyLine))
             }
             2 -> {
@@ -104,17 +109,18 @@ object Notify {
             }
             else -> {
                 val m = h.munafa()
-                people.forEach { (n, mob, r) -> add(n, mob, r, "✅ " + L.t("final_s") + "\n📊 " + (if (m >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(m))) }
-                if (h.mudiPct > 0) add(h.mudiName, h.mudiMobile, "💰 " + L.t("mudi_h"), "💰 " + h.mudiName + " (" + plain(h.mudiPct) + "%): " + (if (h.mudiShare() >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(h.mudiShare())))
-                if (h.khedPct > 0) add(h.khedName, h.khedMobile, "🚚 " + L.t("khed_h"), "🚚 " + h.khedName + " (" + plain(h.khedPct) + "%): " + (if (h.khedShare() >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(h.khedShare())))
+                people.forEach { (n, mob, r) -> add(n, mob, r, "✅ " + L.t("final_s")) }
+                fun mine(pct: Double, amount: Double) = "📌 " + L.t("your_share") + ": " + plain(pct) + "%\n➡ " + (if (amount >= 0) L.t("your_profit") else L.t("your_loss")) + ": " + money(Math.abs(amount))
+                val total = "📊 " + L.t("total_result") + ": " + (if (m >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(m))
+                if (h.mudiPct > 0) add(h.mudiName, h.mudiMobile, "💰 " + L.t("mudi_h"), total + "\n" + mine(h.mudiPct, h.mudiShare()))
+                if (h.khedPct > 0) add(h.khedName, h.khedMobile, "🚚 " + L.t("khed_h"), total + "\n" + mine(h.khedPct, h.khedShare()))
                 if (h.type == "haraji") {
                     val cr = h.companyResult()
                     h.partners.filter { it.share > 0 }.forEach { p ->
                         val pm = h.partnerMunafa(p)
                         add(p.name, p.mobile, "🏢 " + L.t("role_co"),
                             "🏢 " + L.t("co_result") + ": " + (if (cr >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(cr)) + "\n" +
-                                L.t("invest") + " " + money(h.partnerLagat(p)) + " • " + L.t("rem_share") + " " + plain(p.share) + "%\n" +
-                                "➡ " + (if (pm >= 0) L.t("profit") else L.t("loss")) + " " + money(Math.abs(pm)))
+                                "💰 " + L.t("your_invest") + ": " + money(h.partnerLagat(p)) + "\n" + mine(p.share, pm))
                     }
                 }
                 // buyers of the goods, one message each with all his items
@@ -126,7 +132,9 @@ object Notify {
             }
         }
         return map.map { (m, a) ->
-            Rcpt(a.name, m, a.roles.joinToString(" + "), deal(h) + a.parts.joinToString("\n") + "\n🙏 " + Store.owner.ifBlank { "" })
+            val who = nm(a.name)
+            Rcpt(who, m, a.roles.joinToString(" + "),
+                (if (who.isNotBlank()) "🙏 " + L.t("rem_hello") + " " + who + ",\n" else "") + deal(h) + "\n" + a.parts.joinToString("\n\n") + "\n\n🙏 " + nm(Store.owner))
         }
     }
 }
