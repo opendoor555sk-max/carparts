@@ -1856,7 +1856,7 @@ class MainActivity : Activity() {
         if (list.size > 1 || phase >= 0) {
             box.addView(bigButton(L.t("msg_all_wa") + " (" + list.size + ")", 0xFF25D366.toInt()) { dlgRef?.dismiss(); startQueue(h, phase, list) }.apply { textSize = 15f },
                 llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
-            val ppl = list.filter { r -> r.role.any { it == '💰' || it == '🚚' || it == '🔨' || it == '🏢' } }
+            val ppl = list.filter { r -> listOf("💰", "🚚", "🔨", "🏢").any { e -> r.role.contains(e) } }
             if (ppl.isNotEmpty()) box.addView(bigButton(L.t("msg_all_sms") + " (" + ppl.size + ")", BLUE) {
                 try { startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + ppl.joinToString(";") { it.mobile })).putExtra("sms_body", Notify.groupText(h, phase))) } catch (_: Exception) { toast("✗") }
             }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
