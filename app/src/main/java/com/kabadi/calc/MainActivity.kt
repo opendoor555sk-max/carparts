@@ -1869,6 +1869,9 @@ class MainActivity : Activity() {
             }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
         }
         box.addView(small(L.t("msg_title")).apply { setPadding(0, 0, 0, dpi(8f)) })
+        val meNo = Share.myMobile(this)
+        val skipped = listOf(h.mudiName to h.mudiMobile, h.khedName to h.khedMobile, h.mehtaName to h.mehtaMobile).filter { Otp.mobile10(it.second) == meNo && meNo.length == 10 }.map { Notify.nm(it.first).ifBlank { it.second } }
+        box.addView(small("ℹ " + L.t("msg_me") + ": " + meNo.ifBlank { "—" } + (if (skipped.isNotEmpty()) "\n⚠ " + skipped.joinToString(", ") + " — " + L.t("msg_me2") else ""), ORANGE).apply { setPadding(0, 0, 0, dpi(8f)) })
         list.forEach { r ->
             val key = "${h.id}_${phase}_${r.mobile}"
             val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = round(0xFFF7FAF7.toInt(), 10f, 0xFFC8E6C9.toInt()); setPadding(dpi(10f), dpi(8f), dpi(10f), dpi(8f)) }

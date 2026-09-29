@@ -451,6 +451,8 @@ object L {
         "live_t" to arrayOf("Instant messages ON", "तुरंत मैसेज चालू", "તરત મેસેજ ચાલુ"),
         "live_d" to arrayOf("Hisab of others arrive in 1-2 seconds", "दूसरों का हिसाब 1-2 सेकंड में आता है", "બીજાનો હિસાબ 1-2 સેકંડમાં આવે છે"),
         "live_set" to arrayOf("⚡ Instant messages (small notification stays on)", "⚡ तुरंत मैसेज (छोटा नोटिफ़िकेशन रहेगा)", "⚡ તરત મેસેજ (નાની notification રહેશે)"),
+        "msg_me" to arrayOf("This phone's number (not messaged)", "इस फोन का नंबर (मैसेज नहीं जाता)", "આ ફોનનો નંબર (આને મેસેજ નથી જતો)"),
+        "msg_me2" to arrayOf("has this phone's number, so no message. Change the number in Settings if wrong.", "का नंबर इस फोन का है, इसलिए मैसेज नहीं। गलत हो तो Settings में नंबर बदलें।", "નો નંબર આ જ ફોનનો છે એટલે મેસેજ નથી. ખોટો હોય તો Settings માં નંબર બદલો."),
         "salam" to arrayOf("Assalamu Alaikum", "अस्सलामु अलैकुम", "અસ્સલામ વાલેકુમ"),
         "lk_title" to arrayOf("My khata (from others)", "मेरा खाता (दूसरों से)", "મારું ખાતું (બીજાઓ તરફથી)"),
         "lk_pay" to arrayOf("You have to pay", "आपको देना है", "તમારે ચૂકવવાના"),
