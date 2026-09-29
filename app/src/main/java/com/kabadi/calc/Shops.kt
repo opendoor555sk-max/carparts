@@ -20,11 +20,14 @@ object Shops {
 
     fun find(no: String): Shop? = if (no.isBlank()) null else Store.shops.firstOrNull { norm(it.no) == norm(no) }
 
-    /** every credit line (and its hisab) guaranteed by shop [no] */
+    /** a credit line counts against the limit once it is confirmed ("OK – sold"), or it is in a final / old hisab */
+    private fun committed(h: Hisab, l: Line) = l.sold || h.finalAt > 0 || h.step < 0
+
+    /** every confirmed credit line (and its hisab) guaranteed by shop [no] */
     fun lines(no: String, skip: Line? = null): List<Pair<Hisab, Line>> {
         val all = Store.hisabs.toList() + Store.shared.map { it.h }
         return all.filter { it.type == "haraji" }.flatMap { h ->
-            creditLines(h).filter { it !== skip && it.gBy.isEmpty() && needsGuarantor(h, it) && norm(it.shop) == norm(no) }.map { h to it }
+            creditLines(h).filter { it !== skip && it.gBy.isEmpty() && needsGuarantor(h, it) && norm(it.shop) == norm(no) && committed(h, it) }.map { h to it }
         }
     }
     /** credit of that shop not yet paid back */

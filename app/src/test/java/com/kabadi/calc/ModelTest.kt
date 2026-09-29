@@ -428,12 +428,15 @@ class ModelTest {
             val h = Hisab(9, 1, type = "haraji", writer = "mudi", mudiName = "S", mudiMobile = "9876543210", mudiPctText = "100")
             fun ln(k: String, kg: String, cn: String, cm: String) = Line(k, k, false, kgText = kg, rateText = "1000", pay = "udhaar", cName = cn, cMobile = cm, daysText = "10").also { it.shop = "12" }
             val a = ln("a", "600", "R", "9333333333"); val b = ln("b", "500", "T", "9444444444")   // 6 lakh + 5 lakh
-            h.maal.add(a); h.maal.add(b); Store.hisabs.add(h)
+            h.step = 3; h.maal.add(a); h.maal.add(b); Store.hisabs.add(h)
             assertEquals(1_000_000.0, Shops.LIMIT, 0.0)
             assertTrue(shopProblem(h, a) == null)                    // 6 lakh fits in 10 lakh
+            a.sold = true                                            // confirmed: now it uses the limit
             assertTrue(shopProblem(h, b) != null)                    // 5 lakh does not fit in the 4 lakh left
             a.pays.add(Pay(1, "200000"))                             // 2 lakh paid in the office: limit grows back
             assertTrue(shopProblem(h, b) == null)
+            assertEquals(400000.0, Shops.used("12"), 0.001)
+            b.sold = true
             assertEquals(900000.0, Shops.used("12"), 0.001)
             b.shop = "99"                                            // not written by the admin
             assertTrue(shopProblem(h, b) != null)
