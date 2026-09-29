@@ -432,6 +432,7 @@ object L {
         "msg_none" to arrayOf("No contact number to message yet", "अभी मैसेज के लिए कोई नंबर नहीं", "હજી મેસેજ માટે કોઈ નંબર નથી"),
         "msg_started" to arrayOf("Hisab started – you are in this deal", "हिसाब शुरू – आप इस सौदे में हैं", "હિસાબ શરૂ – તમે આ સોદામાં છો"),
         "msg_buy" to arrayOf("Purchase", "खरीद", "ખરીદી"),
+        "pin_forgot" to arrayOf("Forgot the PIN? Set a new PIN", "PIN भूल गए? नया PIN बनाएँ", "PIN ભૂલી ગયા? નવો PIN બનાવો"),
         "final_no" to arrayOf("Cannot finalize yet", "अभी फाइनल नहीं हो सकता", "હજી ફાઈનલ થઈ શકે નહીં"),
         "sh_tot" to arrayOf("My account (all shared hisab)", "मेरा खाता (सभी साझा हिसाब)", "મારું ખાતું (બધા ભાગીદારીના હિસાબ)"),
         "sh_tot_p" to arrayOf("Total profit", "कुल नफा", "કુલ નફો"),

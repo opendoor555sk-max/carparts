@@ -2910,6 +2910,9 @@ class MainActivity : Activity() {
         ap.addView(pill(if (hasPin) L.t("adm_pin_change") else L.t("adm_pin_new"), false, BLUE) {
             if (hasPin) askAdminPin { setAdminPin { showSettings() } } else setAdminPin { showSettings() }
         }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        // owner (admin phone) forgot the PIN: he can set a new one without the old one
+        if (hasPin && LOGIN_ON && Account.isAdmin(this)) ap.addView(pill("🔁 " + L.t("pin_forgot"), false, ORANGE) { setAdminPin { showSettings() } }
+            .apply { textSize = 14f; setPadding(dpi(8f), dpi(8f), dpi(8f), dpi(8f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         if (!LOGIN_ON || Account.isAdmin(this)) body.addView(ap, cardLp())
 
         val lc = card()
