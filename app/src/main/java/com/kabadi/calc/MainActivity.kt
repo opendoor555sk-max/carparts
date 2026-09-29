@@ -543,6 +543,9 @@ class MainActivity : Activity() {
                 .filter { !it.optBoolean("adm") }.map { org.json.JSONObject().put("n", it.optString("n")).put("m", it.optString("m")).put("d", it.optString("d")).put("s", "ok").put("t", it.optLong("first")) })
                 // deleted by admin: hidden until that phone uses the app again
                 .filter { u -> val k = u.optString("m") + ":" + u.optString("d"); val t = hid[k] ?: return@filter true; (seen[k]?.optLong("at") ?: 0L) > t }
+                // one row per phone (device code)
+                .let { l -> l.groupBy { it.optString("d") }.flatMap { (d, g) ->
+                    if (d.isEmpty() || g.size == 1) g else listOf(g.firstOrNull { seen.containsKey(it.optString("m") + ":" + d) } ?: g.first()) } }
             val week = System.currentTimeMillis() - 7L * 86400000L
             val today = System.currentTimeMillis() - 86400000L
             sumTv.text = L.t("u_total") + ": " + all.size + "   •   🟢 " + L.t("u_week") + ": " + seen.values.count { !it.optBoolean("adm") && it.optLong("at") > week } +
@@ -1058,11 +1061,13 @@ class MainActivity : Activity() {
             val nUsers = Relay.seen(this).values.count { !it.optBoolean("adm") }
             body.addView(bigButton("👑 " + L.t(if (Account.REQUIRED) "adm_btn" else "adm_users_btn") + (if (nUsers > 0) "   •   👥 $nUsers" else ""), 0xFF4A148C.toInt()) { showAdmin() }.apply { textSize = 15f },
                 llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
-            val banner = bigButton("", 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
-            body.addView(banner, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
-            every(30000L, { Relay.pending(this) }) { p ->
-                banner.visibility = if (p.isNullOrEmpty()) View.GONE else View.VISIBLE
-                banner.text = "🔔 " + (p?.size ?: 0) + " " + L.t("adm_req_new"); true
+            if (Account.REQUIRED) {
+                val banner = bigButton("", 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
+                body.addView(banner, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+                every(30000L, { Relay.pending(this) }) { p ->
+                    banner.visibility = if (p.isNullOrEmpty()) View.GONE else View.VISIBLE
+                    banner.text = "🔔 " + (p?.size ?: 0) + " " + L.t("adm_req_new"); true
+                }
             }
         }
 

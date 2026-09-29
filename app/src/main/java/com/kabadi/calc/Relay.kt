@@ -112,9 +112,23 @@ object Relay {
         return true
     }
 
+    /** one entry per phone (device code): a phone that changed its name / number is not listed twice */
     fun seen(ctx: Context): Map<String, JSONObject> {
         val map = try { JSONObject(ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE).getString("seen", "{}")) } catch (_: Exception) { JSONObject() }
-        return map.keys().asSequence().associateWith { map.getJSONObject(it) }
+        val byDev = LinkedHashMap<String, JSONObject>()
+        map.keys().asSequence().map { map.getJSONObject(it) }.sortedBy { it.optLong("at") }.forEach { o ->
+            val d = o.optString("d"); val prev = byDev[d]
+            val n = JSONObject(o.toString())
+            if (prev != null) {
+                if (n.optString("m").length != 10 && prev.optString("m").length == 10) {
+                    n.put("m", prev.optString("m")); if (n.optString("n").isBlank()) n.put("n", prev.optString("n"))
+                }
+                val f = listOf(prev.optLong("first"), n.optLong("first")).filter { it > 0 }.minOrNull()
+                if (f != null) n.put("first", f)
+            }
+            byDev[d] = n
+        }
+        return byDev.values.associateBy { it.optString("m") + ":" + it.optString("d") }
     }
 
     // ---- admin side ----
@@ -172,6 +186,8 @@ object Relay {
                 try { nm.notify(10, b.build()) } catch (_: Exception) {}
             }
         } catch (_: Exception) {}
+        // no OTP login any more: old "OTP request" alerts must not come again and again
+        if (!Account.REQUIRED) { try { (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(8) } catch (_: Exception) {}; return }
         val p = pending(ctx) ?: return
         val sp = ctx.getSharedPreferences("kabadi_acct", Context.MODE_PRIVATE)
         val seen = sp.getString("seenReq", "").orEmpty().split(",").toSet()
