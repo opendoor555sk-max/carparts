@@ -141,6 +141,7 @@ class MainActivity : Activity() {
                 requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 9)
             if (intent?.getBooleanExtra("remind", false) == true) showReminders()
             else if (toKhata) showKhata()
+            else if (intent?.getBooleanExtra("shared", false) == true) showShared()
             else if (intent?.getBooleanExtra("admin", false) == true && Account.isAdmin(this)) showAdmin()
         }
         Account.refreshAdminNumber(this)
@@ -686,6 +687,7 @@ class MainActivity : Activity() {
         if (screen == "login") return
         if (i?.getBooleanExtra("remind", false) == true) { autoSave(); showReminders() }
         else if (i?.getBooleanExtra("khata", false) == true) { autoSave(); showKhata() }
+        else if (i?.getBooleanExtra("shared", false) == true) { autoSave(); showShared() }
         else if (i?.getBooleanExtra("admin", false) == true && Account.isAdmin(this)) { autoSave(); showAdmin() }
     }
 
@@ -1204,6 +1206,8 @@ class MainActivity : Activity() {
         h.maal.forEach { if (!it.fixed && it.rateText.isNotBlank()) Store.lastRate[it.name] = it.rateText }
         lastLearned = Store.learn(h)
         h.variant.trim().let { v -> if (v.isNotEmpty() && Store.variants.none { norm(it) == norm(v) }) Store.variants.add(0, v) }
+        // mudi malik / khedut / mehta / partners see every change by themselves (after the names are OK)
+        if (h.step != 0 && Share.targets(this, h).isNotEmpty()) Thread { try { Share.publishIfChanged(this, h) } catch (_: Exception) {} }.start()
     }
 
     private var lastLearned: List<String> = emptyList()
@@ -1816,7 +1820,7 @@ class MainActivity : Activity() {
                     .setMessage(miss.joinToString("\n") { "• $it" }).setPositiveButton("OK", null).show().let { }
                 AlertDialog.Builder(this).setTitle(L.t("final_btn")).setMessage(L.t("final_q"))
                     .setPositiveButton(L.t("yes")) { _, _ -> h.finalAt = System.currentTimeMillis(); autoSave(); Store.save(this); unlocked.remove(h.id)
-                        Thread { try { Share.publish(this, h) } catch (_: Exception) {} }.start(); showEditor(h) }
+                        Thread { try { Share.publish(this, h) } catch (_: Exception) {} }.start(); showEditor(h); showMessages(h, 3, true) }
                     .setNegativeButton(L.t("no"), null).show()
             }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(12f) })
         } else {
@@ -1824,6 +1828,10 @@ class MainActivity : Activity() {
             body.addView(pill("🔒 " + L.t("lock_again"), true, GREEN) { autoSave(); Store.save(this); unlocked.remove(h.id); showEditor(h) }
                 .apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, 0, cardLp())
         }
+
+        if (view == null && (h.finalAt > 0 || (g && h.step >= 1)))
+            body.addView(pill("📤 " + L.t("msg_btn"), true, 0xFF25D366.toInt()) { showMessages(h, if (h.finalAt > 0) 3 else h.step - 1) }
+                .apply { textSize = 15f; gravity = Gravity.CENTER; setPadding(dpi(8f), dpi(12f), dpi(8f), dpi(12f)) }, cardLp())
 
         // action bar
         bottom.visibility = View.VISIBLE
@@ -1836,12 +1844,43 @@ class MainActivity : Activity() {
         if (view == null && Store.hisabs.any { it === h } && ((h.finalAt == 0L && h.step <= 0) || (LOGIN_ON && Account.isAdmin(this)))) act("🗑", 0xFF78909C.toInt()) { askDelete(h) { editing = null; showHome() } }
     }
 
+    /** everybody with a contact number gets the details: WhatsApp / SMS, one tap each */
+    private fun showMessages(h: Hisab, phase: Int, auto: Boolean = false) {
+        val list = Notify.recipients(h, phase, Share.myMobile(this))
+        if (list.isEmpty()) { if (!auto) toast(L.t("msg_none")); return }
+        val sp = getSharedPreferences("kabadi_msgs", MODE_PRIVATE)
+        val sent = sp.getStringSet("sent", emptySet())!!.toMutableSet()
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(14f), dpi(8f), dpi(14f), dpi(4f)) }
+        box.addView(small(L.t("msg_title")).apply { setPadding(0, 0, 0, dpi(8f)) })
+        list.forEach { r ->
+            val key = "${h.id}_${phase}_${r.mobile}"
+            val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = round(0xFFF7FAF7.toInt(), 10f, 0xFFC8E6C9.toInt()); setPadding(dpi(10f), dpi(8f), dpi(10f), dpi(8f)) }
+            val nm = small("", INK).apply { typeface = Typeface.DEFAULT_BOLD; textSize = 15f }
+            fun label() { nm.text = (if (key in sent) "✓ " else "") + r.name.ifBlank { "—" } + " • " + r.role }
+            label()
+            fun mark() { sent.add(key); sp.edit().putStringSet("sent", sent).apply(); label() }
+            row.addView(nm); row.addView(small("📞 " + r.mobile))
+            val acts = LinearLayout(this).apply { setPadding(0, dpi(6f), 0, 0) }
+            acts.addView(pill("💬 WhatsApp", true, 0xFF25D366.toInt()) { mark(); whatsapp(r.mobile, r.text) }.apply { gravity = Gravity.CENTER; textSize = 14f }, llp(0, WRAP_CONTENT, 1f).apply { rightMargin = dpi(4f) })
+            acts.addView(pill("✉ SMS", true, BLUE) {
+                mark(); try { startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + r.mobile)).putExtra("sms_body", r.text)) } catch (_: Exception) { toast("✗") }
+            }.apply { gravity = Gravity.CENTER; textSize = 14f }, llp(0, WRAP_CONTENT, 1f).apply { leftMargin = dpi(4f) })
+            row.addView(acts)
+            box.addView(row, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
+        }
+        AlertDialog.Builder(this).setTitle("📤 " + L.t("msg_btn")).setView(ScrollView(this).apply { addView(box) }).setPositiveButton("OK", null).show()
+    }
+
     /** OK on a step: everything of that step is checked, then locked (only the admin can open it again) */
     private fun confirmStep(h: Hisab, s0: Int) {
         val prob = stepProblems(h, s0)
         if (prob.isNotEmpty()) { AlertDialog.Builder(this).setTitle("❌ " + L.t("final_no")).setMessage(prob.joinToString("\n") { "• $it" }).setPositiveButton("OK", null).show(); return }
         AlertDialog.Builder(this).setTitle(L.t("st_t$s0")).setMessage(L.t("st_q"))
-            .setPositiveButton(L.t("yes")) { _, _ -> h.step = s0 + 1; autoSave(); Store.save(this); showEditor(h) }
+            .setPositiveButton(L.t("yes")) { _, _ ->
+                h.step = s0 + 1; autoSave(); Store.save(this)
+                if (Share.targets(this, h).isNotEmpty()) Thread { try { Share.publishIfChanged(this, h) } catch (_: Exception) {} }.start()
+                showEditor(h); showMessages(h, s0, true)
+            }
             .setNegativeButton(L.t("no"), null).show()
     }
 
@@ -2032,7 +2071,7 @@ class MainActivity : Activity() {
     private fun payBlock(h: Hisab, l: Line, lena: Boolean, box: LinearLayout, redraw: () -> Unit) {
         box.addView(row(pill(L.t("rokad_s"), !l.udhaar, GREEN) { l.pay = "rokad"; redraw(); refreshTotals() } to 0f,
             pill(L.t("udhaar"), l.udhaar, ORANGE) { l.pay = "udhaar"; redraw(); refreshTotals() } to 0f, View(this) to 1f).apply { setPadding(0, dpi(6f), 0, 0) })
-        if (!l.udhaar && !(lena && h.type == "haraji" && !h.isCo)) return
+        // contact of the person is written for cash lines too: he gets the message / entry
         val req = lena && h.type == "haraji" && !h.isCo
         val pn = input("👤 " + L.t(if (lena) "get_from" else "pay_to"), l.cName, false) { l.cName = it }.apply { textSize = 15f }
         val pm = if (req) reqMobile("📞 " + L.t("cmobile") + " *", l.cMobile) { l.cMobile = it } else mobileInput("📞 " + L.t("cmobile"), l.cMobile) { l.cMobile = it }

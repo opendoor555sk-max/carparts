@@ -24,6 +24,10 @@ object Reminders {
             if (timeInMillis <= System.currentTimeMillis()) add(Calendar.DAY_OF_MONTH, 1)
         }
         am.setInexactRepeating(AlarmManager.RTC_WAKEUP, c.timeInMillis, AlarmManager.INTERVAL_DAY, pi)
+        // every phone: look for partner / mudi / khedut hisab sent to this number, about every 15 minutes
+        val sh = PendingIntent.getBroadcast(ctx, 14, Intent(ctx, DueReceiver::class.java).setAction("com.kabadi.calc.SHR"),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        am.setInexactRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 120_000, AlarmManager.INTERVAL_FIFTEEN_MINUTES, sh)
         // admin phone: look for new OTP requests about every 15 minutes
         val rq = PendingIntent.getBroadcast(ctx, 13, Intent(ctx, DueReceiver::class.java).setAction("com.kabadi.calc.REQ"),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -94,6 +98,26 @@ object Reminders {
         try { nm.notify(9, b.build()) } catch (_: Exception) {}
     }
 
+    /** background: hisab that others sent to this phone's number (arrives without opening the app) */
+    fun fetchShared(ctx: Context) {
+        if (!Store.loadedOk) Store.load(ctx)
+        if (!Store.loadedOk) return
+        val n = try { Share.fetch(ctx) } catch (_: Exception) { 0 }
+        if (n <= 0) return
+        Store.save(ctx)
+        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel("shared_new", L.t("sh_title"), NotificationManager.IMPORTANCE_HIGH))
+        val open = PendingIntent.getActivity(ctx, 16, Intent(ctx, MainActivity::class.java).putExtra("shared", true)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val b = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(ctx, "shared_new") else @Suppress("DEPRECATION") Notification.Builder(ctx)
+        val last = Store.shared.maxByOrNull { it.t }
+        b.setSmallIcon(R.drawable.ic_launcher).setContentTitle("👁 $n " + L.t("sh_new"))
+            .setContentText((last?.from?.ifBlank { last.fromMobile } ?: "") + (last?.let { " • " + hTitleOf(it.h) } ?: ""))
+            .setContentIntent(open).setAutoCancel(true)
+        try { nm.notify(10, b.build()) } catch (_: Exception) {}
+    }
+    private fun hTitleOf(h: Hisab) = h.party.ifBlank { listOf(h.mudiName, h.khedName).filter { it.isNotBlank() }.joinToString(" / ") }.ifBlank { h.vehicleInfo() }
+
     fun endOfToday(): Long = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59)
     }.timeInMillis
@@ -125,6 +149,7 @@ class DueReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, i: Intent) {
         when (i.action) {
             Intent.ACTION_BOOT_COMPLETED -> Reminders.schedule(ctx)
+            "com.kabadi.calc.SHR" -> { val r = goAsync(); Thread { try { Reminders.fetchShared(ctx) } finally { r.finish() } }.start() }
             "com.kabadi.calc.REQ" -> { val r = goAsync(); Thread { try { Relay.notifyAdmin(ctx) } finally { r.finish() } }.start() }
             else -> Reminders.check(ctx)
         }

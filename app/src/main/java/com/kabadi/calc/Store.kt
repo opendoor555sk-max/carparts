@@ -206,9 +206,13 @@ object Store {
         }
     }
 
+    /** true once the saved data was read completely (background jobs must not save before that) */
+    var loadedOk = false
+
     fun load(ctx: Context) {
+        loadedOk = false
         try {
-            val s = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString("state", null) ?: return
+            val s = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString("state", null) ?: run { loadedOk = true; return }
             val o = JSONObject(s)
             owner = o.optString("owner")
             mobile = o.optString("mobile")
@@ -229,6 +233,7 @@ object Store {
             o.optJSONArray("te")?.let { trashExp.clear(); trashExp.addAll(jb(it)) }
             o.optJSONArray("variants")?.let { a -> variants.clear(); for (i in 0 until a.length()) variants.add(a.getString(i)) }
             if (o.optInt("ver", 1) < 2) migrate1()
+            loadedOk = true
         } catch (_: Exception) {
         }
     }

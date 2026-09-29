@@ -420,4 +420,26 @@ class ModelTest {
         h.partners.add(Partner("P", "100", "9222222222"))
         assertTrue(stepProblems(h, 0).isEmpty())
     }
+
+    @Test fun messagesGoToEveryContact() {
+        val h = Hisab(5, 1_700_000_000_000, type = "haraji", priceText = "100000", saleText = "150000", commText = "2", commPct = true,
+            mudiName = "Salam", mudiMobile = "9876543210", mudiPctText = "100", mehtaName = "Mehta", mehtaMobile = "9111111111", place = "Anand", step = 3)
+        h.partners.add(Partner("Partner", "100", "9222222222"))
+        val body = Line("body", "Body", false, kgText = "100", rateText = "50", pay = "udhaar", cName = "Rafiq", cMobile = "9333333333", daysText = "30")
+        h.maal.add(body)
+        h.buyLine.pay = "udhaar"; h.buyLine.cName = "Seller"; h.buyLine.cMobile = "9444444444"
+        val me = "9876543210"
+        // names OK: mehta + partner told, not me
+        assertEquals(setOf("9111111111", "9222222222"), Notify.recipients(h, 0, me).map { it.mobile }.toSet())
+        // buying OK: the seller too, with his credit line
+        val b = Notify.recipients(h, 1, me)
+        assertTrue(b.any { it.mobile == "9444444444" && it.text.contains("⏳") })
+        assertTrue(b.first { it.mobile == "9222222222" }.text.contains("100%"))
+        // final: buyer gets his item, credit time + what is left; partner gets profit / loss
+        val f = Notify.recipients(h, 3, me)
+        val buyer = f.first { it.mobile == "9333333333" }
+        assertTrue(buyer.text.contains("Body") && buyer.text.contains("⏳") && buyer.text.contains("Anand"))
+        assertTrue(f.first { it.mobile == "9222222222" }.text.contains("➡"))
+        assertTrue(f.none { it.mobile == me })
+    }
 }

@@ -44,6 +44,12 @@ object Share {
         return n
     }
 
+    /** send only when the hisab is different from what was sent last */
+    fun publishIfChanged(ctx: Context, h: Hisab): Int {
+        if (sp(ctx).getInt("x_${h.id}", 0) == Store.hj(h).toString().hashCode()) return 0
+        return publish(ctx, h)
+    }
+
     /** on app start: send again what changed, or what was sent more than 6 h ago (last 90 days) */
     fun republish(ctx: Context) {
         val now = System.currentTimeMillis()
