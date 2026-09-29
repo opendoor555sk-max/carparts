@@ -20,7 +20,11 @@ class Shared(var from: String, var fromMobile: String, var t: Long, var h: Hisab
 object Share {
     private const val PART = 3000
     fun topic(m: String) = "kmh-p-" + Otp.topic("p:" + Otp.mobile10(m))
-    fun myMobile(ctx: Context) = Otp.mobile10(Account.mobile(ctx).ifBlank { Store.mobile })
+    /** this phone's number for hisab sharing: the number written in Settings (the owner's own); the login number only if Settings is empty */
+    fun myMobile(ctx: Context): String {
+        val st = Otp.mobile10(Store.mobile)
+        return if (st.length == 10) st else Otp.mobile10(Account.mobile(ctx))
+    }
     /** everybody named in the hisab with a mobile: mudi malik, khedut, mehta, company partners */
     fun targetsOf(h: Hisab): List<String> =
         (listOf(h.mudiMobile, h.khedMobile, h.mehtaMobile) + h.partners.map { it.mobile }).map { Otp.mobile10(it) }.filter { it.length == 10 }.distinct()

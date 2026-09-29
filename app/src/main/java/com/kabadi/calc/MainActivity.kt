@@ -1167,7 +1167,7 @@ class MainActivity : Activity() {
                 val nh = Hisab(now, now, type = type, writer = w, mehtaName = mehtaN, mehtaMobile = mehtaM, step = 0)
                 // the person writing is this account: name + mobile are taken from it
                 val me = Account.name(this).ifBlank { Store.owner }
-                if (w == "mudi") { nh.mudiName = me; nh.mudiMobile = myMobile() } else { nh.khedName = me; nh.khedMobile = myMobile() }
+                if (w == "mudi") { nh.mudiName = me; nh.mudiMobile = Share.myMobile(this) } else { nh.khedName = me; nh.khedMobile = Share.myMobile(this) }
                 showEditor(nh)
             }.apply { textSize = 24f; setPadding(0, dpi(18f), 0, dpi(18f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(12f) })
         }
