@@ -383,7 +383,7 @@ class ModelTest {
         assertEquals(3, p.size)                       // no mehta, 60+30 != 100, partners 40 != 100
         h.khedPctText = "40"; h.partners.add(Partner("P2", "60", "9000000004")); h.mehtaName = "Mehta"; h.mehtaMobile = "98765 43210"
         assertTrue(finalProblems(h).isEmpty())
-        assertEquals(setOf("9000000001", "9000000002", "9000000003", "9000000004", "9876543210"), Share.targetsOf(h).toSet())
+        assertEquals(setOf("9000000001", "9000000002", "9876543210"), Share.targetsOf(h).toSet()) // whole hisab: mudi, khedut, mehta only
     }
 
     @Test fun harajiWithLots() {
@@ -440,7 +440,8 @@ class ModelTest {
         // final: buyer gets his item, credit time + what is left; partner gets profit / loss
         val f = Notify.recipients(h, 3, me)
         val buyer = f.first { it.mobile == "9333333333" }
-        assertTrue(buyer.text.contains("Body") && buyer.text.contains("⏳") && buyer.text.contains("Anand"))
+        assertTrue(buyer.text.contains("Body") && buyer.text.contains("⏳"))
+        assertFalse(buyer.text.contains("Anand")) // the place the vehicle was bought is not told to buyers
         assertTrue(f.first { it.mobile == "9222222222" }.text.contains("➡"))
         // mudi malik / khedut / mehta get the whole hisab (buyer line with his name is in it)
         assertTrue(f.first { it.mobile == "9111111111" }.text.contains("Body"))
