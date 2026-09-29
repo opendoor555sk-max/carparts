@@ -121,6 +121,7 @@ class MainActivity : Activity() {
                 try { Feedback.resendPending(this) } catch (_: Exception) {}
                 try { Share.republish(this) } catch (_: Exception) {}
                 try { if (Shops.fetch(this)) ui.post { Store.save(this) } } catch (_: Exception) {}
+                Shops.syncUse(this)
                 val n = try { Share.fetch(this) } catch (_: Exception) { 0 }
                 if (n > 0) ui.post { Store.save(this); toast("👁 $n " + L.t("sh_new")); if (screen == "home") showHome() }
             }.start()
@@ -704,6 +705,7 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        if (Store.hisabs.any { it.type == "haraji" }) Thread { try { Shops.syncUse(this) } catch (_: Exception) {} }.start()
         Live.onNew = null
         if (rec != null || player != null) { stopAudio(); if (screen == "feedback") showFeedback() }
         autoSave()
@@ -2518,7 +2520,7 @@ class MainActivity : Activity() {
         val st = small("", MUTED)
         info.addView(row(st to 1f, pill("⟳ " + L.t("sh_refresh"), false, BLUE) {
             st.text = "⏳"
-            Thread { val ch = try { Shops.fetch(this) } catch (_: Exception) { false }; ui.post { if (ch) Store.save(this); showShops() } }.start()
+            Thread { val ch = try { Shops.fetch(this) } catch (_: Exception) { false }; Shops.syncUse(this); ui.post { if (ch) Store.save(this); showShops() } }.start()
         } to 0f))
         body.addView(info, cardLp())
         if (canEdit) {
@@ -2549,13 +2551,13 @@ class MainActivity : Activity() {
             c.addView(small(L.t("shop_limit_w") + " " + money(s.limit) + "   •   " + L.t("shop_used") + " " + money(used), INK).apply { textSize = 14f })
             c.addView(small(L.t("shop_left") + ": " + money(left), if (left > 0) GREEN else RED).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD })
             // every person this shop guarantees: name, mobile, what he still has to pay, and the items
-            val open = Shops.lines(s.market, s.no).filter { it.second.remaining() > 0.004 }
-            val byPerson = open.groupBy { digits10(it.second.cMobile).ifEmpty { norm(it.second.cName) } }
+            val open = Shops.uses(s.market, s.no).filter { it.remaining > 0.004 }
+            val byPerson = open.groupBy { it.mobile.ifEmpty { norm(it.name) } }
             if (byPerson.isNotEmpty()) c.addView(small("🤝 " + byPerson.size + " " + L.t("shop_people"), 0xFF6A1B9A.toInt()).apply { typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(6f), 0, 0) })
             byPerson.values.forEach { ls ->
-                val f0 = ls.first().second
-                c.addView(small("👤 " + Notify.nm(f0.cName) + "  📞 " + digits10(f0.cMobile) + "  =  " + money(ls.sumOf { it.second.remaining() }), INK).apply { textSize = 14f; typeface = Typeface.DEFAULT_BOLD })
-                ls.forEach { (h, l) -> c.addView(small("     • " + l.name + ": " + money(l.remaining()) + "  (" + Bill.dateText(h.time).substringBefore("  ") + ")", MUTED).apply { textSize = 12.5f }) }
+                val f0 = ls.first()
+                c.addView(small("👤 " + Notify.nm(f0.name) + "  📞 " + f0.mobile + "  =  " + money(ls.sumOf { it.remaining }), INK).apply { textSize = 14f; typeface = Typeface.DEFAULT_BOLD })
+                ls.forEach { u -> c.addView(small("     • " + u.item + ": " + money(u.remaining) + "  (" + Bill.dateText(u.time).substringBefore("  ") + ")", MUTED).apply { textSize = 12.5f }) }
             }
             if (canEdit) c.addView(row(pill("✎", false, BLUE) { shopEdit = s; showShops() } to 1f,
                 pill("🗑", false, RED) { confirmRemove { Store.shops.remove(s); Store.shopsT = System.currentTimeMillis(); Store.save(this)

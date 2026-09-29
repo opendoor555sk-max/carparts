@@ -449,9 +449,13 @@ class ModelTest {
             b.sold = true
             assertEquals(400000.0, Shops.used("", "12"), 0.001); assertEquals(500000.0, Shops.used("3", "12"), 0.001)
             b.mkt = ""; b.shop = "99"
+            // credit the other phones told about also uses the same shop limit (not counted twice when the hisab is here too)
+            Store.shopUse["dev2"] = Shops.Remote(1, listOf(Shops.Use(777, "", "12", 100000.0, "Z", "9000000000", "x", 1), Shops.Use(h.id, "", "12", 999999.0, "dup", "9", "y", 1)))
+            assertEquals(500000.0, Shops.used("", "12"), 0.001)      // 400000 here + 100000 from the other phone (the duplicate hisab is skipped)
+            Store.shopUse.clear()
             // mudi malik / khedut as guarantor do not use any shop
             b.shop = ""; b.gBy = "mudi"; assertTrue(shopProblem(h, b) == null)
-        } finally { Store.shops.clear(); Store.hisabs.clear(); Store.shared.clear() }
+        } finally { Store.shops.clear(); Store.hisabs.clear(); Store.shared.clear(); Store.shopUse.clear() }
     }
 
     @Test fun guarantorRule() {
