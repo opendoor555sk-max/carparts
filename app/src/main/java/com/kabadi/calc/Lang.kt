@@ -543,6 +543,14 @@ object L {
         "sc_view_info" to arrayOf("Today's scrap / metal rates from traders (view only). Highest first. They disappear at 7 PM.", "व्यापारियों के आज के स्क्रैप / मेटल भाव (सिर्फ देखने के लिए)। सबसे ऊँचा पहले। शाम 7 बजे हट जाते हैं।", "વેપારીઓના આજના સ્ક્રેપ / મેટલ ભાવ (ફક્ત જોવા માટે). સૌથી ઊંચો પહેલા. સાંજે 7 વાગ્યે હટી જાય છે."),
         "sc_upd" to arrayOf("Updated", "अपडेट", "અપડેટ"),
         "sc_wait_admin" to arrayOf("Rates not received yet – press refresh", "भाव अभी नहीं मिले – ताज़ा करें दबाएँ", "ભાવ હજુ મળ્યા નથી – તાજું કરો દબાવો"),
+        "tod_h" to arrayOf("Breaking the vehicle – expenses after haraji", "गाड़ी तोड़ने के खर्च – हराजी के बाद", "ગાડી તોડવાના ખર્ચ – હરાજી પછી"),
+        "tod_help_co" to arrayOf("Labour, gas cutting… These are the COMPANY's expenses: company profit becomes less (partners share it).", "मज़दूरी, गैस कटिंग… ये कंपनी के खर्च हैं: कंपनी का नफ़ा कम होगा (भागीदारों में बँटेगा)।", "મજૂરી, ગેસ કટિંગ… આ કંપનીના ખર્ચ છે: કંપનીનો નફો ઘટશે (ભાગીદારોમાં વહેંચાશે)."),
+        "tod_help" to arrayOf("Labour, gas cutting… added to the cost of this haraji hisab.", "मज़दूरी, गैस कटिंग… इस हराजी हिसाब की लागत में जुड़ेंगे।", "મજૂરી, ગેસ કટિંગ… આ હરાજી હિસાબના ખર્ચમાં ઉમેરાશે."),
+        "tod_1" to arrayOf("👷 Labour (opening the vehicle)", "👷 मज़दूरी (गाड़ी खोलने की)", "👷 મજૂરી (ગાડી ખોલવાની)"),
+        "tod_2" to arrayOf("🔥 Gas cutting", "🔥 गैस कटिंग", "🔥 ગેસ કટિંગ"),
+        "tod_3" to arrayOf("🚛 Loading / transport", "🚛 लोडिंग / भाड़ा", "🚛 લોડિંગ / ભાડું"),
+        "tod_4" to arrayOf("🏗 Crane / JCB", "🏗 क्रेन / JCB", "🏗 ક્રેન / JCB"),
+        "sum_tod" to arrayOf("Breaking expenses", "तोड़ने के खर्च", "તોડવાના ખર્ચ"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 

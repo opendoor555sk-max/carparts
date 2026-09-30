@@ -37,7 +37,9 @@ class Line(
     /** credit sale: who is the guarantor: "" = a shopkeeper (name, mobile, shop), "mudi" = the mudi malik, "khed" = the khedut */
     var gBy: String = "",
     /** shop guarantee (haraji): market number – the same shop number can exist in different markets */
-    var mkt: String = ""
+    var mkt: String = "",
+    /** expense written AFTER the haraji (breaking the vehicle: labour, gas cutting…) */
+    var post: Boolean = false
 ) {
     /** for the vehicle price / auction sale lines: value comes from the hisab */
     var calc: (() -> Double)? = null
@@ -161,14 +163,16 @@ class Hisab(
             if (l.fixed) bd(l.amount) else bd(l.kg).multiply(bd(l.rate))
         val bad = mutableListOf<String>()
         val k = kharch.fold(BigDecimal.ZERO) { a, l -> a.add(lineBd(l)) }
+        val kPost = kharch.filter { it.post }.fold(BigDecimal.ZERO) { a, l -> a.add(lineBd(l)) }
+        val kOwner = if (isCo) k.subtract(kPost) else k
         val m = maal.fold(BigDecimal.ZERO) { a, l -> a.add(lineBd(l)) }
         fun off(x: Double, y: BigDecimal) = Math.abs(x - y.toDouble()) > 0.005
         if (off(kharchTotal(), k)) bad.add("kharch")
         if (off(maalTotal(), m)) bad.add("maal")
-        if (off(lagat(), bd(price).add(k))) bad.add("lagat")
+        if (off(lagat(), bd(price).add(kOwner))) bad.add("lagat")
         if (isCo) {
-            if (off(munafa() + ownerComm(), bd(sale).subtract(bd(price)).subtract(k))) bad.add("munafa")
-            if (off(companyResult() + coComm(), m.subtract(bd(sale)))) bad.add("company")
+            if (off(munafa() + ownerComm(), bd(sale).subtract(bd(price)).subtract(kOwner))) bad.add("munafa")
+            if (off(companyResult() + coComm(), m.subtract(bd(sale)).subtract(kPost))) bad.add("company")
             if (off(munafa() + companyResult() + commission(), m.subtract(bd(price)).subtract(k))) bad.add("total")
         } else if (off(munafa() + commission(), bd(sale).add(m).subtract(bd(price)).subtract(k))) bad.add("munafa")
         if (isLot && lots.isNotEmpty() && off(price, lots.fold(BigDecimal.ZERO) { a, t ->
@@ -246,7 +250,11 @@ class Hisab(
     }
     val sale get() = ev(saleText)
     fun kharchTotal() = kharch.sumOf { it.value() }
-    fun lagat() = price + kharchTotal()
+    /** expenses after the haraji (breaking the vehicle) */
+    fun kharchPost() = kharch.filter { it.post }.sumOf { it.value() }
+    fun kharchPre() = kharchTotal() - kharchPost()
+    /** Rit B: the company breaks the vehicle, so those expenses are the company's; otherwise all expenses are in the deal */
+    fun lagat() = price + (if (isCo) kharchPre() else kharchTotal())
     fun maalTotal() = maal.sumOf { it.value() }
     /** Rit B: the company's sales are only the parts (the vehicle price is paid to the owner) */
     fun bikri() = if (isCo) maalTotal() else sale + maalTotal()
@@ -259,9 +267,9 @@ class Hisab(
     /** the owner's (mudi malik + khedut) result. Rit B: company price − cost */
     fun munafa() = if (isCo) sale - lagat() - ownerComm() else bikri() - commission() - lagat()
     /** company's result, shown apart. Rit B: parts sold − price paid − commission; Rit A: the whole deal */
-    fun companyResult() = if (isCo) maalTotal() - sale - coComm() else munafa()
+    fun companyResult() = if (isCo) maalTotal() - sale - coComm() - kharchPost() else munafa()
     /** company's money in (Rit B: price + commission when the company pays it) */
-    fun companyLagat() = if (isCo) sale + coComm() else lagat()
+    fun companyLagat() = if (isCo) sale + coComm() + kharchPost() else lagat()
     /** a person's company share (when mudi malik / khedut are partners too) */
     fun coShareOf(name: String) = if (norm(name).isEmpty()) 0.0 else partners.filter { norm(it.name) == norm(name) }.sumOf { partnerMunafa(it) }
     fun inCompany(name: String) = norm(name).isNotEmpty() && partners.any { norm(it.name) == norm(name) }

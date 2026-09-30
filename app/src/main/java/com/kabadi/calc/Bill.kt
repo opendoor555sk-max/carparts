@@ -126,14 +126,24 @@ object Bill {
         y += 4 * u
 
         // 2. expenses
-        if (h.kharch.isNotEmpty()) {
+        if (h.kharch.any { !it.post }) {
             section(L.t("kharch").substringBefore(" (").removePrefix("2. "))
-            h.kharch.forEachIndexed { i, l ->
+            h.kharch.filter { !it.post }.forEachIndexed { i, l ->
                 row("${i + 1}. " + l.name + if (l.udhaar) "  (" + L.t("udhaar") + " • " + (if (l.remaining() < 0.005) L.t("chukaya") else L.t("left") + " " + money(l.remaining())) + ")" else "", money(l.value()),
                     color = if (l.udhaar && !l.paid) red else Color.rgb(0x21, 0x21, 0x21))
             }
             rule()
-            row(L.t("sum_kharch"), money(h.kharchTotal()), true)
+            row(L.t("sum_kharch"), money(h.kharchPre()), true)
+            y += 4 * u
+        }
+        if (h.kharch.any { it.post }) {
+            section(L.t("tod_h"))
+            h.kharch.filter { it.post }.forEachIndexed { i, l ->
+                row("${i + 1}. " + l.name + if (l.udhaar) "  (" + L.t("udhaar") + " • " + (if (l.remaining() < 0.005) L.t("chukaya") else L.t("left") + " " + money(l.remaining())) + ")" else "", money(l.value()),
+                    color = if (l.udhaar && !l.paid) red else Color.rgb(0x21, 0x21, 0x21))
+            }
+            rule()
+            row(L.t("sum_tod") + if (h.isCo) " 🏢" else "", money(h.kharchPost()), true)
             y += 4 * u
         }
         if (h.kharchBaaki() > 0) row(L.t("dena_baaki"), money(h.kharchBaaki()), false, red)
@@ -380,14 +390,23 @@ object Bill {
             .append(if (l.value() != 0.0) " – " + money(l.value()) else "").append("\n") }
         sb.append("\n").append(if (!h.isLot && h.buyItems.isNotEmpty()) L.t("buy_total") else L.t("sum_price")).append(": ").append(money(h.price)).append("\n")
         credit(h, h.buyLine).let { if (it.isNotEmpty()) sb.append("⏳ ").append(it).append("\n") }
-        if (h.kharch.isNotEmpty()) {
+        if (h.kharch.any { !it.post }) {
             sb.append("\n_").append(L.t("kharch").substringBefore(" (").removePrefix("2. ")).append("_\n")
-            h.kharch.forEach {
+            h.kharch.filter { !it.post }.forEach {
                 sb.append("• ").append(it.name).append(": ").append(money(it.value()))
                 if (it.udhaar) sb.append(" (").append(L.t("udhaar")).append(" • ").append(if (it.paid) L.t("chukaya") else L.t("baaki")).append(")")
                 sb.append("\n")
             }
-            sb.append(L.t("sum_kharch")).append(": ").append(money(h.kharchTotal())).append("\n")
+            sb.append(L.t("sum_kharch")).append(": ").append(money(h.kharchPre())).append("\n")
+        }
+        if (h.kharch.any { it.post }) {
+            sb.append("\n_").append(L.t("tod_h")).append("_\n")
+            h.kharch.filter { it.post }.forEach {
+                sb.append("• ").append(it.name).append(": ").append(money(it.value()))
+                if (it.udhaar) sb.append(" (").append(L.t("udhaar")).append(" • ").append(if (it.paid) L.t("chukaya") else L.t("baaki")).append(")")
+                sb.append("\n")
+            }
+            sb.append(L.t("sum_tod")).append(if (h.isCo) " 🏢" else "").append(": ").append(money(h.kharchPost())).append("\n")
         }
         sb.append("*").append(L.t("sum_lagat")).append(": ").append(money(h.lagat())).append("*\n")
         if (h.maal.isNotEmpty()) {

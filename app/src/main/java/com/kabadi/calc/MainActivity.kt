@@ -1196,6 +1196,7 @@ class MainActivity : Activity() {
     }
     private lateinit var sumKharch: TextView
     private lateinit var sumLagat: TextView
+    private lateinit var sumTod: TextView
     private lateinit var sumMaal: TextView
     private lateinit var sumKg: TextView
     private lateinit var sumLtr: TextView
@@ -1269,8 +1270,10 @@ class MainActivity : Activity() {
             tv.text = parts.joinToString(" • ").let { if (it.isEmpty()) "" else "$it   " } + L.t("lot") + ": " + money(t.price)
         }
         sumPrice.text = money(h.price)
-        sumKharch.text = money(h.kharchTotal())
+        sumKharch.text = money(h.kharchPre())
         sumLagat.text = money(h.lagat())
+        sumTod.text = money(h.kharchPost())
+        (sumTod.parent as? View)?.visibility = if (h.kharchPost() != 0.0) View.VISIBLE else View.GONE
         sumMaal.text = money(h.maalTotal())
         sumKg.text = plain(h.kg()) + " " + L.t("kg")
         sumLtr.text = plain(h.litre()) + " " + L.t("ltr")
@@ -1616,12 +1619,12 @@ class MainActivity : Activity() {
         val kLines = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun drawKharch() {
             kLines.removeAllViews()
-            h.kharch.forEach { l -> kLines.addView(kharchRow(h, l) { drawKharch(); refreshTotals() }) }
+            h.kharch.filter { !it.post }.forEach { l -> kLines.addView(kharchRow(h, l) { drawKharch(); refreshTotals() }) }
         }
         kc.addView(kLines)
         kc.addView(chips(Store.expenses.map { it.label() } + L.t("other"), ORANGE, 3) { i ->
             val b = Store.expenses.getOrNull(i)
-            if (b != null) h.kharch.indexOfFirst { sameItem(it, b.key, b.label()) }.let { at ->
+            if (b != null) h.kharch.filter { !it.post }.indexOfFirst { sameItem(it, b.key, b.label()) }.let { at ->
                 if (at >= 0) { toast(L.t("dup") + ": " + b.label()); focusAt(kLines, at); return@chips }
             }
             h.kharch.add(Line(b?.key ?: "", b?.label() ?: "", true))
@@ -1684,6 +1687,28 @@ class MainActivity : Activity() {
             fun drawS3() { sb3.removeAllViews(); payBlock(h, h.saleLine, true, sb3) { drawS3() } }
             drawS3(); sc.addView(sb3)
             put(sc, 3, 99)
+
+            // 4b. breaking the vehicle after the haraji: labour, gas cutting… (editable like the other expenses)
+            val tdc = card()
+            tdc.addView(heading("🔧 " + L.t("tod_h"), ORANGE).apply { textSize = 15f })
+            tdc.addView(small(L.t(if (h.coMode) "tod_help_co" else "tod_help")))
+            val tLines = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            fun drawTod() {
+                tLines.removeAllViews()
+                h.kharch.filter { it.post }.forEach { l -> tLines.addView(kharchRow(h, l) { drawTod(); refreshTotals() }) }
+            }
+            tdc.addView(tLines)
+            val todNames = listOf(L.t("tod_1"), L.t("tod_2"), L.t("tod_3"), L.t("tod_4"))
+            tdc.addView(chips(todNames + L.t("other"), ORANGE, 3) { i ->
+                val nm = todNames.getOrNull(i) ?: ""
+                if (nm.isNotEmpty()) h.kharch.filter { it.post }.indexOfFirst { norm(it.name) == norm(nm) }.let { at ->
+                    if (at >= 0) { toast(L.t("dup") + ": " + nm); focusAt(tLines, at); return@chips }
+                }
+                h.kharch.add(Line("", nm, true, post = true))
+                drawTod(); refreshTotals(); focusLast(tLines)
+            }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+            drawTod()
+            put(tdc, 3, 99)
 
             // 5. market commission: % or fixed
             val cc = card()
@@ -1769,6 +1794,7 @@ class MainActivity : Activity() {
         tc.addView(heading(L.t("total")))
         sumPrice = sumRow(L.t("sum_price"))
         sumKharch = sumRow(L.t("sum_kharch"))
+        sumTod = sumRow(L.t("sum_tod") + if (h.isCo) " 🏢" else "", false, ORANGE)
         sumLagat = sumRow(L.t("sum_lagat"), true, RED)
         sumKg = sumRow(L.t("sum_kg"))
         sumLtr = sumRow(L.t("sum_ltr"))

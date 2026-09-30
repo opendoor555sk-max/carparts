@@ -88,7 +88,7 @@ object Notify {
         h.partners.filter { it.share > 0 }.forEach { p ->
             sb.append("🏢 ").append(nm(p.name).ifBlank { "?" }).append(" (").append(plain(p.share)).append("%): ")
             if (phase >= 3) { val pm = h.partnerMunafa(p); sb.append(L.t("invest_w")).append(" ").append(money(h.partnerLagat(p))).append(" ➡ ").append(if (pm >= 0) L.t("profit") else L.t("loss")).append(" ").append(money(Math.abs(pm))) }
-            else sb.append(L.t("invest_w")).append(" ").append(money((if (phase == 1) h.price else h.lagat()) * p.share / 100))
+            else sb.append(L.t("invest_w")).append(" ").append(money((if (phase == 1) h.price else h.companyLagat()) * p.share / 100))
             sb.append("\n")
         }
         sb.append("🙏 ").append(Store.owner.ifBlank { "" })
@@ -128,7 +128,7 @@ object Notify {
             }
             2 -> {
                 people.forEach { (n, m, r) -> add(n, m, r, "💸 " + L.t("sum_kharch") + ": " + money(h.kharchTotal())) }
-                coPartners.forEach { p -> if (p.share > 0) add(p.name, p.mobile, co, "💰 " + L.t("your_invest") + ": " + money(h.lagat() * p.share / 100) + "\n📌 " + L.t("your_share") + ": " + plain(p.share) + "%") }
+                coPartners.forEach { p -> if (p.share > 0) add(p.name, p.mobile, co, "💰 " + L.t("your_invest") + ": " + money(h.companyLagat() * p.share / 100) + "\n📌 " + L.t("your_share") + ": " + plain(p.share) + "%") }
                 h.kharch.filter { digits10(it.cMobile).length == 10 }.forEach { l -> add(l.cName, l.cMobile, "🧾 " + L.t("kharch").substringAfter(". ").substringBefore(" ("), lineText(h, l)) }
             }
             else -> {
