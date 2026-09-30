@@ -145,7 +145,8 @@ class MainActivity : Activity() {
             override fun afterTextChanged(s: Editable?) = onChange(s?.toString() ?: "")
         })
     }
-    private fun gap(h: Float = 8f) = View(this).also { it.minimumHeight = dpi(h) }
+    /** spacer: fixed height (a plain View with WRAP_CONTENT would grow to fill the whole screen) */
+    private fun gap(h: Float = 8f) = View(this).also { it.layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, dpi(h)) }
 
     // ---------- screens ----------
     private fun render() {

@@ -45,4 +45,12 @@ class ScreenTest {
         assertEquals(2, walk(act.window.decorView).filterIsInstance<EditText>().size)     // copper + lead only
         Me.reset(ctx); assertTrue(!Me.hasForm(ctx))
     }
+
+    /** a plain View spacer with WRAP_CONTENT height fills the whole screen on a real phone and hides the fields below it */
+    @Test fun spacersHaveFixedHeight() {
+        val act = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val spacers = walk(act.window.decorView).filter { it.javaClass == View::class.java && it.layoutParams != null && it.parent is android.widget.LinearLayout }
+        assertTrue(spacers.isNotEmpty())
+        spacers.forEach { assertTrue("spacer must have fixed height", it.layoutParams.height > 0 || it.layoutParams.height == 1) }
+    }
 }
