@@ -155,6 +155,7 @@ object Relay {
         if (!Account.isAdmin(ctx)) return
         try { reBlock(ctx) } catch (_: Exception) {}
         try { ScrapAdmin.tick(ctx) } catch (_: Exception) {}
+        try { Notice.tick(ctx) } catch (_: Exception) {}
         try { collect(ctx) } catch (_: Exception) {}
         // users' voice / text problems: keep them on this phone and ring
         val nf = try { Feedback.collect(ctx) } catch (_: Exception) { 0 }

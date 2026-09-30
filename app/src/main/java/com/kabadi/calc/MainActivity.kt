@@ -144,6 +144,7 @@ class MainActivity : Activity() {
             if (intent?.getBooleanExtra("remind", false) == true) showReminders()
             else if (toKhata) showKhata()
             else if (intent?.getBooleanExtra("shared", false) == true) showShared()
+            else if (intent?.getBooleanExtra("office", false) == true) showOffice()
             else if (intent?.getBooleanExtra("linked", false) == true) showLinked()
             else if (intent?.getBooleanExtra("admin", false) == true && Account.isAdmin(this)) showAdmin()
         }
@@ -691,6 +692,7 @@ class MainActivity : Activity() {
         if (i?.getBooleanExtra("remind", false) == true) { autoSave(); showReminders() }
         else if (i?.getBooleanExtra("khata", false) == true) { autoSave(); showKhata() }
         else if (i?.getBooleanExtra("shared", false) == true) { autoSave(); showShared() }
+        else if (i?.getBooleanExtra("office", false) == true) { autoSave(); showOffice() }
         else if (i?.getBooleanExtra("linked", false) == true) { autoSave(); showLinked() }
         else if (i?.getBooleanExtra("admin", false) == true && Account.isAdmin(this)) { autoSave(); showAdmin() }
     }
@@ -1034,6 +1036,9 @@ class MainActivity : Activity() {
         body.addView(gridRow(
             pic(R.drawable.home_report, L.t("report_btn")) { showReport() },
             circle("📊", L.t("sc_short"), 0xFF283593.toInt()) { if (Account.isAdmin(this)) { scrapTab = "board"; showScrap() } else showScrapView() }))
+        val offN = Notice.unread(this)
+        body.addView(bigButton("🏢 " + L.t("off_title") + (if (offN > 0) "  🔴 $offN " + L.t("off_new") else ""), 0xFF00695C.toInt()) { showOffice() }
+            .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         if (Store.shared.isNotEmpty()) body.addView(bigButton("👁 " + L.t("sh_title") + " (" + Store.shared.size + ")", BLUE) { showShared() }
             .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         if (Store.linked.isNotEmpty()) body.addView(bigButton("🔗 " + L.t("lk_title") + " (" + Store.linked.size + ")", GREEN) { showLinked() }
@@ -2830,6 +2835,64 @@ class MainActivity : Activity() {
         body.addView(bigButton("✅ " + L.t("save"), GREEN) {
             ScrapAdmin.saveManual(this, t, vals.toMap()); toast("✓ " + L.t("sc_rates_saved")); scrapTab = "board"; showScrap()
         }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
+    }
+
+
+    // ================= OFFICE: notice board of the Kabadi market (admin writes, everybody reads) =================
+    private var officeEdit: Note? = null
+
+    private fun showOffice() {
+        autoSave(); editing = null; viewOnly = null
+        val admin = Account.isAdmin(this)
+        val body = setScreen("office", "🏢 " + L.t("off_title"), { showHome() })
+        val info = card()
+        info.addView(small(L.t("off_info"), INK).apply { textSize = 13f })
+        if (!admin) {
+            val st = small("", MUTED)
+            info.addView(row(st to 1f, pill("⟳ " + L.t("sh_refresh"), false, BLUE) {
+                st.text = "⏳"
+                Thread { val ch = try { Notice.fetch(this) } catch (_: Exception) { false }; ui.post { if (screen == "office") { if (ch) showOffice() else st.text = "✓" } } }.start()
+            } to 0f))
+        }
+        body.addView(info, cardLp())
+        if (admin) {
+            val e = officeEdit
+            var txt = e?.text ?: ""
+            val f = card()
+            f.addView(heading(if (e == null) "＋ " + L.t("off_title") else "✎ " + L.t("off_title")))
+            f.addView(EditText(this).apply {
+                hint = L.t("off_write"); setText(txt); textSize = 16f; setTextColor(INK); setHintTextColor(0xFF9EAAB0.toInt())
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                minLines = 4; gravity = Gravity.TOP; background = round(0xFFF7F9FA.toInt(), 8f, 0xFFCFD8DC.toInt()); setPadding(dpi(10f), dpi(8f), dpi(10f), dpi(8f))
+                addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                    override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                    override fun afterTextChanged(s: Editable?) { txt = s?.toString() ?: "" }
+                })
+            }, llp(MATCH_PARENT, WRAP_CONTENT))
+            f.addView(row(pill("✅ " + L.t(if (e == null) "off_post" else "off_update"), true, GREEN) {
+                if (txt.isBlank()) return@pill toast(L.t("off_write"))
+                if (e == null) Notice.add(this, txt) else Notice.edit(this, e, txt)
+                officeEdit = null; toast("✓ " + L.t("off_sent")); showOffice()
+            }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) } to 1f,
+                (if (e != null) pill("✕", false, MUTED) { officeEdit = null; showOffice() } else View(this)) to 0f))
+            body.addView(f, cardLp())
+        }
+        val all = Notice.list(this)
+        if (all.isEmpty()) body.addView(small(L.t("off_none")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(20f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        val seen = getSharedPreferences("kabadi_office", MODE_PRIVATE).getLong("seen", 0)
+        all.forEach { n ->
+            val c = card()
+            c.addView(small((if (n.t > seen && !admin) "🔴 " + L.t("off_new") + "  •  " else "") + Bill.dateText(n.t), MUTED).apply { textSize = 12.5f })
+            c.addView(TextView(this).apply { text = n.text; textSize = 16f; setTextColor(INK); setTextIsSelectable(true); setPadding(0, dpi(4f), 0, dpi(2f)) })
+            if (admin) c.addView(row(pill("✎", false, BLUE) { officeEdit = n; showOffice() } to 1f,
+                pill("🗑", false, RED) { AlertDialog.Builder(this).setMessage(L.t("off_del")).setPositiveButton(L.t("yes")) { _, _ -> Notice.remove(this, n); officeEdit = null; showOffice() }.setNegativeButton(L.t("no"), null).show() } to 1f))
+            body.addView(c, cardLp())
+        }
+        if (!admin) {
+            Notice.markSeen(this)
+            Thread { val ch = try { Notice.fetch(this) } catch (_: Exception) { false }; if (ch) ui.post { if (screen == "office") showOffice() } }.start()
+        }
     }
 
     // ================= LINKED: lines of other people's hisab where this phone is buyer / seller / service =================

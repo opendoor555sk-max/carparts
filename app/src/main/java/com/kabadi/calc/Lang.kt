@@ -551,6 +551,16 @@ object L {
         "tod_3" to arrayOf("🚛 Loading / transport", "🚛 लोडिंग / भाड़ा", "🚛 લોડિંગ / ભાડું"),
         "tod_4" to arrayOf("🏗 Crane / JCB", "🏗 क्रेन / JCB", "🏗 ક્રેન / JCB"),
         "sum_tod" to arrayOf("Breaking expenses", "तोड़ने के खर्च", "તોડવાના ખર્ચ"),
+        "off_title" to arrayOf("Office – notice board", "ऑफिस – नोटिस बोर्ड", "ઓફિસ – નોટિસ બોર્ડ"),
+        "off_btn" to arrayOf("Office", "ऑफिस", "ઓફિસ"),
+        "off_info" to arrayOf("Notices of the Kabadi market office.", "कबाड़ी मार्केट ऑफिस की नोटिस।", "કબાડી માર્કેટ ઓફિસની નોટિસ."),
+        "off_none" to arrayOf("No notice yet", "अभी कोई नोटिस नहीं", "હજુ કોઈ નોટિસ નથી"),
+        "off_write" to arrayOf("Write the notice (as on the notice board)", "नोटिस लिखें (जैसी नोटिस बोर्ड पर है)", "નોટિસ લખો (નોટિસ બોર્ડ પર છે તેવી)"),
+        "off_post" to arrayOf("Publish to all", "सबको भेजें", "બધાને મોકલો"),
+        "off_update" to arrayOf("Save change", "बदलाव सेव करें", "ફેરફાર સેવ કરો"),
+        "off_sent" to arrayOf("Sent to all phones", "सब फोन में भेजा", "બધા ફોનમાં મોકલ્યું"),
+        "off_del" to arrayOf("Remove this notice?", "यह नोटिस हटाएँ?", "આ નોટિસ કાઢવી?"),
+        "off_new" to arrayOf("New", "नया", "નવું"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 

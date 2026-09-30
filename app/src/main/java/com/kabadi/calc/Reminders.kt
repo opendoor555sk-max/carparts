@@ -104,6 +104,7 @@ object Reminders {
         if (!Store.loadedOk) return 0
         try { if (Shops.fetch(ctx)) Store.save(ctx); Shops.republishIfDue(ctx); Shops.syncUse(ctx) } catch (_: Exception) {}
         try { if (!Account.isAdmin(ctx)) ScrapView.fetch(ctx) } catch (_: Exception) {}
+        try { Notice.fetchAndNotify(ctx, notify) } catch (_: Exception) {}
         val n = try { Share.fetch(ctx) } catch (_: Exception) { 0 }
         if (n <= 0) return 0
         Store.save(ctx)
