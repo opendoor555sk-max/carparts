@@ -1736,7 +1736,7 @@ class MainActivity : Activity() {
             }
             put(cc, 3, 99)
 
-            // 6. company partners
+            // 6. company partners: only when the vehicle / goods go to the company (or partners were already written)
             val pcd = card()
             pcd.addView(heading(L.t("company"), 0xFF6A1B9A.toInt()))
             val pLines = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -1775,7 +1775,7 @@ class MainActivity : Activity() {
             }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             pcd.addView(small("1 " + L.t("pshare").substringBefore(" (") + " = 1%"))
             drawP()
-            if (g) { if (frozenAt(1)) freeze(pcd); slot0.addView(pcd, cardLp()) } else body.addView(pcd, cardLp())
+            if (h.coMode || h.partners.isNotEmpty()) { if (g) { if (frozenAt(1)) freeze(pcd); slot0.addView(pcd, cardLp()) } else body.addView(pcd, cardLp()) }
         }
 
         if (g) okBtn(0, slot0)
