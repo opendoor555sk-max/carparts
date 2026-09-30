@@ -2641,7 +2641,9 @@ class MainActivity : Activity() {
     private fun showScrap() {
         autoSave(); editing = null; viewOnly = null
         val body = setScreen("scrap", "📊 " + L.t("sc_title"), { showHome() })
-        val trs = ScrapAdmin.traders(this).filter { it.st != "removed" }
+        val allTr = ScrapAdmin.traders(this).filter { it.st != "removed" }
+        // the same person (same mobile) added by name and also registered in his app = one line
+        val trs = allTr.filter { t -> !(t.manual && t.mobile.length == 10 && allTr.any { o -> !o.manual && o.mobile == t.mobile }) }
         val pend = trs.count { it.st == "pending" }
         body.addView(row(pill("📊 " + L.t("sc_tab_board"), scrapTab == "board", BLUE) { scrapTab = "board"; showScrap() } to 1f,
             pill("👥 " + L.t("sc_tab_tr") + " (" + trs.size + ")" + (if (pend > 0) " 🔴" + pend else ""), scrapTab == "tr", BLUE) { scrapTab = "tr"; showScrap() } to 1f,
@@ -2733,7 +2735,7 @@ class MainActivity : Activity() {
             c.addView(small("📞 " + t.mobile.ifBlank { "—" } + "     ● " + label, col).apply { typeface = Typeface.DEFAULT_BOLD })
             c.addView(small(L.t("sc_registered") + ": " + Bill.dateText(t.first).substringBefore("  ") + "     " + L.t("sc_last") + ": " + (if (t.last > 0) Bill.dateText(t.last) else "—")))
             val btns = mutableListOf<Pair<View, Float>>()
-            if (t.manual) btns.add(pill("✍ " + L.t("sc_enter"), true, BLUE) { showScrapEntry(t) } to 1f)
+            if (t.manual || t.st == "active") btns.add(pill("✍ " + L.t("sc_enter"), true, BLUE) { showScrapEntry(t) } to 1f)
             if (!t.manual && t.st != "block" && t.st != "active") btns.add(pill("🔑 " + L.t("sc_otp_btn"), true, GREEN) { showOtp(t) } to 1f)
             if (!t.manual && t.st != "block") btns.add(pill("⛔ " + L.t("sc_block"), false, RED) {
                 AlertDialog.Builder(this).setMessage(L.t("sc_block_q")).setPositiveButton(L.t("yes")) { _, _ ->
@@ -2815,7 +2817,7 @@ class MainActivity : Activity() {
         autoSave()
         val body = setScreen("scrapentry", "✍ " + t.name, { scrapTab = "board"; showScrap() })
         val lg = L.lang
-        val cur = ScrapAdmin.aliveRates(this, t.key)
+        val cur = ScrapAdmin.aliveRates(this, t)
         val vals = HashMap<String, Double>(cur)
         body.addView(card().apply { addView(small(L.t("sc_info_board"), INK)) }, cardLp())
         val tiles = ScrapAdmin.format(this).map { m ->

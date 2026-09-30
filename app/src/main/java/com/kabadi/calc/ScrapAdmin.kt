@@ -48,12 +48,16 @@ object ScrapAdmin {
         sp(ctx).edit().putString("en", a.toString()).apply()
     }
 
+    /** one person = one line on the board: the same 10-digit mobile (added by the admin by name AND registered in the app) is one trader */
+    fun canon(mobile: String, key: String) = if (Otp.mobile10(mobile).length == 10) "m:" + Otp.mobile10(mobile) else key
+
     /** every rate sheet kept (30 days), as entries */
     fun history(ctx: Context): List<Entry> {
         val tr = traders(ctx).associateBy { it.key }
         return entries(ctx).filter { tr[it.optString("k")]?.st !in listOf("block", "removed") }.map {
             val t = tr[it.optString("k")]
-            Entry(it.optString("k"), t?.name ?: it.optString("n"), t?.mobile ?: it.optString("m"), it.optLong("at"), Scrap.ratesOf(it))
+            val mob = t?.mobile ?: it.optString("m")
+            Entry(canon(mob, it.optString("k")), t?.name ?: it.optString("n"), mob, it.optLong("at"), Scrap.ratesOf(it))
         }
     }
     /** entries that are still alive (before 7 PM) */
@@ -177,9 +181,10 @@ object ScrapAdmin {
     }
 
     /** rates of this trader that are alive now (to fill the tiles again) */
-    fun aliveRates(ctx: Context, key: String): Map<String, Double> {
+    fun aliveRates(ctx: Context, t: TraderRec): Map<String, Double> {
         val m = HashMap<String, Double>()
-        board(ctx).filter { it.key == key }.sortedBy { it.at }.forEach { m.putAll(it.rates) }
+        val ck = canon(t.mobile, t.key)
+        board(ctx).filter { it.key == ck }.sortedBy { it.at }.forEach { m.putAll(it.rates) }
         return m
     }
 
@@ -190,7 +195,8 @@ object ScrapAdmin {
         entries(ctx).filter { Scrap.alive(it.optLong("at"), cut) }.forEach { e ->
             val t = traders(ctx).firstOrNull { it.key == e.optString("k") }
             if (t != null && t.st in listOf("block", "removed")) return@forEach
-            a.put(JSONObject().put("k", e.optString("k")).put("n", t?.name ?: e.optString("n")).put("m", t?.mobile ?: e.optString("m")).put("at", e.optLong("at")).put("r", e.optJSONObject("r") ?: JSONObject()))
+            val mob = t?.mobile ?: e.optString("m")
+            a.put(JSONObject().put("k", canon(mob, e.optString("k"))).put("n", t?.name ?: e.optString("n")).put("m", mob).put("at", e.optLong("at")).put("r", e.optJSONObject("r") ?: JSONObject()))
         }
         return JSONObject().put("t", System.currentTimeMillis()).put("f", JSONObject(sp(ctx).getString("fmt", "").takeIf { !it.isNullOrBlank() } ?: Scrap.formatJson(0, Scrap.DEFAULT))).put("e", a).toString()
     }
