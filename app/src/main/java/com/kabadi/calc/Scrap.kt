@@ -27,6 +27,8 @@ object Scrap {
     val REG get() = "kmh-tr-" + Otp.topic("trader-reg")
     val RATES get() = "kmh-tp-" + Otp.topic("trader-rates")
     val FORMAT get() = "kmh-tf-" + Otp.topic("trader-format")
+    /** admin → every Kabadi phone: today's board (view only) */
+    val BOARD get() = "kmh-tv-" + Otp.topic("scrap-board")
     private val KEY get() = Otp.shareKey("1000000002")
     fun userTopic(mobile: String, dev: String) = "kmh-tu-" + Otp.topic(Otp.mobile10(mobile) + ":" + dev)
     /** a permanent block is written here too, so a trader cannot come back with a new phone code */

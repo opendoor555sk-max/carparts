@@ -539,6 +539,10 @@ object L {
         "sc_no_tr" to arrayOf("No trader yet", "अभी कोई व्यापारी नहीं", "હજુ કોઈ વેપારી નથી"),
         "sc_wa" to arrayOf("WhatsApp to trader", "व्यापारी को WhatsApp", "વેપારીને WhatsApp"),
         "sc_link" to arrayOf("Trader app link", "व्यापारी ऐप लिंक", "વેપારી એપની લિંક"),
+        "sc_short" to arrayOf("Scrap rates", "स्क्रैप भाव", "સ્ક્રેપ ભાવ"),
+        "sc_view_info" to arrayOf("Today's scrap / metal rates from traders (view only). Highest first. They disappear at 7 PM.", "व्यापारियों के आज के स्क्रैप / मेटल भाव (सिर्फ देखने के लिए)। सबसे ऊँचा पहले। शाम 7 बजे हट जाते हैं।", "વેપારીઓના આજના સ્ક્રેપ / મેટલ ભાવ (ફક્ત જોવા માટે). સૌથી ઊંચો પહેલા. સાંજે 7 વાગ્યે હટી જાય છે."),
+        "sc_upd" to arrayOf("Updated", "अपडेट", "અપડેટ"),
+        "sc_wait_admin" to arrayOf("Rates not received yet – press refresh", "भाव अभी नहीं मिले – ताज़ा करें दबाएँ", "ભાવ હજુ મળ્યા નથી – તાજું કરો દબાવો"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 

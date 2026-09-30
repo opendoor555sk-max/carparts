@@ -1030,11 +1030,10 @@ class MainActivity : Activity() {
             pic(R.drawable.home_party, L.t("party_tile")) { showParties() },
             pic(R.drawable.home_khata, L.t("khata_btn"), if (late > 0) "⚠ $late" else "") { showKhata() }))
         // 7 tiles: the last one sits in the middle
-        body.addView(LinearLayout(this).apply {
-            addView(View(this@MainActivity), llp(0, rowH, 0.5f))
-            addView(pic(R.drawable.home_report, L.t("report_btn")) { showReport() }, llp(0, rowH, 1f))
-            addView(View(this@MainActivity), llp(0, rowH, 0.5f))
-        })
+        // last row: report + scrap / metal rates (everybody can look; the admin manages)
+        body.addView(gridRow(
+            pic(R.drawable.home_report, L.t("report_btn")) { showReport() },
+            circle("📊", L.t("sc_short"), 0xFF283593.toInt()) { if (Account.isAdmin(this)) { scrapTab = "board"; showScrap() } else showScrapView() }))
         if (Store.shared.isNotEmpty()) body.addView(bigButton("👁 " + L.t("sh_title") + " (" + Store.shared.size + ")", BLUE) { showShared() }
             .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         if (Store.linked.isNotEmpty()) body.addView(bigButton("🔗 " + L.t("lk_title") + " (" + Store.linked.size + ")", GREEN) { showLinked() }
@@ -2610,7 +2609,7 @@ class MainActivity : Activity() {
 
     private fun showScrap() {
         autoSave(); editing = null; viewOnly = null
-        val body = setScreen("scrap", "📊 " + L.t("sc_title"), { showSettings() })
+        val body = setScreen("scrap", "📊 " + L.t("sc_title"), { showHome() })
         val trs = ScrapAdmin.traders(this).filter { it.st != "removed" }
         val pend = trs.count { it.st == "pending" }
         body.addView(row(pill("📊 " + L.t("sc_tab_board"), scrapTab == "board", BLUE) { scrapTab = "board"; showScrap() } to 1f,
@@ -2626,13 +2625,9 @@ class MainActivity : Activity() {
         when (scrapTab) { "tr" -> scrapTraders(body, trs); "fmt" -> scrapFormat(body); else -> scrapBoard(body) }
     }
 
-    private fun scrapBoard(body: LinearLayout) {
-        val fmt = ScrapAdmin.format(this); val b = ScrapAdmin.board(this); val lg = L.lang
-        val info = card()
-        info.addView(small(L.t("sc_info_board"), INK).apply { textSize = 13f })
-        info.addView(row(pill("📤 " + L.t("sc_share"), true, GREEN) { sendText(ScrapAdmin.boardText(this)) } to 1f,
-            pill("✍ " + L.t("sc_enter"), false, BLUE) { scrapTab = "tr"; scrapAdd = true; showScrap() } to 1f))
-        body.addView(info, cardLp())
+    /** one card per metal: every trader's rate, highest first */
+    private fun boardCards(body: LinearLayout, fmt: List<Metal>, b: List<Entry>) {
+        val lg = L.lang
         if (b.isEmpty()) body.addView(small(L.t("sc_none_rate")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(16f), 0, dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
         fmt.forEach { m ->
             val q = Scrap.rank(m.id, b)
@@ -2645,6 +2640,35 @@ class MainActivity : Activity() {
             }
             body.addView(c, cardLp())
         }
+    }
+
+    /** everybody (not admin): today's rates, view only */
+    private fun showScrapView() {
+        autoSave(); editing = null; viewOnly = null
+        val body = setScreen("scrapview", "📊 " + L.t("sc_title"), { showHome() })
+        val fmt = ScrapView.format(this); val b = ScrapView.board(this)
+        val info = card()
+        info.addView(small(L.t("sc_view_info"), INK).apply { textSize = 13f })
+        val st = small(if (ScrapView.stamp(this) > 0) L.t("sc_upd") + ": " + Bill.dateText(ScrapView.stamp(this)) else L.t("sc_wait_admin"), MUTED)
+        info.addView(row(st to 1f, pill("⟳ " + L.t("sh_refresh"), false, BLUE) {
+            st.text = "⏳"
+            Thread { val ch = try { ScrapView.fetch(this) } catch (_: Exception) { false }; ui.post { if (screen == "scrapview") { if (ch) showScrapView() else st.text = "✓" } } }.start()
+        } to 0f))
+        if (b.isNotEmpty()) info.addView(pill("📤 " + L.t("sc_share"), true, GREEN) { sendText(ScrapAdmin.boardText(fmt, b)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+        body.addView(info, cardLp())
+        boardCards(body, fmt, b)
+        // new board may have come while the screen was closed
+        Thread { val ch = try { ScrapView.fetch(this) } catch (_: Exception) { false }; if (ch) ui.post { if (screen == "scrapview") showScrapView() } }.start()
+    }
+
+    private fun scrapBoard(body: LinearLayout) {
+        val fmt = ScrapAdmin.format(this); val b = ScrapAdmin.board(this)
+        val info = card()
+        info.addView(small(L.t("sc_info_board"), INK).apply { textSize = 13f })
+        info.addView(row(pill("📤 " + L.t("sc_share"), true, GREEN) { sendText(ScrapAdmin.boardText(this)) } to 1f,
+            pill("✍ " + L.t("sc_enter"), false, BLUE) { scrapTab = "tr"; scrapAdd = true; showScrap() } to 1f))
+        body.addView(info, cardLp())
+        boardCards(body, fmt, b)
     }
 
     private fun hhmm(t: Long) = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date(t))

@@ -67,6 +67,7 @@ object ScrapAdmin {
     fun saveFormat(ctx: Context, list: List<Metal>): Boolean {
         val ver = System.currentTimeMillis()
         sp(ctx).edit().putString("fmt", Scrap.formatJson(ver, list)).putLong("fver", ver).putLong("fpub", 0).apply()
+        try { publishBoard(ctx, true) } catch (_: Exception) {}
         return publishFormat(ctx)
     }
     fun publishFormat(ctx: Context): Boolean {
@@ -138,6 +139,7 @@ object ScrapAdmin {
         val all = traders(ctx)
         all.filter { it.mobile == t.mobile }.forEach { it.st = "block"; it.decAt = System.currentTimeMillis() }   // every phone of that number
         saveTraders(ctx, all)
+        publishBoardAsync(ctx)
         return sendBlock(t.mobile, t.dev)
     }
     private fun sendBlock(mobile: String, dev: String): Boolean {
@@ -151,6 +153,7 @@ object ScrapAdmin {
         if (t.manual) all.removeAll { it.key == t.key }
         else all.firstOrNull { it.key == t.key }?.let { it.st = "removed"; it.decAt = System.currentTimeMillis() }
         saveTraders(ctx, all)
+        publishBoardAsync(ctx)
         if (!t.manual) Thread { Relay.post(Scrap.userTopic(t.mobile, t.dev), JSONObject().put("remove", true).put("rt", t.req)) }.start()
     }
 
@@ -170,6 +173,7 @@ object ScrapAdmin {
             .put("r", JSONObject().also { r -> rates.forEach { (k, v) -> r.put(k, v) } }))
         saveEntries(ctx, en)
         val all = traders(ctx); all.firstOrNull { it.key == t.key }?.last = now; saveTraders(ctx, all)
+        publishBoardAsync(ctx)
     }
 
     /** rates of this trader that are alive now (to fill the tiles again) */
@@ -179,6 +183,32 @@ object ScrapAdmin {
         return m
     }
 
+    // ---------- board for every Kabadi phone (view only) ----------
+    private fun boardJson(ctx: Context): String {
+        val cut = System.currentTimeMillis()
+        val a = JSONArray()
+        entries(ctx).filter { Scrap.alive(it.optLong("at"), cut) }.forEach { e ->
+            val t = traders(ctx).firstOrNull { it.key == e.optString("k") }
+            if (t != null && t.st in listOf("block", "removed")) return@forEach
+            a.put(JSONObject().put("k", e.optString("k")).put("n", t?.name ?: e.optString("n")).put("m", t?.mobile ?: e.optString("m")).put("at", e.optLong("at")).put("r", e.optJSONObject("r") ?: JSONObject()))
+        }
+        return JSONObject().put("t", System.currentTimeMillis()).put("f", JSONObject(sp(ctx).getString("fmt", "").takeIf { !it.isNullOrBlank() } ?: Scrap.formatJson(0, Scrap.DEFAULT))).put("e", a).toString()
+    }
+
+    /** send today's board to all phones when it changed, or every 6 h while there are rates (background thread) */
+    fun publishBoard(ctx: Context, force: Boolean = false): Boolean {
+        val j = boardJson(ctx)
+        val body = JSONObject(j); body.remove("t")
+        val hash = body.toString().hashCode()
+        val now = System.currentTimeMillis()
+        if (!force && sp(ctx).getInt("bhash", 0) == hash && now - sp(ctx).getLong("bpub2", 0) < 6L * 3600_000L) return false
+        if (!force && body.getJSONArray("e").length() == 0 && sp(ctx).getInt("bhash", 0) == hash) return false
+        val ok = Scrap.postSealed(Scrap.BOARD, j)
+        if (ok) sp(ctx).edit().putInt("bhash", hash).putLong("bpub2", now).apply()
+        return ok
+    }
+    fun publishBoardAsync(ctx: Context) { Thread { try { publishBoard(ctx) } catch (_: Exception) {} }.start() }
+
     fun pendingCount(ctx: Context) = traders(ctx).count { it.st == "pending" }
 
     // ---------- admin phone, every ~15 min ----------
@@ -186,6 +216,7 @@ object ScrapAdmin {
     fun tick(ctx: Context) {
         val now = System.currentTimeMillis()
         try { collect(ctx) } catch (_: Exception) {}
+        try { publishBoard(ctx) } catch (_: Exception) {}
         if (now - sp(ctx).getLong("fpub", 0) > 6L * 3600_000L && sp(ctx).getString("fmt", "").orEmpty().isNotBlank()) try { publishFormat(ctx) } catch (_: Exception) {}
         if (now - sp(ctx).getLong("bpub", 0) > 6L * 3600_000L) {
             traders(ctx).filter { it.st == "block" && now - it.decAt < Scrap.KEEP_DAYS * 86_400_000L }.forEach { try { sendBlock(it.mobile, it.dev) } catch (_: Exception) {} }
@@ -207,10 +238,12 @@ object ScrapAdmin {
     }
 
     /** text of the board for WhatsApp */
-    fun boardText(ctx: Context): String {
-        val b = board(ctx); val lg = L.lang
+    fun boardText(ctx: Context): String = boardText(format(ctx), board(ctx))
+
+    fun boardText(fmt: List<Metal>, b: List<Entry>): String {
+        val lg = L.lang
         val sb = StringBuilder("📊 " + L.t("sc_title") + "\n")
-        format(ctx).forEach { m ->
+        fmt.forEach { m ->
             val q = Scrap.rank(m.id, b)
             if (q.isEmpty()) return@forEach
             sb.append("\n*").append(m.name(lg)).append("* (").append(m.unitText(lg)).append(")\n")
