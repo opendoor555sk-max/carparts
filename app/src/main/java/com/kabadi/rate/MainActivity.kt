@@ -164,6 +164,7 @@ class MainActivity : Activity() {
             "asked" -> waiting(body)
             else -> register(body)
         }
+        body.addView(link(t("upd") + "  (" + Updater.myVersionName(this) + ")", BLUE) { Updater.check(this, true) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(18f) })
     }
 
     private fun blocked(body: LinearLayout) {
@@ -227,7 +228,6 @@ class MainActivity : Activity() {
         c.addView(gap(12f))
         c.addView(link(t("again"), BLUE) { Thread { val ch = Me.sync(this@MainActivity); ui.post { if (ch) render() else toast("✓") } }.start() })
         body.addView(c, llp(MATCH_PARENT, WRAP_CONTENT))
-        body.addView(link(t("upd") + "  (" + Updater.myVersionName(this) + ")", BLUE) { Updater.check(this, true) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(18f) })
     }
 
     private fun rates(body: LinearLayout) {
@@ -268,6 +268,5 @@ class MainActivity : Activity() {
         val at = Me.ratesAt(this)
         if (cur.isNotEmpty()) body.addView(small(if (Me.unsent(this)) t("pending") else t("last") + ": " + SimpleDateFormat("HH:mm", Locale.US).format(Date(at)) + "  " + t("sent"),
             if (Me.unsent(this)) RED else GREEN, 14f).apply { gravity = Gravity.CENTER; setPadding(0, dpi(10f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
-        body.addView(link(t("upd") + "  (" + Updater.myVersionName(this) + ")", BLUE) { Updater.check(this, true) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(18f) })
     }
 }

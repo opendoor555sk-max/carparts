@@ -26,7 +26,7 @@ object Updater {
     // Tiny file updated by every build; plain download, so no GitHub API limit.
     private const val VERSION_TXT = "$REPO/releases/download/scrap-latest/version.txt"
     private const val PREFIX = "scrap-v1.0."
-    private const val CHECK_EVERY_MS = 30 * 60 * 1000L
+    private const val CHECK_EVERY_MS = 5 * 60 * 1000L
 
     private class Rel(val code: Int, val name: String, val url: String, val notes: String)
 
