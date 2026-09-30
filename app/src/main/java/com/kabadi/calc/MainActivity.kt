@@ -1035,7 +1035,7 @@ class MainActivity : Activity() {
         // last row: report + scrap / metal rates (everybody can look; the admin manages)
         body.addView(gridRow(
             pic(R.drawable.home_report, L.t("report_btn")) { showReport() },
-            circle("📊", L.t("sc_short"), 0xFF283593.toInt()) { if (Account.isAdmin(this)) { scrapTab = "board"; showScrap() } else showScrapView() }))
+            circle("📊", L.t("sc_short"), 0xFF283593.toInt()) { if (Account.isAdmin(this)) { scrapTab = if (ScrapAdmin.pendingCount(this) > 0) "tr" else "board"; showScrap() } else showScrapView() }))
         val offN = Notice.unread(this)
         body.addView(bigButton("🏢 " + L.t("off_title") + (if (offN > 0) "  🔴 $offN " + L.t("off_new") else ""), 0xFF00695C.toInt()) { showOffice() }
             .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
@@ -3409,7 +3409,7 @@ class MainActivity : Activity() {
                 ad.addView(heading("👑 Admin ✓ (AbdulSalam)"))
                 ad.addView(pill("👑 " + L.t("adm_users_btn"), true, 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
                 ad.addView(pill("🏪 " + L.t("shops_t"), true, 0xFF00695C.toInt()) { showShops() }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
-                ad.addView(pill("📊 " + L.t("sc_title"), true, 0xFF283593.toInt()) { scrapTab = "board"; showScrap() }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+                ad.addView(pill("📊 " + L.t("sc_title"), true, 0xFF283593.toInt()) { scrapTab = if (ScrapAdmin.pendingCount(this) > 0) "tr" else "board"; showScrap() }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             } else {
                 ad.addView(heading("👑 Admin login"))
                 ad.addView(small("Fakt malik (AbdulSalam) mate – code nakho.").apply { setPadding(0, 0, 0, dpi(8f)) })
