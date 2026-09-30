@@ -642,13 +642,19 @@ fun reminders(all: List<Hisab>, now: Long = System.currentTimeMillis(), before: 
 }
 
 /** reasons why a hisab cannot be made final yet (% totals, mehta of a haraji) */
+/** haraji: partners (100 %) are needed only when the vehicle / goods are given to the company, or partners are already written */
+fun needsPartners(h: Hisab) = h.type == "haraji" && (h.coMode || h.partners.isNotEmpty())
+
 fun finalProblems(h: Hisab): List<String> {
     val out = mutableListOf<String>()
     if (h.type == "haraji" && (h.mehtaName.isBlank() || digits10(h.mehtaMobile).length != 10)) out.add("🔨 " + L.t("mehta_need"))
     if ((h.writer.isNotBlank() || h.hasSplit()) && Math.abs(h.mudiPct + h.khedPct - 100) > 0.001)
         out.add(L.t("not100") + ": " + L.t("mudi_h") + " " + plain(h.mudiPct) + "% + " + L.t("khed_h") + " " + plain(h.khedPct) + "%")
-    if (h.type == "haraji" && Math.abs(h.sharesTotal() - 100) > 0.001)
-        out.add(L.t("pt_not100") + " (" + plain(h.sharesTotal()) + "%)")
+    // company partners: only when the vehicle / goods go to the company (or partners were written)
+    if (needsPartners(h)) {
+        if (Math.abs(h.sharesTotal() - 100) > 0.001) out.add(L.t("pt_not100") + " (" + plain(h.sharesTotal()) + "%)")
+        h.partners.filter { it.share > 0 && (it.name.isBlank() || digits10(it.mobile).length != 10) }.forEach { out.add("🏢 " + it.name.ifBlank { "?" } + ": " + L.t("st_need_nm")) }
+    }
     out.addAll(guarantorProblems(h))
     if (h.type == "haraji") out.addAll(partnerDuplicates(h))
     return out
@@ -669,8 +675,6 @@ fun stepProblems(h: Hisab, s: Int): List<String> {
             }
             if (h.type == "haraji") {
                 if (h.mehtaName.isBlank() || digits10(h.mehtaMobile).length != 10) out.add("🔨 " + L.t("mehta_need"))
-                if (Math.abs(h.sharesTotal() - 100) > 0.001) out.add(L.t("pt_not100") + " (" + plain(h.sharesTotal()) + "%)")
-                h.partners.filter { it.share > 0 && (it.name.isBlank() || digits10(it.mobile).length != 10) }.forEach { out.add("🏢 " + it.name.ifBlank { "?" } + ": " + L.t("st_need_nm")) }
                 out.addAll(partnerDuplicates(h))
             }
         }

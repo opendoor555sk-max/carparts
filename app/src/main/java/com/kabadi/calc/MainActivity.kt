@@ -1775,7 +1775,7 @@ class MainActivity : Activity() {
             }.apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             pcd.addView(small("1 " + L.t("pshare").substringBefore(" (") + " = 1%"))
             drawP()
-            if (h.coMode || h.partners.isNotEmpty()) { if (g) { if (frozenAt(1)) freeze(pcd); slot0.addView(pcd, cardLp()) } else body.addView(pcd, cardLp()) }
+            if (h.coMode || h.partners.isNotEmpty()) { if (g) put(pcd, 3, 99) else body.addView(pcd, cardLp()) }
         }
 
         if (g) okBtn(0, slot0)

@@ -415,10 +415,14 @@ class ModelTest {
 
     @Test fun harajiStepNeedsMehtaAndPartners() {
         val h = Hisab(1, 0, type = "haraji", step = 0, mudiName = "S", mudiMobile = "9876543210", mudiPctText = "100")
-        assertEquals(2, stepProblems(h, 0).size)                          // mehta + partners not 100
+        assertEquals(1, stepProblems(h, 0).size)                          // only the mehta (partners come later, only for the company way)
         h.mehtaName = "M"; h.mehtaMobile = "9111111111"
-        h.partners.add(Partner("P", "100", "9222222222"))
         assertTrue(stepProblems(h, 0).isEmpty())
+        assertTrue(finalProblems(h).isEmpty())                            // mudi malik does the haraji himself: no partners needed
+        h.coMode = true
+        assertTrue(finalProblems(h).any { it.contains("100") })           // company way: partners must be 100 %
+        h.partners.add(Partner("P", "100", "9222222222"))
+        assertTrue(finalProblems(h).isEmpty())
     }
 
     @Test fun shopLimitRule() {
