@@ -981,7 +981,7 @@ class MainActivity : Activity() {
         val late = dues.count { it.due != null && it.due <= Reminders.endOfToday() }
         // ---- 6 big round buttons: about 80% of the screen ----
         val dm = resources.displayMetrics
-        val rowH = ((dm.heightPixels * 0.8f - dp(110f)) / 4f).toInt()
+        val rowH = ((dm.heightPixels * 0.8f - dp(135f)) / 4f).toInt()
         val d = minOf(rowH - dpi(12f), (dm.widthPixels - dpi(20f)) / 2 - dpi(16f))
         /** round button: small icon on top, the name as BIG as it can be while staying fully inside the circle */
         fun circle(icon: String, label: String, color: Int, badge: String = "", act: () -> Unit): View {
@@ -1050,7 +1050,10 @@ class MainActivity : Activity() {
             }
         }
         // language: every name on this screen follows it
-        body.addView(langRow { showHome() }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(4f) })
+        body.addView(row(*listOf("EN", "हिं", "ગુ").mapIndexed { i, t ->
+            pill(t, L.lang == i, BLUE) { L.lang = i; Store.save(this); showHome() }.apply {
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 36f); typeface = Typeface.DEFAULT_BOLD; setPadding(dpi(6f), dpi(2f), dpi(6f), dpi(2f)); background = round(if (L.lang == i) BLUE else Color.WHITE, 16f, BLUE) } to 1f }.toTypedArray()),
+            llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(4f) })
         body.addView(gridRow(
             circle("🚚", lab(L.t("new_gaadi")), 0xFF2E7D32.toInt()) { newHisab("gaadi") },
             circle("🔨", lab(L.t("new_haraji")), 0xFF6A1B9A.toInt()) { newHisab("haraji") }))

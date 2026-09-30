@@ -1,3 +1,5 @@
+HOME: bhasha button (EN / हिं / ગુ) ghana mota (3x jevo), nam nanu karyu jethi button ma samay.
+
 HOME: gol button na naam ghana mota (button ni andar j fit thay, pan ni bahar nahi jay), bija home button na akshar pan mota.
 
 NAVO – HOME par BHASHA (English / हिंदी / ગુજરાતી) button upar; home na badha gol button na naam bhasha sathe badlay (pehla naam photo ma Hindi ma j hata). Ganana (⚠) nishan Udhar khata par rahe chhe.
