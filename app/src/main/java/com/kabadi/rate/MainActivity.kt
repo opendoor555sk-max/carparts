@@ -70,6 +70,7 @@ class MainActivity : Activity() {
         "none" to arrayOf("Write at least one rate", "कम से कम एक भाव लिखें", "ઓછામાં ઓછો એક ભાવ લખો"),
         "block" to arrayOf("⛔ The admin has closed this app for you permanently.", "⛔ एडमिन ने आपके लिए यह ऐप हमेशा के लिए बंद कर दिया है।", "⛔ એડમિને તમારા માટે આ એપ કાયમ માટે બંધ કરી છે."),
         "upd" to arrayOf("⬆ Check update", "⬆ अपडेट जाँचें", "⬆ અપડેટ તપાસો"),
+        "nof" to arrayOf("✅ OTP is correct.\nThe admin is preparing your rate form. It will appear here automatically.", "✅ OTP सही है।\nएडमिन आपका भाव फ़ॉर्म तैयार कर रहे हैं। यहाँ अपने आप आ जाएगा।", "✅ OTP સાચો છે.\nએડમિન તમારું ભાવ ફોર્મ તૈયાર કરી રહ્યા છે. તે અહીં આપોઆપ દેખાશે."),
         "kg" to arrayOf("per kg", "प्रति kg", "દર કિલો")
     )
     private fun t(k: String): String = S[k]?.get(Me.lang(this)) ?: k
@@ -116,7 +117,7 @@ class MainActivity : Activity() {
                 tick++
                 val st = Me.state(this@MainActivity)
                 if (st == "active" && shownAlive && Me.rates(this@MainActivity).isEmpty()) { typed.clear(); render() }
-                if (st == "asked" || (st == "active" && tick % 6 == 0)) Thread { val ch = Me.sync(this@MainActivity); ui.post { if (ch && g == gen) render() } }.start()
+                if (st == "asked" || (st == "active" && (tick % 6 == 0 || !Me.hasForm(this@MainActivity)))) Thread { val ch = Me.sync(this@MainActivity); ui.post { if (ch && g == gen) render() } }.start()
                 ui.postDelayed(this, 20000)
             }
         }, 20000)
@@ -159,7 +160,7 @@ class MainActivity : Activity() {
         sv.addView(body); content.addView(sv, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         when (Me.state(this)) {
             "block" -> blocked(body)
-            "active" -> rates(body)
+            "active" -> if (Me.hasForm(this)) rates(body) else noForm(body)
             "asked" -> waiting(body)
             else -> register(body)
         }
@@ -216,6 +217,17 @@ class MainActivity : Activity() {
             addView(link(t("cancel"), MUTED) { Me.reset(this@MainActivity); render() }, llp(0, WRAP_CONTENT, 1f))
         })
         body.addView(c, llp(MATCH_PARENT, WRAP_CONTENT))
+    }
+
+    private fun noForm(body: LinearLayout) {
+        val c = card()
+        c.addView(small("👤 " + Me.name(this) + "   📞 " + Me.mobile(this), INK, 16f).apply { typeface = Typeface.DEFAULT_BOLD })
+        c.addView(gap(8f))
+        c.addView(small(t("nof"), GREEN, 16f))
+        c.addView(gap(12f))
+        c.addView(link(t("again"), BLUE) { Thread { val ch = Me.sync(this@MainActivity); ui.post { if (ch) render() else toast("✓") } }.start() })
+        body.addView(c, llp(MATCH_PARENT, WRAP_CONTENT))
+        body.addView(link(t("upd") + "  (" + Updater.myVersionName(this) + ")", BLUE) { Updater.check(this, true) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(18f) })
     }
 
     private fun rates(body: LinearLayout) {

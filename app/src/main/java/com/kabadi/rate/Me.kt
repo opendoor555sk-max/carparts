@@ -28,17 +28,29 @@ object Me {
         return try { Scrap.ratesOf(JSONObject(sp(c).getString("rates", "{}") ?: "{}").let { JSONObject().put("r", it) }) } catch (_: Exception) { emptyMap() }
     }
 
-    fun format(c: Context): List<Metal> = Scrap.parseFormat(sp(c).getString("fmt", "") ?: "")?.second?.takeIf { it.isNotEmpty() } ?: Scrap.DEFAULT
+    /** the metals the admin chose for THIS trader (empty until the admin finalises his form) */
+    fun format(c: Context): List<Metal> = Scrap.parseFormat(sp(c).getString("fmt", "") ?: "")?.second ?: emptyList()
+    fun hasForm(c: Context) = format(c).isNotEmpty()
     private fun fmtVer(c: Context) = sp(c).getLong("fver", 0)
 
+    /** store the admin's form message {form:[…],fv:…}; false when it is not newer / has no metal */
+    fun takeForm(c: Context, f: JSONObject): Boolean {
+        if (f.optLong("fv") <= fmtVer(c)) return false
+        val j = JSONObject().put("ver", f.optLong("fv")).put("m", f.optJSONArray("form") ?: return false)
+        if (Scrap.parseFormat(j.toString()) == null) return false
+        sp(c).edit().putString("fmt", j.toString()).putLong("fver", f.optLong("fv")).apply()
+        return true
+    }
+
     fun register(c: Context, name: String, mobile: String, t: Long) =
-        sp(c).edit().putString("name", name).putString("mobile", mobile).putString("state", "asked").putLong("req", t).putBoolean("appr", false).putBoolean("act", false).apply()
+        sp(c).edit().putString("name", name).putString("mobile", mobile).putString("state", "asked").putLong("req", t).putBoolean("appr", false).putBoolean("act", false)
+            .remove("fmt").putLong("fver", 0).remove("rates").remove("rat").putBoolean("uns", false).apply()
 
     /** OTP was right */
     fun activate(c: Context) = sp(c).edit().putString("state", "active").putBoolean("act", false).apply()
 
     /** admin removed me (or I cancel): back to the first screen, can register again */
-    fun reset(c: Context) = sp(c).edit().putString("state", "none").putBoolean("appr", false).remove("rates").remove("rat").putBoolean("uns", false).apply()
+    fun reset(c: Context) = sp(c).edit().putString("state", "none").putBoolean("appr", false).remove("rates").remove("rat").remove("fmt").putLong("fver", 0).putBoolean("uns", false).apply()
 
     fun saveRates(c: Context, r: Map<String, Double>) {
         val j = JSONObject(); r.forEach { (k, v) -> j.put(k, v) }
@@ -73,20 +85,17 @@ object Me {
                 sp(c).edit().putString("state", "block").apply(); return true
             }
             val req = reqAt(c)
-            val last = u?.map { it.second }?.lastOrNull { val rt = it.optLong("rt"); rt == req || rt == 0L }
+            val mine = u?.map { it.second }?.filter { val rt = it.optLong("rt"); rt == req || rt == 0L } ?: emptyList()
+            val last = mine.lastOrNull { it.optBoolean("remove") || it.optBoolean("ok") }
             if (last != null) {
                 if (last.optBoolean("remove")) { reset(c); return true }
-                if (last.optBoolean("ok") && !approved(c)) { sp(c).edit().putBoolean("appr", true).apply(); changed = true }
+                if (!approved(c)) { sp(c).edit().putBoolean("appr", true).apply(); changed = true }
             }
+            // this trader's own form (metals), written by the admin
+            val f = mine.filter { it.has("form") }.maxByOrNull { it.optLong("fv") }
+            if (f != null && takeForm(c, f)) changed = true
         }
         st = state(c)
-        // format written by the admin
-        try {
-            val best = Scrap.readSealed(Scrap.FORMAT)?.map { it.second }?.maxByOrNull { it.optLong("ver") }
-            if (best != null && best.optLong("ver") > fmtVer(c)) {
-                sp(c).edit().putString("fmt", best.toString()).putLong("fver", best.optLong("ver")).apply(); changed = true
-            }
-        } catch (_: Exception) {}
         if (st == "active") {
             if (!sp(c).getBoolean("act", false)) {
                 if (Relay.post(Scrap.REG, JSONObject().put("n", name(c)).put("m", mob).put("d", dev).put("t", System.currentTimeMillis()).put("a", 1)))

@@ -31,4 +31,18 @@ class ScreenTest {
         assertTrue(edits.all { it.hint.toString().isNotBlank() })
         println("SCREEN: " + texts.joinToString(" | "))
     }
+
+    @Test fun activeWithoutFormWaitsThenShowsOnlyChosenMetals() {
+        val ctx = org.robolectric.RuntimeEnvironment.getApplication()
+        Me.register(ctx, "Ravi Traders", "9876543210", 1000L); Me.activate(ctx)
+        var act = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        assertEquals(0, walk(act.window.decorView).filterIsInstance<EditText>().size)     // no tiles yet
+        assertTrue(walk(act.window.decorView).filterIsInstance<TextView>().any { it.text.toString().contains("ફોર્મ") })
+        val f = org.json.JSONObject("{\"fv\":5,\"rt\":1000,\"form\":[{\"id\":\"copper\",\"gu\":\"તાંબુ\",\"hi\":\"\",\"en\":\"Copper\",\"u\":\"kg\"},{\"id\":\"lead\",\"gu\":\"સીસું\",\"hi\":\"\",\"en\":\"Lead\",\"u\":\"kg\"}]}")
+        assertTrue(Me.takeForm(ctx, f))
+        assertTrue(!Me.takeForm(ctx, f))                                                  // same version: ignored
+        act = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        assertEquals(2, walk(act.window.decorView).filterIsInstance<EditText>().size)     // copper + lead only
+        Me.reset(ctx); assertTrue(!Me.hasForm(ctx))
+    }
 }
