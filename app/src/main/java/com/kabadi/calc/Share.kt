@@ -110,6 +110,18 @@ object Share {
         return n
     }
 
+    /** the hisab was deleted: tell the phones that got it, so it disappears from their "Maru khatu" / shared list too */
+    fun retract(ctx: Context, h: Hisab) {
+        val tos = (targetsOf(h) + contacts(ctx, h).keys + h.partners.map { Otp.mobile10(it.mobile) }.filter { it.length == 10 }
+            + listOf(h.buyLine, h.saleLine).map { Otp.mobile10(it.cMobile) } + h.maal.map { Otp.mobile10(it.cMobile) } + h.kharch.map { Otp.mobile10(it.cMobile) })
+            .filter { it.length == 10 && it != myMobile(ctx) }.distinct()
+        tos.forEach { m ->
+            val payload = JSONObject().put("f", Store.owner.ifBlank { Account.name(ctx) }).put("fm", myMobile(ctx)).put("t", System.currentTimeMillis()).put("d", h.id).toString()
+            post(ctx, m, payload, "d" + h.id)
+        }
+        sp(ctx).edit().remove("x_${h.id}").remove("t_${h.id}").apply()
+    }
+
     /** send only when the hisab is different from what was sent last */
     fun publishIfChanged(ctx: Context, h: Hisab): Int {
         if (sp(ctx).getInt("x_${h.id}", 0) == Store.hj(h).toString().hashCode()) return 0
@@ -140,6 +152,14 @@ object Share {
             val text = Codec.open((0 until total).joinToString("") { byI[it]!!.optString("p") }, key) ?: return@forEach
             val o = JSONObject(text)
             val fm = o.optString("fm"); val t = o.optLong("t")
+            if (o.has("d")) {   // the maker deleted this hisab
+                val hid = o.optLong("d")
+                if (t > sp(ctx).getLong("del_${fm}_$hid", 0)) sp(ctx).edit().putLong("del_${fm}_$hid", t).apply()
+                if (Store.shared.removeAll { it.h.id == hid && it.fromMobile == fm } or Store.linked.removeAll { it.hid == hid && it.fromMobile == fm }) n++
+                return@forEach
+            }
+            val gone = sp(ctx).getLong("del_${fm}_" + (o.optJSONObject("c")?.optLong("hid") ?: o.optJSONObject("h")?.optLong("id") ?: 0L), 0)
+            if (t <= gone) return@forEach     // an older copy of a hisab that was deleted
             o.optJSONObject("c")?.let { c ->
                 val hid = c.optLong("hid")
                 val ln = c.optJSONArray("ln")

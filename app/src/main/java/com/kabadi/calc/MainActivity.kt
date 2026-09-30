@@ -1130,11 +1130,10 @@ class MainActivity : Activity() {
     }
 
     private fun askDelete(h: Hisab, after: () -> Unit) {
-        // admin phone may delete anything, even a final hisab
-        val admin = LOGIN_ON && Account.isAdmin(this)
-        if ((h.finalAt > 0 || h.step > 0) && !admin) return toast(L.t("locked_del"))
+        // everybody can delete any of his hisab: open, half done or final
         AlertDialog.Builder(this).setMessage((if (h.finalAt > 0) "👑 ✅ " + L.t("final_s") + "\n" else "") + L.t("del_q") + "\n" + hTitle(h) + "  " + money(h.munafa()))
-            .setPositiveButton(L.t("yes")) { _, _ -> Store.hisabs.remove(h); Store.save(this); after() }
+            .setPositiveButton(L.t("yes")) { _, _ -> Store.hisabs.remove(h); Store.save(this)
+                Thread { try { Share.retract(this, h) } catch (_: Exception) {} }.start(); after() }
             .setNegativeButton(L.t("no"), null).show()
     }
 
@@ -1378,7 +1377,7 @@ class MainActivity : Activity() {
         val g = h.step >= 0 && view == null
         val opened = h.id in unlocked                       // admin opened it with his PIN
         fun shown(min: Int) = !g || opened || h.step >= min
-        fun frozenAt(min: Int) = g && !opened && h.step >= min
+        fun frozenAt(@Suppress("UNUSED_PARAMETER") min: Int) = false      // nothing is ever locked: every step stays editable
         fun put(c: View, min: Int, freezeFrom: Int) { if (!shown(min)) return; if (frozenAt(freezeFrom)) freeze(c); body.addView(c, cardLp()) }
         fun okBtn(s0: Int, into: LinearLayout? = null) {
             if (!(g && !opened && h.step == s0 && h.finalAt == 0L)) return
@@ -1827,7 +1826,7 @@ class MainActivity : Activity() {
         refreshTotals()
 
         // ---- Final / lock ----
-        val ls = lockState(h)
+        val ls = 0      // no lock any more (final / credit time / 48 h): a hisab can always be corrected
         if (view != null) {
             freeze(body)
             val ban = card().apply { background = round(0xFFE3F2FD.toInt(), 12f, BLUE) }
@@ -1865,7 +1864,6 @@ class MainActivity : Activity() {
         } else if (h.finalAt == 0L) {
             if (g && opened) body.addView(pill("🔒 " + L.t("lock_again"), true, GREEN) { autoSave(); Store.save(this); unlocked.remove(h.id); showEditor(h) }
                 .apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, 0, cardLp())
-            if (g && !opened && h.step in 1..3) stepBanner(h, body)
             if (!g || opened || h.step >= 3) body.addView(bigButton(L.t("final_btn"), 0xFF1B5E20.toInt()) {
                 if (!hasContent(h)) return@bigButton toast(L.t("none"))
                 val prob = finalProblems(h)
@@ -1880,9 +1878,10 @@ class MainActivity : Activity() {
                     .setNegativeButton(L.t("no"), null).show()
             }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(12f) })
         } else {
-            // opened by admin: lock again when done
-            body.addView(pill("🔒 " + L.t("lock_again"), true, GREEN) { autoSave(); Store.save(this); unlocked.remove(h.id); showEditor(h) }
-                .apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, 0, cardLp())
+            // final, but still editable: changes go to the people concerned by themselves
+            body.addView(card().apply { background = round(0xFFE8F5E9.toInt(), 12f, GREEN)
+                addView(small("✅ " + L.t("final_s") + ": " + Bill.dateText(h.finalAt), INK).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD })
+                addView(small(L.t("final_edit"), MUTED)) }, 0, cardLp())
         }
 
         if (view == null && (h.finalAt > 0 || (g && h.step >= 1)))
@@ -1897,7 +1896,7 @@ class MainActivity : Activity() {
         act(L.t("jpg"), ORANGE) { exportJpg(h) }
         act(L.t("pdf"), RED) { exportPdf(h) }
         act(L.t("share"), GREEN) { shareText(h) }
-        if (view == null && Store.hisabs.any { it === h } && ((h.finalAt == 0L && h.step <= 0) || (LOGIN_ON && Account.isAdmin(this)))) act("🗑", 0xFF78909C.toInt()) { askDelete(h) { editing = null; showHome() } }
+        if (view == null && Store.hisabs.any { it === h }) act("🗑", 0xFF78909C.toInt()) { askDelete(h) { editing = null; showHome() } }
     }
 
     /** everybody with a contact number gets the details: WhatsApp / SMS, one tap each */
@@ -2305,11 +2304,8 @@ class MainActivity : Activity() {
         // step-by-step hisab: "OK – sold" locks the line and sends the buyer his message at once
         if (h.step >= 0 && viewOnly == null && h.finalAt == 0L && h.step >= 3) {
             if (l.sold) {
-                box.addView(row(small("🔒 ✓ " + L.t("sold_done"), GREEN).apply { typeface = Typeface.DEFAULT_BOLD } to 1f,
+                box.addView(row(small("✓ " + L.t("sold_done"), GREEN).apply { typeface = Typeface.DEFAULT_BOLD } to 1f,
                     pill("📤", true, 0xFF25D366.toInt()) { showLineMessage(h, l) } to 0f).apply { setPadding(0, dpi(6f), 0, 0) })
-                if (h.id !in unlocked) freeze(box)
-                // the send button must work also on a locked line
-                (box.getChildAt(box.childCount - 1) as? LinearLayout)?.let { r -> for (i in 0 until r.childCount) { val v = r.getChildAt(i); if (v is TextView && v.text == "📤") v.setOnClickListener { showLineMessage(h, l) } } }
             } else if (h.id !in unlocked || true) box.addView(bigButton(L.t("sold_ok"), 0xFF1B5E20.toInt()) { confirmSold(h, l) }.apply { textSize = 15f },
                 llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
         }
