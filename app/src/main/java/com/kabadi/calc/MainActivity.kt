@@ -983,16 +983,30 @@ class MainActivity : Activity() {
         val dm = resources.displayMetrics
         val rowH = ((dm.heightPixels * 0.8f - dp(110f)) / 4f).toInt()
         val d = minOf(rowH - dpi(12f), (dm.widthPixels - dpi(20f)) / 2 - dpi(16f))
+        /** round button: small icon on top, the name as BIG as it can be while staying fully inside the circle */
         fun circle(icon: String, label: String, color: Int, badge: String = "", act: () -> Unit): View {
-            val txt = android.text.SpannableString(icon + "\n" + label).apply {
-                setSpan(android.text.style.RelativeSizeSpan(2.1f), 0, icon.length, 0)
+            val inner = d * 0.74f                               // width of the text block that fits inside the circle
+            val iconPx = d * 0.22f
+            val avail = d * 0.72f - iconPx
+            fun fits(px: Float): Boolean {
+                val paint = android.text.TextPaint().apply { textSize = px; typeface = Typeface.DEFAULT_BOLD; isAntiAlias = true }
+                if (label.split(' ', '/', '-').any { it.isNotBlank() && paint.measureText(it) > inner }) return false
+                val lay = android.text.StaticLayout.Builder.obtain(label, 0, label.length, paint, inner.toInt())
+                    .setAlignment(android.text.Layout.Alignment.ALIGN_CENTER).setIncludePad(false).build()
+                return lay.lineCount <= 3 && lay.height <= avail
             }
+            var lo = dp(11f); var hi = dp(44f)                  // up to about 3x the old size
+            repeat(14) { val mid = (lo + hi) / 2; if (fits(mid)) lo = mid else hi = mid }
             val oval = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(color); setStroke(dpi(4f), 0x33FFFFFF) }
-            val b = TextView(this).apply {
-                text = txt; textSize = if (d < dpi(130f)) 13.5f else 16f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
-                maxLines = 4; setPadding(dpi(14f), dpi(10f), dpi(14f), dpi(10f))
+            val b = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
+                setPadding(((d - inner) / 2).toInt(), 0, ((d - inner) / 2).toInt(), 0)
                 background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x55FFFFFF), oval, null)
                 elevation = dp(6f); setOnClickListener { act() }
+                addView(TextView(this@MainActivity).apply { text = icon; gravity = Gravity.CENTER; includeFontPadding = false
+                    setTextSize(TypedValue.COMPLEX_UNIT_PX, iconPx * 0.8f) }, llp(MATCH_PARENT, WRAP_CONTENT))
+                addView(TextView(this@MainActivity).apply { text = label; gravity = Gravity.CENTER; includeFontPadding = false
+                    setTextSize(TypedValue.COMPLEX_UNIT_PX, lo); setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD; maxLines = 3 }, llp(MATCH_PARENT, WRAP_CONTENT))
             }
             return FrameLayout(this).apply {
                 addView(b, FrameLayout.LayoutParams(d, d, Gravity.CENTER))
@@ -1052,14 +1066,14 @@ class MainActivity : Activity() {
             circle("📈", lab(L.t("sc_short")), 0xFF283593.toInt()) { if (Account.isAdmin(this)) { scrapTab = if (ScrapAdmin.pendingCount(this) > 0) "tr" else "board"; showScrap() } else showScrapView() }))
         val offN = Notice.unread(this)
         body.addView(bigButton("🏢 " + L.t("off_title") + (if (offN > 0) "  🔴 $offN " + L.t("off_new") else ""), 0xFF00695C.toInt()) { showOffice() }
-            .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+            .apply { textSize = 22f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         if (Store.shared.isNotEmpty()) body.addView(bigButton("👁 " + L.t("sh_title") + " (" + Store.shared.size + ")", BLUE) { showShared() }
-            .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+            .apply { textSize = 22f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         if (Store.linked.isNotEmpty()) body.addView(bigButton("🔗 " + L.t("lk_title") + " (" + Store.linked.size + ")", GREEN) { showLinked() }
-            .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+            .apply { textSize = 22f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         val rem = reminders(Store.hisabs)
         if (rem.isNotEmpty()) body.addView(bigButton("🔔 " + rem.map { it.key.ifEmpty { it.name } }.distinct().size + " " + L.t("rem_banner"), 0xFFE65100.toInt()) { showReminders() }
-            .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+            .apply { textSize = 20f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         thisMonth(Store.hisabs)?.let { m ->
             val mc = card().apply { background = round(0xFFE8F5E9.toInt(), 12f, 0xFFA5D6A7.toInt()) }
             mc.addView(row(small("📅 " + L.t("this_month"), INK).apply { textSize = 15f; typeface = Typeface.DEFAULT_BOLD } to 1f,
@@ -1076,11 +1090,11 @@ class MainActivity : Activity() {
 
         // any user: tell the admin a problem by voice / text
         if (LOGIN_ON && !Account.isAdmin(this)) body.addView(bigButton("🎤 " + L.t("fb_btn"), 0xFFE65100.toInt()) { showFeedback() }
-            .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+            .apply { textSize = 20f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
         if (LOGIN_ON && Account.isAdmin(this)) {
-            val fbBanner = bigButton("", 0xFFE65100.toInt()) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
+            val fbBanner = bigButton("", 0xFFE65100.toInt()) { showAdmin() }.apply { textSize = 20f; visibility = View.GONE }
             body.addView(fbBanner, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
-            val unlBanner = bigButton("", GREEN) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
+            val unlBanner = bigButton("", GREEN) { showAdmin() }.apply { textSize = 20f; visibility = View.GONE }
             body.addView(unlBanner, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             every(30000L, { Unlock.pending(this) }) { p ->
                 unlBanner.visibility = if (p.isNullOrEmpty()) View.GONE else View.VISIBLE
@@ -1092,10 +1106,10 @@ class MainActivity : Activity() {
                 fbBanner.text = "🎤 $n " + L.t("fb_new"); true
             }
             val nUsers = Relay.seen(this).values.count { !it.optBoolean("adm") }
-            body.addView(bigButton("👑 " + L.t(if (Account.REQUIRED) "adm_btn" else "adm_users_btn") + (if (nUsers > 0) "   •   👥 $nUsers" else ""), 0xFF4A148C.toInt()) { showAdmin() }.apply { textSize = 15f },
+            body.addView(bigButton("👑 " + L.t(if (Account.REQUIRED) "adm_btn" else "adm_users_btn") + (if (nUsers > 0) "   •   👥 $nUsers" else ""), 0xFF4A148C.toInt()) { showAdmin() }.apply { textSize = 20f },
                 llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             if (Account.REQUIRED) {
-                val banner = bigButton("", 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 15f; visibility = View.GONE }
+                val banner = bigButton("", 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 20f; visibility = View.GONE }
                 body.addView(banner, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(8f) })
                 every(30000L, { Relay.pending(this) }) { p ->
                     banner.visibility = if (p.isNullOrEmpty()) View.GONE else View.VISIBLE

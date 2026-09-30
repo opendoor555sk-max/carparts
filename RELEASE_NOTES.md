@@ -1,3 +1,5 @@
+HOME: gol button na naam ghana mota (button ni andar j fit thay, pan ni bahar nahi jay), bija home button na akshar pan mota.
+
 NAVO – HOME par BHASHA (English / हिंदी / ગુજરાતી) button upar; home na badha gol button na naam bhasha sathe badlay (pehla naam photo ma Hindi ma j hata). Ganana (⚠) nishan Udhar khata par rahe chhe.
 
 NAAM + MOBILE FARJIYAT (kadak): jena phone ma saaf naam ane sacho 10 ank no mobile (6-9 thi sharu, 0000000000 / 1111111111 jevo khoto nahi) nathi, tene update pachhi app kholta j 'Tamaru naam ane mobile' screen aave – te bhaya vagar app nahi khule. Bharya pachhi tarat admin ni user list ma naam + number dekhay.
