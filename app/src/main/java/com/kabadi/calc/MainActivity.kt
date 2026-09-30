@@ -981,9 +981,9 @@ class MainActivity : Activity() {
         val late = dues.count { it.due != null && it.due <= Reminders.endOfToday() }
         // ---- 6 big round buttons: about 80% of the screen ----
         val dm = resources.displayMetrics
-        val rowH = ((dm.heightPixels * 0.8f - dp(70f)) / 4f).toInt()
+        val rowH = ((dm.heightPixels * 0.8f - dp(110f)) / 4f).toInt()
         val d = minOf(rowH - dpi(12f), (dm.widthPixels - dpi(20f)) / 2 - dpi(16f))
-        fun circle(icon: String, label: String, color: Int, act: () -> Unit): View {
+        fun circle(icon: String, label: String, color: Int, badge: String = "", act: () -> Unit): View {
             val txt = android.text.SpannableString(icon + "\n" + label).apply {
                 setSpan(android.text.style.RelativeSizeSpan(2.1f), 0, icon.length, 0)
             }
@@ -994,8 +994,16 @@ class MainActivity : Activity() {
                 background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x55FFFFFF), oval, null)
                 elevation = dp(6f); setOnClickListener { act() }
             }
-            return FrameLayout(this).apply { addView(b, FrameLayout.LayoutParams(d, d, Gravity.CENTER)) }
+            return FrameLayout(this).apply {
+                addView(b, FrameLayout.LayoutParams(d, d, Gravity.CENTER))
+                if (badge.isNotEmpty()) addView(TextView(this@MainActivity).apply {
+                    text = badge; textSize = 15f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+                    background = round(RED, 14f, Color.WHITE); setPadding(dpi(8f), dpi(2f), dpi(8f), dpi(2f)); elevation = dp(10f)
+                }, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+            }
         }
+        /** label without a leading "+" / emoji: the round button shows its own big icon */
+        fun lab(t: String): String { var x = t.trimStart('+', ' '); if (x.isNotEmpty() && !x[0].isLetterOrDigit()) x = x.substringAfter(' ', x); return x.trim() }
         fun gridRow(a1: View, a2: View) = LinearLayout(this).apply {
             addView(a1, llp(0, rowH, 1f)); addView(a2, llp(0, rowH, 1f))
         }
@@ -1027,20 +1035,21 @@ class MainActivity : Activity() {
                 }, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
             }
         }
+        // language: every name on this screen follows it
+        body.addView(langRow { showHome() }, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(4f) })
         body.addView(gridRow(
-            pic(R.drawable.home_gaadi, L.t("new_gaadi")) { newHisab("gaadi") },
-            pic(R.drawable.home_haraji, L.t("new_haraji")) { newHisab("haraji") }))
+            circle("🚚", lab(L.t("new_gaadi")), 0xFF2E7D32.toInt()) { newHisab("gaadi") },
+            circle("🔨", lab(L.t("new_haraji")), 0xFF6A1B9A.toInt()) { newHisab("haraji") }))
         body.addView(gridRow(
-            pic(R.drawable.home_mudi, L.t("mudi_h")) { showRole("mudi") },
-            pic(R.drawable.home_khed, L.t("khed_h")) { showRole("khed") }))
+            circle("💰", lab(L.t("mudi_h")), 0xFFEF6C00.toInt()) { showRole("mudi") },
+            circle("🌾", lab(L.t("khed_h")), 0xFF558B2F.toInt()) { showRole("khed") }))
         body.addView(gridRow(
-            pic(R.drawable.home_party, L.t("party_tile")) { showParties() },
-            pic(R.drawable.home_khata, L.t("khata_btn"), if (late > 0) "⚠ $late" else "") { showKhata() }))
-        // 7 tiles: the last one sits in the middle
+            circle("🤝", lab(L.t("party_tile")), 0xFF4E342E.toInt()) { showParties() },
+            circle("📒", lab(L.t("khata_btn")), 0xFF1565C0.toInt(), if (late > 0) "⚠ $late" else "") { showKhata() }))
         // last row: report + scrap / metal rates (everybody can look; the admin manages)
         body.addView(gridRow(
-            pic(R.drawable.home_report, L.t("report_btn")) { showReport() },
-            circle("📊", L.t("sc_short"), 0xFF283593.toInt()) { if (Account.isAdmin(this)) { scrapTab = if (ScrapAdmin.pendingCount(this) > 0) "tr" else "board"; showScrap() } else showScrapView() }))
+            circle("📊", lab(L.t("report_btn")), 0xFF00695C.toInt()) { showReport() },
+            circle("📈", lab(L.t("sc_short")), 0xFF283593.toInt()) { if (Account.isAdmin(this)) { scrapTab = if (ScrapAdmin.pendingCount(this) > 0) "tr" else "board"; showScrap() } else showScrapView() }))
         val offN = Notice.unread(this)
         body.addView(bigButton("🏢 " + L.t("off_title") + (if (offN > 0) "  🔴 $offN " + L.t("off_new") else ""), 0xFF00695C.toInt()) { showOffice() }
             .apply { textSize = 15f }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })

@@ -1,3 +1,5 @@
+NAVO – HOME par BHASHA (English / हिंदी / ગુજરાતી) button upar; home na badha gol button na naam bhasha sathe badlay (pehla naam photo ma Hindi ma j hata). Ganana (⚠) nishan Udhar khata par rahe chhe.
+
 NAAM + MOBILE FARJIYAT (kadak): jena phone ma saaf naam ane sacho 10 ank no mobile (6-9 thi sharu, 0000000000 / 1111111111 jevo khoto nahi) nathi, tene update pachhi app kholta j 'Tamaru naam ane mobile' screen aave – te bhaya vagar app nahi khule. Bharya pachhi tarat admin ni user list ma naam + number dekhay.
 
 BADLAV – KOI LOCK NAHI: Gaadi hisab ane Haraji / Company hisab ma have kai j lock thatu nathi – darek step (naam, %, kharid, kharch, vechan), Final pachhi pan, 'OK – vechayu' vali line pan hamesha badli shakay; admin ni permission ke PIN nahi joie. Fakt % nu 100% niyam rahe chhe. Darek hisab (adhuro, puro ke Final) tame jate '🗑' ke lambo dabavi ne kadhi shako; kadhya pachhi bhagidar / kharidnar ni '🔗 Maru khatu' mathi pan te hisab aapo aap nikli jay. Hisab badlo to bija ne badlav aapo aap pohche.
