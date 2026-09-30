@@ -476,6 +476,7 @@ object L {
         "market" to arrayOf("Market", "बाज़ार", "બજાર"),
         "market_no" to arrayOf("Market no. *", "बाज़ार नंबर *", "બજાર નંબર *"),
         "shop_people" to arrayOf("people guaranteed", "लोगों की जमानत", "લોકોની જામીન"),
+        "p_dup" to arrayOf("This partner (name / number) is already written in this hisab", "यह भागीदार (नाम / नंबर) इस हिसाब में पहले से लिखा है", "આ ભાગીદાર (નામ / નંબર) આ હિસાબમાં પહેલેથી લખેલ છે"),
         "salam" to arrayOf("Assalamu Alaikum", "अस्सलामु अलैकुम", "અસ્સલામ વાલેકુમ"),
         "lk_title" to arrayOf("My khata (from others)", "मेरा खाता (दूसरों से)", "મારું ખાતું (બીજાઓ તરફથી)"),
         "lk_pay" to arrayOf("You have to pay", "आपको देना है", "તમારે ચૂકવવાના"),

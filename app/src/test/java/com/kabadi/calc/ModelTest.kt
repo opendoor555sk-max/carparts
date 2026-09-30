@@ -458,6 +458,20 @@ class ModelTest {
         } finally { Store.shops.clear(); Store.hisabs.clear(); Store.shared.clear(); Store.shopUse.clear() }
     }
 
+    @Test fun partnerOnlyOnce() {
+        val h = Hisab(3, 1, type = "haraji", writer = "mudi", mudiName = "S", mudiMobile = "9876543210", mudiPctText = "100", mehtaName = "M", mehtaMobile = "9111111111")
+        val a = Partner("Ilyas", "50", "9510188468"); val b = Partner("Riyan", "50", "7990071166")
+        h.partners.add(a); h.partners.add(b)
+        assertTrue(partnerDuplicates(h).isEmpty())
+        b.mobile = "95101 88468"                            // same number again
+        assertTrue(partnerDup(h, b) && partnerDup(h, a))
+        assertTrue(stepProblems(h, 0).any { it.contains("🏢") } && finalProblems(h).any { it.contains("🏢") })
+        b.mobile = "7990071166"; b.name = " ilyas "         // same name again
+        assertTrue(partnerDup(h, b))
+        b.name = "Riyan"
+        assertTrue(partnerDuplicates(h).isEmpty())
+    }
+
     @Test fun guarantorRule() {
         val h = Hisab(7, 1, type = "haraji", writer = "mudi", mudiName = "Salam", mudiMobile = "9876543210", mudiPctText = "70",
             khedName = "Nauman", khedMobile = "7203960120", khedPctText = "30", mehtaName = "M", mehtaMobile = "9111111111")

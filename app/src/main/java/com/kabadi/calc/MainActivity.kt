@@ -1718,15 +1718,30 @@ class MainActivity : Activity() {
             val pLines = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             fun drawP() {
                 pLines.removeAllViews()
+                val warns = ArrayList<Pair<Partner, TextView>>()
+                fun refreshDup() { warns.forEach { (q, t) -> t.text = if (partnerDup(h, q)) "⛔ " + L.t("p_dup") else "" } }
                 h.partners.forEach { p ->
                     val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = round(0xFFF8F3FB.toInt(), 10f, 0xFFD1C4E9.toInt()); setPadding(dpi(6f), dpi(4f), dpi(4f), dpi(4f)) }
-                    val pn = input(L.t("partner"), p.name, false) { p.name = it; refreshTotals() }.apply { textSize = 15f; tag = "focus" }
+                    val pn = input(L.t("partner"), p.name, false) { p.name = it; refreshDup(); refreshTotals() }.apply { textSize = 15f; tag = "focus" }
                     box.addView(row(pn to 1.6f,
                         input(L.t("pshare"), p.shareText, true) { p.shareText = it; refreshTotals() }.apply { gravity = Gravity.END } to 1f,
                         xBtn { confirmRemove { h.partners.remove(p); drawP(); refreshTotals() } } to 0f))
-                    val pm = reqMobile("📞 " + L.t("cmobile") + " *", p.mobile) { p.mobile = it }
-                    box.addView(row(pm to 1f, pill("👥", false, BLUE) { pickBuyer { n, m -> if (pn.text.isBlank()) pn.setText(n); pm.setText(m) } }
+                    var pmRef: EditText? = null
+                    // one partner (name + number) only once in a haraji: a number already used is refused at once
+                    val pm = reqMobile("📞 " + L.t("cmobile") + " *", p.mobile) { v ->
+                        p.mobile = v
+                        if (digits10(v).length == 10 && h.partners.any { o -> o !== p && digits10(o.mobile) == digits10(v) }) {
+                            toast("⛔ " + L.t("p_dup")); p.mobile = ""; pmRef?.post { pmRef?.setText("") }
+                        }
+                        refreshDup()
+                    }
+                    pmRef = pm
+                    box.addView(row(pm to 1f, pill("👥", false, BLUE) { pickPartner(h, p) { n, m ->
+                        if (h.partners.any { o -> o !== p && (digits10(o.mobile) == digits10(m) || norm(o.name) == norm(n)) }) toast("⛔ " + L.t("p_dup"))
+                        else { if (pn.text.isBlank()) pn.setText(n); pm.setText(m) } } }
                         .apply { textSize = 16f; setPadding(dpi(8f), dpi(4f), dpi(8f), dpi(4f)) } to 0f))
+                    val dupTv = small("", RED).apply { textSize = 12f; typeface = Typeface.DEFAULT_BOLD }
+                    warns.add(p to dupTv); box.addView(dupTv); refreshDup()
                     pLines.addView(box, llp(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
                 }
             }
@@ -2392,6 +2407,21 @@ class MainActivity : Activity() {
         }
         if (!guarantorOk(h, l)) g.addView(small("⚠ " + L.t("g_need"), ORANGE).apply { textSize = 11.5f })
         box.addView(g, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+    }
+
+    /** choose a company partner: earlier partners (name + number kept from earlier haraji) or the phone's contacts; partners already in this hisab are not offered */
+    private fun pickPartner(h: Hisab, p: Partner, done: (String, String) -> Unit) {
+        val used = h.partners.filter { it !== p }
+        val prev = Store.hisabs.flatMap { it.partners }.filter { digits10(it.mobile).length == 10 && it.name.isNotBlank() }
+            .distinctBy { digits10(it.mobile) }.filter { q -> used.none { digits10(it.mobile) == digits10(q.mobile) } }
+        val items = listOf("📇 " + L.t("contacts")) + prev.map { Notify.nm(it.name) + "  •  " + digits10(it.mobile) }
+        AlertDialog.Builder(this).setTitle(L.t("partner")).setItems(items.toTypedArray()) { _, w ->
+            if (w == 0) {
+                contactCb = done
+                try { startActivityForResult(Intent(Intent.ACTION_PICK, android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI), 31) }
+                catch (_: Exception) { toast("✕") }
+            } else prev[w - 1].let { done(it.name, digits10(it.mobile)) }
+        }.show()
     }
 
     /** choose a buyer: from earlier buyers or the phone's contacts */

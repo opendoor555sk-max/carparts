@@ -588,6 +588,11 @@ fun guarantorProblems(h: Hisab): List<String> =
         if (why == null) null else "🤝 " + l.name.ifBlank { L.ln(l) } + " → " + l.cName.ifBlank { "?" } + ": " + why
     }
 
+/** the same company partner (same mobile, or same name) written twice in one haraji – every partner only once */
+fun partnerDup(h: Hisab, p: Partner): Boolean = h.partners.any { o -> o !== p &&
+    ((digits10(p.mobile).length == 10 && digits10(o.mobile) == digits10(p.mobile)) || (p.name.isNotBlank() && norm(o.name) == norm(p.name))) }
+fun partnerDuplicates(h: Hisab): List<String> = h.partners.filter { partnerDup(h, it) }.map { "🏢 " + it.name.ifBlank { digits10(it.mobile) } + ": " + L.t("p_dup") }
+
 fun missingMobile(h: Hisab): List<String> {
     val out = mutableListOf<String>()
     // new hisab (writer chosen): mudi malik and khedut mobile are required
@@ -637,6 +642,7 @@ fun finalProblems(h: Hisab): List<String> {
     if (h.type == "haraji" && Math.abs(h.sharesTotal() - 100) > 0.001)
         out.add(L.t("pt_not100") + " (" + plain(h.sharesTotal()) + "%)")
     out.addAll(guarantorProblems(h))
+    if (h.type == "haraji") out.addAll(partnerDuplicates(h))
     return out
 }
 
@@ -657,6 +663,7 @@ fun stepProblems(h: Hisab, s: Int): List<String> {
                 if (h.mehtaName.isBlank() || digits10(h.mehtaMobile).length != 10) out.add("🔨 " + L.t("mehta_need"))
                 if (Math.abs(h.sharesTotal() - 100) > 0.001) out.add(L.t("pt_not100") + " (" + plain(h.sharesTotal()) + "%)")
                 h.partners.filter { it.share > 0 && (it.name.isBlank() || digits10(it.mobile).length != 10) }.forEach { out.add("🏢 " + it.name.ifBlank { "?" } + ": " + L.t("st_need_nm")) }
+                out.addAll(partnerDuplicates(h))
             }
         }
         1 -> if (h.price <= 0.0) out.add(L.t("st_need_buy"))
