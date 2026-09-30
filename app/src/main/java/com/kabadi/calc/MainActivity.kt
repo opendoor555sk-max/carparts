@@ -180,11 +180,15 @@ class MainActivity : Activity() {
     /** this phone's own contact number (10 digits, "" if not given yet) */
     private fun myMobile() = Account.mobile(this).ifBlank { Store.mobile }.filter { it.isDigit() }.takeLast(10)
 
+    /** a real Indian mobile: 10 digits starting 6-9 (no 0000000000 / 1234567890 fillers) */
+    private fun realMobile(m: String) = m.length == 10 && m[0] in '6'..'9' && m.toSet().size > 2
+    private fun realName(n: String) = n.trim().length >= 2 && n.any { it.isLetter() }
+
     private fun route() {
         if (LOGIN_ON && !Account.isAdmin(this) && Account.blocked(this)) return showBlocked()
         if (!LOGIN_ON || !Account.REQUIRED) {
             // the phone's own contact number is required, so it shows in the admin's user list
-            if (LOGIN_ON && !Account.isAdmin(this) && (myMobile().length != 10 || Account.name(this).ifBlank { Store.owner }.isBlank())) return showNeedMobile()
+            if (LOGIN_ON && !Account.isAdmin(this) && (!realMobile(myMobile()) || !realName(Account.name(this).ifBlank { Store.owner }))) return showNeedMobile()
             return startApp()
         }
         // admin phone: always opens straight away (no sign in / sign out)
@@ -279,10 +283,11 @@ class MainActivity : Activity() {
         body.addView(bigButton("✅ " + L.t("nm_go"), GREEN) {
             val m = mob.filter { it.isDigit() }
             when {
-                name.isBlank() -> toast(L.t("u_name"))
-                m.length != 10 -> toast(L.t("acc_bad_mobile"))
+                !realName(name) -> toast(L.t("u_name"))
+                !realMobile(m) -> toast(L.t("acc_bad_mobile"))
                 else -> {
                     Account.create(this, name.trim(), m, "")
+                    if (!realMobile(Store.mobile.filter { it.isDigit() }.takeLast(10))) Store.mobile = m
                     if (Store.owner.isBlank()) Store.owner = name.trim()
                     if (Store.mobile.isBlank()) Store.mobile = m
                     Store.save(this); hideKeyboard()

@@ -214,7 +214,7 @@ object L {
         "acc_open" to arrayOf("Open", "खोलें", "ખોલો"),
         "acc_enter" to arrayOf("Enter PIN", "PIN डालें", "PIN નાખો"),
         "acc_wrong" to arrayOf("Wrong PIN", "गलत PIN", "ખોટો PIN"),
-        "acc_bad_mobile" to arrayOf("Write full 10 digit mobile", "पूरा 10 अंक का मोबाइल लिखें", "પૂરો 10 આંકડાનો મોબાઇલ લખો"),
+        "acc_bad_mobile" to arrayOf("Write your real 10 digit mobile (starts with 6-9)", "अपना असली 10 अंक का मोबाइल लिखें (6-9 से शुरू)", "તમારો સાચો 10 આંકડાનો મોબાઇલ લખો (6-9 થી શરૂ)"),
         "acc_bad_pin" to arrayOf("PIN must be 4 digits and both same", "PIN 4 अंक का हो और दोनों एक जैसे", "PIN 4 આંકડાનો અને બંને સરખા હોવા જોઈએ"),
         "acc_forgot" to arrayOf("Forgot PIN?", "PIN भूल गए?", "PIN ભૂલી ગયા?"),
         "acc_forgot_q" to arrayOf("Write your registered mobile number to set a new PIN", "नया PIN बनाने के लिए अपना रजिस्टर मोबाइल नंबर लिखें", "નવો PIN બનાવવા તમારો રજીસ્ટર મોબાઇલ નંબર લખો"),
