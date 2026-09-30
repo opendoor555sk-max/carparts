@@ -12,7 +12,9 @@ import org.json.JSONObject
 
 /** a trader in the admin's list. st: pending (asked) / otp (OTP given) / active / block (permanent) / removed */
 class TraderRec(val key: String, var name: String, var mobile: String, var dev: String, var first: Long, var req: Long, var st: String,
-                var decAt: Long = 0, var last: Long = 0, var manual: Boolean = false)
+                var decAt: Long = 0, var last: Long = 0, var manual: Boolean = false,
+                /** this trader's form: ids of the metals the admin gave him ("" = form not final yet) */
+                var form: String = "", var formAt: Long = 0)
 
 /**
  * Admin side of the traders' rate app (Scrap Bhav): trader list (OTP / block / remove), format of metals, rates board.
@@ -29,12 +31,12 @@ object ScrapAdmin {
         val a = JSONArray(sp(ctx).getString("tr", "[]"))
         (0 until a.length()).map { a.getJSONObject(it) }.map {
             TraderRec(it.optString("k"), it.optString("n"), it.optString("m"), it.optString("d"), it.optLong("f"), it.optLong("q"), it.optString("s"),
-                it.optLong("da"), it.optLong("l"), it.optBoolean("man"))
+                it.optLong("da"), it.optLong("l"), it.optBoolean("man"), it.optString("fm"), it.optLong("fa"))
         }.toMutableList()
     } catch (_: Exception) { mutableListOf() }
 
     private fun saveTraders(ctx: Context, l: List<TraderRec>) {
-        val a = JSONArray(); l.forEach { a.put(JSONObject().put("k", it.key).put("n", it.name).put("m", it.mobile).put("d", it.dev).put("f", it.first).put("q", it.req).put("s", it.st).put("da", it.decAt).put("l", it.last).put("man", it.manual)) }
+        val a = JSONArray(); l.forEach { a.put(JSONObject().put("k", it.key).put("n", it.name).put("m", it.mobile).put("d", it.dev).put("f", it.first).put("q", it.req).put("s", it.st).put("da", it.decAt).put("l", it.last).put("man", it.manual).put("fm", it.form).put("fa", it.formAt)) }
         sp(ctx).edit().putString("tr", a.toString()).apply()
     }
 
@@ -72,6 +74,15 @@ object ScrapAdmin {
         val ver = System.currentTimeMillis()
         sp(ctx).edit().putString("fmt", Scrap.formatJson(ver, list)).putLong("fver", ver).putLong("fpub", 0).apply()
         try { publishBoard(ctx, true) } catch (_: Exception) {}
+        // names / units changed or a metal removed: every finalised trader gets his form again
+        try {
+            val all = traders(ctx)
+            all.filter { !it.manual && it.form.isNotBlank() && it.st != "block" && it.st != "removed" }.forEach { r ->
+                r.form = formIds(r).filter { id -> list.any { it.id == id } }.joinToString(","); r.formAt = System.currentTimeMillis()
+                try { pushForm(ctx, r) } catch (_: Exception) {}
+            }
+            saveTraders(ctx, all)
+        } catch (_: Exception) {}
         return publishFormat(ctx)
     }
     fun publishFormat(ctx: Context): Boolean {
@@ -80,6 +91,24 @@ object ScrapAdmin {
         val ok = Scrap.postSealed(Scrap.FORMAT, j)
         if (ok) sp(ctx).edit().putLong("fpub", System.currentTimeMillis()).apply()
         return ok
+    }
+
+    // ---------- one form per trader (which metals he fills) ----------
+    fun formIds(t: TraderRec) = t.form.split(",").filter { it.isNotBlank() }
+    fun formMetals(ctx: Context, t: TraderRec): List<Metal> { val ids = formIds(t).toSet(); return format(ctx).filter { it.id in ids } }
+
+    /** the admin finalised this trader's form: it is sent to his app (only then he sees the tiles) */
+    fun setForm(ctx: Context, t: TraderRec, ids: Collection<String>): Boolean {
+        val all = traders(ctx); val r = all.firstOrNull { it.key == t.key } ?: return false
+        val order = format(ctx).map { it.id }
+        r.form = order.filter { it in ids }.joinToString(","); r.formAt = System.currentTimeMillis()
+        saveTraders(ctx, all)
+        return pushForm(ctx, r)
+    }
+    fun pushForm(ctx: Context, t: TraderRec): Boolean {
+        if (t.manual || t.mobile.length != 10 || t.dev.isBlank() || t.form.isBlank()) return true
+        val a = JSONArray(); formMetals(ctx, t).forEach { a.put(JSONObject().put("id", it.id).put("gu", it.gu).put("hi", it.hi).put("en", it.en).put("u", it.unit)) }
+        return Relay.post(Scrap.userTopic(t.mobile, t.dev), JSONObject().put("form", a).put("fv", t.formAt).put("rt", t.req))
     }
 
     // ---------- collect from the relay ----------
@@ -227,6 +256,12 @@ object ScrapAdmin {
         if (now - sp(ctx).getLong("bpub", 0) > 6L * 3600_000L) {
             traders(ctx).filter { it.st == "block" && now - it.decAt < Scrap.KEEP_DAYS * 86_400_000L }.forEach { try { sendBlock(it.mobile, it.dev) } catch (_: Exception) {} }
             sp(ctx).edit().putLong("bpub", now).apply()
+        }
+        if (now - sp(ctx).getLong("fmpub", 0) > 6L * 3600_000L) {
+            // the relay forgets after 12 h: a trader who has not sent any rate yet may not have got his form
+            traders(ctx).filter { !it.manual && it.form.isNotBlank() && it.last == 0L && it.st in listOf("otp", "active") && now - it.formAt < 7 * 86_400_000L }
+                .forEach { try { pushForm(ctx, it) } catch (_: Exception) {} }
+            sp(ctx).edit().putLong("fmpub", now).apply()
         }
         val pend = traders(ctx).filter { it.st == "pending" }
         val seen = sp(ctx).getString("seenP", "").orEmpty().split(",").toSet()

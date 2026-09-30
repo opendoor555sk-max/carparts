@@ -2733,10 +2733,15 @@ class MainActivity : Activity() {
             }
             c.addView(small("👤 " + t.name, INK).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD })
             c.addView(small("📞 " + t.mobile.ifBlank { "—" } + "     ● " + label, col).apply { typeface = Typeface.DEFAULT_BOLD })
+            if (!t.manual && t.st != "block") {
+                val fc = ScrapAdmin.formIds(t).size
+                c.addView(small("🧩 " + L.t("sc_form") + ": " + (if (fc > 0) "$fc " + L.t("sc_form_done") + " ✓" else L.t("sc_form_pend")), if (fc > 0) GREEN else 0xFFEF6C00.toInt()).apply { typeface = Typeface.DEFAULT_BOLD })
+            }
             c.addView(small(L.t("sc_registered") + ": " + Bill.dateText(t.first).substringBefore("  ") + "     " + L.t("sc_last") + ": " + (if (t.last > 0) Bill.dateText(t.last) else "—")))
             val btns = mutableListOf<Pair<View, Float>>()
             if (t.manual || t.st == "active") btns.add(pill("✍ " + L.t("sc_enter"), true, BLUE) { showScrapEntry(t) } to 1f)
-            if (!t.manual && t.st != "block" && t.st != "active") btns.add(pill("🔑 " + L.t("sc_otp_btn"), true, GREEN) { showOtp(t) } to 1f)
+            if (!t.manual && t.st != "block" && t.st != "active") btns.add(pill("✅ " + L.t("sc_otp_btn"), true, GREEN) { showOtp(t) } to 1f)
+            if (!t.manual && t.st != "block") btns.add(pill("🧩 " + L.t("sc_form"), true, 0xFF00695C.toInt()) { showScrapForm(t) } to 1f)
             if (!t.manual && t.st != "block") btns.add(pill("⛔ " + L.t("sc_block"), false, RED) {
                 AlertDialog.Builder(this).setMessage(L.t("sc_block_q")).setPositiveButton(L.t("yes")) { _, _ ->
                     Thread { val ok = try { ScrapAdmin.block(this, t) } catch (_: Exception) { false }; ui.post { if (!ok) toast("📶 " + L.t("otp_net")); showScrap() } }.start()
@@ -2810,6 +2815,33 @@ class MainActivity : Activity() {
                 pill("🗑", false, RED) { AlertDialog.Builder(this).setMessage(L.t("sc_fmt_del")).setPositiveButton(L.t("yes")) { _, _ -> save(list.filter { it.id != m.id }) }.setNegativeButton(L.t("no"), null).show() } to 1f))
             body.addView(c, cardLp())
         }
+    }
+
+    /** the admin decides which metals THIS trader fills; after Final the tiles appear in his app */
+    private fun showScrapForm(t: TraderRec) {
+        autoSave()
+        val body = setScreen("scrapform", "🧩 " + t.name, { scrapTab = "tr"; showScrap() })
+        val lg = L.lang
+        val sel = ScrapAdmin.formIds(t).toMutableSet()
+        val c = card()
+        c.addView(small(L.t("sc_form_info"), INK).apply { textSize = 13f })
+        val boxes = mutableListOf<android.widget.CheckBox>()
+        ScrapAdmin.format(this).forEach { m ->
+            boxes.add(android.widget.CheckBox(this).apply {
+                text = m.name(lg) + "   (" + m.unitText(lg) + ")"; textSize = 17f; setTextColor(INK); isChecked = m.id in sel
+                setPadding(dpi(4f), dpi(8f), dpi(4f), dpi(8f))
+                setOnCheckedChangeListener { _, on -> if (on) sel.add(m.id) else sel.remove(m.id) }
+            })
+        }
+        c.addView(row(pill(L.t("sc_form_all"), false, BLUE) { boxes.forEach { it.isChecked = true } } to 1f,
+            pill(L.t("sc_form_none"), false, MUTED) { boxes.forEach { it.isChecked = false } } to 1f))
+        boxes.forEach { c.addView(it, llp(MATCH_PARENT, WRAP_CONTENT)) }
+        body.addView(c, cardLp())
+        body.addView(bigButton("✅ " + L.t("sc_form_final"), GREEN) {
+            if (sel.isEmpty()) return@bigButton toast(L.t("sc_form_pick"))
+            Thread { val ok = try { ScrapAdmin.setForm(this, t, sel) } catch (_: Exception) { false }
+                ui.post { toast(if (ok) "✓ " + L.t("sc_form_sent") else "📶 " + L.t("otp_net")); scrapTab = "tr"; showScrap() } }.start()
+        }, llp(MATCH_PARENT, WRAP_CONTENT))
     }
 
     /** admin writes the rates of a trader who has no app (same tiles as the trader app) */

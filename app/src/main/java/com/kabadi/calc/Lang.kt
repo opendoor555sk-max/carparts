@@ -519,7 +519,7 @@ object L {
         "sc_st_manual" to arrayOf("Entered by admin", "एडमिन ने डाला", "એડમિન એ નાખ્યા"),
         "sc_registered" to arrayOf("Registered", "रजिस्टर", "નોંધણી"),
         "sc_last" to arrayOf("Last rate", "आख़िरी भाव", "છેલ્લા ભાવ"),
-        "sc_otp_btn" to arrayOf("OTP", "OTP", "OTP"),
+        "sc_otp_btn" to arrayOf("Accept / OTP", "मंज़ूर / OTP", "સ્વીકારો / OTP"),
         "sc_block" to arrayOf("Block forever", "हमेशा ब्लॉक", "કાયમી બ્લોક"),
         "sc_remove" to arrayOf("Remove", "हटाएँ", "કાઢો"),
         "sc_block_q" to arrayOf("Block this trader FOREVER? His app will stop and he cannot ask again.", "इस व्यापारी को हमेशा के लिए ब्लॉक करें? उसका ऐप बंद हो जाएगा और वह फिर रिक्वेस्ट नहीं कर सकेगा।", "આ વેપારીને કાયમ માટે બ્લોક કરવો? એની એપ બંધ થઈ જશે અને ફરી રિક્વેસ્ટ નહીં કરી શકે."),
@@ -561,6 +561,15 @@ object L {
         "off_sent" to arrayOf("Sent to all phones", "सब फोन में भेजा", "બધા ફોનમાં મોકલ્યું"),
         "off_del" to arrayOf("Remove this notice?", "यह नोटिस हटाएँ?", "આ નોટિસ કાઢવી?"),
         "off_new" to arrayOf("New", "नया", "નવું"),
+        "sc_form" to arrayOf("Form", "फॉर्म", "ફોર્મ"),
+        "sc_form_info" to arrayOf("Tick the metals THIS trader fills, then press Final. Only then the tiles appear in his app.", "इस व्यापारी के लिए धातुएँ चुनें, फिर फाइनल दबाएँ। तभी उसके ऐप में खाने दिखेंगे।", "આ વેપારી માટે ધાતુઓ પસંદ કરો, પછી ફાઇનલ દબાવો. ત્યારે જ તેની એપમાં ખાના દેખાશે."),
+        "sc_form_final" to arrayOf("Final – send form", "फाइनल – फॉर्म भेजें", "ફાઇનલ – ફોર્મ મોકલો"),
+        "sc_form_all" to arrayOf("All", "सब", "બધા"),
+        "sc_form_none" to arrayOf("None", "कोई नहीं", "કોઈ નહીં"),
+        "sc_form_pend" to arrayOf("Form not final yet", "फॉर्म अभी फाइनल नहीं", "ફોર્મ હજુ ફાઇનલ નથી"),
+        "sc_form_done" to arrayOf("metals in form", "धातु फॉर्म में", "ધાતુ ફોર્મમાં"),
+        "sc_form_sent" to arrayOf("Form sent to the trader's app", "फॉर्म व्यापारी के ऐप में भेजा", "ફોર્મ વેપારીની એપમાં મોકલ્યું"),
+        "sc_form_pick" to arrayOf("Tick at least one metal", "कम से कम एक धातु चुनें", "ઓછામાં ઓછી એક ધાતુ પસંદ કરો"),
         "made" to arrayOf("Made with Kabadi Market Hisab", "कबाड़ी मार्केट हिसाब से बना", "કબાડી માર્કેટ હિસાબથી બનાવ્યું")
     )
 
