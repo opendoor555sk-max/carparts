@@ -2596,6 +2596,192 @@ class MainActivity : Activity() {
         }
     }
 
+
+    // ================= SCRAP / METAL RATES (admin) =================
+    private var scrapTab = "board"
+    private var scrapAdd = false
+    private var scrapFmtEdit: Metal? = null
+    private var scrapFmtNew = false
+
+    private fun sendText(t: String) { try { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, t), "")) } catch (_: Exception) {} }
+    private fun decimalInput(hint: String, value: String, onChange: (String) -> Unit) = input(hint, value, true, onChange).apply {
+        inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL; textSize = 18f; gravity = Gravity.CENTER
+    }
+
+    private fun showScrap() {
+        autoSave(); editing = null; viewOnly = null
+        val body = setScreen("scrap", "📊 " + L.t("sc_title"), { showSettings() })
+        val trs = ScrapAdmin.traders(this).filter { it.st != "removed" }
+        val pend = trs.count { it.st == "pending" }
+        body.addView(row(pill("📊 " + L.t("sc_tab_board"), scrapTab == "board", BLUE) { scrapTab = "board"; showScrap() } to 1f,
+            pill("👥 " + L.t("sc_tab_tr") + " (" + trs.size + ")" + (if (pend > 0) " 🔴" + pend else ""), scrapTab == "tr", BLUE) { scrapTab = "tr"; showScrap() } to 1f,
+            pill("🧩 " + L.t("sc_tab_fmt"), scrapTab == "fmt", BLUE) { scrapTab = "fmt"; showScrap() } to 1f))
+        val st = small("", MUTED)
+        body.addView(row(st to 1f, pill("⟳ " + L.t("sh_refresh"), false, BLUE) {
+            st.text = "⏳"
+            Thread { val ch = try { ScrapAdmin.collect(this) } catch (_: Exception) { false }; ui.post { if (screen == "scrap") { if (ch) showScrap() else st.text = "✓" } } }.start()
+        } to 0f))
+        // new requests / rates come in the background: show them without pressing anything
+        Thread { val ch = try { ScrapAdmin.collect(this) } catch (_: Exception) { false }; if (ch) ui.post { if (screen == "scrap") showScrap() } }.start()
+        when (scrapTab) { "tr" -> scrapTraders(body, trs); "fmt" -> scrapFormat(body); else -> scrapBoard(body) }
+    }
+
+    private fun scrapBoard(body: LinearLayout) {
+        val fmt = ScrapAdmin.format(this); val b = ScrapAdmin.board(this); val lg = L.lang
+        val info = card()
+        info.addView(small(L.t("sc_info_board"), INK).apply { textSize = 13f })
+        info.addView(row(pill("📤 " + L.t("sc_share"), true, GREEN) { sendText(ScrapAdmin.boardText(this)) } to 1f,
+            pill("✍ " + L.t("sc_enter"), false, BLUE) { scrapTab = "tr"; scrapAdd = true; showScrap() } to 1f))
+        body.addView(info, cardLp())
+        if (b.isEmpty()) body.addView(small(L.t("sc_none_rate")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(16f), 0, dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        fmt.forEach { m ->
+            val q = Scrap.rank(m.id, b)
+            val c = card()
+            c.addView(heading("🔩 " + m.name(lg) + "  (" + m.unitText(lg) + ")"))
+            if (q.isEmpty()) c.addView(small("—"))
+            q.forEachIndexed { i, x ->
+                c.addView(small((i + 1).toString() + ".  " + Scrap.price(x.price) + "   " + x.name + (if (x.mobile.isNotBlank()) "  📞 " + x.mobile else "") + "   " + hhmm(x.at), if (i == 0) GREEN else INK)
+                    .apply { textSize = if (i == 0) 16f else 14f; if (i == 0) typeface = Typeface.DEFAULT_BOLD; setPadding(0, dpi(2f), 0, dpi(2f)) })
+            }
+            body.addView(c, cardLp())
+        }
+    }
+
+    private fun hhmm(t: Long) = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date(t))
+
+    private fun scrapTraders(body: LinearLayout, trs: List<TraderRec>) {
+        val top = card()
+        top.addView(row(pill("＋ " + L.t("sc_add_tr"), scrapAdd, 0xFF6A1B9A.toInt()) { scrapAdd = !scrapAdd; showScrap() } to 1f,
+            pill("🔗 " + L.t("sc_link"), false, BLUE) { sendText("📊 " + L.t("sc_title") + "\n" + ScrapAdmin.APP_LINK) } to 1f))
+        if (scrapAdd) {
+            var nm = ""; var mb = ""
+            top.addView(row(input(L.t("sc_tr_name"), "", false) { nm = it }.apply { textSize = 15f } to 1f))
+            top.addView(row(mobileInput(L.t("mobile"), "") { mb = it } to 1f))
+            top.addView(pill("✅ " + L.t("save"), true, GREEN) {
+                if (nm.isBlank()) return@pill toast(L.t("sc_tr_name"))
+                val r = ScrapAdmin.addManual(this, nm, mb); scrapAdd = false; showScrapEntry(r)
+            }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+        }
+        body.addView(top, cardLp())
+        if (trs.isEmpty()) body.addView(small(L.t("sc_no_tr")).apply { gravity = Gravity.CENTER; setPadding(0, dpi(16f), 0, 0) }, llp(MATCH_PARENT, WRAP_CONTENT))
+        val order = listOf("pending", "otp", "active", "block")
+        trs.sortedWith(compareBy<TraderRec> { if (it.manual) 3 else order.indexOf(it.st).let { i -> if (i < 0) 9 else i } }.thenByDescending { it.req }).forEach { t ->
+            val c = card()
+            val (label, col) = when {
+                t.manual -> L.t("sc_st_manual") to 0xFF6A1B9A.toInt()
+                t.st == "pending" -> L.t("sc_st_pending") to 0xFFEF6C00.toInt()
+                t.st == "otp" -> L.t("sc_st_otp") to BLUE
+                t.st == "block" -> L.t("sc_st_block") to RED
+                else -> L.t("sc_st_active") to GREEN
+            }
+            c.addView(small("👤 " + t.name, INK).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD })
+            c.addView(small("📞 " + t.mobile.ifBlank { "—" } + "     ● " + label, col).apply { typeface = Typeface.DEFAULT_BOLD })
+            c.addView(small(L.t("sc_registered") + ": " + Bill.dateText(t.first).substringBefore("  ") + "     " + L.t("sc_last") + ": " + (if (t.last > 0) Bill.dateText(t.last) else "—")))
+            val btns = mutableListOf<Pair<View, Float>>()
+            if (t.manual) btns.add(pill("✍ " + L.t("sc_enter"), true, BLUE) { showScrapEntry(t) } to 1f)
+            if (!t.manual && t.st != "block" && t.st != "active") btns.add(pill("🔑 " + L.t("sc_otp_btn"), true, GREEN) { showOtp(t) } to 1f)
+            if (!t.manual && t.st != "block") btns.add(pill("⛔ " + L.t("sc_block"), false, RED) {
+                AlertDialog.Builder(this).setMessage(L.t("sc_block_q")).setPositiveButton(L.t("yes")) { _, _ ->
+                    Thread { val ok = try { ScrapAdmin.block(this, t) } catch (_: Exception) { false }; ui.post { if (!ok) toast("📶 " + L.t("otp_net")); showScrap() } }.start()
+                }.setNegativeButton(L.t("no"), null).show()
+            } to 1f)
+            if (t.st != "block") btns.add(pill("🗑 " + L.t("sc_remove"), false, RED) {
+                AlertDialog.Builder(this).setMessage(L.t("sc_remove_q")).setPositiveButton(L.t("yes")) { _, _ -> ScrapAdmin.remove(this, t); showScrap() }
+                    .setNegativeButton(L.t("no"), null).show()
+            } to 1f)
+            if (btns.isNotEmpty()) c.addView(row(*btns.toTypedArray()))
+            body.addView(c, cardLp())
+        }
+    }
+
+    private fun showOtp(t: TraderRec) {
+        val otp = ScrapAdmin.giveOtp(this, t)
+        val msg = "📊 " + L.t("sc_title") + "\nOTP: " + otp + "\n" + ScrapAdmin.APP_LINK
+        AlertDialog.Builder(this).setTitle("🔑 " + L.t("sc_otp_for") + " " + t.name)
+            .setMessage(otp + "\n\n" + L.t("sc_otp_tell"))
+            .setPositiveButton("WhatsApp") { _, _ ->
+                try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/91" + t.mobile + "?text=" + Uri.encode(msg)))) } catch (_: Exception) { sendText(msg) }
+                showScrap()
+            }
+            .setNegativeButton("OK") { _, _ -> showScrap() }
+            .setOnCancelListener { showScrap() }
+            .show()
+    }
+
+    private fun scrapFormat(body: LinearLayout) {
+        val lg = L.lang
+        val list = ScrapAdmin.format(this)
+        val info = card()
+        info.addView(small(L.t("sc_fmt_info"), INK).apply { textSize = 13f })
+        info.addView(pill("＋ " + L.t("sc_fmt_add"), true, 0xFF00695C.toInt()) { scrapFmtEdit = Metal("", "", "", ""); scrapFmtNew = true; showScrap() }
+            .apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+        body.addView(info, cardLp())
+        val e = scrapFmtEdit
+        if (e != null) {
+            var gu = e.gu; var hi = e.hi; var en = e.en; var unit = e.unit
+            val f = card()
+            f.addView(heading(if (scrapFmtNew) "＋ " + L.t("sc_fmt_add") else "✎ " + e.name(lg)))
+            f.addView(row(input(L.t("sc_fmt_gu"), gu, false) { gu = it }.apply { textSize = 15f } to 1f))
+            f.addView(row(input(L.t("sc_fmt_hi"), hi, false) { hi = it }.apply { textSize = 15f } to 1f))
+            f.addView(row(input(L.t("sc_fmt_en"), en, false) { en = it }.apply { textSize = 15f } to 1f))
+            val kg = pill("₹/kg", unit == "kg", BLUE) {}; val pc = pill("₹/" + L.t("sc_unit_pc").substringAfter("₹ "), unit == "pc", BLUE) {}
+            fun paint() { kg.background = round(if (unit == "kg") BLUE else Color.WHITE, 14f, BLUE); kg.setTextColor(if (unit == "kg") Color.WHITE else BLUE)
+                pc.background = round(if (unit == "pc") BLUE else Color.WHITE, 14f, BLUE); pc.setTextColor(if (unit == "pc") Color.WHITE else BLUE) }
+            kg.text = L.t("sc_unit_kg"); pc.text = L.t("sc_unit_pc")
+            kg.setOnClickListener { unit = "kg"; paint() }; pc.setOnClickListener { unit = "pc"; paint() }; paint()
+            f.addView(row(kg to 1f, pc to 1f))
+            f.addView(row(pill("✅ " + L.t("save"), true, GREEN) {
+                if (gu.isBlank()) return@pill toast(L.t("sc_fmt_gu"))
+                val l = ScrapAdmin.format(this).toMutableList()
+                val old = l.indexOfFirst { it.id == e.id && e.id.isNotBlank() }
+                val m = Metal(if (old >= 0) e.id else Scrap.newId(), gu.trim(), hi.trim(), en.trim(), unit)
+                if (old >= 0) l[old] = m else l.add(m)
+                scrapFmtEdit = null; scrapFmtNew = false
+                Thread { val ok = try { ScrapAdmin.saveFormat(this, l) } catch (_: Exception) { false }; ui.post { toast(if (ok) "✓ " + L.t("sc_fmt_sent") else "📶 " + L.t("otp_net")); showScrap() } }.start()
+            }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) } to 1f,
+                pill("✕", false, MUTED) { scrapFmtEdit = null; scrapFmtNew = false; showScrap() } to 0f))
+            body.addView(f, cardLp())
+        }
+        list.forEachIndexed { i, m ->
+            val c = card()
+            c.addView(small("🔩 " + m.name(lg), INK).apply { textSize = 17f; typeface = Typeface.DEFAULT_BOLD })
+            c.addView(small(listOf(m.gu, m.hi, m.en).filter { it.isNotBlank() }.joinToString(" • ") + "   (" + m.unitText(lg) + ")"))
+            fun save(l: List<Metal>) { Thread { try { ScrapAdmin.saveFormat(this, l) } catch (_: Exception) {}; ui.post { showScrap() } }.start() }
+            c.addView(row(pill("✎", false, BLUE) { scrapFmtEdit = m; scrapFmtNew = false; showScrap() } to 1f,
+                pill("▲", false, BLUE) { if (i > 0) { val l = list.toMutableList(); l.add(i - 1, l.removeAt(i)); save(l) } } to 1f,
+                pill("▼", false, BLUE) { if (i < list.size - 1) { val l = list.toMutableList(); l.add(i + 1, l.removeAt(i)); save(l) } } to 1f,
+                pill("🗑", false, RED) { AlertDialog.Builder(this).setMessage(L.t("sc_fmt_del")).setPositiveButton(L.t("yes")) { _, _ -> save(list.filter { it.id != m.id }) }.setNegativeButton(L.t("no"), null).show() } to 1f))
+            body.addView(c, cardLp())
+        }
+    }
+
+    /** admin writes the rates of a trader who has no app (same tiles as the trader app) */
+    private fun showScrapEntry(t: TraderRec) {
+        autoSave()
+        val body = setScreen("scrapentry", "✍ " + t.name, { scrapTab = "board"; showScrap() })
+        val lg = L.lang
+        val cur = ScrapAdmin.aliveRates(this, t.key)
+        val vals = HashMap<String, Double>(cur)
+        body.addView(card().apply { addView(small(L.t("sc_info_board"), INK)) }, cardLp())
+        val tiles = ScrapAdmin.format(this).map { m ->
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL; background = round(Color.WHITE, 12f); setPadding(dpi(10f), dpi(8f), dpi(10f), dpi(10f)); elevation = dp(1.5f)
+                addView(small(m.name(lg), INK).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER })
+                addView(small(m.unitText(lg)).apply { gravity = Gravity.CENTER })
+                addView(decimalInput("₹", cur[m.id]?.let { plain(it) } ?: "") { s -> val v = s.toDoubleOrNull(); if (v != null && v > 0) vals[m.id] = v else vals.remove(m.id) })
+            }
+        }
+        tiles.chunked(2).forEach { r ->
+            val row = LinearLayout(this)
+            r.forEach { row.addView(it, llp(0, WRAP_CONTENT, 1f).apply { setMargins(dpi(4f), dpi(4f), dpi(4f), dpi(4f)) }) }
+            if (r.size == 1) row.addView(View(this), llp(0, 1, 1f))
+            body.addView(row, llp(MATCH_PARENT, WRAP_CONTENT))
+        }
+        body.addView(bigButton("✅ " + L.t("save"), GREEN) {
+            ScrapAdmin.saveManual(this, t, vals.toMap()); toast("✓ " + L.t("sc_rates_saved")); scrapTab = "board"; showScrap()
+        }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(8f) })
+    }
+
     // ================= LINKED: lines of other people's hisab where this phone is buyer / seller / service =================
     private fun showLinked() {
         autoSave(); editing = null; viewOnly = null
@@ -3110,6 +3296,7 @@ class MainActivity : Activity() {
                 ad.addView(heading("👑 Admin ✓ (AbdulSalam)"))
                 ad.addView(pill("👑 " + L.t("adm_users_btn"), true, 0xFF6A1B9A.toInt()) { showAdmin() }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT))
                 ad.addView(pill("🏪 " + L.t("shops_t"), true, 0xFF00695C.toInt()) { showShops() }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
+                ad.addView(pill("📊 " + L.t("sc_title"), true, 0xFF283593.toInt()) { scrapTab = "board"; showScrap() }.apply { textSize = 15f; setPadding(dpi(8f), dpi(10f), dpi(8f), dpi(10f)) }, llp(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dpi(6f) })
             } else {
                 ad.addView(heading("👑 Admin login"))
                 ad.addView(small("Fakt malik (AbdulSalam) mate – code nakho.").apply { setPadding(0, 0, 0, dpi(8f)) })
