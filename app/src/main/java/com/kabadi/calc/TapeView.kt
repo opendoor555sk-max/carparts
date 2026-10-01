@@ -364,7 +364,7 @@ class TapeView(private val act: Activity) {
                 when (code) {
                     SpeechRecognizer.ERROR_SPEECH_TIMEOUT, SpeechRecognizer.ERROR_NO_MATCH -> {
                         misses++
-                        if (misses >= 3) { stopListening(); toast(tr("Nothing heard. Tap 🎤 to try again", "कुछ सुनाई नहीं दिया। फिर 🎤 दबाइए", "કંઈ સંભળાયું નહીં. ફરી 🎤 દબાવો")) } else again(250)
+                        if (misses >= 4) { stopListening(); toast(tr("Nothing heard. Tap 🎤 to try again", "कुछ सुनाई नहीं दिया। फिर 🎤 दबाइए", "કંઈ સંભળાયું નહીં. ફરી 🎤 દબાવો")) } else again(250)
                     }
                     SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> again(800)
                     SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> { stopListening(); act.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 52) }
