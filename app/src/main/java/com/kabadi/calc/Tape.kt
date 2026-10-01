@@ -67,7 +67,8 @@ object TapeMath {
             st.last().pend = if (l.op == '=') ' ' else l.op
         }
         while (st.size > 1) if (!pop()) return null
-        return st[0].acc
+        // 1 ÷ 3 × 3 shows 1, not 0.99999…: the answer is rounded to 20 significant digits
+        return st[0].acc?.round(java.math.MathContext(20))
     }
 
     /** a value as text: [places] decimals (-1 = floating) and the chosen grouping style */
