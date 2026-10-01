@@ -27,7 +27,9 @@ jobs:
         run: |
           set -o pipefail
           gradle testReleaseUnitTest assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log || {
-            grep -E "^e: |FAILED|AssertionError" build.log | head -20 | while read -r l; do echo "::error::$l"; done; exit 1; }
+            grep -E "^e: |FAILED|AssertionError" build.log | head -20 | while read -r l; do echo "::error::$l"; done
+            echo "::error::DETAIL $(grep -E "^e: |Could not|What went wrong|error:|Unresolved|Exception" -A3 build.log | head -60 | tr '\n' '|' | cut -c1-6000)"
+            exit 1; }
 
       - name: Rename APK
         run: |
