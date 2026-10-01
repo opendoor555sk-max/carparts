@@ -134,7 +134,7 @@ object TapeSpeech {
     private val allWords = hashSetOf("બધું", "બધુ", "બધા", "सब", "सभी", "सारा", "all", "everything")
     private val clearWords = hashSetOf("clear", "ક્લિયર", "क्लियर", "સાફ", "साफ")
     private val cmdModifiers = hashSetOf("ઉપરનું", "ઉપરની", "ઉપર", "છેલ્લું", "છેલ્લી", "ખોટું", "ખોટી", "લખેલું", "લખેલી", "લખેલ", "પહેલાનું", "આ", "એ", "તે", "લાઇન", "નાખો", "નાંખો",
-        "ऊपर", "ऊपरवाला", "आखिरी", "पिछला", "गलत", "लिखा", "लाइन", "डालो", "line", "last", "above", "wrong", "this", "the", "one", "it", "please", "all")
+        "ऊपर", "ऊपरवाला", "वाला", "वाली", "आखिरी", "पिछला", "गलत", "लिखा", "लाइन", "डालो", "line", "last", "above", "wrong", "this", "the", "one", "it", "please", "all")
 
     /** [before] / [after] are what was said before and after the command word (amounts to write); clearAll wipes the paper */
     class Command(val clearAll: Boolean, val before: String, val after: String)
@@ -146,7 +146,7 @@ object TapeSpeech {
         if (di < 0) return null
         if (lows.any { it in allWords }) return Command(true, "", "")
         if (lows[di] in clearWords) return null
-        fun keep(r: List<String>) = r.filter { it.lowercase() !in cmdModifiers }.joinToString(" ")
+        fun keep(r: List<String>) = r.filter { it.lowercase() !in cmdModifiers && it.lowercase() !in fillers }.joinToString(" ")
         return Command(false, keep(toks.subList(0, di)), keep(toks.subList(di + 1, toks.size)))
     }
 

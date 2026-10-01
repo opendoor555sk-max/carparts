@@ -210,6 +210,9 @@ class TapeCalc(val set: TapeSettings) {
         lines.removeAt(i); closed = false
         var depth = 0
         for (l in lines) { depth += l.open; val c = minOf(l.close, depth); l.close = c; depth -= c }
+        // a bracket opened by the deleted line's partner: take the unmatched openings off, the rightmost first
+        var li = lines.size - 1
+        while (depth > 0 && li >= 0) { val l = lines[li]; if (l.open > 0) { l.open--; depth-- } else li-- }
     }
 
     fun ac() {

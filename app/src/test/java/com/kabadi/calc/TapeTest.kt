@@ -273,6 +273,7 @@ class TapeTest {
         c.removeAt(2)                              // the "3000 )" line is gone, "(" must not stay
         assertEquals(2, c.lines.size)
         assertEquals(bd("800"), c.total())
+        assertEquals(0, c.lines.sumOf { it.open - it.close })
         assertFalse(c.closed)
     }
 }

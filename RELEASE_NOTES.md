@@ -1,3 +1,5 @@
+BOLVU: 'uparnu radd karo', 'khotu lakhelu hatavo', 'cancel', 'delete' bolo to chhellu line nikde; 'badhu radd' bole to kagal saf (history ma rahe).
+
 BOLVU FIX: '500 ocha karo (rafikbhai na)' have 500 -500 tarike lakhay ane total ma ghate (pehla ghatatu nahotu); 'karod' khoto shabd ignore.
 
 BOLVU: '500 ocha karo' tema 500 ghate; x ane ÷ pehla thay (300 + 800 x 2 = 1900); Hindi/Gujarati sankhya shabd (pachchis, bas so, dodh hajar) samjay; bija bhasha na shabd pan.
