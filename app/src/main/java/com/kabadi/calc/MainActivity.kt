@@ -712,6 +712,7 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        tapeView?.stopListening()
         if (Store.hisabs.any { it.type == "haraji" }) Thread { try { Shops.syncUse(this) } catch (_: Exception) {} }.start()
         Live.onNew = null
         if (rec != null || player != null) { stopAudio(); if (screen == "feedback") showFeedback() }
@@ -759,6 +760,7 @@ class MainActivity : Activity() {
     }
 
     private fun setScreen(name: String, title: String, back: (() -> Unit)?): LinearLayout {
+        tapeView?.release(); tapeView = null
         gen++
         stopAudio()
         screen = name
@@ -3431,12 +3433,14 @@ class MainActivity : Activity() {
 
     override fun onRequestPermissionsResult(req: Int, perms: Array<out String>, res: IntArray) {
         super.onRequestPermissionsResult(req, perms, res)
+        if (req == 52) { tapeView?.onPermission(res.firstOrNull() == PackageManager.PERMISSION_GRANTED); return }
         if (req == 41 && res.firstOrNull() == PackageManager.PERMISSION_GRANTED) { Reminders.setAutoSms(this, true); if (screen == "settings") showSettings() }
     }
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(req: Int, res: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(req, res, data)
+        if (req == 61) { tapeView?.onVoiceResult(if (res == RESULT_OK) data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS) else null); return }
         if (req == 31 && res == RESULT_OK) {
             val cb = contactCb; contactCb = null
             try {
@@ -3603,51 +3607,16 @@ class MainActivity : Activity() {
     }
 
     // ================= SIMPLE CALCULATOR =================
+    private var tapeView: TapeView? = null
+
+    /** Tape calculator: blank paper, speak the calculation (see TapeView) */
     private fun showCalc() {
         val from = editing.takeIf { viewOnly == null }; if (viewOnly != null) { viewOnly = null; editing = null }
         autoSave()
-        val body = setScreen("calc", L.t("calc"), { if (from != null) showEditor(from) else showHome() })
-        var expr = ""
-        val exprTv = TextView(this).apply { textSize = 22f; setTextColor(MUTED); gravity = Gravity.END; minHeight = dpi(36f) }
-        val resTv = TextView(this).apply { textSize = 40f; setTextColor(INK); gravity = Gravity.END; typeface = Typeface.DEFAULT_BOLD }
-        val disp = card()
-        disp.addView(exprTv, llp(MATCH_PARENT, WRAP_CONTENT))
-        disp.addView(resTv, llp(MATCH_PARENT, WRAP_CONTENT))
-        body.addView(disp, cardLp())
-        fun show() {
-            exprTv.text = expr
-            val v = evalExpr(expr)
-            resTv.text = if (expr.isEmpty()) "0" else if (v.isFinite()) group(plain(v).substringBefore('.')) + (plain(v).substringAfter('.', "").let { if (it.isEmpty()) "" else ".$it" }) else "…"
-        }
-        val keys = listOf(
-            listOf("C", "⌫", "%", "÷"), listOf("7", "8", "9", "×"), listOf("4", "5", "6", "−"),
-            listOf("1", "2", "3", "+"), listOf("(", "0", ".", "=")
-        )
-        keys.forEach { row ->
-            val r = LinearLayout(this)
-            row.forEach { k ->
-                val op = k in listOf("÷", "×", "−", "+", "=", "%")
-                r.addView(TextView(this).apply {
-                    text = k; textSize = 26f; gravity = Gravity.CENTER
-                    setTextColor(if (op || k == "C" || k == "⌫") Color.WHITE else INK)
-                    background = round(when { k == "=" -> GREEN; op -> BLUE; k == "C" || k == "⌫" -> RED; else -> Color.WHITE }, 14f)
-                    elevation = dp(1f)
-                    setPadding(0, dpi(16f), 0, dpi(16f))
-                    setOnClickListener {
-                        when (k) {
-                            "C" -> expr = ""
-                            "⌫" -> expr = expr.dropLast(1)
-                            "=" -> { val v = evalExpr(expr); if (v.isFinite()) expr = plain(v) }
-                            "(" -> expr += if (expr.count { it == '(' } > expr.count { it == ')' } && expr.isNotEmpty() && (expr.last().isDigit() || expr.last() == ')')) ")" else "("
-                            else -> expr += k
-                        }
-                        show()
-                    }
-                }, llp(0, WRAP_CONTENT, 1f).apply { setMargins(dpi(4f), dpi(4f), dpi(4f), dpi(4f)) })
-            }
-            body.addView(r, llp(MATCH_PARENT, WRAP_CONTENT))
-        }
-        body.addView(small("( ) : " + L.t("tip")).apply { setPadding(dpi(6f), dpi(8f), 0, 0) })
-        show()
+        setScreen("calc", L.t("calc"), { if (from != null) showEditor(from) else showHome() })
+        content.removeAllViews()
+        val tv = TapeView(this)
+        tapeView = tv
+        content.addView(tv.root, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
     }
 }
