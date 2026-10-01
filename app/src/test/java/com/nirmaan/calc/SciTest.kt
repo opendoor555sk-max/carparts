@@ -64,6 +64,18 @@ class SciTest {
         assertEquals(7.0, SciMath.run("X=7", env).q.re, 0.0)
     }
 
+    @Test fun newKeys() {
+        assertEquals(128.0, v("2⁷"), 0.0)
+        assertEquals(1e-3, v("10⁻³"), 1e-15)
+        assertEquals(20.0, v("[2+3]×4"), 0.0)
+        assertEquals(1618.7425856, v("1 [vigha (Gujarat)] → m²"), 1e-6)
+        val p = SciMath.run("2∠90", env).q
+        assertEquals(0.0, p.re, 0.0); assertEquals(2.0, p.im, 1e-12)
+        assertEquals("x", SciMath.run("3x + 1 = 7", env).assign)
+        assertEquals(2.0, SciMath.run("3x + 1 = 7", env).q.re, 1e-9)
+        assertEquals(15.0, v("X³ ÷ 25 × 3"), 1e-9)
+    }
+
     @Test fun formats() {
         val o = SciOpts()
         assertEquals("3/4", SciFmt.exact(0.75))

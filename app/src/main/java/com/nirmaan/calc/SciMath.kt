@@ -130,6 +130,7 @@ object SciMath {
         return div(csin(z), ccos(z))
     }
     private fun snap(v: Double) = if (abs(v) < 1e-15) 0.0 else v
+    private fun snapC(v: Double) = if (abs(v) < 1e-14) 0.0 else v
     private val I1 = c(0.0, 1.0)
     fun casin(z: SQ): SQ {
         if (z.im == 0.0 && abs(z.re) <= 1) return c(Math.asin(z.re))
@@ -199,7 +200,9 @@ object SciMath {
 
     val FUNCS = setOf("sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "ln", "log", "exp",
         "sqrt", "cbrt", "abs", "Re", "Im", "arg", "conj", "floor", "ceil", "round", "int", "der", "sum", "prod")
-    private val NAMES = setOf("e", "i", "pi", "Ans", "X", "Y", "Z")
+    private val NAMES = setOf("e", "i", "pi", "Ans", "X", "Y", "Z", "x", "y", "z")
+    private const val SUPD = "⁻⁰¹²³⁴⁵⁶⁷⁸⁹"
+    val VARS = listOf("X", "Y", "Z", "x", "y", "z")
 
     private fun lex(src: String, comma: Boolean): List<Tok> {
         val out = ArrayList<Tok>()
@@ -230,8 +233,15 @@ object SciMath {
                 '×', '*', '·' -> { out.add(Tok(OP, "*")); i++; continue }
                 '÷', '/' -> { out.add(Tok(OP, "/")); i++; continue }
                 '^' -> { out.add(Tok(OP, "^")); i++; continue }
-                '²' -> { out.add(Tok(OP, "^")); out.add(Tok(NUM, "2", 2.0)); i++; continue }
-                '³' -> { out.add(Tok(OP, "^")); out.add(Tok(NUM, "3", 3.0)); i++; continue }
+                '⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹', '⁻' -> {
+                    // x⁷, 10⁻³ : superscript power
+                    var j = i; val sb = StringBuilder()
+                    while (j < s.length && SUPD.indexOf(s[j]) >= 0) { sb.append("-0123456789"[SUPD.indexOf(s[j])]); j++ }
+                    val v = sb.toString().toDoubleOrNull() ?: throw SciErr("syntax", s.substring(i, j))
+                    out.add(Tok(OP, "^")); out.add(Tok(NUM, sb.toString(), v)); i = j; continue
+                }
+                '∠' -> { out.add(Tok(OP, "∠")); i++; continue }
+                ']' -> { out.add(Tok(OP, ")")); i++; continue }
                 '(', ')', '%', '!', '=' -> { out.add(Tok(OP, ch.toString())); i++; continue }
                 ',', ';' -> { out.add(Tok(OP, ",")); i++; continue }
                 '→' -> { out.add(Tok(OP, "→")); i++; continue }
@@ -243,11 +253,12 @@ object SciMath {
                 'Σ' -> { out.add(Tok(FUNC, "sum")); i++; continue }
                 'Π' -> { out.add(Tok(FUNC, "prod")); i++; continue }
                 '[' -> {
+                    // [vigha (Gujarat)] = a unit by name; otherwise [ ] work like ( )
                     val e = s.indexOf(']', i)
-                    if (e < 0) throw SciErr("unknown", s.substring(i))
-                    val name = s.substring(i + 1, e)
-                    out.add(Tok(UNIT, name, u = unitByName(name) ?: throw SciErr("unknown", name)))
-                    i = e + 1; continue
+                    val name = if (e > i) s.substring(i + 1, e) else ""
+                    val u = if (name.isNotBlank() && name.none { it.isDigit() }) unitByName(name) else null
+                    if (u != null) { out.add(Tok(UNIT, name, u = u)); i = e + 1 } else { out.add(Tok(OP, "(")); i++ }
+                    continue
                 }
             }
             if (ch.isLetter()) {
@@ -334,7 +345,7 @@ object SciMath {
         fun term(): Nd {
             var a = unary()
             while (true) {
-                if (isOp("*") || isOp("/")) {
+                if (isOp("*") || isOp("/") || isOp("∠")) {
                     val op = take().s[0]
                     a = NBin(op, a, unary())
                 } else if (startsFactor(peek())) {
@@ -473,6 +484,11 @@ object SciMath {
                     if (n.op == '+') add(a, b) else sub(a, b)
                 }
                 '*' -> mul(a, ev(n.b, env, loc))
+                '∠' -> {
+                    // r∠θ = r·(cos θ + i sin θ), θ in the angle mode
+                    val th = toRad(ev(n.b, env, loc), env.angle)
+                    mul(a, SQ(snapC(cos(th.re)), snapC(sin(th.re))))
+                }
                 '/' -> div(a, ev(n.b, env, loc))
                 '^' -> powQ(a, ev(n.b, env, loc))
                 else -> throw SciErr("syntax")
@@ -638,11 +654,11 @@ object SciMath {
             return Out(q, pick(q.d, p.hints, p.target))
         }
         val lv = p.lhs
-        if (lv is NVar && lv.n in setOf("X", "Y", "Z") && !has(rhs, lv.n)) {
+        if (lv is NVar && lv.n in VARS && !has(rhs, lv.n)) {
             val q = ev(rhs, env)
             return Out(q, pick(q.d, p.hints, p.target), lv.n)
         }
-        val v = listOf("X", "Y", "Z").firstOrNull { has(p.lhs, it) || has(rhs, it) }
+        val v = VARS.firstOrNull { has(p.lhs, it) || has(rhs, it) }
         if (v == null) {
             val a = ev(p.lhs, env); val b = ev(rhs, env)
             if (a.d != b.d) return Out(a, null, truth = false)

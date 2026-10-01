@@ -29,6 +29,9 @@ class SciOpts {
     var vibrate = false
     var prefixDen = false // "Allow prefix in denominator": km/ms style labels allowed
     var interval = 0      // 0 concise, 1 plus-minus
+    var complex = false   // the "Real ▲▼" key: Real or Complex answers
+    var prefixIdx = 0     // which prefix the "Kilo ▲▼" key shows
+    var unitIdx = 0       // which unit the "Meter ▲▼" key shows
 
     val mulSign get() = when (mul) { 1 -> "·"; 2 -> "*"; else -> "×" }
     val divSign get() = if (div == 1) "/" else "÷"

@@ -14,6 +14,7 @@ object SciStore {
             keep = sp.getBoolean("keep", true); negExp = sp.getBoolean("negExp", true); abbrev = sp.getBoolean("abbrev", true)
             spacious = sp.getBoolean("spacious", true); isolate = sp.getBoolean("isolate", true); vibrate = sp.getBoolean("vibrate", false)
             prefixDen = sp.getBoolean("prefixDen", false); interval = sp.getInt("interval", 0)
+            complex = sp.getBoolean("complex", false); prefixIdx = sp.getInt("prefixIdx", 0); unitIdx = sp.getInt("unitIdx", 0)
         }
     }
 
@@ -25,6 +26,7 @@ object SciStore {
             .putBoolean("keep", o.keep).putBoolean("negExp", o.negExp).putBoolean("abbrev", o.abbrev)
             .putBoolean("spacious", o.spacious).putBoolean("isolate", o.isolate).putBoolean("vibrate", o.vibrate)
             .putBoolean("prefixDen", o.prefixDen).putInt("interval", o.interval)
+            .putBoolean("complex", o.complex).putInt("prefixIdx", o.prefixIdx).putInt("unitIdx", o.unitIdx)
             .apply()
     }
 }

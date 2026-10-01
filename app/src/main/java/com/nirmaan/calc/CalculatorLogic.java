@@ -25,6 +25,11 @@ public final class CalculatorLogic {
         try {
             SciMath.Out out = SciMath.INSTANCE.run(expr, new SciMath.Env(vars, o.getAngle(), ans), o.getComma());
             if (out.getTruth() != null) { r.truth = out.getTruth(); return r; }
+            if (!o.getComplex() && out.getQ().getIm() != 0.0) {
+                r.error = true;
+                r.info = t(o, "Complex answer — set Real ▲▼ to Complex", "जवाब कॉम्प्लेक्स है — Real ▲▼ को Complex करो", "જવાબ કૉમ્પ્લેક્સ છે — Real ▲▼ ને Complex કરો");
+                return r;
+            }
             ans = out.getQ();
             ansUnit = out.getUnit();
             r.assign = out.getAssign();
@@ -54,6 +59,15 @@ public final class CalculatorLogic {
         return r;
     }
 
+    /** live answer while typing: works on a copy, so Ans and X Y Z do not change */
+    public Result peek(String expr, SciOpts o) {
+        CalculatorLogic tmp = new CalculatorLogic();
+        tmp.vars.putAll(vars);
+        tmp.ans = ans;
+        tmp.ansUnit = ansUnit;
+        return tmp.eval(expr, o);
+    }
+
     /** the same answer again in new settings (DEG/RAD, decimals, EXACT …) */
     public SciFmt.Shown showAns(SciOpts o) {
         return ans == null ? null : SciFmt.INSTANCE.show(ans, ansUnit, o);
@@ -70,7 +84,7 @@ public final class CalculatorLogic {
             case "domain": return t(o, "Cannot be worked out: " + a, "यह हिसाब नहीं हो सकता: " + a, "આ હિસાબ થઈ શકે નહીં: " + a);
             case "args": return t(o, "Write: ∫(f, a, b)  d/dx(f, a)  Σ(f, a, b)", "ऐसे लिखो: ∫(f, a, b)  d/dx(f, a)  Σ(f, a, b)", "આમ લખો: ∫(f, a, b)  d/dx(f, a)  Σ(f, a, b)");
             case "noroot": return t(o, "No answer found for " + a, a + " का जवाब नहीं मिला", a + " નો જવાબ મળ્યો નહીં");
-            case "nounit": return t(o, "Pick a unit after _", "_ के बाद यूनिट चुनो", "_ પછી યુનિટ પસંદ કરો");
+            case "nounit": return t(o, "Pick a unit after →", "→ के बाद यूनिट चुनो", "→ પછી યુનિટ પસંદ કરો");
             case "incomplete": return t(o, "Incomplete", "अधूरा है", "અધૂરું છે");
             case "big": return t(o, "Range too big", "रेंज बहुत बड़ी है", "રેન્જ બહુ મોટી છે");
             default: return e.getCode();
