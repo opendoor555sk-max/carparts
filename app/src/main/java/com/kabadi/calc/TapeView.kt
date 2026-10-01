@@ -327,6 +327,9 @@ class TapeView(private val act: Activity) {
     private var lastRaw = ""
     private var carryAt = 0L
     private var helpShown = false
+    /** ask the phone for its offline language pack only after the internet failed (asking for it first fails on some phones) */
+    private var offlineFirst = false
+    private var triedOther = false
 
     private fun muteBeep(on: Boolean) {
         try {
@@ -343,7 +346,7 @@ class TapeView(private val act: Activity) {
             act.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 52); return
         }
         if (!SpeechRecognizer.isRecognitionAvailable(act)) return fallbackDialog()
-        listening = true; hardErrors = 0; hardSince = 0; lastActive = System.currentTimeMillis(); lastPartial = ""
+        listening = true; offlineFirst = false; triedOther = false; hardErrors = 0; hardSince = 0; lastActive = System.currentTimeMillis(); lastPartial = ""
         muteBeep(true); root.keepScreenOn = true
         updateMic(); newRecognizer(); listenOnce()
     }
@@ -390,7 +393,7 @@ class TapeView(private val act: Activity) {
                 partial = ""
                 val t = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: lastPartial
                 lastPartial = ""
-                if (!t.isNullOrBlank()) { lastActive = System.currentTimeMillis(); hardErrors = 0; heard(t) } else refresh()
+                if (!t.isNullOrBlank()) { lastActive = System.currentTimeMillis(); hardErrors = 0; triedOther = false; heard(t) } else refresh()
                 again(60)
             }
             override fun onError(code: Int) {
@@ -412,8 +415,11 @@ class TapeView(private val act: Activity) {
                         if (hardErrors > 6) { stopListening(); fallbackDialog() } else { newRecognizerLater(400L * hardErrors) }
                     }
                     SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> { stopListening(); act.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 52) }
-                    // no internet and no offline language pack on the phone
-                    else -> { stopListening(); offlineHelp() }
+                    // internet or language problem: try the other way once (online <-> offline pack), then explain with the code
+                    else -> {
+                        if (!triedOther) { triedOther = true; offlineFirst = !offlineFirst; newRecognizerLater(300) }
+                        else { stopListening(); offlineHelp(code) }
+                    }
                 }
             }
         })
@@ -431,7 +437,7 @@ class TapeView(private val act: Activity) {
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, vCodes[vLang])
             .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, offlineFirst)
             .putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, act.packageName)
             // wait longer for a pause before closing the sentence
             .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
@@ -462,12 +468,12 @@ class TapeView(private val act: Activity) {
         refresh()
     }
 
-    private fun offlineHelp() {
+    private fun offlineHelp(code: Int = 0) {
         val msg = tr(
             "Voice needs internet, or the offline language pack. To talk without internet, download it once:\n\nPhone Settings → Google → Settings for Google apps → Search, Assistant & Voice → Voice → Offline speech recognition → download English, Hindi and Gujarati.\n\n(Names differ a little on each phone.)",
             "आवाज़ के लिए इंटरनेट चाहिए, या ऑफ़लाइन भाषा पैक। बिना इंटरनेट बोलने के लिए एक बार डाउनलोड करें:\n\nफ़ोन Settings → Google → Google apps के लिए सेटिंग → Search, Assistant और Voice → Voice → Offline speech recognition → English, हिन्दी, ગુજરાતી डाउनलोड करें।\n\n(हर फ़ोन में नाम थोड़े अलग हो सकते हैं।)",
             "અવાજ માટે ઇન્ટરનેટ જોઈએ, અથવા ઑફલાઇન ભાષા પેક. ઇન્ટરનેટ વગર બોલવા માટે એક વાર download કરો:\n\nફોન Settings → Google → Settings for Google apps → Search, Assistant & Voice → Voice → Offline speech recognition → English, हिन्दी, ગુજરાતી download કરો.\n\n(દરેક ફોનમાં નામ થોડાં જુદાં હોઈ શકે.)")
-        AlertDialog.Builder(act).setTitle("🎤").setMessage(msg)
+        AlertDialog.Builder(act).setTitle(if (code != 0) "🎤 (error $code)" else "🎤").setMessage(msg)
             .setPositiveButton(tr("Open voice settings", "वॉइस सेटिंग खोलें", "વૉઇસ સેટિંગ ખોલો")) { _, _ ->
                 try { act.startActivity(Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)) } catch (_: Exception) { toast("✕") }
             }
