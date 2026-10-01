@@ -26,7 +26,9 @@ class SciOpts {
     var abbrev = true     // m (on) or metre (off)
     var spacious = true   // 2 + 3 (on) or 2+3 (off)
     var isolate = true    // unit in its own colour
-    var vibrate = true
+    var vibrate = false
+    var prefixDen = false // "Allow prefix in denominator": km/ms style labels allowed
+    var interval = 0      // 0 concise, 1 plus-minus
 
     val mulSign get() = when (mul) { 1 -> "·"; 2 -> "*"; else -> "×" }
     val divSign get() = if (div == 1) "/" else "÷"

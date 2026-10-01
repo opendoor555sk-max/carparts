@@ -158,7 +158,7 @@ class MainActivity : Activity(), Ui {
         }
         val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         top.addView(circleIcon("i") { help() })
-        top.addView(circleIcon("ƒ") { startActivity(android.content.Intent(this, SciActivity::class.java)) }.apply {
+        top.addView(circleIcon("ƒ") { startActivity(android.content.Intent(this, ScientificActivity::class.java)) }.apply {
             (layoutParams as LinearLayout.LayoutParams).leftMargin = dpi(6f) })
         top.addView(circleIcon("🌍") { startActivity(android.content.Intent(this, UnitsActivity::class.java)) }.apply {
             textSize = 15f; (layoutParams as LinearLayout.LayoutParams).leftMargin = dpi(6f) })

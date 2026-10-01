@@ -29,13 +29,13 @@
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:windowSoftInputMode="adjustResize" />
         <activity
-            android:name=".SciActivity"
+            android:name=".ScientificActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:windowSoftInputMode="stateAlwaysHidden" />
         <activity
-            android:name=".SciSettingsActivity"
+            android:name=".SettingsActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
     </application>
