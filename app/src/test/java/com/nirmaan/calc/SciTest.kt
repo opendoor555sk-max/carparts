@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SciTest {
-    private val env = SciMath.Env(mapOf("X" to Q(5.0)), 0, Q(10.0))
+    private val env = SciMath.Env(mapOf("X" to SQ(5.0)), 0, SQ(10.0))
     private fun v(s: String): Double { val r = SciMath.run(s, env); return r.unit?.fromBase(r.q.re) ?: r.q.re }
     private fun u(s: String) = SciMath.run(s, env).unit?.sym
     private fun err(s: String) = try { SciMath.run(s, env); "" } catch (e: SciErr) { e.code }

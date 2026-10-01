@@ -47,8 +47,8 @@ class SciActivity : Activity() {
     }
 
     private lateinit var o: SciOpts
-    private val vars = HashMap<String, Q>()
-    private var ans: Q? = null
+    private val vars = HashMap<String, SQ>()
+    private var ans: SQ? = null
     private var ansUnit: UDef? = null
     private var justEval = false
     private var settingText = false
@@ -570,9 +570,9 @@ class SciActivity : Activity() {
 
     private fun loadState() {
         val sp = getSharedPreferences("sci", Context.MODE_PRIVATE)
-        ans = Q.parse(sp.getString("ans", null))
+        ans = SQ.parse(sp.getString("ans", null))
         ansUnit = sp.getString("ansUnit", null)?.let { Units.byId(it) }
-        for (v in listOf("X", "Y", "Z")) Q.parse(sp.getString("var$v", null))?.let { vars[v] = it }
+        for (v in listOf("X", "Y", "Z")) SQ.parse(sp.getString("var$v", null))?.let { vars[v] = it }
     }
 
     private fun saveState() {

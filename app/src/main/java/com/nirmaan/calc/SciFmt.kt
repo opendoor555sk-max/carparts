@@ -179,7 +179,7 @@ object SciFmt {
     class Shown(val num: String, val unit: String, val approx: String?)
 
     /** the answer as text: number part, unit part, and "≈ 0.75" when the number is shown as 3/4 */
-    fun show(q: Q, unit: UDef?, o: SciOpts): Shown {
+    fun show(q: SQ, unit: UDef?, o: SciOpts): Shown {
         var re = q.re; var im = q.im
         var ul = ""
         if (unit != null) {
@@ -206,7 +206,7 @@ object SciFmt {
     }
 
     /** the answer as text that can be typed back: "3+4i", "12.5 ft" */
-    fun rawOf(q: Q, unit: UDef?, o: SciOpts): String {
+    fun rawOf(q: SQ, unit: UDef?, o: SciOpts): String {
         val re = unit?.fromBase(q.re) ?: q.re
         val im = if (unit != null && unit.off == 0.0 && !unit.inv) q.im / unit.k else if (unit == null) q.im else 0.0
         var s = raw(re, o)

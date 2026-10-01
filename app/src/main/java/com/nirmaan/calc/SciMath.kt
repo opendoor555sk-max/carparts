@@ -64,46 +64,46 @@ class Dim private constructor(val e: IntArray) {
 }
 
 /** a value: complex number + dimension (stored in SI base units) */
-class Q(val re: Double, val im: Double = 0.0, val d: Dim = Dim.NONE) {
+class SQ(val re: Double, val im: Double = 0.0, val d: Dim = Dim.NONE) {
     val isReal get() = im == 0.0
-    fun dim(nd: Dim) = Q(re, im, nd)
-    fun clean(): Q {
+    fun dim(nd: Dim) = SQ(re, im, nd)
+    fun clean(): SQ {
         var r = re; var i = im
         if (i != 0.0 && abs(i) < 1e-13 * maxOf(1.0, abs(r))) i = 0.0
         if (r != 0.0 && i != 0.0 && abs(r) < 1e-13 * abs(i)) r = 0.0
-        return if (r == re && i == im) this else Q(r, i, d)
+        return if (r == re && i == im) this else SQ(r, i, d)
     }
     override fun toString() = "$re,$im,$d"
     companion object {
-        fun parse(s: String?): Q? {
+        fun parse(s: String?): SQ? {
             if (s.isNullOrEmpty()) return null
             val p = s.split(',')
             if (p.size < 2) return null
             val r = p[0].toDoubleOrNull() ?: return null
             val i = p[1].toDoubleOrNull() ?: return null
-            return Q(r, i, Dim.parse(p.drop(2).joinToString(",")))
+            return SQ(r, i, Dim.parse(p.drop(2).joinToString(",")))
         }
     }
 }
 
 object SciMath {
     // ================= complex helpers =================
-    private fun c(r: Double, i: Double = 0.0) = Q(r, i)
-    fun add(a: Q, b: Q): Q { same(a, b); return Q(a.re + b.re, a.im + b.im, a.d).clean() }
-    fun sub(a: Q, b: Q): Q { same(a, b); return Q(a.re - b.re, a.im - b.im, a.d).clean() }
-    fun mul(a: Q, b: Q) = Q(a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re, a.d + b.d).clean()
-    fun div(a: Q, b: Q): Q {
+    private fun c(r: Double, i: Double = 0.0) = SQ(r, i)
+    fun add(a: SQ, b: SQ): SQ { same(a, b); return SQ(a.re + b.re, a.im + b.im, a.d).clean() }
+    fun sub(a: SQ, b: SQ): SQ { same(a, b); return SQ(a.re - b.re, a.im - b.im, a.d).clean() }
+    fun mul(a: SQ, b: SQ) = SQ(a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re, a.d + b.d).clean()
+    fun div(a: SQ, b: SQ): SQ {
         val d = a.d - b.d
-        if (b.im == 0.0) return Q(a.re / b.re, if (a.im == 0.0) 0.0 else a.im / b.re, d).clean()
+        if (b.im == 0.0) return SQ(a.re / b.re, if (a.im == 0.0) 0.0 else a.im / b.re, d).clean()
         val den = b.re * b.re + b.im * b.im
-        return Q((a.re * b.re + a.im * b.im) / den, (a.im * b.re - a.re * b.im) / den, d).clean()
+        return SQ((a.re * b.re + a.im * b.im) / den, (a.im * b.re - a.re * b.im) / den, d).clean()
     }
-    private fun same(a: Q, b: Q) { if (a.d != b.d) throw SciErr("mismatch", SciFmt.dimText(a.d) + " ≠ " + SciFmt.dimText(b.d)) }
-    private fun plain(a: Q, what: String = "") { if (!a.d.none) throw SciErr("needplain", what) }
+    private fun same(a: SQ, b: SQ) { if (a.d != b.d) throw SciErr("mismatch", SciFmt.dimText(a.d) + " ≠ " + SciFmt.dimText(b.d)) }
+    private fun plain(a: SQ, what: String = "") { if (!a.d.none) throw SciErr("needplain", what) }
 
-    fun cexp(z: Q): Q { val m = exp(z.re); return if (z.im == 0.0) c(m) else c(m * cos(z.im), m * sin(z.im)).clean() }
-    fun cln(z: Q): Q = if (z.im == 0.0 && z.re >= 0) c(ln(z.re)) else c(ln(hypot(z.re, z.im)), atan2(z.im, z.re)).clean()
-    fun cpow(a: Q, b: Q): Q {
+    fun cexp(z: SQ): SQ { val m = exp(z.re); return if (z.im == 0.0) c(m) else c(m * cos(z.im), m * sin(z.im)).clean() }
+    fun cln(z: SQ): SQ = if (z.im == 0.0 && z.re >= 0) c(ln(z.re)) else c(ln(hypot(z.re, z.im)), atan2(z.im, z.re)).clean()
+    fun cpow(a: SQ, b: SQ): SQ {
         if (a.im == 0.0 && b.im == 0.0) {
             val x = a.re; val y = b.re
             if (x >= 0 || y == floor(y)) return c(Math.pow(x, y))
@@ -114,15 +114,15 @@ object SciMath {
         if (a.re == 0.0 && a.im == 0.0) return if (b.re > 0) c(0.0) else c(Double.POSITIVE_INFINITY)
         return cexp(mul(b, cln(a)))
     }
-    fun csqrt(z: Q): Q {
+    fun csqrt(z: SQ): SQ {
         if (z.im == 0.0) return if (z.re >= 0) c(sqrt(z.re)) else c(0.0, sqrt(-z.re))
         val m = hypot(z.re, z.im)
         val r = sqrt((m + z.re) / 2); val i = sqrt((m - z.re) / 2) * (if (z.im < 0) -1 else 1)
         return c(r, i)
     }
-    fun csin(z: Q) = if (z.im == 0.0) c(snap(sin(z.re))) else c(sin(z.re) * cosh(z.im), cos(z.re) * sinh(z.im)).clean()
-    fun ccos(z: Q) = if (z.im == 0.0) c(snap(cos(z.re))) else c(cos(z.re) * cosh(z.im), -sin(z.re) * sinh(z.im)).clean()
-    fun ctan(z: Q): Q {
+    fun csin(z: SQ) = if (z.im == 0.0) c(snap(sin(z.re))) else c(sin(z.re) * cosh(z.im), cos(z.re) * sinh(z.im)).clean()
+    fun ccos(z: SQ) = if (z.im == 0.0) c(snap(cos(z.re))) else c(cos(z.re) * cosh(z.im), -sin(z.re) * sinh(z.im)).clean()
+    fun ctan(z: SQ): SQ {
         if (z.im == 0.0) {
             val cs = snap(cos(z.re))
             return if (cs == 0.0) c(Double.NaN) else c(snap(sin(z.re)) / cs)
@@ -131,14 +131,14 @@ object SciMath {
     }
     private fun snap(v: Double) = if (abs(v) < 1e-15) 0.0 else v
     private val I1 = c(0.0, 1.0)
-    fun casin(z: Q): Q {
+    fun casin(z: SQ): SQ {
         if (z.im == 0.0 && abs(z.re) <= 1) return c(Math.asin(z.re))
         // −i ln(iz + √(1−z²))
         val w = add(mul(I1, z), csqrt(sub(c(1.0), mul(z, z))))
         return mul(c(0.0, -1.0), cln(w))
     }
-    fun cacos(z: Q): Q = if (z.im == 0.0 && abs(z.re) <= 1) c(Math.acos(z.re)) else sub(c(PI / 2), casin(z))
-    fun catan(z: Q): Q {
+    fun cacos(z: SQ): SQ = if (z.im == 0.0 && abs(z.re) <= 1) c(Math.acos(z.re)) else sub(c(PI / 2), casin(z))
+    fun catan(z: SQ): SQ {
         if (z.im == 0.0) return c(Math.atan(z.re))
         // i/2 (ln(1−iz) − ln(1+iz))
         val iz = mul(I1, z)
@@ -280,7 +280,7 @@ object SciMath {
 
     // ================= syntax tree =================
     sealed class Nd
-    class NNum(val q: Q, val unit: UDef? = null, val withNum: Boolean = false) : Nd()
+    class NNum(val q: SQ, val unit: UDef? = null, val withNum: Boolean = false) : Nd()
     class NVar(val n: String) : Nd()
     class NNeg(val a: Nd) : Nd()
     class NBin(val op: Char, val a: Nd, val b: Nd) : Nd()
@@ -384,10 +384,10 @@ object SciMath {
                 if (u.off != 0.0 || u.inv) throw SciErr("syntax", u.sym)
                 val ei = round(e).toInt()
                 if (abs(e - ei) > 1e-9) throw SciErr("syntax", "^$e")
-                val q = Q((v ?: 1.0) * Math.pow(u.k, e), 0.0, Dim.ofCat(u.cat).times(ei))
+                val q = SQ((v ?: 1.0) * Math.pow(u.k, e), 0.0, Dim.ofCat(u.cat).times(ei))
                 return NNum(q, null, v != null)
             }
-            return NNum(Q(u.toBase(v ?: 1.0), 0.0, Dim.ofCat(u.cat)), u, v != null)
+            return NNum(SQ(u.toBase(v ?: 1.0), 0.0, Dim.ofCat(u.cat)), u, v != null)
         }
 
         fun primary(): Nd {
@@ -395,13 +395,13 @@ object SciMath {
             when (k.k) {
                 NUM -> {
                     if (peek().k == UNIT) return unitQ(take().u!!, k.v)
-                    return NNum(Q(k.v))
+                    return NNum(SQ(k.v))
                 }
                 UNIT -> return unitQ(k.u!!, null)
                 ID -> return when (k.s) {
-                    "pi" -> NNum(Q(PI))
-                    "e" -> NNum(Q(Math.E))
-                    "i" -> NNum(Q(0.0, 1.0))
+                    "pi" -> NNum(SQ(PI))
+                    "e" -> NNum(SQ(Math.E))
+                    "i" -> NNum(SQ(0.0, 1.0))
                     else -> NVar(k.s)
                 }
                 FUNC -> {
@@ -428,36 +428,36 @@ object SciMath {
     fun parse(text: String, comma: Boolean = false): Parsed = P(lex(text, comma)).top()
 
     // ================= evaluating =================
-    class Env(val vars: Map<String, Q>, val angle: Int = 0, val ans: Q? = null)
+    class Env(val vars: Map<String, SQ>, val angle: Int = 0, val ans: SQ? = null)
 
-    private fun toRad(a: Q, angle: Int): Q {
+    private fun toRad(a: SQ, angle: Int): SQ {
         if (a.d == Dim.of(Dim.A, 1)) return a.dim(Dim.NONE)
         plain(a, "sin")
         if (!a.isReal) return a
         return when (angle) {
-            0 -> Q((a.re % 360.0) * PI / 180)
-            2 -> Q((a.re % 400.0) * PI / 200)
+            0 -> SQ((a.re % 360.0) * PI / 180)
+            2 -> SQ((a.re % 400.0) * PI / 200)
             else -> a
         }
     }
 
-    private fun fromRad(a: Q, angle: Int): Q {
+    private fun fromRad(a: SQ, angle: Int): SQ {
         if (!a.isReal) return a
-        return when (angle) { 0 -> Q(a.re * 180 / PI); 2 -> Q(a.re * 200 / PI); else -> a }
+        return when (angle) { 0 -> SQ(a.re * 180 / PI); 2 -> SQ(a.re * 200 / PI); else -> a }
     }
 
-    fun ev(n: Nd, env: Env, loc: Map<String, Q> = emptyMap()): Q = when (n) {
+    fun ev(n: Nd, env: Env, loc: Map<String, SQ> = emptyMap()): SQ = when (n) {
         is NNum -> n.q
-        is NVar -> loc[n.n] ?: if (n.n == "Ans") env.ans ?: Q(0.0) else env.vars[n.n] ?: Q(0.0)
-        is NNeg -> ev(n.a, env, loc).let { Q(-it.re, -it.im, it.d) }
-        is NPct -> ev(n.a, env, loc).let { Q(it.re / 100, it.im / 100, it.d) }
+        is NVar -> loc[n.n] ?: if (n.n == "Ans") env.ans ?: SQ(0.0) else env.vars[n.n] ?: SQ(0.0)
+        is NNeg -> ev(n.a, env, loc).let { SQ(-it.re, -it.im, it.d) }
+        is NPct -> ev(n.a, env, loc).let { SQ(it.re / 100, it.im / 100, it.d) }
         is NFact -> {
             val a = ev(n.a, env, loc)
             plain(a, "!")
             if (!a.isReal) throw SciErr("domain", "!")
             val x = a.re
             if (x < 0 && x == floor(x)) throw SciErr("domain", "!")
-            if (x == floor(x) && x <= 170) { var r = 1.0; var k = 2.0; while (k <= x) { r *= k; k++ }; Q(r) } else Q(gamma(x + 1))
+            if (x == floor(x) && x <= 170) { var r = 1.0; var k = 2.0; while (k <= x) { r *= k; k++ }; SQ(r) } else SQ(gamma(x + 1))
         }
         is NBin -> {
             val a = ev(n.a, env, loc)
@@ -466,7 +466,7 @@ object SciMath {
                     // 200 + 10% = 220
                     val pc = ev(n.b.a, env, loc)
                     plain(pc, "%")
-                    val part = mul(a, Q(pc.re / 100, pc.im / 100))
+                    val part = mul(a, SQ(pc.re / 100, pc.im / 100))
                     if (n.op == '+') add(a, part) else sub(a, part)
                 } else {
                     val b = ev(n.b, env, loc)
@@ -481,7 +481,7 @@ object SciMath {
         is NCall -> call(n, env, loc)
     }
 
-    private fun powQ(a: Q, b: Q): Q {
+    private fun powQ(a: SQ, b: SQ): SQ {
         plain(b, "^")
         if (a.d.none) return cpow(a, b).clean()
         if (!b.isReal) throw SciErr("domain", "^")
@@ -498,7 +498,7 @@ object SciMath {
 
     private fun nargs(n: NCall, k: Int) { if (n.args.size != k) throw SciErr("args", n.f) }
 
-    private fun call(n: NCall, env: Env, loc: Map<String, Q>): Q {
+    private fun call(n: NCall, env: Env, loc: Map<String, SQ>): SQ {
         val f = n.f
         when (f) {
             "int" -> { nargs(n, 3); return integral(n, env, loc) }
@@ -519,23 +519,23 @@ object SciMath {
             "asin" -> { plain(a, f); fromRad(casin(a), env.angle) }
             "acos" -> { plain(a, f); fromRad(cacos(a), env.angle) }
             "atan" -> { plain(a, f); fromRad(catan(a), env.angle) }
-            "sinh" -> { plain(a, f); val e1 = cexp(a); val e2 = cexp(Q(-a.re, -a.im)); Q((e1.re - e2.re) / 2, (e1.im - e2.im) / 2).clean() }
-            "cosh" -> { plain(a, f); val e1 = cexp(a); val e2 = cexp(Q(-a.re, -a.im)); Q((e1.re + e2.re) / 2, (e1.im + e2.im) / 2).clean() }
-            "tanh" -> { plain(a, f); val e1 = cexp(a); val e2 = cexp(Q(-a.re, -a.im))
-                div(Q(e1.re - e2.re, e1.im - e2.im), Q(e1.re + e2.re, e1.im + e2.im)) }
+            "sinh" -> { plain(a, f); val e1 = cexp(a); val e2 = cexp(SQ(-a.re, -a.im)); SQ((e1.re - e2.re) / 2, (e1.im - e2.im) / 2).clean() }
+            "cosh" -> { plain(a, f); val e1 = cexp(a); val e2 = cexp(SQ(-a.re, -a.im)); SQ((e1.re + e2.re) / 2, (e1.im + e2.im) / 2).clean() }
+            "tanh" -> { plain(a, f); val e1 = cexp(a); val e2 = cexp(SQ(-a.re, -a.im))
+                div(SQ(e1.re - e2.re, e1.im - e2.im), SQ(e1.re + e2.re, e1.im + e2.im)) }
             "ln" -> { plain(a, f); cln(a) }
-            "log" -> { plain(a, f); val l = cln(a); Q(l.re / ln(10.0), l.im / ln(10.0)).clean() }
+            "log" -> { plain(a, f); val l = cln(a); SQ(l.re / ln(10.0), l.im / ln(10.0)).clean() }
             "exp" -> { plain(a, f); cexp(a) }
-            "sqrt" -> if (a.d.none) csqrt(a) else powQ(a, Q(0.5))
-            "cbrt" -> if (a.d.none && a.isReal) Q(Math.cbrt(a.re)) else powQ(a, Q(1.0 / 3))
-            "abs" -> Q(hypot(a.re, a.im), 0.0, a.d)
-            "Re" -> Q(a.re, 0.0, a.d)
-            "Im" -> Q(a.im, 0.0, a.d)
-            "conj" -> Q(a.re, -a.im, a.d)
-            "arg" -> fromRad(Q(atan2(a.im, a.re)), env.angle)
-            "floor" -> Q(floor(a.re), 0.0, a.d)
-            "ceil" -> Q(Math.ceil(a.re), 0.0, a.d)
-            "round" -> Q(Math.rint(a.re), 0.0, a.d)
+            "sqrt" -> if (a.d.none) csqrt(a) else powQ(a, SQ(0.5))
+            "cbrt" -> if (a.d.none && a.isReal) SQ(Math.cbrt(a.re)) else powQ(a, SQ(1.0 / 3))
+            "abs" -> SQ(hypot(a.re, a.im), 0.0, a.d)
+            "Re" -> SQ(a.re, 0.0, a.d)
+            "Im" -> SQ(a.im, 0.0, a.d)
+            "conj" -> SQ(a.re, -a.im, a.d)
+            "arg" -> fromRad(SQ(atan2(a.im, a.re)), env.angle)
+            "floor" -> SQ(floor(a.re), 0.0, a.d)
+            "ceil" -> SQ(Math.ceil(a.re), 0.0, a.d)
+            "round" -> SQ(Math.rint(a.re), 0.0, a.d)
             else -> throw SciErr("unknown", f)
         }
     }
@@ -544,7 +544,7 @@ object SciMath {
     private val GX = doubleArrayOf(0.1834346424956498, 0.5255324099163290, 0.7966664774136267, 0.9602898564975363)
     private val GW = doubleArrayOf(0.3626837833783620, 0.3137066458778873, 0.2223810344533745, 0.1012285362903763)
 
-    private fun gl(g: (Double) -> Q, lo: Double, hi: Double, panels: Int): Q {
+    private fun gl(g: (Double) -> SQ, lo: Double, hi: Double, panels: Int): SQ {
         var sr = 0.0; var si = 0.0; var d: Dim? = null
         val h = (hi - lo) / panels
         for (pn in 0 until panels) {
@@ -555,39 +555,39 @@ object SciMath {
                 sr += GW[k] * v.re * h / 2; si += GW[k] * v.im * h / 2
             }
         }
-        return Q(sr, si, d ?: Dim.NONE).clean()
+        return SQ(sr, si, d ?: Dim.NONE).clean()
     }
 
-    private fun integral(n: NCall, env: Env, loc: Map<String, Q>): Q {
+    private fun integral(n: NCall, env: Env, loc: Map<String, SQ>): SQ {
         val qa = ev(n.args[1], env, loc); val qb = ev(n.args[2], env, loc)
         if (!qa.isReal || !qb.isReal) throw SciErr("domain", "∫")
         val xd = if (qa.re.isInfinite()) qb.d else qa.d
         if (!qa.re.isInfinite() && !qb.re.isInfinite() && qa.d != qb.d) throw SciErr("mismatch")
         val a = qa.re; val b = qb.re
-        if (a == b) return Q(0.0, 0.0, Dim.NONE)
+        if (a == b) return SQ(0.0, 0.0, Dim.NONE)
         val sign = if (a > b) -1.0 else 1.0
         val lo = minOf(a, b); val hi = maxOf(a, b)
-        fun f(x: Double): Q = ev(n.args[0], env, loc + ("X" to Q(x, 0.0, xd)))
-        val r: Q = when {
-            lo.isInfinite() && hi.isInfinite() -> gl({ t -> val x = t / (1 - t * t); val w = (1 + t * t) / ((1 - t * t) * (1 - t * t)); f(x).let { Q(it.re * w, it.im * w, it.d) } }, -1.0, 1.0, 256)
-            hi.isInfinite() -> gl({ t -> val x = lo + t / (1 - t); val w = 1 / ((1 - t) * (1 - t)); f(x).let { Q(it.re * w, it.im * w, it.d) } }, 0.0, 1.0, 256)
-            lo.isInfinite() -> gl({ t -> val x = hi - t / (1 - t); val w = 1 / ((1 - t) * (1 - t)); f(x).let { Q(it.re * w, it.im * w, it.d) } }, 0.0, 1.0, 256)
+        fun f(x: Double): SQ = ev(n.args[0], env, loc + ("X" to SQ(x, 0.0, xd)))
+        val r: SQ = when {
+            lo.isInfinite() && hi.isInfinite() -> gl({ t -> val x = t / (1 - t * t); val w = (1 + t * t) / ((1 - t * t) * (1 - t * t)); f(x).let { SQ(it.re * w, it.im * w, it.d) } }, -1.0, 1.0, 256)
+            hi.isInfinite() -> gl({ t -> val x = lo + t / (1 - t); val w = 1 / ((1 - t) * (1 - t)); f(x).let { SQ(it.re * w, it.im * w, it.d) } }, 0.0, 1.0, 256)
+            lo.isInfinite() -> gl({ t -> val x = hi - t / (1 - t); val w = 1 / ((1 - t) * (1 - t)); f(x).let { SQ(it.re * w, it.im * w, it.d) } }, 0.0, 1.0, 256)
             else -> gl(::f, lo, hi, 128)
         }
-        return Q(sign * r.re, sign * r.im, r.d + xd).clean()
+        return SQ(sign * r.re, sign * r.im, r.d + xd).clean()
     }
 
     // ---- d/dx(f(X), a): central difference + Richardson ----
-    private fun derivative(n: NCall, env: Env, loc: Map<String, Q>): Q {
+    private fun derivative(n: NCall, env: Env, loc: Map<String, SQ>): SQ {
         val qa = ev(n.args[1], env, loc)
         if (!qa.isReal) throw SciErr("domain", "d/dx")
         val a = qa.re
-        fun f(x: Double) = ev(n.args[0], env, loc + ("X" to Q(x, 0.0, qa.d)))
-        fun dd(h: Double): Q { val p = f(a + h); val m = f(a - h); return Q((p.re - m.re) / (2 * h), (p.im - m.im) / (2 * h), p.d) }
+        fun f(x: Double) = ev(n.args[0], env, loc + ("X" to SQ(x, 0.0, qa.d)))
+        fun dd(h: Double): SQ { val p = f(a + h); val m = f(a - h); return SQ((p.re - m.re) / (2 * h), (p.im - m.im) / (2 * h), p.d) }
         val h = 1e-3 * maxOf(1.0, abs(a))
         val d1 = dd(h); val d2 = dd(h / 2)
         val re = (4 * d2.re - d1.re) / 3; val im = (4 * d2.im - d1.im) / 3
-        return Q(roundTiny(re), roundTiny(im), d1.d - qa.d).clean()
+        return SQ(roundTiny(re), roundTiny(im), d1.d - qa.d).clean()
     }
     private fun roundTiny(v: Double): Double {
         // 11.999999998 → 12 (difference error), keep real decimals
@@ -596,27 +596,27 @@ object SciMath {
     }
 
     // ---- Σ(f(X), a, b) and Π ----
-    private fun series(n: NCall, env: Env, loc: Map<String, Q>): Q {
+    private fun series(n: NCall, env: Env, loc: Map<String, SQ>): SQ {
         val qa = ev(n.args[1], env, loc); val qb = ev(n.args[2], env, loc)
         plain(qa, "Σ"); plain(qb, "Σ")
         val a = Math.rint(qa.re).toLong(); val b = Math.rint(qb.re).toLong()
         if (b - a > 1_000_000) throw SciErr("big")
-        var acc: Q? = null
+        var acc: SQ? = null
         var k = a
         while (k <= b) {
-            val v = ev(n.args[0], env, loc + ("X" to Q(k.toDouble())))
+            val v = ev(n.args[0], env, loc + ("X" to SQ(k.toDouble())))
             acc = if (acc == null) v else if (n.f == "sum") add(acc, v) else mul(acc, v)
             k++
         }
-        return acc ?: Q(if (n.f == "sum") 0.0 else 1.0)
+        return acc ?: SQ(if (n.f == "sum") 0.0 else 1.0)
     }
 
     // ================= whole line =================
     class Out(
-        val q: Q,                  // the answer (SI)
+        val q: SQ,                  // the answer (SI)
         val unit: UDef?,           // show it in this unit (null = plain / composite)
         val assign: String? = null, // "X" when the line stored or solved a memory
-        val roots: List<Q> = emptyList(),
+        val roots: List<SQ> = emptyList(),
         val truth: Boolean? = null  // "2+2=4" → true
     )
 
@@ -655,10 +655,10 @@ object SciMath {
     }
 
     /** solve lhs = rhs for the memory v (real roots, up to 3) */
-    private fun solve(lhs: Nd, rhs: Nd, v: String, env: Env): List<Q> {
+    private fun solve(lhs: Nd, rhs: Nd, v: String, env: Env): List<SQ> {
         // which dimension must v have?  try none, then what balances the two sides
         fun dims(xd: Dim): Pair<Dim, Dim>? = try {
-            val one = mapOf(v to Q(1.0, 0.0, xd))
+            val one = mapOf(v to SQ(1.0, 0.0, xd))
             ev(lhs, env, one).d to ev(rhs, env, one).d
         } catch (e: SciErr) { if (e.code == "mismatch") null else throw e }
         var xd = Dim.NONE
@@ -668,7 +668,7 @@ object SciMath {
             xd = tries.firstOrNull { val d = dims(it); d != null && d.first == d.second } ?: throw SciErr("mismatch")
         }
         fun g(x: Double): Double {
-            val m = mapOf(v to Q(x, 0.0, xd))
+            val m = mapOf(v to SQ(x, 0.0, xd))
             return try { val a = ev(lhs, env, m); val b = ev(rhs, env, m); if (abs(a.im - b.im) > 1e-9 * maxOf(1.0, abs(a.re))) Double.NaN else a.re - b.re } catch (e: SciErr) { Double.NaN }
         }
         val pts = ArrayList<Double>()
@@ -711,7 +711,7 @@ object SciMath {
             }
         }
         roots.sortBy { abs(it) }
-        return roots.take(3).sorted().map { Q(it, 0.0, xd) }
+        return roots.take(3).sorted().map { SQ(it, 0.0, xd) }
     }
     private fun clean(r: Double): Double { val k = Math.rint(r * 1e9) / 1e9; return if (abs(k - r) < 1e-10 * maxOf(1.0, abs(r))) k else r }
 
