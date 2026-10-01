@@ -188,7 +188,7 @@ class TapeView(private val act: Activity) {
     private fun key(k: String) {
         buzz()
         when (k) {
-            "AC" -> calc.ac()
+            "AC" -> { calc.ac(); lastRaw = "" }
             "⌫" -> calc.back()
             "%" -> calc.percent()
             "÷" -> calc.op('/')
@@ -237,6 +237,9 @@ class TapeView(private val act: Activity) {
             rows.addView(rule())
         }
         if (entry.isNotEmpty()) rows.addView(row("", "", entry, "", BLUE, null, 0xFFFFF3C4.toInt()), lp(MATCH_PARENT, WRAP_CONTENT))
+        if (lastRaw.isNotEmpty() && partial.isEmpty()) rows.addView(TextView(act).apply {
+            text = "🗣 $lastRaw"; textSize = 12f; setTextColor(MUTED); setPadding(dp(12), dp(8), dp(12), dp(4))
+        }, lp(MATCH_PARENT, WRAP_CONTENT))
         if (partial.isNotEmpty()) rows.addView(TextView(act).apply {
             text = "🎤 $partial"; textSize = 15f; setTextColor(MUTED); typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC); setPadding(dp(12), dp(10), dp(12), dp(10))
         }, lp(MATCH_PARENT, WRAP_CONTENT))
@@ -267,7 +270,7 @@ class TapeView(private val act: Activity) {
     private fun clearTape() {
         if (calc.lines.isEmpty() && !calc.hasEntry()) return
         AlertDialog.Builder(act).setMessage(tr("Clear this paper? (it stays in history)", "यह कागज़ साफ़ करें? (हिस्ट्री में रहेगा)", "આ કાગળ સાફ કરવો? (હિસ્ટ્રી માં રહેશે)"))
-            .setPositiveButton(tr("Clear", "साफ़", "સાફ")) { _, _ -> calc.ac(); refresh() }
+            .setPositiveButton(tr("Clear", "साफ़", "સાફ")) { _, _ -> calc.ac(); lastRaw = ""; refresh() }
             .setNegativeButton(tr("No", "नहीं", "ના"), null).show()
     }
 
@@ -320,6 +323,8 @@ class TapeView(private val act: Activity) {
     private var hardSince = 0L
     private var lastPartial = ""
     private var carry = ""
+    /** what the phone wrote for the last sentence (shown small under the lines, so a wrong word is easy to see) */
+    private var lastRaw = ""
     private var carryAt = 0L
     private var helpShown = false
 
@@ -441,6 +446,7 @@ class TapeView(private val act: Activity) {
 
     /** the spoken text becomes lines on the paper; words left without an amount (cut between two sentences) join the next sentence */
     private fun heard(text: String) {
+        lastRaw = text
         val now = System.currentTimeMillis()
         val full = (if (carry.isNotBlank() && now - carryAt < 20_000) "$carry " else "") + text
         carry = ""

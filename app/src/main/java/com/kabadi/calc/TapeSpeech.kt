@@ -33,13 +33,17 @@ object TapeSpeech {
     private val fillers = hashSetOf("rupees", "rupee", "rs", "rupaiya", "રૂપિયા", "રૂપિયાનું", "રૂ", "रुपये", "रुपया", "रुपए", "₹",
         "pachi", "પછી", "फिर", "then", "and", "ane", "અને", "और", "of", "na", "ના", "નો", "ની", "નું")
     private val opWords: Map<Char, Set<String>> = mapOf(
-        '+' to setOf("plus", "add", "પ્લસ", "જમા", "ઉમેરો", "ઉમેર", "ઉમેરવા", "प्लस", "जोड़", "जोड़ो", "जमा", "जोड"),
-        '-' to setOf("minus", "less", "માઇનસ", "માઈનસ", "ઓછા", "ઓછું", "બાદ", "બાદબાકી", "घटा", "माइनस", "कम", "घटाओ", "घटाव"),
-        'x' to setOf("times", "into", "multiply", "multiplied", "x", "ગુણ", "ગુણ્યા", "ગુણી", "ગુણાકાર", "गुना", "गुणा", "गुणे"),
-        '/' to setOf("divide", "divided", "by", "ભાગ", "ભાગ્યા", "ભાગાકાર", "भाग", "बटा", "भागा"),
-        '=' to setOf("total", "equals", "equal", "kul", "કુલ", "બરાબર", "ટોટલ", "टोटल", "कुल", "बराबर", "योग")
+        '+' to setOf("+", "plus", "add", "adding", "પ્લસ", "જમા", "ઉમેરો", "ઉમેર", "ઉમેરવા", "વત્તા", "જોડો", "જોડ", "જોડી",
+            "प्लस", "जोड़", "जोड़ो", "जमा", "जोड", "जोडो", "जोड़ें", "जोड़कर"),
+        '-' to setOf("-", "−", "–", "—", "minus", "less", "subtract", "માઇનસ", "માઈનસ", "ઓછા", "ઓછું", "ઓછો", "ઓછી", "બાદ", "બાદબાકી", "ઘટાડો", "ઘટાડ",
+            "घटा", "माइनस", "कम", "घटाओ", "घटाव", "ऋण", "घटाइए", "घटाकर"),
+        'x' to setOf("×", "✕", "✖", "*", "times", "into", "multiply", "multiplied", "x", "ગુણ", "ગુણ્યા", "ગુણ્યાં", "ગુણા", "ગુણી", "ગુણીને", "ગુણાકાર", "મલ્ટીપ્લાય",
+            "गुना", "गुणा", "गुणे", "गुणित", "मल्टीप्लाई"),
+        '/' to setOf("÷", "/", "divide", "divided", "by", "ભાગ", "ભાગ્યા", "ભાગાકાર", "ભાગે", "ભાગી", "ભાગો", "ડિવાઇડ", "ડિવાઈડ",
+            "भाग", "बटा", "बटे", "भागा", "भाजित", "भागे", "डिवाइड"),
+        '=' to setOf("=", "total", "equals", "equal", "kul", "કુલ", "બરાબર", "ટોટલ", "સરવાળો", "सरवाळो", "टोटल", "कुल", "बराबर", "योग", "योगफल")
     )
-    private val pctWords = hashSetOf("percent", "percentage", "ટકા", "ટકાવારી", "प्रतिशत", "फीसदी", "%")
+    private val pctWords = hashSetOf("percent", "percentage", "ટકા", "ટકાવારી", "પર્સેન્ટ", "પરસેન્ટ", "પર્સન્ટ", "प्रतिशत", "फीसदी", "फ़ीसदी", "परसेंट", "पर्सेंट", "%")
 
     private fun opOf(w: String): Char? = opWords.entries.firstOrNull { w in it.value }?.key
 
@@ -95,11 +99,18 @@ object TapeSpeech {
 
     class Result(val items: List<Item>, /** item words heard after the last amount (the amount comes in the next sentence) */ val rest: String)
 
+    private const val DIG = "0-9૦-૯०-९"
+
+    /** symbols the phone's voice typing writes ("500+1200", "800 × 2", "10%") become separate words */
+    private fun clean(t: String): String = t.replace("₹", " ").replace("/-", " ")
+        .replace(Regex("([+×✕✖*÷/%=])"), " $1 ")
+        .replace(Regex("(?<=[$DIG])\\s*[-−–—]\\s*(?=[$DIG])"), " - ")
+        .replace(Regex("(?<=[$DIG])\\s*[xX]\\s*(?=[$DIG])"), " x ")
+
     fun parse(text0: String): List<Item> = parseFull(text0).items
 
     fun parseFull(text0: String): Result {
-        val text = text0.replace("₹", " ").replace("%", " % ").replace("/-", " ").replace("=", " total ")
-        val toks = text.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val toks = clean(text0).trim().split(Regex("\\s+")).map { it.trim { c -> c in ".,;:!?।\"'()[]{}" } }.filter { it.isNotEmpty() }
         val out = ArrayList<Item>()
         var words = ArrayList<String>()
         var acc = Acc()

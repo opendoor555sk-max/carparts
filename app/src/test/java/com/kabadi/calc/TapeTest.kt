@@ -151,4 +151,34 @@ class TapeTest {
         assertEquals(bd("1200"), b.items[0].amount)
         assertEquals("", TapeSpeech.parseFull("labour 500 total").rest)
     }
+
+    @Test fun symbolsFromVoiceTyping() {
+        val a = p("labour 500 + diesel 1200 - advance 300 =")
+        assertEquals(listOf('+', '-', '='), a.map { it.op })
+        assertEquals(listOf(bd("500"), bd("1200"), bd("300")), a.map { it.amount })
+        assertEquals(listOf('+', '='), p("500+1200 =").map { it.op }.let { listOf(it[0], it[1]) })
+        assertEquals(listOf(bd("800"), bd("2")), p("800 × 2").map { it.amount })
+        assertEquals(listOf('x', '+'), p("800 × 2").map { it.op })
+        assertEquals(listOf('x', '+'), p("800 * 2").map { it.op })
+        assertEquals(listOf('x', '+'), p("800x2").map { it.op })
+        assertEquals(listOf('/', '+'), p("1000 ÷ 4").map { it.op })
+        assertEquals(listOf('-', '+'), p("500-300").map { it.op })
+        assertEquals(listOf('-', '+'), p("500 − 300").map { it.op })
+        assertTrue(p("500 + 10%")[1].pct)
+    }
+
+    @Test fun gujaratiOperatorWords() {
+        assertEquals(listOf('x', '+'), p("૮૦૦ ગુણાકાર ૨").map { it.op })
+        assertEquals(listOf('/', '+'), p("૧૦૦૦ ભાગાકાર ૪").map { it.op })
+        assertEquals(listOf('+', '+'), p("૫૦૦ વત્તા ૧૨૦૦").map { it.op })
+        assertEquals(listOf('-', '+'), p("૫૦૦ બાદબાકી ૩૦૦").map { it.op })
+        assertTrue(p("૫૦૦ પ્લસ ૧૦ ટકાવારી")[1].pct)
+        assertTrue(p("500 + 10 પર્સેન્ટ")[1].pct)
+    }
+
+    @Test fun punctuationFromVoiceTypingIsIgnored() {
+        val r = p("labour 500, plus diesel 1200. total.")
+        assertEquals(listOf('+', '='), r.map { it.op })
+        assertEquals(listOf("labour", "diesel"), r.map { it.note })
+    }
 }
