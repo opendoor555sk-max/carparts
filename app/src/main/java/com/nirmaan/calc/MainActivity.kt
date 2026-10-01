@@ -158,6 +158,8 @@ class MainActivity : Activity(), Ui {
         }
         val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         top.addView(circleIcon("i") { help() })
+        top.addView(circleIcon("🌍") { startActivity(android.content.Intent(this, UnitsActivity::class.java)) }.apply {
+            textSize = 15f; (layoutParams as LinearLayout.LayoutParams).leftMargin = dpi(6f) })
         lblTv = TextView(this).apply {
             textSize = 20f; setTextColor(c(0xFF111111)); maxLines = 1; ellipsize = TextUtils.TruncateAt.END
             setPadding(dpi(8f), 0, dpi(6f), 0)
