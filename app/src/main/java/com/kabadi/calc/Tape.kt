@@ -201,7 +201,15 @@ class TapeCalc(val set: TapeSettings) {
     /** CE: clear the entry; nothing typed: delete the last line */
     fun ce() {
         if (cur.isNotEmpty() || pendOpen > 0 || pendClose > 0) { clearEntry(); return }
-        if (lines.isNotEmpty()) { lines.removeAt(lines.size - 1); closed = false }
+        if (lines.isNotEmpty()) removeAt(lines.size - 1)
+    }
+
+    /** delete a line; brackets that lost their partner are repaired */
+    fun removeAt(i: Int) {
+        if (i !in lines.indices) return
+        lines.removeAt(i); closed = false
+        var depth = 0
+        for (l in lines) { depth += l.open; val c = minOf(l.close, depth); l.close = c; depth -= c }
     }
 
     fun ac() {

@@ -263,7 +263,7 @@ class TapeView(private val act: Activity) {
                 val v = try { BigDecimal(amt.text.toString().replace(",", "").trim()) } catch (_: Exception) { null }
                 if (v == null) toast("✕") else { l.value = v; l.note = note.text.toString().trim(); refresh() }
             }
-            .setNeutralButton(tr("Delete line", "लाइन हटाएं", "લાઇન કાઢો")) { _, _ -> calc.lines.removeAt(i); refresh() }
+            .setNeutralButton(tr("Delete line", "लाइन हटाएं", "લાઇન કાઢો")) { _, _ -> calc.removeAt(i); refresh() }
             .setNegativeButton(tr("Cancel", "रद्द", "રદ"), null).show()
     }
 
@@ -452,17 +452,47 @@ class TapeView(private val act: Activity) {
         root.postDelayed({ if (listening && !dead) listenOnce() }, ms)
     }
 
-    /** the spoken text becomes lines on the paper; words left without an amount (cut between two sentences) join the next sentence */
+    /** for tests */
+    fun feed(text: String) = heard(text)
+
+    /** the spoken sentence: a command ("ઉપરનું રદ્દ કરો", "બધું રદ્દ") or lines for the paper */
     private fun heard(text: String) {
         lastRaw = text
+        val cmd = TapeSpeech.command(text)
+        if (cmd != null) {
+            carry = ""
+            if (cmd.clearAll) {
+                calc.ac(); lastRaw = text; buzz(); refresh()
+                toast(tr("Paper cleared (kept in history)", "कागज़ साफ़ (हिस्ट्री में है)", "કાગળ સાફ (હિસ્ટ્રી માં છે)"))
+                return
+            }
+            addText(cmd.before, false)
+            if (calc.lines.isEmpty()) toast(tr("Nothing to delete", "हटाने को कुछ नहीं", "કાઢવા માટે કંઈ નથી"))
+            else {
+                val gone = calc.lines.last()
+                calc.removeAt(calc.lines.size - 1)
+                toast("🗑 " + gone.note.ifBlank { calc.lineText(gone) } + "  " + calc.lineText(gone))
+            }
+            addText(cmd.after, false)
+            buzz(); refresh()
+            return
+        }
+        addText(text, true)
+    }
+
+    /** words left without an amount (cut between two sentences) join the next sentence */
+    private fun addText(text: String, useCarry: Boolean) {
+        if (text.isBlank()) return
         val now = System.currentTimeMillis()
-        val full = (if (carry.isNotBlank() && now - carryAt < 20_000) "$carry " else "") + text
-        carry = ""
+        val full = (if (useCarry && carry.isNotBlank() && now - carryAt < 20_000) "$carry " else "") + text
+        if (useCarry) carry = ""
         val r = TapeSpeech.parseFull(full)
-        if (r.rest.isNotBlank()) { carry = r.rest; carryAt = now }
+        if (useCarry && r.rest.isNotBlank()) { carry = r.rest; carryAt = now }
         if (r.items.isEmpty()) {
-            if (r.rest.isBlank()) toast(tr("No amount heard. Say item, then amount", "रकम नहीं सुनी। पहले मद, फिर रकम बोलिए", "રકમ સંભળાઈ નહીં. પહેલાં વિગત, પછી રકમ બોલો"))
-            else { partial = r.rest; refresh(); partial = "" }
+            if (useCarry) {
+                if (r.rest.isBlank()) toast(tr("No amount heard. Say item, then amount", "रकम नहीं सुनी। पहले मद, फिर रकम बोलिए", "રકમ સંભળાઈ નહીં. પહેલાં વિગત, પછી રકમ બોલો"))
+                else { partial = r.rest; refresh(); partial = "" }
+            }
             return
         }
         calc.addSpoken(r.items)

@@ -125,10 +125,35 @@ object TapeSpeech {
         .replace(Regex("(?<=[$DIG])\\s*[-−–—]\\s*(?=[$DIG])"), " - ")
         .replace(Regex("(?<=[$DIG])\\s*[xX]\\s*(?=[$DIG])"), " x ")
 
+    private fun tokens(t: String): List<String> =
+        clean(t).trim().split(Regex("\\s+")).map { it.trim { c -> c in ".,;:!?।\"'()[]{}" } }.filter { it.isNotEmpty() }
+
+    // ---- spoken commands: "ઉપરનું રદ્દ કરો", "ખોટું લખેલું હટાવો", "cancel", "બધું રદ્દ" ----
+    private val deleteWords = hashSetOf("રદ્દ", "રદ", "રદ્દ", "કેન્સલ", "કૅન્સલ", "કેંસલ", "ડિલીટ", "ડીલીટ", "હટાવો", "હટાવ", "હટાવી", "કાઢી", "ભૂંસો", "ભુંસો", "ભૂસો", "ભૂંસી",
+        "रद्द", "रद", "कैंसिल", "कैंसल", "डिलीट", "हटाओ", "हटाइए", "हटा", "मिटाओ", "मिटा", "cancel", "cancelled", "delete", "remove", "undo", "erase")
+    private val allWords = hashSetOf("બધું", "બધુ", "બધા", "सब", "सभी", "सारा", "all", "everything")
+    private val clearWords = hashSetOf("clear", "ક્લિયર", "क्लियर", "સાફ", "साफ")
+    private val cmdModifiers = hashSetOf("ઉપરનું", "ઉપરની", "ઉપર", "છેલ્લું", "છેલ્લી", "ખોટું", "ખોટી", "લખેલું", "લખેલી", "લખેલ", "પહેલાનું", "આ", "એ", "તે", "લાઇન", "નાખો", "નાંખો",
+        "ऊपर", "ऊपरवाला", "आखिरी", "पिछला", "गलत", "लिखा", "लाइन", "डालो", "line", "last", "above", "wrong", "this", "the", "one", "it", "please", "all")
+
+    /** [before] / [after] are what was said before and after the command word (amounts to write); clearAll wipes the paper */
+    class Command(val clearAll: Boolean, val before: String, val after: String)
+
+    fun command(text0: String): Command? {
+        val toks = tokens(text0)
+        val lows = toks.map { it.lowercase() }
+        val di = lows.indexOfFirst { it in deleteWords || it in clearWords }
+        if (di < 0) return null
+        if (lows.any { it in allWords }) return Command(true, "", "")
+        if (lows[di] in clearWords) return null
+        fun keep(r: List<String>) = r.filter { it.lowercase() !in cmdModifiers }.joinToString(" ")
+        return Command(false, keep(toks.subList(0, di)), keep(toks.subList(di + 1, toks.size)))
+    }
+
     fun parse(text0: String): List<Item> = parseFull(text0).items
 
     fun parseFull(text0: String): Result {
-        val toks = clean(text0).trim().split(Regex("\\s+")).map { it.trim { c -> c in ".,;:!?।\"'()[]{}" } }.filter { it.isNotEmpty() }
+        val toks = tokens(text0)
         val out = ArrayList<Item>()
         var words = ArrayList<String>()
         var acc = Acc()

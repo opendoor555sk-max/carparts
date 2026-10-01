@@ -236,4 +236,43 @@ class TapeTest {
         assertEquals(bd("2500"), p("અઢી હજાર")[0].amount)
         assertEquals(bd("1250"), p("બાર સો પચાસ")[0].amount)
     }
+
+    // ---- spoken commands ----
+    private fun cmd(s: String) = TapeSpeech.command(s)
+
+    @Test fun deleteCommands() {
+        for (t in listOf("ઉપરનું રદ્દ કરો", "ખોટું લખેલું હટાવો", "કેન્સલ", "રદ કરો", "ડિલીટ", "ઉપરનું હટાવ", "cancel", "delete the last one", "remove", "undo",
+            "रद्द करो", "ऊपर वाला हटाओ", "कैंसिल", "ખોટું કાઢી નાખો")) {
+            val c = cmd(t)
+            assertTrue("no command in: $t", c != null)
+            assertFalse("should not clear all: $t", c!!.clearAll)
+            assertEquals("", c.before); assertEquals("", c.after)
+        }
+    }
+
+    @Test fun clearAllCommands() {
+        for (t in listOf("બધું રદ્દ કરો", "બધું હટાવો", "બધુ કાઢી નાખો", "clear all", "delete all", "सब हटाओ", "બધું સાફ")) assertTrue("no clear in: $t", cmd(t)?.clearAll == true)
+    }
+
+    @Test fun commandWithAmountsAround() {
+        val c = cmd("ડીઝલ 500 રદ્દ કરો ક્રેન 800")!!
+        assertEquals("ડીઝલ 500", c.before)
+        assertEquals("ક્રેન 800", c.after)
+    }
+
+    @Test fun ordinarySentencesAreNotCommands() {
+        assertNull(cmd("labour 500 plus diesel 1200 total"))
+        assertNull(cmd("રદ્દી 500 પ્લસ કાગળ 300"))      // રદ્દી = scrap paper, not રદ્દ
+        assertNull(cmd("clear 500"))
+        assertNull(cmd("મજૂરી 500 ઓછા કરો"))
+    }
+
+    @Test fun removingALineRepairsBrackets() {
+        val c = TapeCalc(TapeSettings(places = 0))
+        c.addSpoken(TapeSpeech.parse("labour 300 plus gas 500 times 3000 total"))
+        c.removeAt(2)                              // the "3000 )" line is gone, "(" must not stay
+        assertEquals(2, c.lines.size)
+        assertEquals(bd("800"), c.total())
+        assertFalse(c.closed)
+    }
 }
