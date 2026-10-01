@@ -1,3 +1,5 @@
+HOME: 'Haraji / Company hisab' button have 'Haraji hisab' (nam nanu karyu).
+
 BOLVU: 'uparnu radd karo', 'khotu lakhelu hatavo', 'cancel', 'delete' bolo to chhellu line nikde; 'badhu radd' bole to kagal saf (history ma rahe).
 
 BOLVU FIX: '500 ocha karo (rafikbhai na)' have 500 -500 tarike lakhay ane total ma ghate (pehla ghatatu nahotu); 'karod' khoto shabd ignore.

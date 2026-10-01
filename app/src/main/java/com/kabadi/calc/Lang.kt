@@ -73,7 +73,7 @@ object L {
         "all_total" to arrayOf("All hisab profit", "सब हिसाब का मुनाफा", "બધા હિસાબનો નફો"),
         "copy" to arrayOf("Copy", "कॉपी", "કૉપિ"),
         "new_gaadi" to arrayOf("+ Vehicle hisab", "+ गाड़ी हिसाब", "+ ગાડી હિસાબ"),
-        "new_haraji" to arrayOf("+ Auction / Company hisab", "+ हराजी / कंपनी हिसाब", "+ હરાજી / કંપની હિસાબ"),
+        "new_haraji" to arrayOf("+ Auction hisab", "+ हराजी हिसाब", "+ હરાજી હિસાબ"),
         "haraji" to arrayOf("AUCTION", "हराजी", "હરાજી"),
         "buy_price" to arrayOf("1. Auction buying price", "1. हराजी में खरीदी कीमत", "1. હરાજીમાં ખરીદ કિંમત"),
         "sale" to arrayOf("4. Sold in auction (amount)", "4. हराजी में बेचा (रकम)", "4. હરાજીમાં વેચ્યું (રકમ)"),
