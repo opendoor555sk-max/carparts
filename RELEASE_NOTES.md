@@ -1,3 +1,5 @@
+BOLVU: 🎤 ek var dabavo – mic chalu rahe (3 min sudhi), beep band, sentence vachche kapay to word aagal joday, internet vagar mate offline pack ni madad (⚙ ma).
+
 NAVU – KALKULETAR: Kabadi ma upar jamna 🧮 have TAPE KALKULETAR chhe: kora kagal par 🎤 dabavi ne bolo (majuri 500 plus diesel 1200 minus advance 300 kul) – kagal ni jem lakhay ane total aave; Gujarati/Hindi/English.
 
 HOME: bhasha button (EN / हिं / ગુ) ghana mota (3x jevo), nam nanu karyu jethi button ma samay.

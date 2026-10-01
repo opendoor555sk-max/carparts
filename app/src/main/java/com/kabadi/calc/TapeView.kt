@@ -3,11 +3,13 @@ package com.kabadi.calc
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.media.AudioManager
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -50,7 +52,6 @@ class TapeView(private val act: Activity) {
     private val vCodes = arrayOf("en-IN", "hi-IN", "gu-IN")
     private var vLang = TapeStore.voiceLang(act, L.lang.coerceIn(0, 2)).coerceIn(0, 2)
     private var listening = false
-    private var misses = 0
     private var partial = ""
     private var sr: SpeechRecognizer? = null
     private var dead = false
@@ -303,11 +304,32 @@ class TapeView(private val act: Activity) {
         opt({ tr("Decimals: ", "दशमलव: ", "દશાંશ: ") + placesName() }) { set.places = placesList[(placesList.indexOf(set.places) + 1) % placesList.size] }
         opt({ tr("Smart % (100 + 10% = 110): ", "स्मार्ट % (100 + 10% = 110): ", "સ્માર્ટ % (100 + 10% = 110): ") + (if (set.smart) "ON" else "OFF") }) { set.smart = !set.smart }
         opt({ tr("Vibration: ", "वाइब्रेशन: ", "વાઇબ્રેશન: ") + (if (set.vibrate) "ON" else "OFF") }) { set.vibrate = !set.vibrate }
+        opt({ tr("🎤 Voice without internet: how", "🎤 बिना इंटरनेट आवाज़: कैसे", "🎤 ઇન્ટરનેટ વગર અવાજ: કેવી રીતે") }) { offlineHelp() }
         AlertDialog.Builder(act).setTitle("⚙").setView(box)
             .setPositiveButton("OK") { _, _ -> TapeStore.saveSettings(act, set); refresh() }.show()
     }
 
     // ---------------------------------------------------------------- voice
+    // One tap = the microphone stays on (up to 3 minutes of silence). The phone's recogniser ends after every sentence, so it
+    // is restarted straight away on the same object, the "beep" is muted meanwhile, the screen stays on, text that was cut
+    // between two sentences is carried over, and it asks for the on-device (offline) language pack first.
+    private val audio = act.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private var beepMuted = false
+    private var lastActive = 0L
+    private var hardErrors = 0
+    private var hardSince = 0L
+    private var lastPartial = ""
+    private var carry = ""
+    private var carryAt = 0L
+    private var helpShown = false
+
+    private fun muteBeep(on: Boolean) {
+        try {
+            if (on && !beepMuted && !audio.isStreamMute(AudioManager.STREAM_MUSIC)) { audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0); beepMuted = true }
+            else if (!on && beepMuted) { audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0); beepMuted = false }
+        } catch (_: Exception) {}
+    }
+
     private fun toggleMic() { if (listening) stopListening() else startListening() }
 
     fun startListening() {
@@ -316,14 +338,19 @@ class TapeView(private val act: Activity) {
             act.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 52); return
         }
         if (!SpeechRecognizer.isRecognitionAvailable(act)) return fallbackDialog()
-        listening = true; misses = 0; updateMic(); listenOnce()
+        listening = true; hardErrors = 0; hardSince = 0; lastActive = System.currentTimeMillis(); lastPartial = ""
+        muteBeep(true); root.keepScreenOn = true
+        updateMic(); newRecognizer(); listenOnce()
     }
 
     fun stopListening() {
         listening = false
+        muteBeep(false); root.keepScreenOn = false
         try { sr?.cancel() } catch (_: Exception) {}
         try { sr?.destroy() } catch (_: Exception) {}
         sr = null
+        // what was being said when stopped is not lost
+        if (lastPartial.isNotBlank()) { val t = lastPartial; lastPartial = ""; partial = ""; heard(t) }
         partial = ""
         if (!dead) { updateMic(); refresh() }
     }
@@ -331,13 +358,13 @@ class TapeView(private val act: Activity) {
     fun release() {
         dead = true
         listening = false
+        muteBeep(false)
         try { sr?.destroy() } catch (_: Exception) {}
         sr = null
         TapeStore.saveState(act, calc)
     }
 
-    private fun listenOnce() {
-        if (!listening || dead) return
+    private fun newRecognizer() {
         try { sr?.destroy() } catch (_: Exception) {}
         val r = SpeechRecognizer.createSpeechRecognizer(act)
         sr = r
@@ -350,52 +377,95 @@ class TapeView(private val act: Activity) {
             override fun onEvent(t: Int, b: Bundle?) {}
             override fun onPartialResults(b: Bundle?) {
                 val t = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
-                if (dead || !listening) return
-                partial = t; refresh()
+                if (dead || !listening || t.isBlank()) return
+                lastActive = System.currentTimeMillis(); lastPartial = t; partial = t; refresh()
             }
             override fun onResults(b: Bundle?) {
+                if (dead || !listening) return
                 partial = ""
-                val t = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                if (!t.isNullOrBlank()) { misses = 0; heard(t) } else refresh()
-                again(250)
+                val t = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: lastPartial
+                lastPartial = ""
+                if (!t.isNullOrBlank()) { lastActive = System.currentTimeMillis(); hardErrors = 0; heard(t) } else refresh()
+                again(60)
             }
             override fun onError(code: Int) {
-                partial = ""; refresh()
+                if (dead || !listening) return
+                // the sentence was cut off by an error: keep what had already been heard
+                val salv = lastPartial; lastPartial = ""; partial = ""
+                if (salv.isNotBlank()) { lastActive = System.currentTimeMillis(); heard(salv) } else refresh()
                 when (code) {
                     SpeechRecognizer.ERROR_SPEECH_TIMEOUT, SpeechRecognizer.ERROR_NO_MATCH -> {
-                        misses++
-                        if (misses >= 4) { stopListening(); toast(tr("Nothing heard. Tap 🎤 to try again", "कुछ सुनाई नहीं दिया। फिर 🎤 दबाइए", "કંઈ સંભળાયું નહીં. ફરી 🎤 દબાવો")) } else again(250)
+                        if (System.currentTimeMillis() - lastActive > 180_000) {
+                            stopListening()
+                            toast(tr("Nothing heard for 3 minutes. Tap 🎤 to start again", "3 मिनट कुछ नहीं सुना। फिर 🎤 दबाइए", "3 મિનિટ કંઈ સંભળાયું નહીં. ફરી 🎤 દબાવો"))
+                        } else again(60)
                     }
-                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> again(800)
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY, SpeechRecognizer.ERROR_CLIENT, SpeechRecognizer.ERROR_AUDIO, 11 -> {
+                        val now = System.currentTimeMillis()
+                        if (now - hardSince > 15_000) { hardSince = now; hardErrors = 0 }
+                        hardErrors++
+                        if (hardErrors > 6) { stopListening(); fallbackDialog() } else { newRecognizerLater(400L * hardErrors) }
+                    }
                     SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> { stopListening(); act.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 52) }
-                    else -> { stopListening(); toast("🎤 ($code)"); fallbackDialog() }
+                    // no internet and no offline language pack on the phone
+                    else -> { stopListening(); offlineHelp() }
                 }
             }
         })
+    }
+
+    private fun newRecognizerLater(ms: Long) {
+        root.postDelayed({ if (listening && !dead) { newRecognizer(); listenOnce() } }, ms)
+    }
+
+    private fun listenOnce() {
+        if (!listening || dead) return
+        val r = sr ?: return
         val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, vCodes[vLang])
             .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
             .putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, act.packageName)
-        try { r.startListening(i) } catch (_: Exception) { stopListening(); fallbackDialog() }
+            // wait longer for a pause before closing the sentence
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 20000L)
+        try { r.startListening(i) } catch (_: Exception) { newRecognizerLater(500) }
     }
 
     private fun again(ms: Long) {
         root.postDelayed({ if (listening && !dead) listenOnce() }, ms)
     }
 
-    /** the spoken text becomes lines on the paper */
+    /** the spoken text becomes lines on the paper; words left without an amount (cut between two sentences) join the next sentence */
     private fun heard(text: String) {
-        val items = TapeSpeech.parse(text)
-        if (items.isEmpty()) {
-            partial = text; refresh(); partial = ""
-            toast(tr("No amount heard. Say item, then amount", "रकम नहीं सुनी। पहले मद, फिर रकम बोलिए", "રકમ સંભળાઈ નહીં. પહેલાં વિગત, પછી રકમ બોલો"))
+        val now = System.currentTimeMillis()
+        val full = (if (carry.isNotBlank() && now - carryAt < 20_000) "$carry " else "") + text
+        carry = ""
+        val r = TapeSpeech.parseFull(full)
+        if (r.rest.isNotBlank()) { carry = r.rest; carryAt = now }
+        if (r.items.isEmpty()) {
+            if (r.rest.isBlank()) toast(tr("No amount heard. Say item, then amount", "रकम नहीं सुनी। पहले मद, फिर रकम बोलिए", "રકમ સંભળાઈ નહીં. પહેલાં વિગત, પછી રકમ બોલો"))
+            else { partial = r.rest; refresh(); partial = "" }
             return
         }
-        calc.addSpoken(items)
+        calc.addSpoken(r.items)
         buzz()
         refresh()
+    }
+
+    private fun offlineHelp() {
+        val msg = tr(
+            "Voice needs internet, or the offline language pack. To talk without internet, download it once:\n\nPhone Settings → Google → Settings for Google apps → Search, Assistant & Voice → Voice → Offline speech recognition → download English, Hindi and Gujarati.\n\n(Names differ a little on each phone.)",
+            "आवाज़ के लिए इंटरनेट चाहिए, या ऑफ़लाइन भाषा पैक। बिना इंटरनेट बोलने के लिए एक बार डाउनलोड करें:\n\nफ़ोन Settings → Google → Google apps के लिए सेटिंग → Search, Assistant और Voice → Voice → Offline speech recognition → English, हिन्दी, ગુજરાતી डाउनलोड करें।\n\n(हर फ़ोन में नाम थोड़े अलग हो सकते हैं।)",
+            "અવાજ માટે ઇન્ટરનેટ જોઈએ, અથવા ઑફલાઇન ભાષા પેક. ઇન્ટરનેટ વગર બોલવા માટે એક વાર download કરો:\n\nફોન Settings → Google → Settings for Google apps → Search, Assistant & Voice → Voice → Offline speech recognition → English, हिन्दी, ગુજરાતી download કરો.\n\n(દરેક ફોનમાં નામ થોડાં જુદાં હોઈ શકે.)")
+        AlertDialog.Builder(act).setTitle("🎤").setMessage(msg)
+            .setPositiveButton(tr("Open voice settings", "वॉइस सेटिंग खोलें", "વૉઇસ સેટિંગ ખોલો")) { _, _ ->
+                try { act.startActivity(Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)) } catch (_: Exception) { toast("✕") }
+            }
+            .setNegativeButton(tr("Close", "बंद", "બંધ"), null).show()
     }
 
     /** phone without the continuous recogniser: the normal Google voice window, one sentence at a time */

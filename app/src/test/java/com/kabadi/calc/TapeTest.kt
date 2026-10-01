@@ -141,4 +141,14 @@ class TapeTest {
         assertEquals(0, p("hello how are you").size)
         assertEquals(0, p("").size)
     }
+
+    @Test fun wordsCutBetweenTwoSentencesAreCarried() {
+        val a = TapeSpeech.parseFull("labour 500 plus diesel")
+        assertEquals(1, a.items.size)
+        assertEquals("diesel", a.rest)
+        val b = TapeSpeech.parseFull(a.rest + " 1200 total")
+        assertEquals("diesel", b.items[0].note)
+        assertEquals(bd("1200"), b.items[0].amount)
+        assertEquals("", TapeSpeech.parseFull("labour 500 total").rest)
+    }
 }

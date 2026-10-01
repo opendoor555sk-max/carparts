@@ -93,7 +93,11 @@ object TapeSpeech {
         fun takeAll(ps: List<Part>): Boolean { val t = copy(); for (p in ps) if (!t.take(p)) return false; total = t.total; cur = t.cur; last = t.last; return true }
     }
 
-    fun parse(text0: String): List<Item> {
+    class Result(val items: List<Item>, /** item words heard after the last amount (the amount comes in the next sentence) */ val rest: String)
+
+    fun parse(text0: String): List<Item> = parseFull(text0).items
+
+    fun parseFull(text0: String): Result {
         val text = text0.replace("₹", " ").replace("%", " % ").replace("/-", " ").replace("=", " total ")
         val toks = text.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         val out = ArrayList<Item>()
@@ -130,6 +134,6 @@ object TapeSpeech {
             }
         }
         flush('+')
-        return out.filter { it.amount.signum() > 0 }
+        return Result(out.filter { it.amount.signum() > 0 }, if (acc.active()) "" else words.joinToString(" "))
     }
 }
