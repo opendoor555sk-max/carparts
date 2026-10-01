@@ -25,13 +25,28 @@ object TapeSpeech {
         "એક" to 1, "બે" to 2, "ત્રણ" to 3, "ચાર" to 4, "પાંચ" to 5, "છ" to 6, "સાત" to 7, "આઠ" to 8, "નવ" to 9, "દસ" to 10,
         "વીસ" to 20, "ત્રીસ" to 30, "ચાલીસ" to 40, "પચાસ" to 50, "સાઠ" to 60, "સિત્તેર" to 70, "એંસી" to 80, "નેવું" to 90
     )
+
+    // Hindi and Gujarati 11..99 are single words
+    private val hi99 = "ग्यारह बारह तेरह चौदह पंद्रह सोलह सत्रह अठारह उन्नीस बीस इक्कीस बाईस तेईस चौबीस पच्चीस छब्बीस सत्ताईस अट्ठाईस उनतीस तीस इकतीस बत्तीस तैंतीस चौंतीस पैंतीस छत्तीस सैंतीस अड़तीस उनतालीस चालीस इकतालीस बयालीस तैंतालीस चौवालीस पैंतालीस छियालीस सैंतालीस अड़तालीस उनचास पचास इक्यावन बावन तिरपन चौवन पचपन छप्पन सत्तावन अट्ठावन उनसठ साठ इकसठ बासठ तिरसठ चौंसठ पैंसठ छियासठ सड़सठ अड़सठ उनहत्तर सत्तर इकहत्तर बहत्तर तिहत्तर चौहत्तर पचहत्तर छिहत्तर सतहत्तर अठहत्तर उनासी अस्सी इक्यासी बयासी तिरासी चौरासी पचासी छियासी सत्तासी अट्ठासी नवासी नब्बे इक्यानवे बानवे तिरानवे चौरानवे पचानवे छियानवे सत्तानवे अट्ठानवे निन्यानवे".split(" ")
+    private val gu99 = "અગિયાર બાર તેર ચૌદ પંદર સોળ સત્તર અઢાર ઓગણીસ વીસ એકવીસ બાવીસ તેવીસ ચોવીસ પચ્ચીસ છવ્વીસ સત્તાવીસ અઠ્ઠાવીસ ઓગણત્રીસ ત્રીસ એકત્રીસ બત્રીસ તેત્રીસ ચોત્રીસ પાંત્રીસ છત્રીસ સાડત્રીસ આડત્રીસ ઓગણચાલીસ ચાલીસ એકતાલીસ બેતાલીસ ત્રેતાલીસ ચુંમાલીસ પિસ્તાલીસ છેતાલીસ સુડતાલીસ અડતાલીસ ઓગણપચાસ પચાસ એકાવન બાવન ત્રેપન ચોપન પંચાવન છપ્પન સત્તાવન અઠ્ઠાવન ઓગણસાઠ સાઠ એકસઠ બાસઠ ત્રેસઠ ચોસઠ પાંસઠ છાસઠ સડસઠ અડસઠ ઓગણોતેર સિત્તેર ઇકોતેર બોતેર તોતેર ચુમોતેર પંચોતેર છોતેર સિત્યોતેર ઇઠ્યોતેર ઓગણાએંસી એંસી એક્યાસી બ્યાસી ત્યાસી ચોર્યાસી પંચાસી છ્યાસી સત્યાસી અઠ્યાસી નેવ્યાસી નેવું એકાણું બાણું ત્રાણું ચોરાણું પંચાણું છન્નું સત્તાણું અઠ્ઠાણું નવ્વાણું".split(" ")
+    private val unitAll: Map<String, Int> = HashMap(unitW).also { m ->
+        hi99.forEachIndexed { i, w -> m[w] = 11 + i }
+        gu99.forEachIndexed { i, w -> m[w] = 11 + i }
+    }
+    /** whole values that stand alone ("બસો" = 200, "દોઢ" = 1.5) */
+    private val fullW: Map<String, BigDecimal> = mapOf(
+        "બસો" to BigDecimal(200), "બસ્સો" to BigDecimal(200), "અઢીસો" to BigDecimal(250), "દોઢસો" to BigDecimal(150), "પાનસો" to BigDecimal(500), "પાંસો" to BigDecimal(500),
+        "डेढ़सौ" to BigDecimal(150), "ढाईसौ" to BigDecimal(250),
+        "દોઢ" to BigDecimal("1.5"), "અઢી" to BigDecimal("2.5"), "डेढ़" to BigDecimal("1.5"), "डेढ" to BigDecimal("1.5"), "ढाई" to BigDecimal("2.5"), "अढ़ाई" to BigDecimal("2.5"),
+        "sawa" to BigDecimal("1.25")
+    )
     private val multW: Map<String, Int> = mapOf(
         "hundred" to 100, "thousand" to 1000, "lakh" to 100000, "lac" to 100000,
         "सौ" to 100, "हज़ार" to 1000, "हजार" to 1000, "लाख" to 100000,
         "સો" to 100, "હજાર" to 1000, "લાખ" to 100000
     )
     private val fillers = hashSetOf("rupees", "rupee", "rs", "rupaiya", "રૂપિયા", "રૂપિયાનું", "રૂ", "रुपये", "रुपया", "रुपए", "₹",
-        "pachi", "પછી", "फिर", "then", "and", "ane", "અને", "और", "of", "na", "ના", "નો", "ની", "નું")
+        "આયે", "આયો", "आये", "आए", "आया", "કરો", "કર", "करो", "कर", "કરજો", "pachi", "પછી", "फिर", "then", "and", "ane", "અને", "और", "of", "na", "ના", "નો", "ની", "નું")
     private val opWords: Map<Char, Set<String>> = mapOf(
         '+' to setOf("+", "plus", "add", "adding", "પ્લસ", "જમા", "ઉમેરો", "ઉમેર", "ઉમેરવા", "વત્તા", "જોડો", "જોડ", "જોડી",
             "प्लस", "जोड़", "जोड़ो", "जमा", "जोड", "जोडो", "जोड़ें", "जोड़कर"),
@@ -43,6 +58,8 @@ object TapeSpeech {
             "भाग", "बटा", "बटे", "भागा", "भाजित", "भागे", "डिवाइड"),
         '=' to setOf("=", "total", "equals", "equal", "kul", "કુલ", "બરાબર", "ટોટલ", "સરવાળો", "सरवाळो", "टोटल", "कुल", "बराबर", "योग", "योगफल")
     )
+    /** "500 ઓછા કરો": at the very end of a sentence these take the amount before them off */
+    private val postMinus = hashSetOf("ઓછા", "ઓછું", "ઓછો", "ઓછી", "ઘટાડો", "घटा", "घटाओ", "घटाकर", "घटाइए", "कम")
     private val pctWords = hashSetOf("percent", "percentage", "ટકા", "ટકાવારી", "પર્સેન્ટ", "પરસેન્ટ", "પર્સન્ટ", "प्रतिशत", "फीसदी", "फ़ीसदी", "परसेंट", "पर्सेंट", "%")
 
     private fun opOf(w: String): Char? = opWords.entries.firstOrNull { w in it.value }?.key
@@ -55,10 +72,11 @@ object TapeSpeech {
         val tok = tok0.map { digMap[it] ?: it }.joinToString("").replace(",", "")
         if (tok.isNotEmpty() && tok.all { it in '0'..'9' || it == '.' } && Regex("[0-9]+(\\.[0-9]+)?").matches(tok)) return listOf(Part(K.D, BigDecimal(tok)))
         val w = tok.lowercase()
-        unitW[w]?.let { return listOf(Part(if (it >= 20 && it % 10 == 0) K.T else K.U, BigDecimal(it))) }
+        fullW[w]?.let { return listOf(Part(K.D, it)) }
+        unitAll[w]?.let { return listOf(Part(if (it >= 20 && it % 10 == 0) K.T else K.U, BigDecimal(it))) }
         multW[w]?.let { return listOf(Part(K.M, BigDecimal(it))) }
         for ((m, mv) in multW) if (w.length > m.length && w.endsWith(m)) {
-            val u = unitW[w.dropLast(m.length)]
+            val u = unitAll[w.dropLast(m.length)]
             if (u != null) return listOf(Part(K.U, BigDecimal(u)), Part(K.M, BigDecimal(mv)))
         }
         return null
@@ -70,7 +88,7 @@ object TapeSpeech {
         var cur: BigDecimal = BigDecimal.ZERO
         var last: K? = null
         fun active() = last != null
-        fun value(): BigDecimal = total.add(cur)
+        fun value(): BigDecimal = total.add(cur).let { v -> if (v.scale() > 0) v.stripTrailingZeros().let { z -> if (z.scale() < 0) z.setScale(0) else z } else v }
         fun copy() = Acc().also { it.total = total; it.cur = cur; it.last = last }
         fun take(p: Part): Boolean {
             when (p.k) {
@@ -97,7 +115,8 @@ object TapeSpeech {
         fun takeAll(ps: List<Part>): Boolean { val t = copy(); for (p in ps) if (!t.take(p)) return false; total = t.total; cur = t.cur; last = t.last; return true }
     }
 
-    class Result(val items: List<Item>, /** item words heard after the last amount (the amount comes in the next sentence) */ val rest: String)
+    class Result(val items: List<Item>, /** item words heard after the last amount (the amount comes in the next sentence) */ val rest: String,
+        /** "500 ઓછા કરો": the first amount of this sentence is taken off the tape that is already written */ val firstNeg: Boolean = false)
 
     private const val DIG = "0-9૦-૯०-९"
 
@@ -115,6 +134,7 @@ object TapeSpeech {
         var words = ArrayList<String>()
         var acc = Acc()
         var pct = false
+        var tailPost = false
 
         fun flush(op: Char?): Boolean {
             if (!acc.active()) return false
@@ -130,12 +150,14 @@ object TapeSpeech {
         for (t in toks) {
             val lw = t.lowercase()
             if (lw in fillers) continue
-            if (lw in pctWords) { if (acc.active()) pct = true else if (out.isNotEmpty()) out.last().pct = true; continue }
+            if (lw in pctWords) { tailPost = false; if (acc.active()) pct = true else if (out.isNotEmpty()) out.last().pct = true; continue }
             val o = opOf(lw)
             if (o != null && !(lw == "x" && !acc.active() && out.isEmpty())) {
                 if (!flush(o) && out.isNotEmpty()) out.last().op = o
+                tailPost = lw in postMinus
                 continue
             }
+            tailPost = false
             val ps = parts(t)
             if (ps != null) {
                 if (!acc.takeAll(ps)) { flush('+'); acc = Acc(); acc.takeAll(ps) }
@@ -145,6 +167,12 @@ object TapeSpeech {
             }
         }
         flush('+')
-        return Result(out.filter { it.amount.signum() > 0 }, if (acc.active()) "" else words.joinToString(" "))
+        var firstNeg = false
+        if (tailPost && out.isNotEmpty()) {
+            // "... 500 ઓછા કરો": that last amount is taken off, it is not a connector
+            out.last().op = '+'
+            if (out.size >= 2) out[out.size - 2].op = '-' else firstNeg = true
+        }
+        return Result(out.filter { it.amount.signum() > 0 }, if (acc.active()) "" else words.joinToString(" "), firstNeg)
     }
 }

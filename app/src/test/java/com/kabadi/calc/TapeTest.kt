@@ -181,4 +181,47 @@ class TapeTest {
         assertEquals(listOf('+', '='), r.map { it.op })
         assertEquals(listOf("labour", "diesel"), r.map { it.note })
     }
+
+    @Test fun amountThenTakeOffAtTheEnd() {
+        val a = TapeSpeech.parseFull("રવિ કે પાસે 500 આયે ઓછા કરો")
+        assertEquals(1, a.items.size)
+        assertEquals(bd("500"), a.items[0].amount)
+        assertTrue(a.firstNeg)
+        assertEquals("", a.rest)
+        val b = TapeSpeech.parseFull("labour 500 diesel 300 ઓછા કરો")
+        assertEquals(listOf('-', '+'), b.items.map { it.op })
+        val c = TapeCalc(TapeSettings(places = 0))
+        c.addSpoken(TapeSpeech.parse("labour 1000 plus diesel 200"))
+        c.addSpoken(a.items, a.firstNeg)
+        assertEquals(bd("700"), c.total())      // 1000 + 200 - 500
+    }
+
+    @Test fun middleMinusStaysAConnector() {
+        val r = p("मजदूरी पांच सौ जोड़ डीजल 1200 घटा एडवांस 300 कुल")
+        assertEquals(listOf('+', '-', '='), r.map { it.op })
+    }
+
+    @Test fun productsBindTighter() {
+        val c = TapeCalc(TapeSettings(places = 0))
+        c.addSpoken(TapeSpeech.parse("labour 300 plus gas 500 times 3000 total"))
+        assertEquals(bd("1500300"), c.total())
+        val d = TapeCalc(TapeSettings(places = 0))
+        d.addSpoken(TapeSpeech.parse("labour 300 plus gas 800 times"))
+        d.addSpoken(TapeSpeech.parse("2 total"))
+        assertEquals(bd("1900"), d.total())
+        val e = TapeCalc(TapeSettings(places = 0))
+        e.addSpoken(TapeSpeech.parse("1000 minus 800 times 2 total"))
+        assertEquals(bd("-600"), e.total())
+    }
+
+    @Test fun hindiGujaratiNumberWords() {
+        assertEquals(bd("25"), p("पच्चीस")[0].amount)
+        assertEquals(bd("2100"), p("इक्कीस सौ")[0].amount)
+        assertEquals(bd("25"), p("પચ્ચીસ")[0].amount)
+        assertEquals(bd("200"), p("બસો")[0].amount)
+        assertEquals(bd("500"), p("પાનસો")[0].amount)
+        assertEquals(bd("1500"), p("દોઢ હજાર")[0].amount)
+        assertEquals(bd("2500"), p("અઢી હજાર")[0].amount)
+        assertEquals(bd("1250"), p("બાર સો પચાસ")[0].amount)
+    }
 }

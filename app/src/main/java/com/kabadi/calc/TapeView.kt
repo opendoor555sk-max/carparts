@@ -438,6 +438,8 @@ class TapeView(private val act: Activity) {
             .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
             .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, offlineFirst)
+            // Android 13+: also understand the other two languages (Hindi words in a Gujarati sentence and so on)
+            .putExtra("android.speech.extra.ADDITIONAL_LANGUAGES", vCodes.filterIndexed { k, _ -> k != vLang }.toTypedArray())
             .putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, act.packageName)
             // wait longer for a pause before closing the sentence
             .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
@@ -463,7 +465,7 @@ class TapeView(private val act: Activity) {
             else { partial = r.rest; refresh(); partial = "" }
             return
         }
-        calc.addSpoken(r.items)
+        calc.addSpoken(r.items, r.firstNeg)
         buzz()
         refresh()
     }

@@ -209,12 +209,28 @@ class TapeCalc(val set: TapeSettings) {
         lines.clear(); clearEntry(); closed = false
     }
 
-    /** spoken lines: written under the tape (a finished tape starts a new one) */
-    fun addSpoken(items: List<TapeSpeech.Item>) {
+    /**
+     * Spoken lines are written under the tape (a finished tape starts a new one).
+     * Like on paper, "x" and "÷" bind tighter than "+" and "−": 300 + 800 x 2 = 1900 (the product gets brackets).
+     */
+    fun addSpoken(items: List<TapeSpeech.Item>, firstNeg: Boolean = false) {
         if (items.isEmpty()) return
         fresh(); clearEntry()
+        val base = lines.size
         items.forEach { lines.add(TLine(it.amount, it.op, it.pct, 0, 0, it.note)) }
+        if (firstNeg) { if (base > 0) lines[base - 1].op = '-' else lines[0].value = lines[0].value.negate() }
         closed = items.last().op == '='
+        // a product that was started in an earlier sentence ("... 800 times" / "2 total") continues
+        var i = base
+        if (base > 0 && lines[base - 1].op in "x/") { i = base - 1; while (i > 0 && lines[i - 1].op in "x/") i-- }
+        while (i < lines.size) {
+            if (lines[i].op == 'x' || lines[i].op == '/') {
+                var j = i
+                while (j < lines.size && (lines[j].op == 'x' || lines[j].op == '/')) j++
+                if (j < lines.size) { lines[i].open++; lines[j].close++ }
+                i = j + 1
+            } else i++
+        }
     }
 
     private fun clearEntry() { cur = ""; neg = false; curPct = false; pendOpen = 0; pendClose = 0 }
