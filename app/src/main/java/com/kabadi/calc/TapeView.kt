@@ -72,7 +72,7 @@ class TapeView(private val act: Activity) {
     private fun fmt(v: BigDecimal) = TapeMath.fmt(v, set.places, set.style)
     private fun totalText(l: List<TLine>) = TapeMath.total(l, set.smart)?.let { fmt(it) } ?: "Error"
 
-    init {
+    private fun build() {
         TapeStore.loadState(act, calc)
         calc.archive = { TapeStore.addHistory(act, it, totalText(it)) }
         root.orientation = LinearLayout.VERTICAL
@@ -496,4 +496,7 @@ class TapeView(private val act: Activity) {
     fun onPermission(granted: Boolean) {
         if (granted) startListening() else toast(tr("Allow the microphone to speak", "बोलने के लिए माइक की अनुमति दें", "બોલવા માટે માઇક ની પરવાનગી આપો"))
     }
+
+    // must stay LAST: every property above has to exist before the screen is built
+    init { build() }
 }

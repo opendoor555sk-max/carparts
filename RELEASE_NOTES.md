@@ -1,3 +1,5 @@
+FIX: Kalkuletar kholta app band thati hati (error) – sudhari didhu.
+
 BOLVU FIX: + − × ÷ % (symbol ke shabd – plus, minus, gunakar, bhagakar, takavari) have barabar samjay; pan kagal ni niche 🗣 ma phone e shu lakhyu te dekhay.
 
 BOLVU: 🎤 ek var dabavo – mic chalu rahe (3 min sudhi), beep band, sentence vachche kapay to word aagal joday, internet vagar mate offline pack ni madad (⚙ ma).
