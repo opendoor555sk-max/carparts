@@ -1,3 +1,5 @@
+BOLVU: '500 ocha karo' tema 500 ghate; x ane ÷ pehla thay (300 + 800 x 2 = 1900); Hindi/Gujarati sankhya shabd (pachchis, bas so, dodh hajar) samjay; bija bhasha na shabd pan.
+
 FIX: Kalkuletar kholta app band thati hati (error) – sudhari didhu.
 
 BOLVU FIX: + − × ÷ % (symbol ke shabd – plus, minus, gunakar, bhagakar, takavari) have barabar samjay; pan kagal ni niche 🗣 ma phone e shu lakhyu te dekhay.
