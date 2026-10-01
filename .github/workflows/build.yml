@@ -32,7 +32,7 @@ jobs:
         if: failure()
         run: |
           wc -l build.log
-          { grep -aE "e: |FAILED|AssertionError|expected|No key|What went wrong|Exception" build.log; tail -n 25 build.log; } | head -60 | while IFS= read -r line; do
+          { grep -aE -A2 "\.java:[0-9]+: error:" build.log; grep -aE "e: |FAILED|AssertionError|expected|No key|What went wrong|Exception" build.log; tail -n 25 build.log; } | head -60 | while IFS= read -r line; do
             echo "::error::${line}"
           done
 
