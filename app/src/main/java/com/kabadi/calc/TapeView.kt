@@ -465,7 +465,7 @@ class TapeView(private val act: Activity) {
             else { partial = r.rest; refresh(); partial = "" }
             return
         }
-        calc.addSpoken(r.items, r.firstNeg)
+        calc.addSpoken(r.items)
         buzz()
         refresh()
     }

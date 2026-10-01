@@ -185,15 +185,27 @@ class TapeTest {
     @Test fun amountThenTakeOffAtTheEnd() {
         val a = TapeSpeech.parseFull("રવિ કે પાસે 500 આયે ઓછા કરો")
         assertEquals(1, a.items.size)
-        assertEquals(bd("500"), a.items[0].amount)
-        assertTrue(a.firstNeg)
+        assertEquals(bd("-500"), a.items[0].amount)
         assertEquals("", a.rest)
         val b = TapeSpeech.parseFull("labour 500 diesel 300 ઓછા કરો")
-        assertEquals(listOf('-', '+'), b.items.map { it.op })
+        assertEquals(listOf(bd("500"), bd("-300")), b.items.map { it.amount })
         val c = TapeCalc(TapeSettings(places = 0))
         c.addSpoken(TapeSpeech.parse("labour 1000 plus diesel 200"))
-        c.addSpoken(a.items, a.firstNeg)
+        c.addSpoken(a.items)
         assertEquals(bd("700"), c.total())      // 1000 + 200 - 500
+    }
+
+    @Test fun googleWritesMinusAsASymbolAndNameAfterTheAmount() {
+        // what the phone really wrote: "500 - કરોડ રફિકભાઈ ના" (ઓછા કરો રફિકભાઈના)
+        val r = TapeSpeech.parseFull("500 - કરોડ રફિકભાઈ ના")
+        assertEquals(1, r.items.size)
+        assertEquals(bd("-500"), r.items[0].amount)
+        assertEquals("રફિકભાઈ", r.items[0].note)
+        assertEquals("", r.rest)
+        val c = TapeCalc(TapeSettings(places = 0))
+        c.addSpoken(TapeSpeech.parse("ક્રેન ભાડું 5000 વાલીયા પેડલ વાળાને 500"))
+        c.addSpoken(r.items)
+        assertEquals(bd("5000"), c.total())
     }
 
     @Test fun middleMinusStaysAConnector() {

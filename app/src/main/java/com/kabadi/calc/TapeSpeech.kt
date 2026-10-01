@@ -9,7 +9,7 @@ import java.math.BigDecimal
  * Works for Gujarati, Hindi and English words, and for digits in any of the three scripts.
  */
 object TapeSpeech {
-    class Item(val note: String, val amount: BigDecimal, var op: Char, var pct: Boolean)
+    class Item(var note: String, var amount: BigDecimal, var op: Char, var pct: Boolean)
 
     private val digMap = HashMap<Char, Char>().also { m ->
         "૦૧૨૩૪૫૬૭૮૯".forEachIndexed { i, c -> m[c] = '0' + i }
@@ -46,7 +46,7 @@ object TapeSpeech {
         "સો" to 100, "હજાર" to 1000, "લાખ" to 100000
     )
     private val fillers = hashSetOf("rupees", "rupee", "rs", "rupaiya", "રૂપિયા", "રૂપિયાનું", "રૂ", "रुपये", "रुपया", "रुपए", "₹",
-        "આયે", "આયો", "आये", "आए", "आया", "કરો", "કર", "करो", "कर", "કરજો", "pachi", "પછી", "फिर", "then", "and", "ane", "અને", "और", "of", "na", "ના", "નો", "ની", "નું")
+        "કરોડ", "આયે", "આયો", "आये", "आए", "आया", "કરો", "કર", "करो", "कर", "કરજો", "pachi", "પછી", "फिर", "then", "and", "ane", "અને", "और", "of", "na", "ના", "નો", "ની", "નું")
     private val opWords: Map<Char, Set<String>> = mapOf(
         '+' to setOf("+", "plus", "add", "adding", "પ્લસ", "જમા", "ઉમેરો", "ઉમેર", "ઉમેરવા", "વત્તા", "જોડો", "જોડ", "જોડી",
             "प्लस", "जोड़", "जोड़ो", "जमा", "जोड", "जोडो", "जोड़ें", "जोड़कर"),
@@ -115,8 +115,7 @@ object TapeSpeech {
         fun takeAll(ps: List<Part>): Boolean { val t = copy(); for (p in ps) if (!t.take(p)) return false; total = t.total; cur = t.cur; last = t.last; return true }
     }
 
-    class Result(val items: List<Item>, /** item words heard after the last amount (the amount comes in the next sentence) */ val rest: String,
-        /** "500 ઓછા કરો": the first amount of this sentence is taken off the tape that is already written */ val firstNeg: Boolean = false)
+    class Result(val items: List<Item>, /** item words heard after the last amount (the amount comes in the next sentence) */ val rest: String)
 
     private const val DIG = "0-9૦-૯०-९"
 
@@ -134,7 +133,7 @@ object TapeSpeech {
         var words = ArrayList<String>()
         var acc = Acc()
         var pct = false
-        var tailPost = false
+        var signIdx = -1   // "500 ઓછા કરો રફિકભાઈના" / "500 - ...": no amount follows, so the minus belongs to this amount
 
         fun flush(op: Char?): Boolean {
             if (!acc.active()) return false
@@ -150,16 +149,16 @@ object TapeSpeech {
         for (t in toks) {
             val lw = t.lowercase()
             if (lw in fillers) continue
-            if (lw in pctWords) { tailPost = false; if (acc.active()) pct = true else if (out.isNotEmpty()) out.last().pct = true; continue }
+            if (lw in pctWords) { if (acc.active()) pct = true else if (out.isNotEmpty()) out.last().pct = true; continue }
             val o = opOf(lw)
             if (o != null && !(lw == "x" && !acc.active() && out.isEmpty())) {
                 if (!flush(o) && out.isNotEmpty()) out.last().op = o
-                tailPost = lw in postMinus
+                signIdx = if (o == '-' && (lw in postMinus || (lw.length == 1 && lw in "-−–—")) && out.isNotEmpty()) out.size - 1 else -1
                 continue
             }
-            tailPost = false
             val ps = parts(t)
             if (ps != null) {
+                signIdx = -1
                 if (!acc.takeAll(ps)) { flush('+'); acc = Acc(); acc.takeAll(ps) }
             } else {
                 if (acc.active() && !numberFirst) flush('+')
@@ -167,12 +166,11 @@ object TapeSpeech {
             }
         }
         flush('+')
-        var firstNeg = false
-        if (tailPost && out.isNotEmpty()) {
-            // "... 500 ઓછા કરો": that last amount is taken off, it is not a connector
-            out.last().op = '+'
-            if (out.size >= 2) out[out.size - 2].op = '-' else firstNeg = true
+        if (signIdx in out.indices) {
+            val it0 = out[signIdx]
+            out[signIdx] = Item((it0.note + " " + words.joinToString(" ")).trim(), it0.amount.negate(), '+', it0.pct)
+            words = ArrayList()
         }
-        return Result(out.filter { it.amount.signum() > 0 }, if (acc.active()) "" else words.joinToString(" "), firstNeg)
+        return Result(out.filter { it.amount.signum() != 0 }, if (acc.active()) "" else words.joinToString(" "))
     }
 }

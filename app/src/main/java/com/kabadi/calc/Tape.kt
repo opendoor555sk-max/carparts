@@ -213,12 +213,11 @@ class TapeCalc(val set: TapeSettings) {
      * Spoken lines are written under the tape (a finished tape starts a new one).
      * Like on paper, "x" and "÷" bind tighter than "+" and "−": 300 + 800 x 2 = 1900 (the product gets brackets).
      */
-    fun addSpoken(items: List<TapeSpeech.Item>, firstNeg: Boolean = false) {
+    fun addSpoken(items: List<TapeSpeech.Item>) {
         if (items.isEmpty()) return
         fresh(); clearEntry()
         val base = lines.size
         items.forEach { lines.add(TLine(it.amount, it.op, it.pct, 0, 0, it.note)) }
-        if (firstNeg) { if (base > 0) lines[base - 1].op = '-' else lines[0].value = lines[0].value.negate() }
         closed = items.last().op == '='
         // a product that was started in an earlier sentence ("... 800 times" / "2 total") continues
         var i = base
