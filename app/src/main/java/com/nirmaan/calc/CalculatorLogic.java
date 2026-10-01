@@ -46,12 +46,10 @@ public final class CalculatorLogic {
             }
             r.info = info.toString();
             r.raw = r.assign != null ? r.assign : SciFmt.INSTANCE.rawOf(out.getQ(), out.getUnit(), o);
-        } catch (SciErr e) {
-            r.error = true;
-            r.info = errText(e, o);
         } catch (Exception e) {
+            // SciErr is a Kotlin (unchecked) exception, so it is caught here
             r.error = true;
-            r.info = "";
+            r.info = e instanceof SciErr ? errText((SciErr) e, o) : "";
         }
         return r;
     }
