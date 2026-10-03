@@ -1,0 +1,4 @@
+android/build.gradle.bak
+*.log
+build/
+.gradle/
