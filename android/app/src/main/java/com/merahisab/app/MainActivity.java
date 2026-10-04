@@ -99,6 +99,7 @@ public class MainActivity extends Activity {
     private File dataFile() { return new File(getFilesDir(), "data.json"); }
 
     private void loadData() {
+        I18n.set(db.settings.lang);
         try {
             File f = dataFile();
             if (f.exists()) {
@@ -144,7 +145,7 @@ public class MainActivity extends Activity {
         return p;
     }
 
-    void toast(String m) { Toast.makeText(this, m, Toast.LENGTH_SHORT).show(); }
+    void toast(String m) { Toast.makeText(this, I18n.tr(m), Toast.LENGTH_SHORT).show(); }
 
     String versionName() {
         try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception e) { return "1.0"; }
@@ -197,6 +198,7 @@ public class MainActivity extends Activity {
     }
 
     void render() {
+        I18n.set(db.settings.lang);
         if (scroll == null) return;
         LinearLayout v;
         if (partyId != null) v = screens.party(partyId);

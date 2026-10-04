@@ -69,7 +69,7 @@ public final class Ui {
 
     public static TextView t(Context c, CharSequence s, float sp, int color, boolean bold) {
         TextView v = new TextView(c);
-        v.setText(s);
+        v.setText(I18n.tr(s));
         v.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         v.setTextColor(color);
         if (bold) v.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -154,7 +154,7 @@ public final class Ui {
 
     public static EditText fld(Context c, String hint, String text, int inputType) {
         EditText e = new EditText(c);
-        e.setHint(hint);
+        e.setHint(I18n.tr(hint));
         e.setText(text);
         e.setTextColor(TEXT);
         e.setHintTextColor(MUTED);

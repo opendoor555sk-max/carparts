@@ -27,17 +27,17 @@ public final class Fmt {
 
     public static String weekday(String iso) {
         int dow = LocalDate.parse(iso).getDayOfWeek().getValue() % 7; // Mon=1..Sun=7 -> Sun=0
-        return WDAYS[dow];
+        return I18n.weekday(dow);
     }
 
     public static String longDate(String iso) {
         LocalDate d = LocalDate.parse(iso);
-        return weekday(iso) + ", " + d.getDayOfMonth() + " " + MONTHS[d.getMonthValue() - 1] + " " + d.getYear();
+        return weekday(iso) + ", " + d.getDayOfMonth() + " " + I18n.month(d.getMonthValue() - 1) + " " + d.getYear();
     }
 
     public static String shortDate(String iso) {
         LocalDate d = LocalDate.parse(iso);
-        String m = MONTHS[d.getMonthValue() - 1];
+        String m = I18n.month(d.getMonthValue() - 1);
         if (m.length() > 5) m = m.substring(0, 5);
         return d.getDayOfMonth() + " " + m + ", " + d.getYear();
     }
@@ -50,7 +50,7 @@ public final class Fmt {
 
     public static String monthLabel(String key) {
         String[] p = key.split("-");
-        return MONTHS[Integer.parseInt(p[1]) - 1] + " " + p[0];
+        return I18n.month(Integer.parseInt(p[1]) - 1) + " " + p[0];
     }
 
     public static double round2(double n) { return Math.round(n * 100.0) / 100.0; }

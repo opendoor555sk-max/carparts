@@ -309,7 +309,45 @@ final class Screens {
         LinearLayout.LayoutParams l2 = Ui.weight(1); l2.setMargins(Ui.dp(4), 0, Ui.dp(4), 0);
         two.addView(c1, l1);
         two.addView(c2, l2);
+        Ui.tap(c1, new Runnable() { @Override public void run() { a.kf = "customer"; a.kq = ""; a.go("khata"); } });
+        Ui.tap(c2, new Runnable() { @Override public void run() { a.kf = "creditor"; a.kq = ""; a.go("khata"); } });
         root.addView(two);
+
+        // In-Review: spoken entries waiting for confirmation
+        if (!db.review.isEmpty()) {
+            root.addView(sectionHead("✦ ઇન-રિવ્યુ વ્યવહારો (" + db.review.size() + ")", null, null));
+            for (final Model.Pending q : db.review) {
+                LinearLayout card = Ui.card(c);
+                LinearLayout line = Ui.h(c);
+                TextView mic = Ui.t(c, "🎤", 18, Ui.ACCENT, true);
+                mic.setGravity(Gravity.CENTER);
+                mic.setBackground(Ui.rr(Ui.SOFT, 0, 22));
+                LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(Ui.dp(44), Ui.dp(44));
+                mp.setMargins(0, 0, Ui.dp(10), 0);
+                line.addView(mic, mp);
+                LinearLayout mid = Ui.v(c);
+                mid.addView(Ui.t(c, "વૉઇસ ટ્રાન્ઝેક્શન", 15, Ui.TEXT, true));
+                mid.addView(Ui.t(c, q.said, 13, Ui.MUTED, false));
+                line.addView(mid, Ui.weight(1));
+                LinearLayout rt = Ui.v(c);
+                rt.setGravity(Gravity.END);
+                TextView am = Ui.t(c, q.amount > 0 ? Fmt.money(q.amount) : "₹ ?", 17, Ui.tone(Ui.toneOf(q.type)), true);
+                am.setGravity(Gravity.END);
+                rt.addView(am);
+                TextView rv = Ui.t(c, "રિવ્યુ ›", 12, Ui.ACCENT, true);
+                rv.setBackground(Ui.rr(Ui.SOFT, 0, 10));
+                Ui.pad(rv, 10, 4, 10, 4);
+                rv.setGravity(Gravity.END);
+                rt.addView(rv);
+                line.addView(rt);
+                card.addView(line);
+                Ui.tap(card, new Runnable() { @Override public void run() { a.sheets.openReviewById(q.id); } });
+                LinearLayout.LayoutParams cp = Ui.fillW();
+                cp.setMargins(Ui.dp(12), Ui.dp(4), Ui.dp(12), Ui.dp(4));
+                card.setLayoutParams(cp);
+                root.addView(card);
+            }
+        }
 
         root.addView(sectionHead("તાજેતરના વ્યવહારો", "બધા જુઓ ›", new Runnable() { @Override public void run() { a.go("txn"); } }));
         if (recent.isEmpty()) {
@@ -525,7 +563,7 @@ final class Screens {
             String sub = !es.isEmpty() ? "છેલ્લી નોંધ " + Fmt.fmtDate(es.get(0).date) : (!r.p.phone.isEmpty() ? r.p.phone : "હજી નોંધ નથી");
             sub = (r.k.equals("creditor") ? "લેણદાર" : "ગ્રાહક") + ((ov.recv + ov.pay) > 0 ? " · મુદતવીતી" : "") + " · " + sub;
             int col = r.b > 0 ? Ui.GREEN : (r.b < 0 ? Ui.RED : Ui.MUTED);
-            lb.addView(row(r.p.name, Ui.ACCENT, r.p.name, sub, Fmt.money(Math.abs(r.b)), col, r.b > 0 ? "લેવાના" : (r.b < 0 ? "દેવાના" : "બરાબર"),
+            lb.addView(row(r.p.name, Ui.ACCENT, (a.sheets.light(r.p).isEmpty() ? "" : a.sheets.light(r.p) + " ") + r.p.name, sub, Fmt.money(Math.abs(r.b)), col, r.b > 0 ? "લેવાના" : (r.b < 0 ? "દેવાના" : "બરાબર"),
                     new Runnable() { @Override public void run() { a.openParty(r.p.id); } }));
         }
     }
@@ -700,7 +738,21 @@ final class Screens {
         LinearLayout l2 = listBox();
         l2.addView(row("👥", Ui.ACCENT, "માસિક સારાંશ અહેવાલ", "ફિલ્ટર્સ સાથે ગ્રાહક અને લેણદાર માસિક સારાંશ", null, 0, null,
                 new Runnable() { @Override public void run() { a.sub = "monthly"; a.render(); } }));
+        l2.addView(divider());
+        l2.addView(row("⏳", Ui.ACCENT, "બાકી ચૂકવણી (Pending)", "કોણ તમને આપશે અને કોને તમારે આપવાના, તાકીદ મુજબ", null, 0, null,
+                new Runnable() { @Override public void run() { a.sheets.pendingSheet(); } }));
         root.addView(l2);
+        root.addView(sectionHead("રોકડ અને નફો", null, null));
+        LinearLayout l3 = listBox();
+        l3.addView(row("₹", Ui.ACCENT, "રોકડ સારાંશ", "ફક્ત રોકડ નોંધ, શરૂઆત અને અંતના બેલેન્સ સાથે", null, 0, null,
+                new Runnable() { @Override public void run() { a.sheets.cashSheet(); } }));
+        l3.addView(divider());
+        l3.addView(row("◔", Ui.ACCENT, "નફો-નુકસાન (P&L)", "ચોખ્ખી આવક, ખર્ચ અને નફાનું વિશ્લેષણ", null, 0, null,
+                new Runnable() { @Override public void run() { a.sheets.pnlSheet(); } }));
+        l3.addView(divider());
+        l3.addView(row("▥", Ui.ACCENT, "વાર્ષિક રિપોર્ટ", "આખા વર્ષની મહિના મુજબ આવક અને ખર્ચ", null, 0, null,
+                new Runnable() { @Override public void run() { a.sheets.annualSheet(); } }));
+        root.addView(l3);
         return root;
     }
 

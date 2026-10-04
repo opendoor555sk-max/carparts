@@ -28,7 +28,7 @@ final class Sheets {
     /** Entry form state. */
     static final class Form {
         String id = null, type = "income", partyId = null, name = "", amount = "", note = "", date = Fmt.today(), mode = "cash",
-                cat = "અન્ય", said = "", due = "", prodId = "", qty = "";
+                cat = "અન્ય", said = "", due = "", prodId = "", qty = "", pendingId = null;
         boolean lock = false;
     }
 
@@ -350,7 +350,7 @@ final class Sheets {
         boolean okMode = false;
         for (String m : modes) if (m.equals(f.mode)) okMode = true;
         if (!okMode) f.mode = "cash";
-        final Ui.Sheet s = open(f.id != null ? "નોંધમાં ફેરફાર" : "નોંધ ઉમેરો");
+        final Ui.Sheet s = open(f.pendingId != null ? "રિવ્યુ: વૉઇસ નોંધ" : (f.id != null ? "નોંધમાં ફેરફાર" : "નોંધ ઉમેરો"));
         fName = null; fNote = null; fQty = null; suggBox = null;
 
         if (!f.said.isEmpty()) {
@@ -482,11 +482,17 @@ final class Sheets {
             dueBtn = dateField(f.due, "મુદત પસંદ કરો", true);
             s.add(dueBtn);
         }
-        s.add(Ui.btn(c, f.said.isEmpty() ? "નોંધ કરો" : "હા, સેવ કરો", "primary", new Runnable() { @Override public void run() { syncForm(); saveEntry(); } }));
-        if (!f.said.isEmpty()) {
-            s.add(Ui.btn(c, "🎤 બોલીને “હા” કે “ના” કહો", "ghost", new Runnable() { @Override public void run() { yesNoVoice(); } }));
+        if (f.pendingId != null) {
+            s.add(Ui.btn(c, "સેવ અને આગળ", "primary", new Runnable() { @Override public void run() { syncForm(); saveEntry(); } }));
+            s.add(Ui.btn(c, "છોડી દો", "ghost", new Runnable() { @Override public void run() { discardPending(form.pendingId); } }));
+            s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        } else {
+            s.add(Ui.btn(c, f.said.isEmpty() ? "નોંધ કરો" : "હા, સેવ કરો", "primary", new Runnable() { @Override public void run() { syncForm(); saveEntry(); } }));
+            if (!f.said.isEmpty()) {
+                s.add(Ui.btn(c, "🎤 બોલીને “હા” કે “ના” કહો", "ghost", new Runnable() { @Override public void run() { yesNoVoice(); } }));
+            }
+            s.add(Ui.btn(c, "રદ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
         }
-        s.add(Ui.btn(c, "રદ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
         s.show();
     }
 
@@ -556,10 +562,44 @@ final class Sheets {
             }
         }
         if (!replaced) a.db.txns.add(rec);
+        if (f.pendingId != null) removePending(f.pendingId);
         a.save();
         close();
         a.render();
         a.toast("નોંધ થઈ ગઈ" + (T.party && a.db.party(pid) != null ? " · " + a.db.party(pid).name : ""));
+        if (f.pendingId != null && !a.db.review.isEmpty()) openReview(a.db.review.get(0));
+    }
+
+    // ---------- In-Review (spoken entries waiting for confirmation) ----------
+    private void removePending(String id) {
+        for (int i = 0; i < a.db.review.size(); i++) if (a.db.review.get(i).id.equals(id)) { a.db.review.remove(i); break; }
+    }
+
+    void openReview(Model.Pending q) {
+        Form f = new Form();
+        f.type = q.type;
+        f.amount = q.amount > 0 ? Fmt.plain(q.amount).replace(",", "") : "";
+        f.name = q.name;
+        f.partyId = (q.partyId != null && a.db.party(q.partyId) != null) ? q.partyId : null;
+        f.date = Fmt.validIso(q.date) ? q.date : Fmt.today();
+        f.said = q.said;
+        f.note = q.note;
+        f.cat = q.cat.isEmpty() ? "અન્ય" : q.cat;
+        f.pendingId = q.id;
+        openEntry(f);
+    }
+
+    void openReviewById(String id) {
+        for (Model.Pending q : a.db.review) if (q.id.equals(id)) { openReview(q); return; }
+    }
+
+    private void discardPending(String id) {
+        removePending(id);
+        a.save();
+        close();
+        a.render();
+        a.toast("ઇન-રિવ્યુ રદ કર્યું");
+        if (!a.db.review.isEmpty()) openReview(a.db.review.get(0));
     }
 
     // ---------- transaction detail ----------
@@ -713,10 +753,235 @@ final class Sheets {
 
     void homeMenuSheet() {
         Ui.Sheet s = open(null);
+        s.add(srow("રિમાઇન્ડર મોકલો", "ગ્રાહકને બાકી રકમની યાદ અપાવો", null, new Runnable() { @Override public void run() { remSel.clear(); reminderSheet(); } }));
+        s.add(srow("રિમાઇન્ડર ઇતિહાસ", "કોને કોને મોકલ્યું", null, new Runnable() { @Override public void run() { reminderHistorySheet(); } }));
         s.add(srow("સેટિંગ્સ", "થીમ, પિન, બેકઅપ", null, new Runnable() { @Override public void run() { close(); a.go("more"); } }));
         s.add(srow("બેકઅપ લો", a.backupTimeText(), null, new Runnable() { @Override public void run() { backupSheet(); } }));
         if (!a.db.settings.pinHash.isEmpty()) s.add(srow("હમણાં લૉક કરો", "એપ ફરી ખોલવા પિન જોઈશે", null, new Runnable() { @Override public void run() { close(); a.showPin("unlock", null); } }));
         s.add(srow("મદદ (FAQs)", "કેવી રીતે વાપરવું", null, new Runnable() { @Override public void run() { faqSheet(); } }));
+        s.show();
+    }
+
+    // ---------- risk traffic light + report sheets ----------
+    /** 🟢 recent / 🟡 older than 30 days / 🔴 overdue, for customers who owe money. */
+    String light(Model.Party p) {
+        double b = a.db.partyBal(p.id);
+        if (b <= 0) return "";
+        String today = Fmt.today();
+        if (a.db.overdueFor(p.id, today).recv > 0) return "🔴";
+        String last = "";
+        for (Model.Txn t : a.db.txns) if (p.id.equals(t.partyId) && t.date.compareTo(last) > 0) last = t.date;
+        if (!last.isEmpty()) {
+            try {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.parse(last), java.time.LocalDate.parse(today));
+                if (days > 30) return "🟡";
+            } catch (Exception e) { /* ignore */ }
+        }
+        return "🟢";
+    }
+
+    void pendingSheet() {
+        Ui.Sheet s = open("બાકી ચૂકવણી (Pending)");
+        final List<Object[]> rows = new ArrayList<>();
+        String today = Fmt.today();
+        for (Model.Party p : a.db.parties) {
+            double b = a.db.partyBal(p.id);
+            if (Math.abs(b) < 0.005) continue;
+            Model.Due ov = a.db.overdueFor(p.id, today);
+            boolean od = ov.recv > 0 || ov.pay > 0;
+            rows.add(new Object[]{p, b, od ? 0 : 1});
+        }
+        Collections.sort(rows, new Comparator<Object[]>() {
+            @Override public int compare(Object[] x, Object[] y) {
+                int c1 = (Integer) x[2] - (Integer) y[2];
+                return c1 != 0 ? c1 : Double.compare(Math.abs((Double) y[1]), Math.abs((Double) x[1]));
+            }
+        });
+        if (rows.isEmpty()) {
+            TextView e = Ui.t(c, "કોઈ બાકી નથી", 14, Ui.MUTED, false);
+            e.setGravity(Gravity.CENTER); Ui.pad(e, 10, 24, 10, 24); s.add(e);
+        } else {
+            LinearLayout box = Ui.v(c);
+            for (Object[] r : rows) {
+                final Model.Party p = (Model.Party) r[0];
+                double b = (Double) r[1];
+                String lt = light(p);
+                box.addView(rowItem(p.name, (lt.isEmpty() ? "" : lt + " ") + p.name, b > 0 ? "લેવાના" : "દેવાના", Fmt.money(Math.abs(b)), b > 0 ? Ui.GREEN : Ui.RED, null,
+                        new Runnable() { @Override public void run() { close(); a.openParty(p.id); } }));
+            }
+            s.add(scrollBox(box, 380));
+        }
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    private void statLine(Ui.Sheet s, String label, double v, int color) {
+        LinearLayout l = Ui.h(c);
+        Ui.pad(l, 4, 8, 4, 8);
+        l.addView(Ui.t(c, label, 15, Ui.TEXT, false), Ui.weight(1));
+        l.addView(Ui.t(c, Fmt.money(v), 16, color, true));
+        s.add(l);
+    }
+
+    void cashSheet() {
+        String ym = Fmt.today().substring(0, 7);
+        double open = a.db.settings.openCash, in = 0, out = 0;
+        for (Model.Txn t : a.db.txns) {
+            double e = Model.type(t.type).cash * t.amount;
+            if (e == 0 || "writeoff".equals(t.mode) || "upi".equals(t.mode)) continue;
+            String m = t.date.length() >= 7 ? t.date.substring(0, 7) : "";
+            if (m.compareTo(ym) < 0) open += e;
+            else if (m.equals(ym)) { if (e > 0) in += e; else out -= e; }
+        }
+        Ui.Sheet s = open("રોકડ સારાંશ");
+        TextView mt = Ui.t(c, Fmt.monthLabel(ym), 14, Ui.MUTED, true);
+        mt.setGravity(Gravity.CENTER); s.add(mt);
+        statLine(s, "શરૂઆતનું બેલેન્સ", open, Ui.TEXT);
+        statLine(s, "રોકડ/બેંક આવક", in, Ui.GREEN);
+        statLine(s, "જાવક", out, Ui.RED);
+        statLine(s, "અંતનું બેલેન્સ", open + in - out, Ui.ACCENT);
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    void pnlSheet() {
+        String ym = Fmt.today().substring(0, 7);
+        Model.Totals t = a.db.monthTotals(ym);
+        Ui.Sheet s = open("નફો-નુકસાન (P&L)");
+        TextView mt = Ui.t(c, Fmt.monthLabel(ym), 14, Ui.MUTED, true);
+        mt.setGravity(Gravity.CENTER); s.add(mt);
+        statLine(s, "કુલ આવક", t.inc, Ui.GREEN);
+        statLine(s, "ખર્ચ", t.exp, Ui.RED);
+        statLine(s, "ચોખ્ખો નફો", t.inc - t.exp, t.inc - t.exp >= 0 ? Ui.GREEN : Ui.RED);
+        statLine(s, "ઉધાર વેચાણ", t.gave, Ui.TEXT);
+        statLine(s, "ઉધાર ખરીદી", t.took, Ui.TEXT);
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    void annualSheet() {
+        String yr = Fmt.today().substring(0, 4);
+        Ui.Sheet s = open("વાર્ષિક રિપોર્ટ");
+        TextView mt = Ui.t(c, yr, 14, Ui.MUTED, true);
+        mt.setGravity(Gravity.CENTER); s.add(mt);
+        LinearLayout box = Ui.v(c);
+        double ti = 0, te = 0;
+        for (int m = 1; m <= 12; m++) {
+            String key = yr + "-" + (m < 10 ? "0" : "") + m;
+            Model.Totals t = a.db.monthTotals(key);
+            ti += t.inc; te += t.exp;
+            if (t.inc == 0 && t.exp == 0) continue;
+            box.addView(rowItem(I18n.month(m - 1), I18n.month(m - 1), Fmt.money(t.exp) + " ↑", Fmt.money(t.inc), Ui.GREEN, null, null));
+        }
+        s.add(scrollBox(box, 300));
+        statLine(s, "કુલ આવક", ti, Ui.GREEN);
+        statLine(s, "ખર્ચ", te, Ui.RED);
+        statLine(s, "ચોખ્ખો નફો", ti - te, ti - te >= 0 ? Ui.GREEN : Ui.RED);
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    // ---------- send reminder (one by one, from this phone) ----------
+    private final java.util.LinkedHashSet<String> remSel = new java.util.LinkedHashSet<>();
+    private final List<String> remQueue = new ArrayList<>();
+
+    private List<Model.Party> dueCustomers() {
+        List<Model.Party> out = new ArrayList<>();
+        for (Model.Party p : a.db.parties) if (a.db.kindOf(p).equals("customer") && a.db.partyBal(p.id) > 0) out.add(p);
+        Collections.sort(out, new Comparator<Model.Party>() {
+            @Override public int compare(Model.Party x, Model.Party y) { return Double.compare(a.db.partyBal(y.id), a.db.partyBal(x.id)); }
+        });
+        return out;
+    }
+
+    void reminderSheet() {
+        final List<Model.Party> list = dueCustomers();
+        double total = 0;
+        for (Model.Party p : list) total += a.db.partyBal(p.id);
+        Ui.Sheet s = open("રિમાઇન્ડર મોકલો");
+        TextView hd = Ui.t(c, list.size() + " ગ્રાહકો • " + Fmt.money(total) + " બાકી", 14, Ui.TEXT, true);
+        s.add(hd);
+        if (list.isEmpty()) {
+            TextView e = Ui.t(c, "હમણાં બાકી ગ્રાહકો નથી", 14, Ui.MUTED, false);
+            e.setGravity(Gravity.CENTER); Ui.pad(e, 10, 18, 10, 18); s.add(e);
+        } else {
+            TextView all = Ui.t(c, "બધા પસંદ કરો", 14, Ui.ACCENT, true);
+            all.setGravity(Gravity.END);
+            Ui.tap(all, new Runnable() { @Override public void run() {
+                if (remSel.size() == list.size()) remSel.clear(); else for (Model.Party p : list) remSel.add(p.id);
+                reminderSheet();
+            } });
+            s.add(all);
+            LinearLayout box = Ui.v(c);
+            double selAmt = 0;
+            for (final Model.Party p : list) {
+                final boolean on = remSel.contains(p.id);
+                double b = a.db.partyBal(p.id);
+                if (on) selAmt += b;
+                box.addView(rowItem(p.name, (on ? "☑  " : "☐  ") + p.name, p.phone.isEmpty() ? "ફોન નથી" : p.phone, Fmt.money(b), Ui.RED, null, new Runnable() {
+                    @Override public void run() { if (on) remSel.remove(p.id); else remSel.add(p.id); reminderSheet(); }
+                }));
+            }
+            s.add(scrollBox(box, 280));
+            final int n = remSel.size();
+            TextView go = Ui.btn(c, "ચાલુ રાખો (" + n + " પસંદ કર્યા • " + Fmt.money(selAmt) + ")", n > 0 ? "primary" : "ghost", new Runnable() {
+                @Override public void run() {
+                    if (remSel.isEmpty()) return;
+                    remQueue.clear();
+                    remQueue.addAll(remSel);
+                    remNext();
+                }
+            });
+            s.add(go);
+        }
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    private void remNext() {
+        while (!remQueue.isEmpty() && a.db.party(remQueue.get(0)) == null) remQueue.remove(0);
+        if (remQueue.isEmpty()) { close(); a.toast("મોકલ્યું"); return; }
+        final Model.Party p = a.db.party(remQueue.remove(0));
+        final double b = a.db.partyBal(p.id);
+        Ui.Sheet s = open("રિમાઇન્ડર મોકલો");
+        LinearLayout card = Ui.card(c);
+        TextView nm = Ui.t(c, p.name, 20, Ui.TEXT, true); nm.setGravity(Gravity.CENTER); card.addView(nm);
+        TextView am = Ui.t(c, Fmt.money(b), 28, Ui.RED, true); am.setGravity(Gravity.CENTER); card.addView(am);
+        TextView ph = Ui.t(c, p.phone.isEmpty() ? "ફોન નથી" : p.phone, 13, Ui.MUTED, false); ph.setGravity(Gravity.CENTER); card.addView(ph);
+        s.add(card);
+        s.add(Ui.btn(c, "WhatsApp ખોલો", "green", new Runnable() {
+            @Override public void run() {
+                String msg = a.db.settings.upiId.isEmpty()
+                        ? "નમસ્તે " + p.name + ", તમારા " + Fmt.money(b) + " બાકી છે. કૃપા કરીને ચૂકવણી કરશો." + (a.db.settings.shop.isEmpty() ? "" : "\n— " + a.db.settings.shop)
+                        : a.payMsg(p, b);
+                Model.RemLog rl = new Model.RemLog();
+                rl.partyId = p.id; rl.name = p.name; rl.amount = b; rl.ts = System.currentTimeMillis();
+                a.db.remLog.add(rl);
+                a.save();
+                a.openUrl(a.waLink(p.phone, msg));
+                remNext();
+            }
+        }));
+        s.add(Ui.btn(c, "છોડો", "ghost", new Runnable() { @Override public void run() { remNext(); } }));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { remQueue.clear(); close(); } }));
+        s.show();
+    }
+
+    void reminderHistorySheet() {
+        Ui.Sheet s = open("રિમાઇન્ડર ઇતિહાસ");
+        if (a.db.remLog.isEmpty()) {
+            TextView e = Ui.t(c, "કોઈ ઇતિહાસ નથી", 14, Ui.MUTED, false);
+            e.setGravity(Gravity.CENTER); Ui.pad(e, 10, 24, 10, 24); s.add(e);
+        } else {
+            LinearLayout box = Ui.v(c);
+            for (int i = a.db.remLog.size() - 1; i >= 0; i--) {
+                Model.RemLog r = a.db.remLog.get(i);
+                String when = new java.text.SimpleDateFormat("dd/MM/yyyy hh:mm a", java.util.Locale.US).format(new java.util.Date(r.ts));
+                box.addView(rowItem(r.name, r.name, "WhatsApp · " + when, Fmt.money(r.amount), Ui.RED, null, null));
+            }
+            s.add(scrollBox(box, 360));
+        }
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
         s.show();
     }
 
@@ -918,7 +1183,7 @@ final class Sheets {
         Ui.Sheet s = open("ભાષા અને વૉઇસ");
         s.add(Ui.label(c, "બોલવાની ભાષા (માઇક કઈ ભાષા સમજે)"));
         s.add(seg(new String[][]{{"gu-IN", "ગુજરાતી"}, {"hi-IN", "हिन्दी"}, {"en-IN", "English"}}, st.lang, new java.util.function.Consumer<String>() {
-            @Override public void accept(String v) { st.lang = v; a.save(); voiceSetSheet(); a.render(); }
+            @Override public void accept(String v) { st.lang = v; I18n.set(v); a.save(); a.render(); voiceSetSheet(); }
         }));
         s.add(srow("બોલીને જવાબ આપો", "હિસાબ પૂછો ત્યારે એપ બોલીને સંભળાવે", st.speak ? "● ચાલુ" : "○ બંધ", new Runnable() {
             @Override public void run() { st.speak = !st.speak; a.save(); voiceSetSheet(); a.render(); }
@@ -1091,7 +1356,7 @@ final class Sheets {
         Ui.Sheet s = open("બોલીને નોંધ કરો");
         voiceOpen = true;
         s.add(seg(new String[][]{{"gu-IN", "ગુજરાતી"}, {"hi-IN", "हिन्दी"}, {"en-IN", "English"}}, st.lang, new java.util.function.Consumer<String>() {
-            @Override public void accept(String v) { st.lang = v; a.save(); a.stopListen(); voiceSheet(null); }
+            @Override public void accept(String v) { st.lang = v; I18n.set(v); a.save(); a.stopListen(); a.render(); voiceSheet(null); }
         }));
         micBtn = Ui.t(c, "🎤", 34, Color.WHITE, true);
         micBtn.setGravity(Gravity.CENTER);
@@ -1120,10 +1385,21 @@ final class Sheets {
                 handleCommand(t);
             }
         }));
+        s.add(Ui.btn(c, "રદ કરો", "ghost", new Runnable() { @Override public void run() { a.stopListen(); close(); } }));
         s.dlg.setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
             @Override public void onDismiss(android.content.DialogInterface d) { a.stopListen(); voiceOpen = false; }
         });
         s.show();
+        if (msg == null) {
+            micBtn.post(new Runnable() { @Override public void run() { if (voiceOpen && !a.isListening()) startVoice(); } });
+        }
+    }
+
+    private void micState(boolean on) {
+        if (micBtn == null) return;
+        micBtn.setText(on ? "■" : "🎤");
+        micBtn.setBackground(on ? Ui.grad(Color.parseColor("#F05252"), Color.parseColor("#C81E1E"), 44) : Ui.grad(Color.parseColor("#8B3FE0"), Ui.PURPLE, 44));
+        micBtn.setAlpha(1f);
     }
 
     private void startVoice() {
@@ -1131,14 +1407,14 @@ final class Sheets {
             @Override public void partial(String t) { if (vText != null) vText.setText(t + " …"); }
             @Override public void fin(String t) { if (vText != null) vText.setText(t); handleCommand(t); }
             @Override public void end(boolean got) {
-                if (micBtn != null) micBtn.setAlpha(1f);
-                if (vStat != null && !got) vStat.setText("ફરી માઇક દબાવીને બોલો");
+                micState(false);
+                if (vStat != null && !got) vStat.setText(I18n.tr("ફરી માઇક દબાવીને બોલો"));
             }
-            @Override public void error(String kind) { if (vStat != null) vStat.setText(a.speechError(kind)); a.toast(a.speechError(kind)); }
+            @Override public void error(String kind) { if (vStat != null) vStat.setText(I18n.tr(a.speechError(kind))); a.toast(a.speechError(kind)); }
         });
         if (ok) {
-            if (vStat != null) vStat.setText("સાંભળી રહ્યો છું… બોલો");
-            if (micBtn != null) micBtn.setAlpha(0.6f);
+            if (vStat != null) vStat.setText(I18n.tr("સાંભળી રહ્યો છું… બોલો"));
+            micState(true);
         }
     }
 
@@ -1146,23 +1422,29 @@ final class Sheets {
         Parser.Result r = Parser.parseCommand(text, a.db.parties);
         if ("entry".equals(r.kind)) {
             a.stopListen();
-            Form f = new Form();
-            f.type = r.type;
-            f.amount = r.amount == null ? "" : Fmt.plain(r.amount).replace(",", "");
-            f.name = r.name == null ? "" : r.name;
-            f.partyId = r.partyId;
-            f.date = Fmt.addDays(Fmt.today(), r.dateOffset);
-            f.said = text;
-            f.note = Parser.leftover(text, r.name);
+            Model.Pending q = new Model.Pending();
+            q.id = a.uid();
+            q.said = text;
+            q.type = r.type;
+            q.amount = r.amount == null ? 0 : r.amount;
+            q.name = r.name == null ? "" : r.name;
+            q.partyId = r.partyId;
+            q.date = Fmt.addDays(Fmt.today(), r.dateOffset);
+            q.note = Parser.leftover(text, r.name);
+            q.ts = System.currentTimeMillis();
+            q.cat = "";
             if ("expense".equals(r.type)) {
-                f.cat = "અન્ય";
-                String first = f.note.isEmpty() ? "" : f.note.split(" ")[0];
+                q.cat = "અન્ય";
+                String first = q.note.isEmpty() ? "" : q.note.split(" ")[0];
                 for (String cat : Fmt.CATS) {
-                    for (String w : cat.split("/")) if (!first.isEmpty() && Parser.normText(w).equals(Parser.normText(first))) f.cat = cat;
+                    for (String w : cat.split("/")) if (!first.isEmpty() && Parser.normText(w).equals(Parser.normText(first))) q.cat = cat;
                 }
             }
-            openEntry(f);
-            if (r.amount == null) a.toast("રકમ સંભળાઈ નહીં, લખો");
+            a.db.review.add(q);
+            a.save();
+            close();
+            a.go("home");
+            a.toast("ઇન-રિવ્યુમાં ઉમેર્યું" + (q.amount > 0 ? " · " + Fmt.money(q.amount) : ""));
             return;
         }
         if ("query".equals(r.kind)) {
@@ -1223,7 +1505,7 @@ final class Sheets {
                 }
             }));
         }
-        s.add(Ui.btn(c, "🎤 ફરી બોલો", "ghost", new Runnable() { @Override public void run() { voiceSheet(null); startVoice(); } }));
+        s.add(Ui.btn(c, "🎤 ફરી બોલો", "ghost", new Runnable() { @Override public void run() { voiceSheet(null); } }));
         s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
         s.show();
     }

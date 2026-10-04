@@ -56,6 +56,20 @@ public final class Model {
         public boolean productMode = false, speak = true;
     }
 
+    /** A spoken entry waiting in the "In-Review" list until the user confirms it. */
+    public static final class Pending {
+        public String id = "", said = "", type = "gave", name = "", partyId = null, note = "", date = "", cat = "";
+        public double amount;
+        public long ts;
+    }
+
+    /** One reminder that was sent (history list). */
+    public static final class RemLog {
+        public String partyId = "", name = "";
+        public double amount;
+        public long ts;
+    }
+
     public static final class Totals { public double gave, took, inc, exp, got, paid; }
     public static final class Due { public double recv, pay; }
     public static final class Cash { public double cash, bank; }
@@ -64,6 +78,8 @@ public final class Model {
         public List<Party> parties = new ArrayList<>();
         public List<Txn> txns = new ArrayList<>();
         public List<Product> products = new ArrayList<>();
+        public List<Pending> review = new ArrayList<>();
+        public List<RemLog> remLog = new ArrayList<>();
         public Settings settings = new Settings();
         public long saved;
 
@@ -235,6 +251,20 @@ public final class Model {
             s.put("upiId", settings.upiId); s.put("upiName", settings.upiName); s.put("productMode", settings.productMode);
             s.put("speak", settings.speak); s.put("pinHash", settings.pinHash); s.put("bio", settings.bio);
             s.put("lastBackup", settings.lastBackup); s.put("deviceId", settings.deviceId);
+            List<Object> rv = new ArrayList<>();
+            for (Pending q : review) {
+                Map<String, Object> x = new LinkedHashMap<>();
+                x.put("id", q.id); x.put("said", q.said); x.put("type", q.type); x.put("name", q.name); x.put("partyId", q.partyId);
+                x.put("note", q.note); x.put("date", q.date); x.put("cat", q.cat); x.put("amount", q.amount); x.put("ts", (double) q.ts);
+                rv.add(x);
+            }
+            List<Object> rl = new ArrayList<>();
+            for (RemLog q : remLog) {
+                Map<String, Object> x = new LinkedHashMap<>();
+                x.put("partyId", q.partyId); x.put("name", q.name); x.put("amount", q.amount); x.put("ts", (double) q.ts);
+                rl.add(x);
+            }
+            m.put("review", rv); m.put("remlog", rl);
             m.put("parties", ps); m.put("txns", ts); m.put("products", pr); m.put("settings", s); m.put("saved", (double) saved);
             return m;
         }
@@ -244,7 +274,25 @@ public final class Model {
             parties = new ArrayList<>();
             txns = new ArrayList<>();
             products = new ArrayList<>();
+            review = new ArrayList<>();
+            remLog = new ArrayList<>();
             settings = new Settings();
+            Object rvo = o.get("review");
+            if (rvo instanceof List) for (Object x : (List<Object>) rvo) {
+                Map<String, Object> m = (Map<String, Object>) x;
+                Pending q = new Pending();
+                q.id = str(m, "id"); q.said = str(m, "said"); q.type = str(m, "type"); q.name = str(m, "name");
+                q.partyId = m.get("partyId") instanceof String ? (String) m.get("partyId") : null;
+                q.note = str(m, "note"); q.date = str(m, "date"); q.cat = str(m, "cat"); q.amount = num(m, "amount"); q.ts = (long) num(m, "ts");
+                if (TYPES.containsKey(q.type)) review.add(q);
+            }
+            Object rlo = o.get("remlog");
+            if (rlo instanceof List) for (Object x : (List<Object>) rlo) {
+                Map<String, Object> m = (Map<String, Object>) x;
+                RemLog q = new RemLog();
+                q.partyId = str(m, "partyId"); q.name = str(m, "name"); q.amount = num(m, "amount"); q.ts = (long) num(m, "ts");
+                remLog.add(q);
+            }
             Object po = o.get("parties");
             if (po instanceof List) for (Object x : (List<Object>) po) {
                 Map<String, Object> m = (Map<String, Object>) x;
