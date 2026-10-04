@@ -408,6 +408,16 @@ public final class I18n {
         put("શુભ સવાર", "शुभ प्रभात", "Good Morning");
         put("શુભ બપોર", "शुभ दोपहर", "Good Afternoon");
         put("શુભ સાંજ", "शुभ संध्या", "Good Evening");
+        put("વૉઇસ ટેસ્ટ લૉગ", "वॉइस टेस्ट लॉग", "Voice test log");
+        put("શું બોલ્યા, એપ શું સમજ્યું", "क्या बोले, ऐप ने क्या समझा", "What you said, what the app understood");
+        put("બોલેલું વાક્ય, એપ શું સમજ્યું, અને તમારો ચુકાદો. ખોટું હોય તો ✗ દબાવી સાચું લખો.", "बोला वाक्य, ऐप ने क्या समझा और आपका फ़ैसला। गलत हो तो ✗ दबाकर सही लिखें।", "Sentence you said, what the app understood, and your verdict. If wrong, tap ✗ and type the correct one.");
+        put("હજી કોઈ વૉઇસ ટેસ્ટ નથી", "अभी कोई वॉइस टेस्ट नहीं", "No voice tests yet");
+        put("✓ સાચું", "✓ सही", "✓ Correct");
+        put("✗ ખોટું", "✗ गलत", "✗ Wrong");
+        put("📤 બધું શેર કરો (મને મોકલવા)", "📤 सब शेयर करें (मुझे भेजने के लिए)", "📤 Share all (to send to me)");
+        put("લૉગ સાફ કરો", "लॉग साफ़ करें", "Clear log");
+        put("સાચું શું બોલવું હતું?", "सही क्या बोलना था?", "What should it have been?");
+        put("સાચું વાક્ય લખો", "सही वाक्य लिखें", "Type the correct sentence");
         put(" નું ખાતું અને તેની ", " का खाता और उसकी ", "'s account and its ");
         put(" નોંધ કાઢી નાખવી છે?", " प्रविष्टियाँ हटानी हैं?", " entries?");
         put(" ખાતા અને ", " खाते और ", " accounts and ");
@@ -431,6 +441,8 @@ public final class I18n {
         put("રિમાઇન્ડર ઇતિહાસ", "रिमाइंडर इतिहास", "Send Reminder History");
         put("બધા પસંદ કરો", "सभी चुनें", "Select All");
         put("ચાલુ રાખો", "जारी रखें", "Continue");
+    }
+    private static void init7() {
         put("WhatsApp ખોલો", "WhatsApp खोलें", "Open WhatsApp");
         put("છોડો", "छोड़ें", "Skip");
         put("કોઈ ઇતિહાસ નથી", "कोई इतिहास नहीं", "No history found");
@@ -441,8 +453,6 @@ public final class I18n {
         put("નફો-નુકસાન (P&L)", "नफ़ा-नुकसान (P&L)", "P&L Report");
         put("ચોખ્ખી આવક, ખર્ચ અને નફાનું વિશ્લેષણ", "शुद्ध आमदनी, खर्च और मुनाफ़े का विश्लेषण", "Net income, expense and profit analysis");
         put("વાર્ષિક રિપોર્ટ", "वार्षिक रिपोर्ट", "Annual Report");
-    }
-    private static void init7() {
         put("આખા વર્ષની મહિના મુજબ આવક અને ખર્ચ", "पूरे साल की महीने के अनुसार आमदनी और खर्च", "Monthly income & expense for the full year");
         put("શરૂઆતનું બેલેન્સ", "शुरुआती बैलेंस", "Opening balance");
         put("અંતનું બેલેન્સ", "अंतिम बैलेंस", "Closing balance");

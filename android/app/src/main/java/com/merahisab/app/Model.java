@@ -70,6 +70,13 @@ public final class Model {
         public long ts;
     }
 
+    /** One spoken sentence kept for voice testing: what was heard, what the app understood, and the user's verdict. */
+    public static final class VLog {
+        public String heard = "", alts = "", res = "", fix = "";
+        public int ok; // 0 not rated, 1 correct, -1 wrong
+        public long ts;
+    }
+
     public static final class Totals { public double gave, took, inc, exp, got, paid; }
     public static final class Due { public double recv, pay; }
     public static final class Cash { public double cash, bank; }
@@ -80,6 +87,7 @@ public final class Model {
         public List<Product> products = new ArrayList<>();
         public List<Pending> review = new ArrayList<>();
         public List<RemLog> remLog = new ArrayList<>();
+        public List<VLog> vlog = new ArrayList<>();
         public Settings settings = new Settings();
         public long saved;
 
@@ -264,7 +272,13 @@ public final class Model {
                 x.put("partyId", q.partyId); x.put("name", q.name); x.put("amount", q.amount); x.put("ts", (double) q.ts);
                 rl.add(x);
             }
-            m.put("review", rv); m.put("remlog", rl);
+            List<Object> vl = new ArrayList<>();
+            for (VLog q : vlog) {
+                Map<String, Object> x = new LinkedHashMap<>();
+                x.put("heard", q.heard); x.put("alts", q.alts); x.put("res", q.res); x.put("fix", q.fix); x.put("ok", (double) q.ok); x.put("ts", (double) q.ts);
+                vl.add(x);
+            }
+            m.put("review", rv); m.put("remlog", rl); m.put("vlog", vl);
             m.put("parties", ps); m.put("txns", ts); m.put("products", pr); m.put("settings", s); m.put("saved", (double) saved);
             return m;
         }
@@ -276,7 +290,15 @@ public final class Model {
             products = new ArrayList<>();
             review = new ArrayList<>();
             remLog = new ArrayList<>();
+            vlog = new ArrayList<>();
             settings = new Settings();
+            Object vlo = o.get("vlog");
+            if (vlo instanceof List) for (Object x : (List<Object>) vlo) {
+                Map<String, Object> m = (Map<String, Object>) x;
+                VLog q = new VLog();
+                q.heard = str(m, "heard"); q.alts = str(m, "alts"); q.res = str(m, "res"); q.fix = str(m, "fix"); q.ok = (int) num(m, "ok"); q.ts = (long) num(m, "ts");
+                vlog.add(q);
+            }
             Object rvo = o.get("review");
             if (rvo instanceof List) for (Object x : (List<Object>) rvo) {
                 Map<String, Object> m = (Map<String, Object>) x;

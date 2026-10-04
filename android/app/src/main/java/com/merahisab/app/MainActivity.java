@@ -73,6 +73,7 @@ public class MainActivity extends Activity {
     // ---- speech / tts / bio ----
     private SpeechRecognizer recognizer;
     private SpeechCb speechCb;
+    String lastAlts = "";
     private boolean listening = false, gotText = false;
     private String pendingLangStart = null;
     private TextToSpeech tts;
@@ -546,7 +547,20 @@ public class MainActivity extends Activity {
                 listening = false;
                 if (l != null && !l.isEmpty()) {
                     gotText = true;
-                    if (cb != null) cb.fin(l.get(0).trim());
+                    // several guesses from the speech engine: pick the one the app understands best
+                    int bestI = 0, bestS = -1;
+                    StringBuilder alts = new StringBuilder();
+                    for (int k = 0; k < l.size(); k++) {
+                        String c = l.get(k).trim();
+                        if (k > 0) alts.append(" | ").append(c);
+                        Parser.Result pr = Parser.parseCommand(c, db.parties);
+                        int sc = 0;
+                        if ("entry".equals(pr.kind)) sc = 2 + (pr.amount != null && pr.amount > 0 ? 1 : 0) + (pr.partyId != null ? 1 : 0);
+                        else if ("query".equals(pr.kind)) sc = 1 + (pr.partyId != null ? 2 : 0);
+                        if (sc > bestS) { bestS = sc; bestI = k; }
+                    }
+                    lastAlts = alts.toString();
+                    if (cb != null) cb.fin(l.get(bestI).trim());
                 }
                 if (cb != null) cb.end(gotText);
             }
@@ -572,7 +586,7 @@ public class MainActivity extends Activity {
         i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, db.settings.lang);
         i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
-        i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5);
         listening = true;
         recognizer.startListening(i);
         return true;

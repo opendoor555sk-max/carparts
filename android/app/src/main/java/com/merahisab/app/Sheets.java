@@ -755,6 +755,7 @@ final class Sheets {
         Ui.Sheet s = open(null);
         s.add(srow("રિમાઇન્ડર મોકલો", "ગ્રાહકને બાકી રકમની યાદ અપાવો", null, new Runnable() { @Override public void run() { remSel.clear(); reminderSheet(); } }));
         s.add(srow("રિમાઇન્ડર ઇતિહાસ", "કોને કોને મોકલ્યું", null, new Runnable() { @Override public void run() { reminderHistorySheet(); } }));
+        s.add(srow("વૉઇસ ટેસ્ટ લૉગ", "શું બોલ્યા, એપ શું સમજ્યું", null, new Runnable() { @Override public void run() { voiceLogSheet(); } }));
         s.add(srow("સેટિંગ્સ", "થીમ, પિન, બેકઅપ", null, new Runnable() { @Override public void run() { close(); a.go("more"); } }));
         s.add(srow("બેકઅપ લો", a.backupTimeText(), null, new Runnable() { @Override public void run() { backupSheet(); } }));
         if (!a.db.settings.pinHash.isEmpty()) s.add(srow("હમણાં લૉક કરો", "એપ ફરી ખોલવા પિન જોઈશે", null, new Runnable() { @Override public void run() { close(); a.showPin("unlock", null); } }));
@@ -1420,6 +1421,7 @@ final class Sheets {
 
     void handleCommand(String text) {
         Parser.Result r = Parser.parseCommand(text, a.db.parties);
+        logVoice(text, r);
         if ("entry".equals(r.kind)) {
             a.stopListen();
             Model.Pending q = new Model.Pending();
@@ -1468,6 +1470,82 @@ final class Sheets {
         }
         voiceSheet("સમજાયું નહીં: “" + text + "”. ફરી બોલો, જેમ કે “હનીફ ભાઈને 5000 નો માલ ઉધાર આપ્યો”.");
         if (vText != null) vText.setText(text);
+    }
+
+    // ---------- voice test log ----------
+    private void logVoice(String text, Parser.Result r) {
+        Model.VLog v = new Model.VLog();
+        v.ts = System.currentTimeMillis();
+        v.heard = text;
+        v.alts = a.lastAlts; a.lastAlts = "";
+        String kind = r.kind == null ? "?" : r.kind;
+        StringBuilder sb = new StringBuilder(kind);
+        if (r.type != null) sb.append(" · ").append(r.type);
+        if (r.amount != null) sb.append(" · ").append(Fmt.plain(r.amount));
+        if (r.name != null) sb.append(" · ").append(r.name).append(r.partyId != null ? " ✓" : " ✗");
+        if (r.what != null) sb.append(" · ").append(r.what);
+        v.res = sb.toString();
+        a.db.vlog.add(v);
+        while (a.db.vlog.size() > 200) a.db.vlog.remove(0);
+        a.save();
+    }
+
+    void voiceLogSheet() {
+        Ui.Sheet s = open("વૉઇસ ટેસ્ટ લૉગ");
+        TextView h = Ui.t(c, "બોલેલું વાક્ય, એપ શું સમજ્યું, અને તમારો ચુકાદો. ખોટું હોય તો ✗ દબાવી સાચું લખો.", 13, Ui.MUTED, false);
+        Ui.pad(h, 8, 4, 8, 8); s.add(h);
+        if (a.db.vlog.isEmpty()) {
+            TextView e = Ui.t(c, "હજી કોઈ વૉઇસ ટેસ્ટ નથી", 14, Ui.MUTED, false);
+            e.setGravity(Gravity.CENTER); Ui.pad(e, 10, 24, 10, 24); s.add(e);
+        } else {
+            int good = 0, bad = 0;
+            for (Model.VLog v : a.db.vlog) { if (v.ok > 0) good++; else if (v.ok < 0) bad++; }
+            TextView st = Ui.t(c, "✓ " + good + "   ✗ " + bad + "   કુલ " + a.db.vlog.size(), 14, Ui.TEXT, true);
+            st.setGravity(Gravity.CENTER); Ui.pad(st, 8, 4, 8, 8); s.add(st);
+            LinearLayout box = Ui.v(c);
+            for (int i = a.db.vlog.size() - 1; i >= 0; i--) {
+                final Model.VLog v = a.db.vlog.get(i);
+                String mark = v.ok > 0 ? "✅ " : (v.ok < 0 ? "❌ " : "▫️ ");
+                String sub = "→ " + v.res + (v.fix.isEmpty() ? "" : "\nસાચું: " + v.fix) + (v.alts.isEmpty() ? "" : "\nબીજા અંદાજ: " + v.alts);
+                LinearLayout row = Ui.v(c);
+                row.addView(rowItem(v.heard, mark + v.heard, sub, "", Ui.TEXT, null, null));
+                LinearLayout bt = Ui.h(c);
+                bt.addView(Ui.btn(c, "✓ સાચું", "ghost", new Runnable() { @Override public void run() { v.ok = 1; a.save(); voiceLogSheet(); } }), new LinearLayout.LayoutParams(0, -2, 1));
+                bt.addView(Ui.btn(c, "✗ ખોટું", "ghost", new Runnable() { @Override public void run() { fixSheet(v); } }), new LinearLayout.LayoutParams(0, -2, 1));
+                row.addView(bt);
+                box.addView(row);
+            }
+            s.add(scrollBox(box, 380));
+        }
+        s.add(Ui.btn(c, "📤 બધું શેર કરો (મને મોકલવા)", "primary", new Runnable() { @Override public void run() { a.shareText(voiceLogText()); } }));
+        s.add(Ui.btn(c, "લૉગ સાફ કરો", "ghost", new Runnable() { @Override public void run() { a.db.vlog.clear(); a.save(); voiceLogSheet(); } }));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    private void fixSheet(final Model.VLog v) {
+        Ui.Sheet s = open("સાચું શું બોલવું હતું?");
+        TextView h = Ui.t(c, "સંભળાયું: “" + v.heard + "”", 14, Ui.MUTED, false);
+        Ui.pad(h, 8, 4, 8, 8); s.add(h);
+        final EditText f = Ui.fld(c, "સાચું વાક્ય લખો", v.fix, android.text.InputType.TYPE_CLASS_TEXT);
+        s.add(f);
+        s.add(Ui.btn(c, "સેવ", "primary", new Runnable() {
+            @Override public void run() { v.ok = -1; v.fix = f.getText().toString().trim(); a.save(); voiceLogSheet(); }
+        }));
+        s.show();
+    }
+
+    private String voiceLogText() {
+        StringBuilder sb = new StringBuilder("Mera Hisab voice test log\n\n");
+        java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.US);
+        for (Model.VLog v : a.db.vlog) {
+            sb.append(df.format(new java.util.Date(v.ts))).append(" [").append(v.ok > 0 ? "OK" : (v.ok < 0 ? "WRONG" : "?")).append("] ");
+            sb.append("heard: ").append(v.heard).append("\n   app: ").append(v.res);
+            if (!v.fix.isEmpty()) sb.append("\n   should be: ").append(v.fix);
+            if (!v.alts.isEmpty()) sb.append("\n   alts: ").append(v.alts);
+            sb.append("\n");
+        }
+        return sb.toString();
     }
 
     /** No single khata matched the spoken name: show what was heard and let the user tap the right khata. */
