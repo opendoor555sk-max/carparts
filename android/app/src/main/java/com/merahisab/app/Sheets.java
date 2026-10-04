@@ -285,6 +285,7 @@ final class Sheets {
             if (n.contains(q) || q.contains(n) || f.equals(first) || (f.length() >= 4 && first.length() >= 4 && Parser.lev(f, first) <= 2)) out.add(p);
             if (out.size() >= 6) break;
         }
+        for (Model.Party p : Parser.phonMatches(name, a.db.parties)) if (!out.contains(p) && out.size() < 8) out.add(p);
         return out;
     }
 
@@ -1172,7 +1173,7 @@ final class Sheets {
                     List<Model.Party> sm = similar(r.name == null ? "" : r.name);
                     if (sm.size() == 1) p = sm.get(0);
                 }
-                if (p == null) { voiceSheet("“" + (r.name == null ? "" : r.name) + "” નામનું ખાતું મળ્યું નહીં. ખાતા ટેબ જુઓ."); return; }
+                if (p == null) { partyPicker(text, r.name); return; }
                 close();
                 a.openParty(p.id);
                 a.speak(a.partySummary(p));
@@ -1185,6 +1186,35 @@ final class Sheets {
         }
         voiceSheet("સમજાયું નહીં: “" + text + "”. ફરી બોલો, જેમ કે “હનીફ ભાઈને 5000 નો માલ ઉધાર આપ્યો”.");
         if (vText != null) vText.setText(text);
+    }
+
+    /** No single khata matched the spoken name: show what was heard and let the user tap the right khata. */
+    void partyPicker(String heard, String name) {
+        List<Model.Party> list = similar(name == null ? "" : name);
+        boolean none = list.isEmpty();
+        if (none) for (int i = 0; i < Math.min(8, a.db.parties.size()); i++) list.add(a.db.parties.get(i));
+        Ui.Sheet s = open("કયું ખાતું ખોલવું?");
+        TextView h = Ui.t(c, "સંભળાયું: “" + heard + "”", 14, Ui.MUTED, false);
+        h.setGravity(Gravity.CENTER);
+        Ui.pad(h, 8, 6, 8, 6);
+        s.add(h);
+        if (a.db.parties.isEmpty()) {
+            TextView e = Ui.t(c, "હજી કોઈ ખાતું નથી. પહેલાં નોંધ કરો, જેમ કે “કાસમ ભાઈને 5000 આપ્યા”.", 14, Ui.TEXT, false);
+            e.setGravity(Gravity.CENTER); Ui.pad(e, 10, 10, 10, 10); s.add(e);
+        } else {
+            TextView q = Ui.t(c, none ? "આ નામનું ખાતું મળ્યું નહીં. તમારા ખાતા:" : "આમાંથી કયું? ટૅપ કરો:", 15, Ui.TEXT, true);
+            q.setGravity(Gravity.CENTER); Ui.pad(q, 8, 6, 8, 8); s.add(q);
+            LinearLayout box = Ui.v(c);
+            for (final Model.Party p : list) {
+                box.addView(rowItem(p.name, p.name, "", "", Ui.TEXT, null, new Runnable() {
+                    @Override public void run() { close(); a.openParty(p.id); a.speak(a.partySummary(p)); }
+                }));
+            }
+            s.add(scrollBox(box, 260));
+        }
+        s.add(Ui.btn(c, "🎤 ફરી બોલો", "primary", new Runnable() { @Override public void run() { voiceSheet(null); startVoice(); } }));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
     }
 
     void expenseSheet(String scope) {

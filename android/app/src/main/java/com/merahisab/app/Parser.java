@@ -44,11 +44,11 @@ public final class Parser {
             "પૈસા", "રૂપિયા", "રકમ", "પેમેન્ટ", "पैसा", "पैसे", "रुपये", "रुपया", "रुपए", "पेमेंट");
     private static final List<String> HISAB = L("balance", "account", "ledger", "hisab", "hisaab", "hishab", "khata", "khaata", "statement", "detail", "baki", "baaki",
             "હિસાબ", "ખાતું", "ખાતા", "ડિટેલ", "બાકી", "हिसाब", "खाता", "डिटेल", "बाकी");
-    private static final List<String> SHOW = L("tell", "display", "check", "batao", "bata", "bataiye", "dikhao", "dikha", "show", "kitna", "kitne", "jano", "janvu",
-            "બતાવો", "બતાવ", "બોલો", "કહો", "કેટલા", "કેટલું", "જણાવો", "बताओ", "बताइए", "बता", "दिखाओ", "कितना", "कितने");
+    private static final List<String> SHOW = L("open", "khol", "kholo", "kholiye", "kholna", "khulo", "tell", "display", "check", "batao", "bata", "bataiye", "dikhao", "dikha", "show", "kitna", "kitne", "jano", "janvu",
+            "ખોલો", "ખોલ", "ખોલવું", "खोलो", "खोल", "खोलिए", "બતાવો", "બતાવ", "બોલો", "કહો", "કેટલા", "કેટલું", "જણાવો", "बताओ", "बताइए", "बता", "दिखाओ", "कितना", "कितने");
     private static final List<String> MULT = L("thousand", "hundred", "hajar", "hazar", "hazaar", "હજાર", "हजार", "sau", "સો", "सौ", "lakh", "laakh", "લાખ", "लाख");
     private static final List<String> TIME = L("aaj", "kal", "આજે", "આજ", "आज", "કાલે", "કાલ", "ગઈકાલે", "कल", "mahina", "mahine", "મહિનો", "મહિના", "महीने", "महीना", "is", "iss", "આ", "इस");
-    private static final List<String> FILL = L("mujhe", "mene", "maine", "me", "mein", "ma", "ek", "koi", "sab", "saara", "sara", "બધા", "બધું", "सब", "सारा", "ka", "ki", "ke", "ko", "se", "ne", "ni", "no", "na", "nu", "ne");
+    private static final List<String> FILL = L("mujhe", "mene", "maine", "me", "mein", "ma", "ek", "koi", "sab", "saara", "sara", "બધા", "બધું", "सब", "सारा", "ka", "ki", "ke", "ko", "se", "ne", "ni", "no", "na", "nu", "ne", "hai", "hain", "he", "chhe", "che", "hu", "hoon", "mera", "mara", "meri", "mari", "please", "plz", "jara", "zara", "है", "हैं", "छे", "છે", "मेरा", "मेरी", "મારું", "મારા", "જરા");
     private static final List<List<String>> ANYKW = L2(EXP, GOT, TOOK, PAID, GIVE, GOODS, MONEY, HISAB, SHOW, MULT, TIME);
 
     @SafeVarargs
@@ -180,6 +180,65 @@ public final class Parser {
         return null;
     }
 
+
+    /** Name for a query with no particle ("khata kholo kasam bhai"): the leftover non-keyword words. */
+    private static String fallbackName(List<String> tokens) {
+        List<String> cand = new ArrayList<>();
+        for (String t : tokens) if (!isNameStop(t)) cand.add(t);
+        if (cand.isEmpty() || cand.size() > 3) return null;
+        return String.join(" ", cand);
+    }
+
+    private static final String IND_FROM = "કખગઘઙચછજઝઞટઠડઢણતથદધનપફબભમયરલળવશષસહ" + "कखगघङचछजझञटठडढणतथदधनपफबभमयरलळवशषसह";
+    private static final String IND_MAP_TO = "kkggnccjjnttddnttddnppbbm0rllvsss0";
+
+    /** Rough sound-skeleton of a name, same for Gujarati, Devanagari and Latin spellings (kasam = kasam = ksm). */
+    public static String phon(String name) {
+        String s = normText(name).replace(" ", "");
+        StringBuilder b = new StringBuilder();
+        String lat = s.replace("sh", "s").replace("ch", "C").replace("kh", "k").replace("gh", "g").replace("th", "t").replace("dh", "d")
+                .replace("ph", "p").replace("bh", "b").replace("jh", "j");
+        for (int i = 0; i < lat.length(); i++) {
+            char c = lat.charAt(i);
+            if (c == 'ં' || c == 'ं') { b.append('n'); continue; }
+            int k = IND_FROM.indexOf(c);
+            if (k >= 0) { char m = IND_MAP_TO.charAt(k % IND_MAP_TO.length()); b.append(m == 'c' ? 'C' : m); continue; }
+            if (c >= 'a' && c <= 'z') {
+                switch (c) {
+                    case 'c': case 'q': b.append('k'); break;
+                    case 'z': b.append('j'); break;
+                    case 'f': b.append('p'); break;
+                    case 'w': b.append('v'); break;
+                    case 'x': b.append("ks"); break;
+                    case 'a': case 'e': case 'i': case 'o': case 'u': case 'y': case 'h': break;
+                    default: b.append(c);
+                }
+            } else if (c == 'C') b.append('C');
+        }
+        StringBuilder o = new StringBuilder();
+        for (int i = 0; i < b.length(); i++) if (i == 0 || b.charAt(i) != b.charAt(i - 1)) o.append(b.charAt(i));
+        return o.toString().replace("0", "");
+    }
+
+    /** Parties whose sound-skeleton matches the spoken name (works across scripts). */
+    public static List<Model.Party> phonMatches(String spoken, List<Model.Party> parties) {
+        List<Model.Party> out = new ArrayList<>();
+        String q = phon(spoken);
+        if (q.length() < 2) return out;
+        int best = 99;
+        List<Model.Party> hits = new ArrayList<>();
+        for (Model.Party p : parties) {
+            String pp = phon(p.name);
+            if (pp.isEmpty()) continue;
+            int d = lev(pp, q);
+            int lim = Math.min(pp.length(), q.length()) >= 4 ? 1 : 0;
+            if (d > lim) continue;
+            if (d < best) { best = d; hits.clear(); }
+            if (d == best) hits.add(p);
+        }
+        return hits;
+    }
+
     private static boolean isNameStop(String t) {
         return numVal(t) != null || isAnyKw(t) || isIn(t, FILL) || PARTICLES.contains(t) || ENG_FWD.contains(t) || t.equals("a") || t.equals("the") || t.equals("of") || t.equals("rs") || t.equals("rupees") || t.equals("rupee") || t.equals("and") || YESTERDAY.contains(t) || TODAY.contains(t) || t.equals("on") || t.equals("is") || t.equals("what") || t.equals("show");
     }
@@ -260,6 +319,8 @@ public final class Parser {
                 if (pn.length() >= 4 && first.length() >= 4 && lev(pn, first) <= (Math.min(pn.length(), first.length()) >= 5 ? 2 : 1)) near.add(p);
             }
             if (near.size() == 1) return near.get(0);
+            List<Model.Party> ph = phonMatches(candName, parties);
+            if (ph.size() == 1) return ph.get(0);
         }
         return null;
     }
@@ -285,8 +346,11 @@ public final class Parser {
         }
         if (amount == null && asks && hasKw(tokens, HISAB)) {
             r.kind = "query";
-            if (party != null || candName != null) {
-                r.what = "party"; r.partyId = party != null ? party.id : null; r.name = nameOut;
+            String cn = candName;
+            if (cn == null) cn = fallbackName(tokens);
+            Model.Party qp = party != null ? party : matchParty(tokens, parties, cn);
+            if (qp != null || cn != null) {
+                r.what = "party"; r.partyId = qp != null ? qp.id : null; r.name = qp != null ? qp.name : prettyName(cn);
             } else r.what = "all";
             return r;
         }
