@@ -408,6 +408,10 @@ public final class I18n {
         put("શુભ સવાર", "शुभ प्रभात", "Good Morning");
         put("શુભ બપોર", "शुभ दोपहर", "Good Afternoon");
         put("શુભ સાંજ", "शुभ संध्या", "Good Evening");
+        put("એપે શીખેલું", "ऐप ने सीखा", "Learned by app");
+        put(" નામ શીખ્યા", " नाम सीखे", " names learned");
+        put("તમારા સુધારા પરથી એપ આ નામ શીખ્યું. ખોટું હોય તો ✕ દબાવી કાઢી નાખો.", "आपके सुधार से ऐप ने ये नाम सीखे। गलत हो तो ✕ दबाकर हटाएँ।", "The app learned these names from your corrections. Tap ✕ to remove a wrong one.");
+        put("હજી કંઈ શીખ્યું નથી. વૉઇસ ટેસ્ટ લૉગમાં ✗ દબાવી સાચું લખો.", "अभी कुछ नहीं सीखा। वॉइस टेस्ट लॉग में ✗ दबाकर सही लिखें।", "Nothing learned yet. Tap ✗ in the voice test log and type the correct one.");
         put("વૉઇસ ટેસ્ટ લૉગ", "वॉइस टेस्ट लॉग", "Voice test log");
         put("શું બોલ્યા, એપ શું સમજ્યું", "क्या बोले, ऐप ने क्या समझा", "What you said, what the app understood");
         put("બોલેલું વાક્ય, એપ શું સમજ્યું, અને તમારો ચુકાદો. ખોટું હોય તો ✗ દબાવી સાચું લખો.", "बोला वाक्य, ऐप ने क्या समझा और आपका फ़ैसला। गलत हो तो ✗ दबाकर सही लिखें।", "Sentence you said, what the app understood, and your verdict. If wrong, tap ✗ and type the correct one.");
@@ -437,12 +441,12 @@ public final class I18n {
         put("છોડી દો", "छोड़ दें", "Discard");
         put("ઇન-રિવ્યુમાં ઉમેર્યું", "इन-रिव्यू में जोड़ा", "Added to In-Review");
         put("ટ્રાન્સક્રિપ્શન", "ट्रांसक्रिप्शन", "TRANSCRIPTION");
+    }
+    private static void init7() {
         put("રિમાઇન્ડર મોકલો", "रिमाइंडर भेजें", "Send Reminder");
         put("રિમાઇન્ડર ઇતિહાસ", "रिमाइंडर इतिहास", "Send Reminder History");
         put("બધા પસંદ કરો", "सभी चुनें", "Select All");
         put("ચાલુ રાખો", "जारी रखें", "Continue");
-    }
-    private static void init7() {
         put("WhatsApp ખોલો", "WhatsApp खोलें", "Open WhatsApp");
         put("છોડો", "छोड़ें", "Skip");
         put("કોઈ ઇતિહાસ નથી", "कोई इतिहास नहीं", "No history found");

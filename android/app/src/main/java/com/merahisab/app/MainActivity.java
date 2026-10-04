@@ -553,7 +553,7 @@ public class MainActivity extends Activity {
                     for (int k = 0; k < l.size(); k++) {
                         String c = l.get(k).trim();
                         if (k > 0) alts.append(" | ").append(c);
-                        Parser.Result pr = Parser.parseCommand(c, db.parties);
+                        Parser.Result pr = Parser.parseCommand(Parser.applyAliases(c, db.aliasPairs()), db.parties);
                         int sc = 0;
                         if ("entry".equals(pr.kind)) sc = 2 + (pr.amount != null && pr.amount > 0 ? 1 : 0) + (pr.partyId != null ? 1 : 0);
                         else if ("query".equals(pr.kind)) sc = 1 + (pr.partyId != null ? 2 : 0);

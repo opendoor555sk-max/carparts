@@ -77,6 +77,12 @@ public final class Model {
         public long ts;
     }
 
+    /** A spelling the speech engine produced that the app learned to map to a real khata name. */
+    public static final class Learn {
+        public String from = "", to = "";
+        public long ts;
+    }
+
     public static final class Totals { public double gave, took, inc, exp, got, paid; }
     public static final class Due { public double recv, pay; }
     public static final class Cash { public double cash, bank; }
@@ -88,6 +94,12 @@ public final class Model {
         public List<Pending> review = new ArrayList<>();
         public List<RemLog> remLog = new ArrayList<>();
         public List<VLog> vlog = new ArrayList<>();
+        public List<Learn> learn = new ArrayList<>();
+        public List<String[]> aliasPairs() {
+            List<String[]> l = new ArrayList<>();
+            for (Learn x : learn) l.add(new String[]{x.from, x.to});
+            return l;
+        }
         public Settings settings = new Settings();
         public long saved;
 
@@ -278,7 +290,13 @@ public final class Model {
                 x.put("heard", q.heard); x.put("alts", q.alts); x.put("res", q.res); x.put("fix", q.fix); x.put("ok", (double) q.ok); x.put("ts", (double) q.ts);
                 vl.add(x);
             }
-            m.put("review", rv); m.put("remlog", rl); m.put("vlog", vl);
+            List<Object> ln = new ArrayList<>();
+            for (Learn q : learn) {
+                Map<String, Object> x = new LinkedHashMap<>();
+                x.put("from", q.from); x.put("to", q.to); x.put("ts", (double) q.ts);
+                ln.add(x);
+            }
+            m.put("review", rv); m.put("remlog", rl); m.put("vlog", vl); m.put("learn", ln);
             m.put("parties", ps); m.put("txns", ts); m.put("products", pr); m.put("settings", s); m.put("saved", (double) saved);
             return m;
         }
@@ -291,7 +309,15 @@ public final class Model {
             review = new ArrayList<>();
             remLog = new ArrayList<>();
             vlog = new ArrayList<>();
+            learn = new ArrayList<>();
             settings = new Settings();
+            Object lno = o.get("learn");
+            if (lno instanceof List) for (Object x : (List<Object>) lno) {
+                Map<String, Object> m = (Map<String, Object>) x;
+                Learn q = new Learn();
+                q.from = str(m, "from"); q.to = str(m, "to"); q.ts = (long) num(m, "ts");
+                if (!q.from.isEmpty() && !q.to.isEmpty()) learn.add(q);
+            }
             Object vlo = o.get("vlog");
             if (vlo instanceof List) for (Object x : (List<Object>) vlo) {
                 Map<String, Object> m = (Map<String, Object>) x;

@@ -104,6 +104,17 @@ public final class Parser {
         return false;
     }
 
+    /** Replace words the app has learned (heard spelling -> real khata name) before parsing. aliases = {from, to}. */
+    public static String applyAliases(String text, List<String[]> aliases) {
+        if (text == null || aliases == null) return text;
+        for (String[] al : aliases) {
+            if (al[0].isEmpty() || al[0].equalsIgnoreCase(al[1])) continue;
+            text = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(al[0]), java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE)
+                    .matcher(text).replaceAll(java.util.regex.Matcher.quoteReplacement(al[1]));
+        }
+        return text;
+    }
+
     public static String normText(String s) {
         s = s == null ? "" : s.toLowerCase();
         s = Normalizer.normalize(s, Normalizer.Form.NFC);

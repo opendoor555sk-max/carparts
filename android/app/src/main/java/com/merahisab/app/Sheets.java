@@ -756,6 +756,7 @@ final class Sheets {
         s.add(srow("રિમાઇન્ડર મોકલો", "ગ્રાહકને બાકી રકમની યાદ અપાવો", null, new Runnable() { @Override public void run() { remSel.clear(); reminderSheet(); } }));
         s.add(srow("રિમાઇન્ડર ઇતિહાસ", "કોને કોને મોકલ્યું", null, new Runnable() { @Override public void run() { reminderHistorySheet(); } }));
         s.add(srow("વૉઇસ ટેસ્ટ લૉગ", "શું બોલ્યા, એપ શું સમજ્યું", null, new Runnable() { @Override public void run() { voiceLogSheet(); } }));
+        s.add(srow("એપે શીખેલું", a.db.learn.size() + " નામ શીખ્યા", null, new Runnable() { @Override public void run() { learnedSheet(); } }));
         s.add(srow("સેટિંગ્સ", "થીમ, પિન, બેકઅપ", null, new Runnable() { @Override public void run() { close(); a.go("more"); } }));
         s.add(srow("બેકઅપ લો", a.backupTimeText(), null, new Runnable() { @Override public void run() { backupSheet(); } }));
         if (!a.db.settings.pinHash.isEmpty()) s.add(srow("હમણાં લૉક કરો", "એપ ફરી ખોલવા પિન જોઈશે", null, new Runnable() { @Override public void run() { close(); a.showPin("unlock", null); } }));
@@ -1420,8 +1421,10 @@ final class Sheets {
     }
 
     void handleCommand(String text) {
+        final String orig = text;
+        text = Parser.applyAliases(text, a.db.aliasPairs());
         Parser.Result r = Parser.parseCommand(text, a.db.parties);
-        logVoice(text, r);
+        logVoice(orig, r);
         if ("entry".equals(r.kind)) {
             a.stopListen();
             Model.Pending q = new Model.Pending();
@@ -1490,6 +1493,49 @@ final class Sheets {
         a.save();
     }
 
+    /** Remember that the spoken spelling `heardName` means khata `p` (used on every next voice command). */
+    void learnAlias(String heardName, Model.Party p) {
+        if (heardName == null || p == null) return;
+        String f = heardName.trim().toLowerCase();
+        if (f.length() < 2 || f.equalsIgnoreCase(p.name.trim())) return;
+        for (Model.Learn x : a.db.learn) if (x.from.equals(f)) { x.to = p.name; a.save(); return; }
+        Model.Learn l = new Model.Learn();
+        l.from = f; l.to = p.name; l.ts = System.currentTimeMillis();
+        a.db.learn.add(l);
+        a.save();
+    }
+
+    /** From a ✗ correction: if the correct sentence names an existing khata, learn what the app heard for it. */
+    private void learnFromFix(Model.VLog v) {
+        if (v.fix.isEmpty()) return;
+        Parser.Result bad = Parser.parseCommand(Parser.applyAliases(v.heard, a.db.aliasPairs()), a.db.parties);
+        Parser.Result good = Parser.parseCommand(v.fix, a.db.parties);
+        if (good.partyId == null || bad.name == null) return;
+        if (good.partyId.equals(bad.partyId)) return;
+        learnAlias(bad.name, a.db.party(good.partyId));
+    }
+
+    void learnedSheet() {
+        Ui.Sheet s = open("એપે શીખેલું");
+        TextView h = Ui.t(c, "તમારા સુધારા પરથી એપ આ નામ શીખ્યું. ખોટું હોય તો ✕ દબાવી કાઢી નાખો.", 13, Ui.MUTED, false);
+        Ui.pad(h, 8, 4, 8, 8); s.add(h);
+        if (a.db.learn.isEmpty()) {
+            TextView e = Ui.t(c, "હજી કંઈ શીખ્યું નથી. વૉઇસ ટેસ્ટ લૉગમાં ✗ દબાવી સાચું લખો.", 14, Ui.MUTED, false);
+            e.setGravity(Gravity.CENTER); Ui.pad(e, 10, 24, 10, 24); s.add(e);
+        } else {
+            LinearLayout box = Ui.v(c);
+            for (int i = a.db.learn.size() - 1; i >= 0; i--) {
+                final Model.Learn l = a.db.learn.get(i);
+                box.addView(rowItem(l.from, "“" + l.from + "”  →  " + l.to, "", "✕", Ui.RED, null, new Runnable() {
+                    @Override public void run() { a.db.learn.remove(l); a.save(); learnedSheet(); }
+                }));
+            }
+            s.add(scrollBox(box, 340));
+        }
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
     void voiceLogSheet() {
         Ui.Sheet s = open("વૉઇસ ટેસ્ટ લૉગ");
         TextView h = Ui.t(c, "બોલેલું વાક્ય, એપ શું સમજ્યું, અને તમારો ચુકાદો. ખોટું હોય તો ✗ દબાવી સાચું લખો.", 13, Ui.MUTED, false);
@@ -1530,7 +1576,7 @@ final class Sheets {
         final EditText f = Ui.fld(c, "સાચું વાક્ય લખો", v.fix, android.text.InputType.TYPE_CLASS_TEXT);
         s.add(f);
         s.add(Ui.btn(c, "સેવ", "primary", new Runnable() {
-            @Override public void run() { v.ok = -1; v.fix = f.getText().toString().trim(); a.save(); voiceLogSheet(); }
+            @Override public void run() { v.ok = -1; v.fix = f.getText().toString().trim(); a.save(); learnFromFix(v); voiceLogSheet(); }
         }));
         s.show();
     }
@@ -1567,7 +1613,7 @@ final class Sheets {
             LinearLayout box = Ui.v(c);
             for (final Model.Party p : list) {
                 box.addView(rowItem(p.name, p.name, "", "", Ui.TEXT, null, new Runnable() {
-                    @Override public void run() { close(); a.openParty(p.id); a.speak(a.partySummary(p)); }
+                    @Override public void run() { learnAlias(name, p); close(); a.openParty(p.id); a.speak(a.partySummary(p)); }
                 }));
             }
             s.add(scrollBox(box, 260));
