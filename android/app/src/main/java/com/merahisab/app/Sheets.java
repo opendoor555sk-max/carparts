@@ -1212,7 +1212,18 @@ final class Sheets {
             }
             s.add(scrollBox(box, 260));
         }
-        s.add(Ui.btn(c, "🎤 ફરી બોલો", "primary", new Runnable() { @Override public void run() { voiceSheet(null); startVoice(); } }));
+        if (name != null && !name.trim().isEmpty()) {
+            final String nn = name.trim();
+            s.add(Ui.btn(c, "➕ “" + nn + "” નું નવું ખાતું બનાવો", "primary", new Runnable() {
+                @Override public void run() {
+                    Model.Party np = a.newParty(nn, "", "customer");
+                    a.save();
+                    close();
+                    a.openParty(np.id);
+                }
+            }));
+        }
+        s.add(Ui.btn(c, "🎤 ફરી બોલો", "ghost", new Runnable() { @Override public void run() { voiceSheet(null); startVoice(); } }));
         s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
         s.show();
     }
