@@ -916,7 +916,7 @@ final class Sheets {
         final Model.Settings st = a.db.settings;
         Ui.Sheet s = open("ભાષા અને વૉઇસ");
         s.add(Ui.label(c, "બોલવાની ભાષા (માઇક કઈ ભાષા સમજે)"));
-        s.add(seg(new String[][]{{"gu-IN", "ગુજરાતી"}, {"hi-IN", "हिन्दी"}}, st.lang, new java.util.function.Consumer<String>() {
+        s.add(seg(new String[][]{{"gu-IN", "ગુજરાતી"}, {"hi-IN", "हिन्दी"}, {"en-IN", "English"}}, st.lang, new java.util.function.Consumer<String>() {
             @Override public void accept(String v) { st.lang = v; a.save(); voiceSetSheet(); a.render(); }
         }));
         s.add(srow("બોલીને જવાબ આપો", "હિસાબ પૂછો ત્યારે એપ બોલીને સંભળાવે", st.speak ? "● ચાલુ" : "○ બંધ", new Runnable() {
@@ -1089,7 +1089,7 @@ final class Sheets {
         final Model.Settings st = a.db.settings;
         Ui.Sheet s = open("બોલીને નોંધ કરો");
         voiceOpen = true;
-        s.add(seg(new String[][]{{"gu-IN", "ગુજરાતી"}, {"hi-IN", "हिन्दी"}}, st.lang, new java.util.function.Consumer<String>() {
+        s.add(seg(new String[][]{{"gu-IN", "ગુજરાતી"}, {"hi-IN", "हिन्दी"}, {"en-IN", "English"}}, st.lang, new java.util.function.Consumer<String>() {
             @Override public void accept(String v) { st.lang = v; a.save(); a.stopListen(); voiceSheet(null); }
         }));
         micBtn = Ui.t(c, "🎤", 34, Color.WHITE, true);
@@ -1219,10 +1219,10 @@ final class Sheets {
             }
             s.add(scrollBox(list, 220));
         }
-        final String say = title + " " + Fmt.plain(total) + " રૂપિયા";
+        final String say = a.isEnglish() ? ("Total expense " + Fmt.plain(total) + " rupees") : (title + " " + Fmt.plain(total) + " રૂપિયા");
         s.add(Ui.btn(c, "🔊 બોલીને સંભળાવો", "primary", new Runnable() { @Override public void run() { a.speak(say); } }));
         s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
         s.show();
-        a.speak(title + " કુલ " + Fmt.plain(total) + " રૂપિયા");
+        a.speak(say);
     }
 }

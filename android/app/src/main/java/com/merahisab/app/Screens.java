@@ -877,7 +877,7 @@ final class Screens {
         biz.add(srow("▦", "બિઝનેસ સેટઅપ", "UPI વિગતો (ચૂકવણી Link માટે)", null, new Runnable() { @Override public void run() { sh.bizSetupSheet(); } }));
 
         List<View> app = new ArrayList<>();
-        app.add(srow("🌐", "ભાષા અને વૉઇસ", (s.lang.equals("hi-IN") ? "હિન્દી" : "ગુજરાતી") + " · બોલીને જવાબ " + (s.speak ? "ચાલુ" : "બંધ"), null, new Runnable() { @Override public void run() { sh.voiceSetSheet(); } }));
+        app.add(srow("🌐", "ભાષા અને વૉઇસ", (s.lang.equals("hi-IN") ? "હિન્દી" : (s.lang.equals("en-IN") ? "English" : "ગુજરાતી")) + " · બોલીને જવાબ " + (s.speak ? "ચાલુ" : "બંધ"), null, new Runnable() { @Override public void run() { sh.voiceSetSheet(); } }));
         app.add(srow("🎨", "એપ થીમ", themeName, null, new Runnable() { @Override public void run() { sh.themeSheet(); } }));
         app.add(srow("📦", "પ્રોડક્ટ પ્રમાણે એન્ટ્રી", "એન્ટ્રીમાં પ્રોડક્ટ સિલેક્શન અને રેટ", tgl(s.productMode), new Runnable() {
             @Override public void run() { s.productMode = !s.productMode; a.save(); a.render(); if (s.productMode && a.db.products.isEmpty()) sh.prodSheet(); }

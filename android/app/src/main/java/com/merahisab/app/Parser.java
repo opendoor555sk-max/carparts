@@ -26,27 +26,27 @@ public final class Parser {
 
     private static List<String> L(String... a) { return Arrays.asList(a); }
 
-    private static final List<String> EXP = L("kharch", "kharcha", "ખર્ચ", "ખર્ચો", "खर्च", "खर्चा", "expense");
-    private static final List<String> GOT = L("mile", "mila", "mili", "aaya", "aaye", "aayi", "jama", "jamaa", "wapas", "vapas", "received", "receive", "prapt",
+    private static final List<String> EXP = L("spent", "spend", "spending", "expenses", "kharch", "kharcha", "ખર્ચ", "ખર્ચો", "खर्च", "खर्चा", "expense");
+    private static final List<String> GOT = L("mile", "mila", "mili", "aaya", "aaye", "aayi", "jama", "jamaa", "wapas", "vapas", "received", "receive", "prapt", "collected", "returned",
             "મળ્યા", "મળ્યો", "મળ્યું", "મળી", "આવ્યા", "આવ્યો", "આવ્યું", "જમા", "પાછા", "પરત",
             "मिले", "मिला", "मिली", "आए", "आया", "आई", "जमा", "वापस");
-    private static final List<String> TOOK = L("liya", "liye", "lidha", "lidhu", "khareeda", "kharida", "kharid", "kharidi",
+    private static final List<String> TOOK = L("took", "taken", "bought", "purchased", "borrowed", "liya", "liye", "lidha", "lidhu", "khareeda", "kharida", "kharid", "kharidi",
             "લીધા", "લીધો", "લીધું", "લીધી", "ખરીદ્યા", "ખરીદ્યો", "ખરીદ્યું", "ખરીદી",
             "लिया", "लिए", "ली", "खरीदा", "खरीदे", "खरीद");
     private static final List<String> PAID = L("chukavya", "chukaya", "chukaye", "chukav", "paid", "bhugtan",
             "ચૂકવ્યા", "ચૂકવ્યો", "ચૂકવી", "ચુકવ્યા", "ભરપાઈ", "चुकाया", "चुकाए", "चुकाई", "भुगतान");
-    private static final List<String> GIVE = L("diya", "diye", "di", "dia", "aapya", "aapyo", "apya", "sold", "becha", "beche",
+    private static final List<String> GIVE = L("gave", "given", "give", "lent", "diya", "diye", "di", "dia", "aapya", "aapyo", "apya", "sold", "becha", "beche",
             "આપ્યા", "આપ્યો", "આપ્યું", "આપી", "દીધા", "દીધો", "દીધું", "વેચ્યા", "વેચ્યો", "વેચ્યું",
             "दिया", "दिए", "दी", "बेचा", "बेचे");
-    private static final List<String> GOODS = L("maal", "mal", "bhada", "bhade", "bhadu", "udhar", "udhaar", "uthar", "udhari", "pedal",
+    private static final List<String> GOODS = L("goods", "credit", "rent", "maal", "mal", "bhada", "bhade", "bhadu", "udhar", "udhaar", "uthar", "udhari", "pedal",
             "માલ", "ભાડે", "ભાડું", "ભાડા", "ઉધાર", "उधार", "माल", "भाड़ा", "भाड़े", "किराया");
     private static final List<String> MONEY = L("paisa", "paise", "payment", "rakam", "rupiya", "rupaye", "rupees", "rs",
             "પૈસા", "રૂપિયા", "રકમ", "પેમેન્ટ", "पैसा", "पैसे", "रुपये", "रुपया", "रुपए", "पेमेंट");
-    private static final List<String> HISAB = L("hisab", "hisaab", "hishab", "khata", "khaata", "statement", "detail", "baki", "baaki",
+    private static final List<String> HISAB = L("balance", "account", "ledger", "hisab", "hisaab", "hishab", "khata", "khaata", "statement", "detail", "baki", "baaki",
             "હિસાબ", "ખાતું", "ખાતા", "ડિટેલ", "બાકી", "हिसाब", "खाता", "डिटेल", "बाकी");
-    private static final List<String> SHOW = L("batao", "bata", "bataiye", "dikhao", "dikha", "show", "kitna", "kitne", "jano", "janvu",
+    private static final List<String> SHOW = L("tell", "display", "check", "batao", "bata", "bataiye", "dikhao", "dikha", "show", "kitna", "kitne", "jano", "janvu",
             "બતાવો", "બતાવ", "બોલો", "કહો", "કેટલા", "કેટલું", "જણાવો", "बताओ", "बताइए", "बता", "दिखाओ", "कितना", "कितने");
-    private static final List<String> MULT = L("hajar", "hazar", "hazaar", "હજાર", "हजार", "sau", "સો", "सौ", "lakh", "laakh", "લાખ", "लाख");
+    private static final List<String> MULT = L("thousand", "hundred", "hajar", "hazar", "hazaar", "હજાર", "हजार", "sau", "સો", "सौ", "lakh", "laakh", "લાખ", "लाख");
     private static final List<String> TIME = L("aaj", "kal", "આજે", "આજ", "आज", "કાલે", "કાલ", "ગઈકાલે", "कल", "mahina", "mahine", "મહિનો", "મહિના", "महीने", "महीना", "is", "iss", "આ", "इस");
     private static final List<String> FILL = L("mujhe", "mene", "maine", "me", "mein", "ma", "ek", "koi", "sab", "saara", "sara", "બધા", "બધું", "सब", "सारा", "ka", "ki", "ke", "ko", "se", "ne", "ni", "no", "na", "nu", "ne");
     private static final List<List<String>> ANYKW = L2(EXP, GOT, TOOK, PAID, GIVE, GOODS, MONEY, HISAB, SHOW, MULT, TIME);
@@ -55,10 +55,11 @@ public final class Parser {
     private static List<List<String>> L2(List<String>... a) { return Arrays.asList(a); }
 
     private static final List<String> PARTICLES = L("ko", "se", "ne", "ka", "ki", "ke", "ni", "no", "nu", "ને", "થી", "નો", "ની", "ના", "નું", "પાસે", "પાસેથી", "को", "से", "ने", "का", "की", "के", "पास");
-    private static final List<String> YESTERDAY = L("kal", "કાલે", "કાલ", "ગઈકાલે", "कल");
-    private static final List<String> TODAY = L("aaj", "આજે", "આજ", "आज");
-    private static final List<String> YES_WORDS = L("haan", "han", "ha", "haa", "sahi", "save", "yes", "ok", "okay", "હા", "સાચું", "સેવ", "हाँ", "हां", "हा", "सही", "सेव");
-    private static final List<String> NO_WORDS = L("na", "nahi", "nahin", "no", "cancel", "ના", "નહીં", "નથી", "ન", "नहीं", "ना", "नही", "गलत");
+    private static final List<String> YESTERDAY = L("yesterday", "kal", "કાલે", "કાલ", "ગઈકાલે", "कल");
+    private static final List<String> TODAY = L("today", "aaj", "આજે", "આજ", "आज");
+    private static final List<String> YES_WORDS = L("haan", "han", "ha", "haa", "sahi", "save", "yes", "ok", "okay", "yeah", "yep", "correct", "હા", "સાચું", "સેવ", "हाँ", "हां", "हा", "सही", "सेव");
+    private static final List<String> NO_WORDS = L("nope", "na", "nahi", "nahin", "no", "cancel", "ના", "નહીં", "નથી", "ન", "नहीं", "ना", "नही", "गलत");
+    private static final List<String> ENG_FWD = L("to", "from", "for");
     private static final String[] SUFFIXES = {"ને", "થી", "નો", "ની", "ના", "નું"};
 
     private static final Map<String, Integer> NUMWORDS = new HashMap<>();
@@ -77,8 +78,10 @@ public final class Parser {
         add(50, "pachas", "pachaas", "પચાસ", "पचास"); add(60, "saath", "sath", "સાઠ", "साठ");
         add(70, "sattar", "sitter", "સિત્તેર", "सत्तर"); add(80, "assi", "ashi", "એંસી", "अस्सी");
         add(90, "nabbe", "nevu", "નેવું", "नब्बे");
-        for (String w : L("hajar", "hazar", "hazaar", "હજાર", "हजार")) MULTVAL.put(w, 1000);
-        for (String w : L("sau", "સો", "सौ")) MULTVAL.put(w, 100);
+        add(1, "one"); add(2, "two"); add(3, "three"); add(4, "four"); add(5, "five"); add(6, "six"); add(7, "seven"); add(8, "eight"); add(9, "nine");
+        add(10, "ten"); add(15, "fifteen"); add(20, "twenty"); add(30, "thirty"); add(40, "forty"); add(50, "fifty"); add(60, "sixty"); add(70, "seventy"); add(80, "eighty"); add(90, "ninety");
+        for (String w : L("hajar", "hazar", "hazaar", "thousand", "હજાર", "हजार")) MULTVAL.put(w, 1000);
+        for (String w : L("sau", "hundred", "સો", "सौ")) MULTVAL.put(w, 100);
         for (String w : L("lakh", "laakh", "લાખ", "लाख")) MULTVAL.put(w, 100000);
     }
 
@@ -178,10 +181,21 @@ public final class Parser {
     }
 
     private static boolean isNameStop(String t) {
-        return numVal(t) != null || isAnyKw(t) || isIn(t, FILL) || PARTICLES.contains(t);
+        return numVal(t) != null || isAnyKw(t) || isIn(t, FILL) || PARTICLES.contains(t) || ENG_FWD.contains(t) || t.equals("a") || t.equals("the") || t.equals("of") || t.equals("rs") || t.equals("rupees") || t.equals("rupee") || t.equals("and") || YESTERDAY.contains(t) || TODAY.contains(t) || t.equals("on") || t.equals("is") || t.equals("what") || t.equals("show");
     }
 
     private static String extractName(List<String> tokens) {
+        for (int i = 0; i < tokens.size(); i++) {
+            if (!ENG_FWD.contains(tokens.get(i))) continue;
+            List<String> cand = new ArrayList<>();
+            for (int j = i + 1; j < tokens.size() && cand.size() < 3; j++) {
+                String w = tokens.get(j);
+                if (w.endsWith("'s") && w.length() > 2) w = w.substring(0, w.length() - 2);
+                if (isNameStop(w)) break;
+                cand.add(w);
+            }
+            if (!cand.isEmpty()) return String.join(" ", cand);
+        }
         for (int i = 0; i < tokens.size(); i++) {
             if (!PARTICLES.contains(tokens.get(i))) continue;
             List<String> cand = new ArrayList<>();
@@ -318,7 +332,8 @@ public final class Parser {
         outer:
         for (String t : tokenize(text)) {
             if (numVal(t) != null) continue;
-            if (nameToks.contains(t) || PARTICLES.contains(t) || isIn(t, FILL)) continue;
+            if (nameToks.contains(t) || PARTICLES.contains(t) || isIn(t, FILL) || ENG_FWD.contains(t) || YESTERDAY.contains(t) || TODAY.contains(t)) continue;
+            if (t.equals("a") || t.equals("the") || t.equals("of") || t.equals("on") || t.equals("and") || t.equals("rs") || t.equals("rupees") || t.equals("rupee")) continue;
             for (List<String> k : kws) if (isIn(t, k)) continue outer;
             if (UDHAR.contains(t)) continue;
             out.add(t);

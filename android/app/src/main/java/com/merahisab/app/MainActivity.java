@@ -303,7 +303,10 @@ public class MainActivity extends Activity {
         return s.toString();
     }
 
+    boolean isEnglish() { return db.settings.lang.equals("en-IN"); }
+
     String partySummary(Model.Party p) {
+        if (isEnglish()) return partySummaryEn(p);
         double b = db.partyBal(p.id), gave = 0, got = 0, took = 0, paid = 0;
         for (Model.Txn t : db.txns) {
             if (!p.id.equals(t.partyId)) continue;
@@ -316,6 +319,22 @@ public class MainActivity extends Activity {
         if (took > 0) m.append("ઉધાર લીધું ").append(Fmt.plain(took)).append(" રૂપિયા. ");
         if (paid > 0) m.append("ચૂકવ્યા ").append(Fmt.plain(paid)).append(" રૂપિયા. ");
         m.append(b > 0 ? "કુલ બાકી " + Fmt.plain(b) + " રૂપિયા લેવાના છે." : (b < 0 ? "કુલ " + Fmt.plain(-b) + " રૂપિયા દેવાના છે." : "હિસાબ બરાબર છે."));
+        return m.toString();
+    }
+
+    private String partySummaryEn(Model.Party p) {
+        double b = db.partyBal(p.id), gave = 0, got = 0, took = 0, paid = 0;
+        for (Model.Txn x : db.txns) {
+            if (!p.id.equals(x.partyId)) continue;
+            if (x.type.equals("gave")) gave += x.amount; else if (x.type.equals("got")) got += x.amount;
+            else if (x.type.equals("took")) took += x.amount; else if (x.type.equals("paid")) paid += x.amount;
+        }
+        StringBuilder m = new StringBuilder("Account of " + p.name + ". ");
+        if (gave > 0) m.append("Total given on credit ").append(Fmt.plain(gave)).append(" rupees. ");
+        if (got > 0) m.append("Received ").append(Fmt.plain(got)).append(" rupees. ");
+        if (took > 0) m.append("Taken on credit ").append(Fmt.plain(took)).append(" rupees. ");
+        if (paid > 0) m.append("Paid ").append(Fmt.plain(paid)).append(" rupees. ");
+        m.append(b > 0 ? "You will receive " + Fmt.plain(b) + " rupees." : (b < 0 ? "You have to pay " + Fmt.plain(-b) + " rupees." : "The account is settled."));
         return m.toString();
     }
 
@@ -458,7 +477,7 @@ public class MainActivity extends Activity {
     void speak(String text) {
         if (!db.settings.speak || !ttsReady) return;
         try {
-            tts.setLanguage(Locale.forLanguageTag(db.settings.lang.equals("hi-IN") ? "hi-IN" : "gu-IN"));
+            tts.setLanguage(Locale.forLanguageTag(db.settings.lang));
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "mh");
         } catch (Exception e) { /* ignore */ }
     }
