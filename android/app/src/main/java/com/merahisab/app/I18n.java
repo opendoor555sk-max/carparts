@@ -119,11 +119,11 @@ public final class I18n {
         put("લાઇટ", "लाइट", "Light");
         put("ડાર્ક", "डार्क", "Dark");
         put("સિસ્ટમ", "सिस्टम", "System");
-        put("બિઝનેસ પ્રોફાઇલ", "बिज़नेस प्रोफ़ाइल", "Business Profile");
+        put("બિઝનેસ પ્રોફાઇલ", "बिज़नेस प्रोफ़ाइल", "Business profile");
         put("તમારા બિઝનેસની માહિતી અપડેટ કરો", "अपने बिज़नेस की जानकारी अपडेट करें", "Update your business information");
-        put("ઓપનિંગ બેલેન્સ", "ओपनिंग बैलेंस", "Opening Balance");
+        put("ઓપનિંગ બેલેન્સ", "ओपनिंग बैलेंस", "Opening balance");
         put("ઓપનિંગ કેશ બેલેન્સ સેટ કરો", "शुरुआती नकद बैलेंस सेट करें", "Set opening cash balance");
-        put("બિઝનેસ સેટઅપ", "बिज़नेस सेटअप", "Business Setup");
+        put("બિઝનેસ સેટઅપ", "बिज़नेस सेटअप", "Business setup");
         put("UPI વિગતો (ચૂકવણી Link માટે)", "UPI विवरण (भुगतान लिंक के लिए)", "UPI details (for payment links)");
         put("ભાષા અને વૉઇસ", "भाषा और वॉइस", "Language & Voice");
         put("હિન્દી", "हिन्दी", "Hindi");
@@ -133,7 +133,7 @@ public final class I18n {
         put("બંધ", "बंद", "Off");
     }
     private static void init2() {
-        put("એપ થીમ", "ऐप थीम", "App Theme");
+        put("એપ થીમ", "ऐप थीम", "App theme");
         put("પ્રોડક્ટ પ્રમાણે એન્ટ્રી", "प्रोडक्ट के अनुसार प्रविष्टि", "Product-wise Entry");
         put("એન્ટ્રીમાં પ્રોડક્ટ સિલેક્શન અને રેટ", "प्रविष्टि में प्रोडक्ट चुनना और रेट", "Product selection and rate in entries");
         put("પ્રોડક્ટ યાદી", "प्रोडक्ट सूची", "Product Master");
@@ -408,6 +408,26 @@ public final class I18n {
         put("શુભ સવાર", "शुभ प्रभात", "Good Morning");
         put("શુભ બપોર", "शुभ दोपहर", "Good Afternoon");
         put("શુભ સાંજ", "शुभ संध्या", "Good Evening");
+        put("UPI અને QR વિગતો", "UPI और QR विवरण", "UPI and QR details");
+        put("ભાષા", "भाषा", "Language");
+        put("પ્રોડક્ટ પ્રમાણે એન્ટ્રી ચાલુ કરો", "प्रोडक्ट के अनुसार एंट्री चालू करें", "Turn on product-wise entry");
+        put("એન્ટ્રીમાં પ્રોડક્ટ સિલેક્શન અને રેટ ચાલુ કરો", "एंट्री में प्रोडक्ट चयन और रेट चालू करें", "Enable product selection and rate in entry");
+        put("પ્રોડક્ટ માસ્ટર", "प्रोडक्ट मास्टर", "Product master");
+        put("બનાવેલ પ્રોડક્ટ્સ જુઓ", "बनाए गए प्रोडक्ट देखें", "View created products");
+        put("વૉઇસ સેટિંગ્સ", "वॉइस सेटिंग्स", "Voice settings");
+        put("ભાષા અને બોલીને જવાબ", "भाषा और बोलकर जवाब", "Language and spoken replies");
+        put("વૉઇસ સેટિંગ્સ, ટેસ્ટ અને શીખેલું", "वॉइस सेटिंग्स, टेस्ट और सीखा हुआ", "Voice settings, test and learned");
+        put("સુરક્ષા માટે પિન સેટ કરો", "सुरक्षा के लिए पिन सेट करें", "Set a PIN for security");
+        put("દુકાન, પ્રોફાઇલ અને સેટઅપ", "दुकान, प्रोफ़ाइल और सेटअप", "Shop, profile and setup");
+        put("મદદ, FAQs, ફીડબેક અને નીતિઓ", "मदद, FAQs, फीडबैक और नीतियाँ", "Help, FAQs, feedback and policies");
+        put("એપ પ્રતિસાદ", "ऐप प्रतिक्रिया", "App feedback");
+        put("તમારા સૂચનો શેર કરો અથવા ભૂલ અહેવાલ કરો", "अपने सुझाव शेयर करें या गलती बताएँ", "Share suggestions or report a bug");
+        put("પ્રાઈવસી પોલીસી", "प्राइवेसी पॉलिसी", "Privacy policy");
+        put("તમારા સૂચનો લખો અથવા કોઈ ભૂલ આવી હોય તો જણાવો. પછી WhatsApp/Email થી મોકલી શકો.", "अपने सुझाव लिखें या कोई गलती हो तो बताएँ। फिर WhatsApp/Email से भेज सकते हैं।", "Write your suggestions or report a bug. You can then send it via WhatsApp/Email.");
+        put("અહીં લખો", "यहाँ लिखें", "Write here");
+        put("મોકલો", "भेजें", "Send");
+        put("કંઈક લખો", "कुछ लिखें", "Write something");
+        put("એકાઉન્ટ કાઢી નાખો", "एकाउंट हटाएँ", "Delete account");
         put("વ્યવસાયનો પ્રકાર, પ્રોફાઇલ અને સેટઅપ", "व्यवसाय का प्रकार, प्रोफ़ाइल और सेटअप", "Business type, profile and setup");
         put("સર્વિસિસ અને બિલિંગ", "सर्विसेज़ और बिलिंग", "Services and billing");
         put("વૉઇસ ટેસ્ટ, શીખેલું અને ચૂકવણી Link", "वॉइस टेस्ट, सीखा हुआ और भुगतान Link", "Voice test, learned names and payment link");
@@ -421,6 +441,8 @@ public final class I18n {
         put("ઉધાર જાવક", "उधार जावक", "Credit outgoing");
         put("દૈનિક નોંધો", "दैनिક प्रविष्टियाँ", "Daily entries");
         put("આ સમયગાળામાં કોઈ નોંધ નથી.", "इस अवधि में कोई प्रविष्टि नहीं।", "No entries in this period.");
+    }
+    private static void init7() {
         put("ગયો મહિનો", "पिछला महीना", "Last month");
         put("આ વર્ષ", "इस साल", "This year");
         put("બધા સમય", "सभी समय", "All time");
@@ -441,8 +463,6 @@ public final class I18n {
         put("સર્વિસ પ્રોવાઈડર", "सर्विस प्रोवाइडर", "Service provider");
         put("કામ, સર્વિસ, પાર્ટ અને ઉધાર-રોકડ", "काम, सर्विस, पार्ट और उधार-नकद", "Work, service, parts and credit/cash");
         put("આગળ", "आगे", "Next");
-    }
-    private static void init7() {
         put("← પાછા", "← वापस", "← Back");
         put("વ્યવસાય શ્રેણી પસંદ કરો", "व्यवसाय श्रेणी चुनें", "Choose business category");
         put("તમારા કામની શ્રેણી ચૂંટો", "अपने काम की श्रेणी चुनें", "Pick the category of your work");
@@ -483,6 +503,8 @@ public final class I18n {
         put("ચૂકવવાના બાકી: ", "चुकाना बाकी: ", "Left to pay: ");
         put("બાકી (ઉધાર): ", "बाकी (उधार): ", "Due (credit): ");
         put(" · પાર્ટ: ", " · पार्ट: ", " · Part: ");
+    }
+    private static void init8() {
         put("સાથે મળ્યા", "साथ में मिले", "Received with it");
         put("સાથે ચૂકવ્યા", "साथ में चुकाए", "Paid with it");
         put("એપે શીખેલું", "ऐप ने सीखा", "Learned by app");
@@ -503,8 +525,6 @@ public final class I18n {
         put(" નોંધ કાઢી નાખવી છે?", " प्रविष्टियाँ हटानी हैं?", " entries?");
         put(" ખાતા અને ", " खाते और ", " accounts and ");
         put(" નોંધ પાછી લાવવી છે? હાલનો ડેટા બદલાઈ જશે.", " प्रविष्टियाँ वापस लानी हैं? मौजूदा डेटा बदल जाएगा।", " entries? Current data will be replaced.");
-    }
-    private static void init8() {
         put("પેટ્રોલ/ડીઝલ", "पेट्रोल/डीज़ल", "Petrol/Diesel");
         put("ભાડું", "किराया", "Rent");
         put("પગાર", "वेतन", "Salary");
@@ -545,6 +565,8 @@ public final class I18n {
         put("બેલ પર સૂચનાઓ", "बेल पर सूचनाएँ", "Notifications");
         put("ખાતું ખોલો", "खाता खोलें", "Open Account");
         put("હમણાં બાકી ગ્રાહકો નથી", "अभी कोई बकाया ग्राहक नहीं", "No customers with due amount");
+    }
+    private static void init9() {
         put("રિમાઇન્ડર ગયું", "रिमाइंडर भेजा", "Reminder sent");
         put(" ગ્રાહકો • ", " ग्राहक • ", " customers • ");
         put(" બાકી", " बकाया", " due");
@@ -564,6 +586,7 @@ public final class I18n {
         init6();
         init7();
         init8();
+        init9();
         List<String> ks = new ArrayList<>();
         for (String k : M.keySet()) if (k.length() >= 5) ks.add(k);
         Collections.sort(ks, new Comparator<String>() { @Override public int compare(String a, String b) { return b.length() - a.length(); } });

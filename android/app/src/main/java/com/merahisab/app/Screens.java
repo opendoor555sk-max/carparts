@@ -1024,28 +1024,51 @@ final class Screens {
 
     // ---------------- SETTINGS ----------------
     private View srow(String glyph, String title, String sub, String right, Runnable r) {
+        return srowT(glyph, Ui.ACCENT, title, sub, right, null, r);
+    }
+
+    /** Settings row with its own tint, optional text/view on the right. */
+    private View srowT(String glyph, int tint, String title, String sub, String right, View rightView, Runnable r) {
         LinearLayout l = Ui.h(c);
-        Ui.pad(l, 14, 10, 14, 10);
-        TextView ic = Ui.t(c, glyph, 18, Ui.ACCENT, true);
+        l.setGravity(Gravity.CENTER_VERTICAL);
+        Ui.pad(l, 14, 12, 14, 12);
+        TextView ic = Ui.t(c, glyph, 18, tint, true);
         ic.setGravity(Gravity.CENTER);
-        ic.setBackground(Ui.rr(Ui.SOFT, 0, 12));
-        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Ui.dp(40), Ui.dp(40));
-        ip.setMargins(0, 0, Ui.dp(12), 0);
+        ic.setBackground(Ui.rr((tint & 0x00FFFFFF) | 0x24000000, 0, 14));
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Ui.dp(44), Ui.dp(44));
+        ip.setMargins(0, 0, Ui.dp(14), 0);
         l.addView(ic, ip);
         LinearLayout tx = Ui.v(c);
-        tx.addView(Ui.t(c, title, 15, Ui.TEXT, true));
-        tx.addView(Ui.t(c, sub, 12, Ui.MUTED, false));
+        tx.addView(Ui.t(c, title, 16, Ui.TEXT, true));
+        if (sub != null && !sub.isEmpty()) tx.addView(Ui.t(c, sub, 12, Ui.MUTED, false));
         l.addView(tx, Ui.weight(1));
-        l.addView(Ui.t(c, right == null ? "›" : right, 16, right != null && right.startsWith("✔") ? Ui.GREEN : Ui.MUTED, true));
+        if (rightView != null) l.addView(rightView);
+        else l.addView(Ui.t(c, right == null ? "›" : right, right == null ? 22 : 16, right != null && right.startsWith("✔") ? Ui.GREEN : Ui.MUTED, true));
         Ui.tap(l, r);
         return l;
+    }
+
+    private View switchView(boolean on) {
+        LinearLayout pill = Ui.h(c);
+        pill.setGravity(on ? Gravity.END | Gravity.CENTER_VERTICAL : Gravity.START | Gravity.CENTER_VERTICAL);
+        pill.setBackground(Ui.rr(on ? Color.parseColor("#B794E0") : Color.parseColor("#E8E0EA"), on ? 0 : Color.parseColor("#7D737F"), 18));
+        Ui.pad(pill, 4, 4, 4, 4);
+        TextView knob = new TextView(c);
+        knob.setBackground(Ui.rr(on ? Color.parseColor("#6B21A8") : Color.parseColor("#7D737F"), 0, 14));
+        pill.addView(knob, new LinearLayout.LayoutParams(Ui.dp(on ? 26 : 20), Ui.dp(on ? 26 : 20)));
+        pill.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(58), Ui.dp(34)));
+        return pill;
+    }
+
+    private View srowSw(String glyph, int tint, String title, String sub, boolean on, Runnable r) {
+        return srowT(glyph, tint, title, sub, null, switchView(on), r);
     }
 
     private String tgl(boolean on) { return on ? "● ચાલુ" : "○ બંધ"; }
 
     private View acc(final String id, String glyph, String title, String sub, List<View> rows, int tint) {
         LinearLayout box = Ui.v(c);
-        box.setBackground(Ui.rr(Ui.SURFACE, Ui.LINE, 16));
+        box.setBackground(Ui.rr(Ui.SURFACE, a.setOpen.equals(id) ? ((tint & 0x00FFFFFF) | 0x66000000) : Ui.LINE, 18));
         LinearLayout.LayoutParams bp = Ui.fillW();
         bp.setMargins(Ui.dp(16), Ui.dp(6), Ui.dp(16), Ui.dp(6));
         box.setLayoutParams(bp);
@@ -1062,7 +1085,10 @@ final class Screens {
         tx.addView(Ui.t(c, title, 16, Ui.TEXT, true));
         tx.addView(Ui.t(c, sub, 12, Ui.MUTED, false));
         head.addView(tx, Ui.weight(1));
-        head.addView(Ui.t(c, open ? "⌃" : "⌄", 18, Ui.MUTED, true));
+        TextView chev = Ui.t(c, open ? "⌃" : "⌄", 18, open ? tint : Ui.MUTED, true);
+        chev.setGravity(Gravity.CENTER);
+        chev.setBackground(Ui.rr(Ui.SURFACE2, 0, 20));
+        head.addView(chev, new LinearLayout.LayoutParams(Ui.dp(38), Ui.dp(38)));
         Ui.tap(head, new Runnable() { @Override public void run() { a.setOpen = a.setOpen.equals(id) ? "" : id; a.render(); } });
         box.addView(head);
         if (open) for (View v : rows) { box.addView(divider()); box.addView(v); }
@@ -1078,45 +1104,50 @@ final class Screens {
         boolean hasPin = !s.pinHash.isEmpty();
         final Sheets sh = a.sheets;
 
+        final int BLUE = Color.parseColor("#2F6FE0"), ORANGE = Color.parseColor("#F59E0B"), TEAL = Color.parseColor("#0D9488"), GREEN = Color.parseColor("#4CAF50"),
+                PURP = Color.parseColor("#8B5CF6"), BLUE2 = Color.parseColor("#3F51B5"), PINK = Color.parseColor("#E11D74"), GREY = Color.parseColor("#607D8B");
+
         List<View> biz = new ArrayList<>();
-        biz.add(srow("💼", "વ્યવસાયનો પ્રકાર", s.biz.equals("service") ? "સર્વિસ પ્રોવાઈડર (સેવા નોંધ ચાલુ)" : "દુકાન / સ્ટોર · સર્વિસ માટે અહીં બદલો", null, new Runnable() { @Override public void run() { sh.bizSheet(); } }));
-        biz.add(srow("👤", "બિઝનેસ પ્રોફાઇલ", "તમારા બિઝનેસની માહિતી અપડેટ કરો", null, new Runnable() { @Override public void run() { sh.profileSheet(); } }));
-        biz.add(srow("👛", "ઓપનિંગ બેલેન્સ", "ઓપનિંગ કેશ બેલેન્સ સેટ કરો", null, new Runnable() { @Override public void run() { sh.openBalSheet(); } }));
+        biz.add(srowT("🏪", Color.parseColor("#2196F3"), "વ્યવસાયનો પ્રકાર", s.biz.equals("service") ? "સર્વિસ પ્રોવાઈડર (સેવા નોંધ ચાલુ)" : "દુકાન / સ્ટોર · સર્વિસ માટે અહીં બદલો", null, null, new Runnable() { @Override public void run() { sh.bizSheet(); } }));
+        biz.add(srowT("◉", TEAL, "બિઝનેસ પ્રોફાઇલ", s.shop.isEmpty() ? "તમારા બિઝનેસની માહિતી અપડેટ કરો" : s.shop, null, null, new Runnable() { @Override public void run() { sh.profileSheet(); } }));
+        biz.add(srowT("👛", GREEN, "ઓપનિંગ બેલેન્સ", "ઓપનિંગ કેશ બેલેન્સ સેટ કરો", null, null, new Runnable() { @Override public void run() { sh.openBalSheet(); } }));
+        biz.add(srowT("▦", PURP, "બિઝનેસ સેટઅપ", "UPI અને QR વિગતો", null, null, new Runnable() { @Override public void run() { sh.bizSetupSheet(); } }));
 
         List<View> app = new ArrayList<>();
-        app.add(srow("🌐", "ભાષા અને વૉઇસ", (s.lang.equals("hi-IN") ? "હિન્દી" : (s.lang.equals("en-IN") ? "English" : "ગુજરાતી")) + " · બોલીને જવાબ " + (s.speak ? "ચાલુ" : "બંધ"), null, new Runnable() { @Override public void run() { sh.voiceSetSheet(); } }));
-        app.add(srow("🎨", "એપ થીમ", themeName, null, new Runnable() { @Override public void run() { sh.themeSheet(); } }));
-        app.add(srow("📦", "પ્રોડક્ટ પ્રમાણે એન્ટ્રી", "એન્ટ્રીમાં પ્રોડક્ટ સિલેક્શન અને રેટ", tgl(s.productMode), new Runnable() {
+        app.add(srowT("文", BLUE2, "ભાષા", s.lang.equals("hi-IN") ? "હિન્દી" : (s.lang.equals("en-IN") ? "English" : "ગુજરાતી"), null, null, new Runnable() { @Override public void run() { sh.voiceSetSheet(); } }));
+        app.add(srowT("◐", PURP, "એપ થીમ", themeName, null, null, new Runnable() { @Override public void run() { sh.themeSheet(); } }));
+        app.add(srowSw("▤", PURP, "પ્રોડક્ટ પ્રમાણે એન્ટ્રી ચાલુ કરો", "એન્ટ્રીમાં પ્રોડક્ટ સિલેક્શન અને રેટ ચાલુ કરો", s.productMode, new Runnable() {
             @Override public void run() { s.productMode = !s.productMode; a.save(); a.render(); if (s.productMode && a.db.products.isEmpty()) sh.prodSheet(); }
         }));
-        if (s.productMode) app.add(srow("▤", "પ્રોડક્ટ યાદી", a.db.products.size() + " પ્રોડક્ટ · રેટ સેટ કરો", null, new Runnable() { @Override public void run() { sh.prodSheet(); } }));
+        app.add(srowT("☰", TEAL, "પ્રોડક્ટ માસ્ટર", "બનાવેલ પ્રોડક્ટ્સ જુઓ", null, null, new Runnable() { @Override public void run() { sh.prodSheet(); } }));
 
         List<View> svc = new ArrayList<>();
-        svc.add(srow("🎤", "વૉઇસ ટેસ્ટ લૉગ", "શું બોલ્યા, એપ શું સમજ્યું", null, new Runnable() { @Override public void run() { sh.voiceLogSheet(); } }));
-        svc.add(srow("🧠", "એપે શીખેલું", a.db.learn.size() + " નામ શીખ્યા", null, new Runnable() { @Override public void run() { sh.learnedSheet(); } }));
-        svc.add(srow("▦", "ચૂકવણી Link (UPI)", "બિલ સાથે મોકલવાની UPI વિગતો", null, new Runnable() { @Override public void run() { sh.bizSetupSheet(); } }));
+        svc.add(srowT("🎤", PURP, "વૉઇસ સેટિંગ્સ", "ભાષા અને બોલીને જવાબ", null, null, new Runnable() { @Override public void run() { sh.voiceSetSheet(); } }));
+        svc.add(srowT("☑", GREEN, "વૉઇસ ટેસ્ટ લૉગ", "શું બોલ્યા, એપ શું સમજ્યું", null, null, new Runnable() { @Override public void run() { sh.voiceLogSheet(); } }));
+        svc.add(srowT("🧠", PINK, "એપે શીખેલું", a.db.learn.size() + " નામ શીખ્યા", null, null, new Runnable() { @Override public void run() { sh.learnedSheet(); } }));
 
         List<View> sec = new ArrayList<>();
-        sec.add(srow("🔒", "સિક્યુરિટી પિન", hasPin ? "પિન સક્રિય છે (બદલવા માટે ટેપ કરો)" : "એપ ખોલવા માટે 4 અંકનો પિન મૂકો", tgl(hasPin), new Runnable() { @Override public void run() { sh.pinToggle(); } }));
-        sec.add(srow("☝", "ફિંગરપ્રિન્ટ લૉક", "અનલૉક કરવા માટે બાયોમેટ્રિક્સ વાપરો", tgl(!s.bio.isEmpty()), new Runnable() { @Override public void run() { sh.bioToggle(); } }));
+        sec.add(srowSw("🔒", PURP, "સિક્યુરિટી પિન", "સુરક્ષા માટે પિન સેટ કરો", hasPin, new Runnable() { @Override public void run() { sh.pinToggle(); } }));
+        sec.add(srowSw("☝", Color.parseColor("#2196F3"), "ફિંગરપ્રિન્ટ લૉક", "અનલૉક કરવા માટે બાયોમેટ્રિક્સ વાપરો", !s.bio.isEmpty(), new Runnable() { @Override public void run() { sh.bioToggle(); } }));
 
         List<View> bk = new ArrayList<>();
-        bk.add(srow("☁", "ડેટા બેકઅપ", a.backupTimeText(), a.backupFresh() ? "✔" : null, new Runnable() { @Override public void run() { sh.backupSheet(); } }));
-        bk.add(srow("⬆", "બેકઅપ પાછું લાવો", "પહેલાં સેવ કરેલી ફાઇલ પસંદ કરો", null, new Runnable() { @Override public void run() { a.pickRestoreFile(); } }));
-        bk.add(srow("⟳", "એપ અપડેટ ચકાસો", "નવા વર્ઝન માટે તપાસો", null, new Runnable() { @Override public void run() { a.checkUpdate(); } }));
+        bk.add(srowT("☁", Color.parseColor("#2196F3"), "ડેટા બેકઅપ", a.backupTimeText(), a.backupFresh() ? "✔" : null, null, new Runnable() { @Override public void run() { sh.backupSheet(); } }));
+        bk.add(srowT("⬆", GREEN, "બેકઅપ પાછું લાવો", "પહેલાં સેવ કરેલી ફાઇલ પસંદ કરો", null, null, new Runnable() { @Override public void run() { a.pickRestoreFile(); } }));
+        bk.add(srowT("⬇", ORANGE, "એપ અપડેટ ચકાસો", "નવા વર્ઝન માટે તપાસો", null, null, new Runnable() { @Override public void run() { a.checkUpdate(); } }));
 
         List<View> sup = new ArrayList<>();
-        sup.add(srow("?", "FAQs", "વારંવાર પૂછાતા પ્રશ્નો", null, new Runnable() { @Override public void run() { sh.faqSheet(); } }));
-        sup.add(srow("🛡", "પ્રાઇવસી", "ડેટા વપરાશ અને સુરક્ષા માર્ગદર્શિકા", null, new Runnable() { @Override public void run() { sh.privacySheet(); } }));
+        sup.add(srowT("?", PURP, "FAQs", "વારંવાર પૂછાતા પ્રશ્નો", null, null, new Runnable() { @Override public void run() { sh.faqSheet(); } }));
+        sup.add(srowT("!", ORANGE, "એપ પ્રતિસાદ", "તમારા સૂચનો શેર કરો અથવા ભૂલ અહેવાલ કરો", null, null, new Runnable() { @Override public void run() { sh.feedbackSheet(); } }));
+        sup.add(srowT("🛡", GREY, "પ્રાઈવસી પોલીસી", "ડેટા વપરાશ અને સુરક્ષા માર્ગદર્શિકા", null, null, new Runnable() { @Override public void run() { sh.privacySheet(); } }));
 
-        root.addView(acc("biz", "▣", "વ્યવસાય વ્યવસ્થાપન", "વ્યવસાયનો પ્રકાર, પ્રોફાઇલ અને સેટઅપ", biz, Color.parseColor("#3B6FE0")));
-        root.addView(acc("app", "⚙", "એપ્લિકેશન", "ભાષા, થીમ અને એન્ટ્રી ઓપ્શન્સ", app, Color.parseColor("#8B5CF6")));
-        root.addView(acc("svc", "🧾", "સર્વિસિસ અને બિલિંગ", "વૉઇસ ટેસ્ટ, શીખેલું અને ચૂકવણી Link", svc, Color.parseColor("#16A34A")));
-        root.addView(acc("sec", "🛡", "સુરક્ષા", "એપ PIN અને બાયોમેટ્રિક સિક્યુરિટી", sec, Color.parseColor("#F59E0B")));
+        root.addView(acc("biz", "▣", "વ્યવસાય વ્યવસ્થાપન", "દુકાન, પ્રોફાઇલ અને સેટઅપ", biz, BLUE));
+        root.addView(acc("app", "⚙", "એપ્લિકેશન", "ભાષા, થીમ અને એન્ટ્રી ઓપ્શન્સ", app, PURP));
+        root.addView(acc("svc", "🧾", "સર્વિસિસ અને બિલિંગ", "વૉઇસ સેટિંગ્સ, ટેસ્ટ અને શીખેલું", svc, Color.parseColor("#16A34A")));
+        root.addView(acc("sec", "🛡", "સુરક્ષા", "એપ PIN અને બાયોમેટ્રિક સિક્યુરિટી", sec, Color.parseColor("#D97706")));
         root.addView(acc("bk", "☁", "બેકઅપ અને એપ અપડેટ્સ", "બેકઅપ, રીસ્ટોર અને એપ અપડેટ", bk, Color.parseColor("#0EA5E9")));
-        root.addView(acc("sup", "🎧", "સપોર્ટ અને લીગલ", "મદદ, FAQs અને નીતિઓ", sup, Color.parseColor("#EC4899")));
+        root.addView(acc("sup", "🎧", "સપોર્ટ અને લીગલ", "મદદ, FAQs, ફીડબેક અને નીતિઓ", sup, PINK));
 
-        TextView wipe = Ui.t(c, "🗑  બધો ડેટા કાઢી નાખો", 15, Ui.RED, true);
+        TextView wipe = Ui.t(c, "🗑  એકાઉન્ટ કાઢી નાખો", 15, Ui.RED, true);
         wipe.setGravity(Gravity.CENTER);
         wipe.setBackground(Ui.rr(Ui.DNGBG, 0, 14));
         Ui.pad(wipe, 14, 14, 14, 14);

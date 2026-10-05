@@ -1707,6 +1707,23 @@ final class Sheets {
         s.show();
     }
 
+    void feedbackSheet() {
+        Ui.Sheet s = open("એપ પ્રતિસાદ");
+        TextView h = Ui.t(c, "તમારા સૂચનો લખો અથવા કોઈ ભૂલ આવી હોય તો જણાવો. પછી WhatsApp/Email થી મોકલી શકો.", 13, Ui.MUTED, false);
+        Ui.pad(h, 8, 4, 8, 8); s.add(h);
+        final EditText f = Ui.fld(c, "અહીં લખો", "", Ui.IN_PLAIN);
+        s.add(f);
+        s.add(Ui.btn(c, "મોકલો", "primary", new Runnable() {
+            @Override public void run() {
+                String t = f.getText().toString().trim();
+                if (t.isEmpty()) { a.toast("કંઈક લખો"); return; }
+                a.shareText("Mera Hisab feedback (v" + a.versionName() + "):\n" + t);
+            }
+        }));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
     void bizSheet() {
         Ui.Sheet s = open("વ્યવસાયનો પ્રકાર");
         s.add(Ui.btn(c, "દુકાન / સ્ટોર", a.db.settings.biz.equals("store") ? "primary" : "ghost", new Runnable() { @Override public void run() { a.db.settings.biz = "store"; a.save(); close(); a.render(); } }));
