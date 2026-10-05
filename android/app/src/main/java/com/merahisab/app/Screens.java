@@ -927,6 +927,7 @@ final class Screens {
         final Sheets sh = a.sheets;
 
         List<View> biz = new ArrayList<>();
+        biz.add(srow("💼", "વ્યવસાયનો પ્રકાર", s.biz.equals("service") ? "સર્વિસ પ્રોવાઈડર (સેવા નોંધ ચાલુ)" : "દુકાન / સ્ટોર · સર્વિસ માટે અહીં બદલો", null, new Runnable() { @Override public void run() { sh.bizSheet(); } }));
         biz.add(srow("👤", "બિઝનેસ પ્રોફાઇલ", "તમારા બિઝનેસની માહિતી અપડેટ કરો", null, new Runnable() { @Override public void run() { sh.profileSheet(); } }));
         biz.add(srow("👛", "ઓપનિંગ બેલેન્સ", "ઓપનિંગ કેશ બેલેન્સ સેટ કરો", null, new Runnable() { @Override public void run() { sh.openBalSheet(); } }));
         biz.add(srow("▦", "બિઝનેસ સેટઅપ", "UPI વિગતો (ચૂકવણી Link માટે)", null, new Runnable() { @Override public void run() { sh.bizSetupSheet(); } }));

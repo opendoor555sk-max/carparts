@@ -408,6 +408,8 @@ public final class I18n {
         put("શુભ સવાર", "शुभ प्रभात", "Good Morning");
         put("શુભ બપોર", "शुभ दोपहर", "Good Afternoon");
         put("શુભ સાંજ", "शुभ संध्या", "Good Evening");
+        put("સર્વિસ પ્રોવાઈડર (સેવા નોંધ ચાલુ)", "सर्विस प्रोवाइडर (सेवा प्रविष्टि चालू)", "Service provider (service entry on)");
+        put("દુકાન / સ્ટોર · સર્વિસ માટે અહીં બદલો", "दुकान / स्टोर · सर्विस के लिए यहाँ बदलें", "Shop / Store · change here for service");
         put("સ્વાગત છે", "स्वागत है", "Welcome");
         put("આગળ વધો", "आगे बढ़ें", "Continue");
         put("તમારું નામ લખો", "आपका नाम लिखें", "Enter your name");
@@ -439,10 +441,10 @@ public final class I18n {
         put("બાયોમેટ્રિક્સ સક્રિય કરો?", "बायोमेट्रिक चालू करें?", "Enable biometrics?");
         put("શું તમે એપને ઝડપથી અનલોક કરવા માટે ફિંગરપ્રિન્ટ અથવા ફેસ આઈડી વાપરવા માંગો છો?", "क्या आप ऐप जल्दी अनलॉक करने के लिए फिंगरप्रिंट या फेस आईडी इस्तेमाल करना चाहते हैं?", "Do you want to use fingerprint or face ID to unlock the app quickly?");
         put("ના", "नहीं", "No");
-        put("હા", "हाँ", "Yes");
-        put("વ્યવસાયનો પ્રકાર", "व्यवसाय का प्रकार", "Business type");
     }
     private static void init7() {
+        put("હા", "हाँ", "Yes");
+        put("વ્યવસાયનો પ્રકાર", "व्यवसाय का प्रकार", "Business type");
         put("સેવા નોંધ", "सेवा प्रविष्टि", "Service entry");
         put("સેવા / કામનું નામ", "सेवा / काम का नाम", "Service / work name");
         put("જેમ કે મશીન રિપેર", "जैसे मशीन रिपेयर", "e.g. machine repair");
@@ -501,10 +503,10 @@ public final class I18n {
         put("ચાલુ રાખો", "जारी रखें", "Continue");
         put("WhatsApp ખોલો", "WhatsApp खोलें", "Open WhatsApp");
         put("છોડો", "छोड़ें", "Skip");
-        put("કોઈ ઇતિહાસ નથી", "कोई इतिहास नहीं", "No history found");
-        put("બાકી ચૂકવણી (Pending)", "बकाया भुगतान (Pending)", "Pending Payments");
     }
     private static void init8() {
+        put("કોઈ ઇતિહાસ નથી", "कोई इतिहास नहीं", "No history found");
+        put("બાકી ચૂકવણી (Pending)", "बकाया भुगतान (Pending)", "Pending Payments");
         put("કોણ તમને આપશે અને કોને તમારે આપવાના, તાકીદ મુજબ", "कौन आपको देगा और किसे आपको देना है, तुरंत के क्रम में", "Who owes you & who you owe, sorted by urgency");
         put("રોકડ સારાંશ", "नकद सारांश", "Cash Summary");
         put("ફક્ત રોકડ નોંધ, શરૂઆત અને અંતના બેલેન્સ સાથે", "सिर्फ़ नकद प्रविष्टियाँ, शुरुआती और अंतिम बैलेंस के साथ", "Cash-only entries with opening & closing balance");
