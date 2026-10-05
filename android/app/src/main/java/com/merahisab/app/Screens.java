@@ -1043,7 +1043,7 @@ final class Screens {
 
     private String tgl(boolean on) { return on ? "● ચાલુ" : "○ બંધ"; }
 
-    private View acc(final String id, String glyph, String title, String sub, List<View> rows) {
+    private View acc(final String id, String glyph, String title, String sub, List<View> rows, int tint) {
         LinearLayout box = Ui.v(c);
         box.setBackground(Ui.rr(Ui.SURFACE, Ui.LINE, 16));
         LinearLayout.LayoutParams bp = Ui.fillW();
@@ -1052,10 +1052,10 @@ final class Screens {
         boolean open = a.setOpen.equals(id);
         LinearLayout head = Ui.h(c);
         Ui.pad(head, 14, 12, 14, 12);
-        TextView ic = Ui.t(c, glyph, 18, Ui.ACCENT, true);
+        TextView ic = Ui.t(c, glyph, 20, tint, true);
         ic.setGravity(Gravity.CENTER);
-        ic.setBackground(Ui.rr(Ui.SOFT, 0, 12));
-        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Ui.dp(40), Ui.dp(40));
+        ic.setBackground(Ui.rr((tint & 0x00FFFFFF) | 0x2A000000, 0, 14));
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Ui.dp(46), Ui.dp(46));
         ip.setMargins(0, 0, Ui.dp(12), 0);
         head.addView(ic, ip);
         LinearLayout tx = Ui.v(c);
@@ -1082,7 +1082,6 @@ final class Screens {
         biz.add(srow("💼", "વ્યવસાયનો પ્રકાર", s.biz.equals("service") ? "સર્વિસ પ્રોવાઈડર (સેવા નોંધ ચાલુ)" : "દુકાન / સ્ટોર · સર્વિસ માટે અહીં બદલો", null, new Runnable() { @Override public void run() { sh.bizSheet(); } }));
         biz.add(srow("👤", "બિઝનેસ પ્રોફાઇલ", "તમારા બિઝનેસની માહિતી અપડેટ કરો", null, new Runnable() { @Override public void run() { sh.profileSheet(); } }));
         biz.add(srow("👛", "ઓપનિંગ બેલેન્સ", "ઓપનિંગ કેશ બેલેન્સ સેટ કરો", null, new Runnable() { @Override public void run() { sh.openBalSheet(); } }));
-        biz.add(srow("▦", "બિઝનેસ સેટઅપ", "UPI વિગતો (ચૂકવણી Link માટે)", null, new Runnable() { @Override public void run() { sh.bizSetupSheet(); } }));
 
         List<View> app = new ArrayList<>();
         app.add(srow("🌐", "ભાષા અને વૉઇસ", (s.lang.equals("hi-IN") ? "હિન્દી" : (s.lang.equals("en-IN") ? "English" : "ગુજરાતી")) + " · બોલીને જવાબ " + (s.speak ? "ચાલુ" : "બંધ"), null, new Runnable() { @Override public void run() { sh.voiceSetSheet(); } }));
@@ -1091,6 +1090,11 @@ final class Screens {
             @Override public void run() { s.productMode = !s.productMode; a.save(); a.render(); if (s.productMode && a.db.products.isEmpty()) sh.prodSheet(); }
         }));
         if (s.productMode) app.add(srow("▤", "પ્રોડક્ટ યાદી", a.db.products.size() + " પ્રોડક્ટ · રેટ સેટ કરો", null, new Runnable() { @Override public void run() { sh.prodSheet(); } }));
+
+        List<View> svc = new ArrayList<>();
+        svc.add(srow("🎤", "વૉઇસ ટેસ્ટ લૉગ", "શું બોલ્યા, એપ શું સમજ્યું", null, new Runnable() { @Override public void run() { sh.voiceLogSheet(); } }));
+        svc.add(srow("🧠", "એપે શીખેલું", a.db.learn.size() + " નામ શીખ્યા", null, new Runnable() { @Override public void run() { sh.learnedSheet(); } }));
+        svc.add(srow("▦", "ચૂકવણી Link (UPI)", "બિલ સાથે મોકલવાની UPI વિગતો", null, new Runnable() { @Override public void run() { sh.bizSetupSheet(); } }));
 
         List<View> sec = new ArrayList<>();
         sec.add(srow("🔒", "સિક્યુરિટી પિન", hasPin ? "પિન સક્રિય છે (બદલવા માટે ટેપ કરો)" : "એપ ખોલવા માટે 4 અંકનો પિન મૂકો", tgl(hasPin), new Runnable() { @Override public void run() { sh.pinToggle(); } }));
@@ -1105,11 +1109,12 @@ final class Screens {
         sup.add(srow("?", "FAQs", "વારંવાર પૂછાતા પ્રશ્નો", null, new Runnable() { @Override public void run() { sh.faqSheet(); } }));
         sup.add(srow("🛡", "પ્રાઇવસી", "ડેટા વપરાશ અને સુરક્ષા માર્ગદર્શિકા", null, new Runnable() { @Override public void run() { sh.privacySheet(); } }));
 
-        root.addView(acc("biz", "🏪", "વ્યવસાય વ્યવસ્થાપન", "દુકાન, પ્રોફાઇલ અને ઓપનિંગ બેલેન્સ સેટઅપ", biz));
-        root.addView(acc("app", "⚙", "એપ્લિકેશન", "ભાષા, થીમ અને એન્ટ્રી ઓપ્શન્સ", app));
-        root.addView(acc("sec", "🛡", "સુરક્ષા", "એપ PIN અને બાયોમેટ્રિક સિક્યુરિટી", sec));
-        root.addView(acc("bk", "☁", "બેકઅપ અને એપ અપડેટ્સ", "બેકઅપ અને એપ અપડેટ", bk));
-        root.addView(acc("sup", "?", "સપોર્ટ અને લીગલ", "મદદ, FAQs અને નીતિઓ", sup));
+        root.addView(acc("biz", "▣", "વ્યવસાય વ્યવસ્થાપન", "વ્યવસાયનો પ્રકાર, પ્રોફાઇલ અને સેટઅપ", biz, Color.parseColor("#3B6FE0")));
+        root.addView(acc("app", "⚙", "એપ્લિકેશન", "ભાષા, થીમ અને એન્ટ્રી ઓપ્શન્સ", app, Color.parseColor("#8B5CF6")));
+        root.addView(acc("svc", "🧾", "સર્વિસિસ અને બિલિંગ", "વૉઇસ ટેસ્ટ, શીખેલું અને ચૂકવણી Link", svc, Color.parseColor("#16A34A")));
+        root.addView(acc("sec", "🛡", "સુરક્ષા", "એપ PIN અને બાયોમેટ્રિક સિક્યુરિટી", sec, Color.parseColor("#F59E0B")));
+        root.addView(acc("bk", "☁", "બેકઅપ અને એપ અપડેટ્સ", "બેકઅપ, રીસ્ટોર અને એપ અપડેટ", bk, Color.parseColor("#0EA5E9")));
+        root.addView(acc("sup", "🎧", "સપોર્ટ અને લીગલ", "મદદ, FAQs અને નીતિઓ", sup, Color.parseColor("#EC4899")));
 
         TextView wipe = Ui.t(c, "🗑  બધો ડેટા કાઢી નાખો", 15, Ui.RED, true);
         wipe.setGravity(Gravity.CENTER);
@@ -1133,7 +1138,7 @@ final class Screens {
         n1.setGravity(Gravity.CENTER);
         Ui.pad(n1, 24, 10, 24, 2);
         root.addView(n1);
-        TextView n2 = Ui.t(c, "Mera Hisab · વર્ઝન " + a.versionName(), 12, Ui.MUTED, false);
+        TextView n2 = Ui.t(c, "Version " + a.versionName(), 12, Ui.MUTED, false);
         n2.setGravity(Gravity.CENTER);
         Ui.pad(n2, 24, 2, 24, 12);
         root.addView(n2);

@@ -151,16 +151,16 @@ public final class I18n {
         put("વારંવાર પૂછાતા પ્રશ્નો", "अक्सर पूछे जाने वाले प्रश्न", "Frequently asked questions");
         put("પ્રાઇવસી", "प्राइवेसी", "Privacy");
         put("ડેટા વપરાશ અને સુરક્ષા માર્ગદર્શિકા", "डेटा उपयोग और सुरक्षा दिशानिर्देश", "Data usage and security guidelines");
-        put("વ્યવસાય વ્યવસ્થાપન", "व्यवसाय प्रबंधन", "Accounts");
+        put("વ્યવસાય વ્યવસ્થાપન", "व्यवसाय प्रबंधन", "Business management");
         put("દુકાન, પ્રોફાઇલ અને ઓપનિંગ બેલેન્સ સેટઅપ", "दुकान, प्रोफ़ाइल और ओपनिंग बैलेंस सेटअप", "Shop, profile and opening balance setup");
         put("એપ્લિકેશન", "एप्लिकेशन", "Application");
-        put("ભાષા, થીમ અને એન્ટ્રી ઓપ્શન્સ", "भाषा, थीम और प्रविष्टि विकल्प", "Language, theme and entry options");
+        put("ભાષા, થીમ અને એન્ટ્રી ઓપ્શન્સ", "भाषा, थीम और एंट्री ऑप्शन", "Language, theme and entry options");
         put("સુરક્ષા", "सुरक्षा", "Security");
         put("એપ PIN અને બાયોમેટ્રિક સિક્યુરિટી", "ऐप PIN और बायोमेट्रिक सुरक्षा", "App PIN and biometric security");
-        put("બેકઅપ અને એપ અપડેટ્સ", "बैकअप और ऐप अपडेट", "Backup & App Updates");
+        put("બેકઅપ અને એપ અપડેટ્સ", "बैकअप और ऐप अपडेट्स", "Backup and app updates");
         put("બેકઅપ અને એપ અપડેટ", "बैकअप और ऐप अपडेट", "Backup and app update");
-        put("સપોર્ટ અને લીગલ", "सहायता और कानूनी", "Support & Legal");
-        put("મદદ, FAQs અને નીતિઓ", "मदद, FAQ और नीतियाँ", "Help, FAQs and policies");
+        put("સપોર્ટ અને લીગલ", "सपोर्ट और लीगल", "Support and legal");
+        put("મદદ, FAQs અને નીતિઓ", "मदद, FAQs और नीतियाँ", "Help, FAQs and policies");
         put("🗑  બધો ડેટા કાઢી નાખો", "🗑  सारा डेटा मिटाएँ", "🗑  Erase all data");
         put("બધું ખાતું અને બધી નોંધ કાઢી નાખવી છે? આ પાછું નહીં આવે.", "सारे खाते और सारी प्रविष्टियाँ मिटानी हैं? यह वापस नहीं आएगा।", "Delete all accounts and entries? This cannot be undone.");
         put("હા, બધું કાઢી નાખો", "हाँ, सब मिटा दें", "Yes, delete everything");
@@ -408,6 +408,12 @@ public final class I18n {
         put("શુભ સવાર", "शुभ प्रभात", "Good Morning");
         put("શુભ બપોર", "शुभ दोपहर", "Good Afternoon");
         put("શુભ સાંજ", "शुभ संध्या", "Good Evening");
+        put("વ્યવસાયનો પ્રકાર, પ્રોફાઇલ અને સેટઅપ", "व्यवसाय का प्रकार, प्रोफ़ाइल और सेटअप", "Business type, profile and setup");
+        put("સર્વિસિસ અને બિલિંગ", "सर्विसेज़ और बिलिंग", "Services and billing");
+        put("વૉઇસ ટેસ્ટ, શીખેલું અને ચૂકવણી Link", "वॉइस टेस्ट, सीखा हुआ और भुगतान Link", "Voice test, learned names and payment link");
+        put("ચૂકવણી Link (UPI)", "भुगतान Link (UPI)", "Payment link (UPI)");
+        put("બિલ સાથે મોકલવાની UPI વિગતો", "बिल के साथ भेजने की UPI जानकारी", "UPI details to send with bills");
+        put("બેકઅપ, રીસ્ટોર અને એપ અપડેટ", "बैकअप, रीस्टोर और ऐप अपडेट", "Backup, restore and app update");
         put("સાથી", "साथी", "Saathi");
         put("પ્રગતિ", "प्रगति", "Pragati");
         put("બધા સંપર્કો", "सभी संपर्क", "All contacts");
@@ -435,14 +441,14 @@ public final class I18n {
         put("સર્વિસ પ્રોવાઈડર", "सर्विस प्रोवाइडर", "Service provider");
         put("કામ, સર્વિસ, પાર્ટ અને ઉધાર-રોકડ", "काम, सर्विस, पार्ट और उधार-नकद", "Work, service, parts and credit/cash");
         put("આગળ", "आगे", "Next");
+    }
+    private static void init7() {
         put("← પાછા", "← वापस", "← Back");
         put("વ્યવસાય શ્રેણી પસંદ કરો", "व्यवसाय श्रेणी चुनें", "Choose business category");
         put("તમારા કામની શ્રેણી ચૂંટો", "अपने काम की श्रेणी चुनें", "Pick the category of your work");
         put("દૂધની સેવા", "दूध सेवा", "Milk service");
         put("ટિફિન સેવા", "टिफिन सेवा", "Tiffin service");
         put("લોન્ડ્રી / ધોલાઈ", "लॉन्ड्री / धुलाई", "Laundry");
-    }
-    private static void init7() {
         put("ચાની દુકાન", "चाय की दुकान", "Tea shop");
         put("છાપું / મેગેઝિન", "अखबार / मैगज़ीन", "Newspaper / Magazine");
         put("પાણીની સેવા", "पानी सेवा", "Water service");
@@ -497,14 +503,14 @@ public final class I18n {
         put(" નોંધ કાઢી નાખવી છે?", " प्रविष्टियाँ हटानी हैं?", " entries?");
         put(" ખાતા અને ", " खाते और ", " accounts and ");
         put(" નોંધ પાછી લાવવી છે? હાલનો ડેટા બદલાઈ જશે.", " प्रविष्टियाँ वापस लानी हैं? मौजूदा डेटा बदल जाएगा।", " entries? Current data will be replaced.");
+    }
+    private static void init8() {
         put("પેટ્રોલ/ડીઝલ", "पेट्रोल/डीज़ल", "Petrol/Diesel");
         put("ભાડું", "किराया", "Rent");
         put("પગાર", "वेतन", "Salary");
         put("ચા-નાસ્તો", "चाय-नाश्ता", "Tea & snacks");
         put("વીજળી", "बिजली", "Electricity");
         put("રિપેરિંગ", "मरम्मत", "Repairs");
-    }
-    private static void init8() {
         put("પરિવહન", "परिवहन", "Transport");
         put("ઇન-રિવ્યુ વ્યવહારો (", "इन-रिव्यू लेन-देन (", "In-Review Transactions (");
         put("વૉઇસ ટ્રાન્ઝેક્શન", "वॉइस ट्रांज़ैक्शन", "Voice Transaction");
