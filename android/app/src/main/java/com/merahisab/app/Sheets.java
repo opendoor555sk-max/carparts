@@ -28,12 +28,16 @@ final class Sheets {
     /** Entry form state. */
     static final class Form {
         String id = null, type = "income", partyId = null, name = "", amount = "", note = "", date = Fmt.today(), mode = "cash",
-                cat = "અન્ય", said = "", due = "", prodId = "", qty = "", pendingId = null;
+                cat = "અન્ય", said = "", due = "", prodId = "", qty = "", pendingId = null, svc = "", paid = "";
+        List<String[]> parts = new ArrayList<>();
         boolean lock = false;
     }
 
     private Form form;
-    private EditText fName, fAmt, fNote, fQty;
+    private EditText fName, fAmt, fNote, fQty, fSvc, fPaid;
+    private final List<EditText> partNames = new ArrayList<>(), partAmts = new ArrayList<>();
+    private TextView tvTot;
+    private boolean svcOn, paidOn;
     private LinearLayout suggBox;
     private TextView dateBtn, dueBtn;
 
@@ -269,6 +273,34 @@ final class Sheets {
         if (fAmt != null) form.amount = fAmt.getText().toString();
         if (fNote != null) form.note = fNote.getText().toString();
         if (fQty != null) form.qty = fQty.getText().toString();
+        if (fSvc != null) form.svc = fSvc.getText().toString();
+        if (fPaid != null) form.paid = fPaid.getText().toString();
+        if (!partNames.isEmpty() && partNames.size() == form.parts.size()) {
+            for (int i = 0; i < partNames.size(); i++) form.parts.set(i, new String[]{partNames.get(i).getText().toString(), partAmts.get(i).getText().toString()});
+        }
+    }
+
+    private double partsSum(Form f) {
+        double t = 0;
+        for (String[] p : f.parts) t += parseD(p[1]);
+        return t;
+    }
+
+    private void refreshTotals() {
+        if (tvTot == null || form == null) return;
+        double lab = fAmt == null ? 0 : parseD(fAmt.getText().toString());
+        double ps = 0;
+        for (EditText e : partAmts) ps += parseD(e.getText().toString());
+        double total = lab + (svcOn ? ps : 0);
+        double paid = fPaid == null ? 0 : parseD(fPaid.getText().toString());
+        StringBuilder sb = new StringBuilder();
+        if (svcOn) sb.append("કુલ: ").append(Fmt.money(total));
+        if (paidOn) {
+            if (sb.length() > 0) sb.append("   ·   ");
+            double rest = Math.max(0, total - paid);
+            sb.append(form.type.equals("took") ? "ચૂકવવાના બાકી: " : "બાકી (ઉધાર): ").append(Fmt.money(rest));
+        }
+        tvTot.setText(I18n.tr(sb.toString()));
     }
 
     private List<Model.Party> similar(String name) {
@@ -351,7 +383,10 @@ final class Sheets {
         for (String m : modes) if (m.equals(f.mode)) okMode = true;
         if (!okMode) f.mode = "cash";
         final Ui.Sheet s = open(f.pendingId != null ? "રિવ્યુ: વૉઇસ નોંધ" : (f.id != null ? "નોંધમાં ફેરફાર" : "નોંધ ઉમેરો"));
-        fName = null; fNote = null; fQty = null; suggBox = null;
+        fName = null; fNote = null; fQty = null; suggBox = null; fSvc = null; fPaid = null; tvTot = null;
+        partNames.clear(); partAmts.clear();
+        svcOn = a.db.settings.biz.equals("service") && f.type.equals("gave") && f.id == null;
+        paidOn = (f.type.equals("gave") || f.type.equals("took")) && f.id == null;
 
         if (!f.said.isEmpty()) {
             s.add(said("તમે બોલ્યા: “" + f.said + "”\nનીચે બધું બરાબર છે? જોઈ લો અને સેવ કરો."));
@@ -467,13 +502,62 @@ final class Sheets {
                 }
             });
         }
-        s.add(Ui.label(c, "નોંધ (જરૂરી નથી)" + (T.party ? " · માલ/ભાડું શું હતું" : "")));
+        if (svcOn) {
+            s.add(Ui.label(c, "સેવા / કામનું નામ"));
+            fSvc = Ui.fld(c, "જેમ કે મશીન રિપેર", f.svc, Ui.IN_PLAIN);
+            s.add(fSvc);
+        }
+        s.add(Ui.label(c, svcOn ? "વધારાની નોંધ (જરૂરી નથી)" : "નોંધ (જરૂરી નથી)" + (T.party ? " · માલ/ભાડું શું હતું" : "")));
         fNote = Ui.fld(c, "જેમ કે પેડલ ભાડું", f.note, Ui.IN_PLAIN);
         s.add(fNote);
-        s.add(Ui.label(c, "રકમ (₹)"));
+        s.add(Ui.label(c, svcOn ? "સેવાની રકમ / લેબર (₹)" : "રકમ (₹)"));
         fAmt = Ui.fld(c, "0", f.amount, Ui.IN_NUM);
         fAmt.setTextSize(24);
         s.add(fAmt);
+        final Runnable refresh = new Runnable() { @Override public void run() { refreshTotals(); } };
+        Ui.onText(fAmt, refresh);
+        if (svcOn) {
+            s.add(Ui.label(c, "પાર્ટ / માલ (જરૂરી નથી)"));
+            for (int i = 0; i < f.parts.size(); i++) {
+                final int idx = i;
+                LinearLayout row = Ui.h(c);
+                EditText pn = Ui.fld(c, "પાર્ટનું નામ", f.parts.get(i)[0], Ui.IN_PLAIN);
+                EditText pa = Ui.fld(c, "₹", f.parts.get(i)[1], Ui.IN_NUM);
+                row.addView(pn, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2));
+                row.addView(pa, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+                TextView x = Ui.t(c, "✕", 18, Ui.RED, true);
+                Ui.pad(x, 12, 8, 6, 8);
+                Ui.tap(x, new Runnable() { @Override public void run() { syncForm(); form.parts.remove(idx); renderForm(); } });
+                row.addView(x);
+                partNames.add(pn); partAmts.add(pa);
+                Ui.onText(pa, refresh);
+                s.add(row);
+            }
+            s.add(Ui.btn(c, "＋ પાર્ટ ઉમેરો", "ghost", new Runnable() { @Override public void run() { syncForm(); form.parts.add(new String[]{"", ""}); renderForm(); } }));
+        }
+        if (paidOn) {
+            s.add(Ui.label(c, f.type.equals("took") ? "અત્યારે કેટલા ચૂકવ્યા (₹)" : "અત્યારે કેટલા મળ્યા (₹)"));
+            fPaid = Ui.fld(c, "0 = બધું ઉધાર", f.paid, Ui.IN_NUM);
+            s.add(fPaid);
+            Ui.onText(fPaid, refresh);
+            LinearLayout pc = Ui.h(c);
+            pc.addView(Ui.chip(c, "બધું ઉધાર", false, new Runnable() { @Override public void run() { syncForm(); form.paid = ""; renderForm(); } }));
+            pc.addView(Ui.chip(c, "બધા રોકડ", false, new Runnable() {
+                @Override public void run() {
+                    syncForm();
+                    double tot = parseD(form.amount) + (svcOn ? partsSum(form) : 0);
+                    form.paid = tot > 0 ? Fmt.plain(tot).replace(",", "") : "";
+                    renderForm();
+                }
+            }));
+            s.add(pc);
+        }
+        if (svcOn || paidOn) {
+            tvTot = Ui.t(c, "", 15, Ui.TEXT, true);
+            Ui.pad(tvTot, 4, 10, 4, 4);
+            s.add(tvTot);
+            refreshTotals();
+        }
         s.add(Ui.label(c, "તારીખ"));
         dateBtn = dateField(f.date, "તારીખ પસંદ કરો", false);
         s.add(dateBtn);
@@ -529,7 +613,22 @@ final class Sheets {
         if (f == null) return;
         Model.TypeInfo T = Model.type(f.type);
         double amt = parseD(f.amount);
-        if (!(amt > 0)) { a.toast("રકમ લખો"); return; }
+        double total = amt;
+        String noteTxt = f.note.trim();
+        if (svcOn && f.id == null) {
+            StringBuilder sv = new StringBuilder(f.svc.trim().isEmpty() ? "સેવા" : f.svc.trim());
+            if (amt > 0) sv.append(" ").append(Fmt.money(amt));
+            for (String[] p : f.parts) {
+                double pv = parseD(p[1]);
+                if (pv <= 0 && p[0].trim().isEmpty()) continue;
+                total += pv;
+                sv.append(" · પાર્ટ: ").append(p[0].trim().isEmpty() ? "પાર્ટ" : p[0].trim()).append(" ").append(Fmt.money(pv));
+            }
+            if (!noteTxt.isEmpty()) sv.append(" · ").append(noteTxt);
+            noteTxt = sv.toString();
+        }
+        if (!(total > 0)) { a.toast("રકમ લખો"); return; }
+        amt = total;
         if (!Fmt.validIso(f.date)) { a.toast("તારીખ પસંદ કરો"); return; }
         String pid = null;
         if (T.party) {
@@ -550,7 +649,7 @@ final class Sheets {
         rec.type = f.type;
         rec.partyId = pid;
         rec.amount = amt;
-        rec.note = f.note.trim();
+        rec.note = noteTxt;
         rec.mode = (f.type.equals("gave") || f.type.equals("took")) ? "" : f.mode;
         rec.cat = f.type.equals("expense") ? f.cat : "";
         rec.said = f.said;
@@ -562,11 +661,24 @@ final class Sheets {
             }
         }
         if (!replaced) a.db.txns.add(rec);
+        double paidNow = (paidOn && f.id == null) ? Math.min(parseD(f.paid), amt) : 0;
+        if (paidNow > 0 && pid != null) {
+            Model.Txn pr = new Model.Txn();
+            pr.id = a.uid();
+            pr.ts = rec.ts + 1; pr.upd = pr.ts;
+            pr.date = f.date;
+            pr.type = f.type.equals("took") ? "paid" : "got";
+            pr.partyId = pid;
+            pr.amount = paidNow;
+            pr.mode = "cash";
+            pr.note = f.type.equals("took") ? "સાથે ચૂકવ્યા" : "સાથે મળ્યા";
+            a.db.txns.add(pr);
+        }
         if (f.pendingId != null) removePending(f.pendingId);
         a.save();
         close();
         a.render();
-        a.toast("નોંધ થઈ ગઈ" + (T.party && a.db.party(pid) != null ? " · " + a.db.party(pid).name : ""));
+        a.toast("નોંધ થઈ ગઈ" + (T.party && a.db.party(pid) != null ? " · " + a.db.party(pid).name : "") + (paidNow > 0 && paidNow < amt ? " · બાકી " + Fmt.money(amt - paidNow) : ""));
         if (f.pendingId != null && !a.db.review.isEmpty()) openReview(a.db.review.get(0));
     }
 
@@ -586,6 +698,12 @@ final class Sheets {
         f.note = q.note;
         f.cat = q.cat.isEmpty() ? "અન્ય" : q.cat;
         f.pendingId = q.id;
+        f.svc = q.svc;
+        if (q.paid > 0) f.paid = Fmt.plain(q.paid).replace(",", "");
+        if (!q.parts.isEmpty()) for (String pp : q.parts.split(";")) {
+            int k = pp.lastIndexOf(':');
+            if (k > 0) f.parts.add(new String[]{pp.substring(0, k), pp.substring(k + 1)});
+        }
         openEntry(f);
     }
 
@@ -757,6 +875,7 @@ final class Sheets {
         s.add(srow("રિમાઇન્ડર ઇતિહાસ", "કોને કોને મોકલ્યું", null, new Runnable() { @Override public void run() { reminderHistorySheet(); } }));
         s.add(srow("વૉઇસ ટેસ્ટ લૉગ", "શું બોલ્યા, એપ શું સમજ્યું", null, new Runnable() { @Override public void run() { voiceLogSheet(); } }));
         s.add(srow("એપે શીખેલું", a.db.learn.size() + " નામ શીખ્યા", null, new Runnable() { @Override public void run() { learnedSheet(); } }));
+        s.add(srow("વ્યવસાયનો પ્રકાર", a.db.settings.biz.equals("service") ? "સર્વિસ પ્રોવાઈડર" : "દુકાન / સ્ટોર", null, new Runnable() { @Override public void run() { bizSheet(); } }));
         s.add(srow("સેટિંગ્સ", "થીમ, પિન, બેકઅપ", null, new Runnable() { @Override public void run() { close(); a.go("more"); } }));
         s.add(srow("બેકઅપ લો", a.backupTimeText(), null, new Runnable() { @Override public void run() { backupSheet(); } }));
         if (!a.db.settings.pinHash.isEmpty()) s.add(srow("હમણાં લૉક કરો", "એપ ફરી ખોલવા પિન જોઈશે", null, new Runnable() { @Override public void run() { close(); a.showPin("unlock", null); } }));
@@ -1445,6 +1564,14 @@ final class Sheets {
                     for (String w : cat.split("/")) if (!first.isEmpty() && Parser.normText(w).equals(Parser.normText(first))) q.cat = cat;
                 }
             }
+            if (a.db.settings.biz.equals("service") && "gave".equals(r.type)) {
+                double[] sv = Parser.serviceVoice(text);
+                if (sv[1] > 0) {
+                    q.amount = sv[0];
+                    q.parts = "પાર્ટ:" + Fmt.plain(sv[1]).replace(",", "");
+                }
+                if (sv[2] > 0) q.paid = q.amount + sv[1];
+            }
             a.db.review.add(q);
             a.save();
             close();
@@ -1532,6 +1659,14 @@ final class Sheets {
             }
             s.add(scrollBox(box, 340));
         }
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    void bizSheet() {
+        Ui.Sheet s = open("વ્યવસાયનો પ્રકાર");
+        s.add(Ui.btn(c, "દુકાન / સ્ટોર", a.db.settings.biz.equals("store") ? "primary" : "ghost", new Runnable() { @Override public void run() { a.db.settings.biz = "store"; a.save(); close(); a.render(); } }));
+        s.add(Ui.btn(c, "સર્વિસ પ્રોવાઈડર", a.db.settings.biz.equals("service") ? "primary" : "ghost", new Runnable() { @Override public void run() { a.db.settings.biz = "service"; a.save(); close(); a.render(); } }));
         s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
         s.show();
     }

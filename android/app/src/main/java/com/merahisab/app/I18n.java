@@ -323,7 +323,7 @@ public final class I18n {
         put("ફિંગરપ્રિન્ટ લૉક બંધ", "फ़िंगरप्रिंट लॉक बंद", "Fingerprint lock off");
         put("પહેલા સિક્યુરિટી પિન સેટ કરો", "पहले सिक्योरिटी पिन सेट करें", "Set a Security PIN first");
         put("આ ફોનમાં ફિંગરપ્રિન્ટ ઉપલબ્ધ નથી", "इस फ़ोन में फ़िंगरप्रिंट उपलब्ध नहीं", "Fingerprint is not available on this phone");
-        put("ફિંગરપ્રિન્ટ લૉક ચાલુ કરો", "फ़िंगरप्रिंट लॉक चालू करें", "Turn on fingerprint lock");
+        put("ફિંગરપ્રિન્ટ લૉક ચાલુ કરો", "फिंगरप्रिंट लॉक चालू करें", "Turn on fingerprint lock");
         put("ફિંગરપ્રિન્ટ લૉક ચાલુ", "फ़िंगरप्रिंट लॉक चालू", "Fingerprint lock on");
         put("ફિંગરપ્રિન્ટ ચકાસણી ન થઈ", "फ़िंगरप्रिंट जाँच नहीं हुई", "Fingerprint not verified");
         put("⬇ Downloads માં સેવ કરો", "⬇ Downloads में सेव करें", "⬇ Save to Downloads");
@@ -408,6 +408,60 @@ public final class I18n {
         put("શુભ સવાર", "शुभ प्रभात", "Good Morning");
         put("શુભ બપોર", "शुभ दोपहर", "Good Afternoon");
         put("શુભ સાંજ", "शुभ संध्या", "Good Evening");
+        put("સ્વાગત છે", "स्वागत है", "Welcome");
+        put("આગળ વધો", "आगे बढ़ें", "Continue");
+        put("તમારું નામ લખો", "आपका नाम लिखें", "Enter your name");
+        put("તમે શું કરો છો?", "आप क्या करते हैं?", "What do you do?");
+        put("તમારા માટે સૌથી યોગ્ય પ્રોફાઇલ પસંદ કરો", "अपने लिए सबसे उपयुक्त प्रोफ़ाइल चुनें", "Choose the profile that suits you best");
+        put("દુકાન / સ્ટોર", "दुकान / स्टोर", "Shop / Store");
+        put("દુકાન, ગ્રાહકો અને સ્ટોક મેનેજ કરો", "दुकान, ग्राहक और स्टॉक संभालें", "Manage shop, customers and stock");
+        put("સર્વિસ પ્રોવાઈડર", "सर्विस प्रोवाइडर", "Service provider");
+        put("કામ, સર્વિસ, પાર્ટ અને ઉધાર-રોકડ", "काम, सर्विस, पार्ट और उधार-नकद", "Work, service, parts and credit/cash");
+        put("આગળ", "आगे", "Next");
+        put("← પાછા", "← वापस", "← Back");
+        put("વ્યવસાય શ્રેણી પસંદ કરો", "व्यवसाय श्रेणी चुनें", "Choose business category");
+        put("તમારા કામની શ્રેણી ચૂંટો", "अपने काम की श्रेणी चुनें", "Pick the category of your work");
+        put("દૂધની સેવા", "दूध सेवा", "Milk service");
+        put("ટિફિન સેવા", "टिफिन सेवा", "Tiffin service");
+        put("લોન્ડ્રી / ધોલાઈ", "लॉन्ड्री / धुलाई", "Laundry");
+        put("ચાની દુકાન", "चाय की दुकान", "Tea shop");
+        put("છાપું / મેગેઝિન", "अखबार / मैगज़ीन", "Newspaper / Magazine");
+        put("પાણીની સેવા", "पानी सेवा", "Water service");
+        put("અન્ય સેવા", "अन्य सेवा", "Other service");
+        put("દુકાન / ધંધાનું નામ", "दुकान / धंधे का नाम", "Shop / business name");
+        put("શરૂ કરવા માટે તેને નામ આપો", "शुरू करने के लिए इसे नाम दें", "Give it a name to start");
+        put("શરૂ કરો", "शुरू करें", "Start");
+        put("ધંધાનું નામ લખો", "धंधे का नाम लिखें", "Enter business name");
+        put("તમારી એપ સુરક્ષિત કરો", "अपना ऐप सुरक्षित करें", "Secure your app");
+        put("4-અંકનો PIN સેટ કરો અથવા છોડો", "4 अंकों का PIN सेट करें या छोड़ें", "Set a 4-digit PIN or skip");
+        put("PIN સેટ કરો", "PIN सेट करें", "Set PIN");
+        put("છોડો (Skip)", "छोड़ें (Skip)", "Skip");
+        put("બાયોમેટ્રિક્સ સક્રિય કરો?", "बायोमेट्रिक चालू करें?", "Enable biometrics?");
+        put("શું તમે એપને ઝડપથી અનલોક કરવા માટે ફિંગરપ્રિન્ટ અથવા ફેસ આઈડી વાપરવા માંગો છો?", "क्या आप ऐप जल्दी अनलॉक करने के लिए फिंगरप्रिंट या फेस आईडी इस्तेमाल करना चाहते हैं?", "Do you want to use fingerprint or face ID to unlock the app quickly?");
+        put("ના", "नहीं", "No");
+        put("હા", "हाँ", "Yes");
+        put("વ્યવસાયનો પ્રકાર", "व्यवसाय का प्रकार", "Business type");
+    }
+    private static void init7() {
+        put("સેવા નોંધ", "सेवा प्रविष्टि", "Service entry");
+        put("સેવા / કામનું નામ", "सेवा / काम का नाम", "Service / work name");
+        put("જેમ કે મશીન રિપેર", "जैसे मशीन रिपेयर", "e.g. machine repair");
+        put("વધારાની નોંધ (જરૂરી નથી)", "अतिरिक्त नोट (ज़रूरी नहीं)", "Extra note (optional)");
+        put("સેવાની રકમ / લેબર (₹)", "सेवा की रकम / लेबर (₹)", "Service amount / labour (₹)");
+        put("પાર્ટ / માલ (જરૂરી નથી)", "पार्ट / माल (ज़रूरी नहीं)", "Parts / material (optional)");
+        put("પાર્ટનું નામ", "पार्ट का नाम", "Part name");
+        put("＋ પાર્ટ ઉમેરો", "＋ पार्ट जोड़ें", "＋ Add part");
+        put("અત્યારે કેટલા મળ્યા (₹)", "अभी कितने मिले (₹)", "Received now (₹)");
+        put("અત્યારે કેટલા ચૂકવ્યા (₹)", "अभी कितने चुकाए (₹)", "Paid now (₹)");
+        put("0 = બધું ઉધાર", "0 = सब उधार", "0 = all on credit");
+        put("બધું ઉધાર", "सब उधार", "All on credit");
+        put("બધા રોકડ", "सब नकद", "All cash");
+        put("કુલ: ", "कुल: ", "Total: ");
+        put("ચૂકવવાના બાકી: ", "चुकाना बाकी: ", "Left to pay: ");
+        put("બાકી (ઉધાર): ", "बाकी (उधार): ", "Due (credit): ");
+        put(" · પાર્ટ: ", " · पार्ट: ", " · Part: ");
+        put("સાથે મળ્યા", "साथ में मिले", "Received with it");
+        put("સાથે ચૂકવ્યા", "साथ में चुकाए", "Paid with it");
         put("એપે શીખેલું", "ऐप ने सीखा", "Learned by app");
         put(" નામ શીખ્યા", " नाम सीखे", " names learned");
         put("તમારા સુધારા પરથી એપ આ નામ શીખ્યું. ખોટું હોય તો ✕ દબાવી કાઢી નાખો.", "आपके सुधार से ऐप ने ये नाम सीखे। गलत हो तो ✕ दबाकर हटाएँ।", "The app learned these names from your corrections. Tap ✕ to remove a wrong one.");
@@ -441,8 +495,6 @@ public final class I18n {
         put("છોડી દો", "छोड़ दें", "Discard");
         put("ઇન-રિવ્યુમાં ઉમેર્યું", "इन-रिव्यू में जोड़ा", "Added to In-Review");
         put("ટ્રાન્સક્રિપ્શન", "ट्रांसक्रिप्शन", "TRANSCRIPTION");
-    }
-    private static void init7() {
         put("રિમાઇન્ડર મોકલો", "रिमाइंडर भेजें", "Send Reminder");
         put("રિમાઇન્ડર ઇતિહાસ", "रिमाइंडर इतिहास", "Send Reminder History");
         put("બધા પસંદ કરો", "सभी चुनें", "Select All");
@@ -451,6 +503,8 @@ public final class I18n {
         put("છોડો", "छोड़ें", "Skip");
         put("કોઈ ઇતિહાસ નથી", "कोई इतिहास नहीं", "No history found");
         put("બાકી ચૂકવણી (Pending)", "बकाया भुगतान (Pending)", "Pending Payments");
+    }
+    private static void init8() {
         put("કોણ તમને આપશે અને કોને તમારે આપવાના, તાકીદ મુજબ", "कौन आपको देगा और किसे आपको देना है, तुरंत के क्रम में", "Who owes you & who you owe, sorted by urgency");
         put("રોકડ સારાંશ", "नकद सारांश", "Cash Summary");
         put("ફક્ત રોકડ નોંધ, શરૂઆત અને અંતના બેલેન્સ સાથે", "सिर्फ़ नकद प्रविष्टियाँ, शुरुआती और अंतिम बैलेंस के साथ", "Cash-only entries with opening & closing balance");
@@ -486,6 +540,7 @@ public final class I18n {
         init5();
         init6();
         init7();
+        init8();
         List<String> ks = new ArrayList<>();
         for (String k : M.keySet()) if (k.length() >= 5) ks.add(k);
         Collections.sort(ks, new Comparator<String>() { @Override public int compare(String a, String b) { return b.length() - a.length(); } });

@@ -22,6 +22,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -60,7 +61,8 @@ public class MainActivity extends Activity {
     private FrameLayout root;
     private ScrollView scroll;
     private LinearLayout navBar;
-    private View lockView;
+    private View lockView, setupView;
+    private String setupCat = "";
     private long stoppedAt = 0;
     private boolean unlocked = false;
 
@@ -87,6 +89,10 @@ public class MainActivity extends Activity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         day = Fmt.today(); month = day.substring(0, 7); rday = day; rmonth = month;
         loadData();
+        if (!db.settings.setupDone && (!db.parties.isEmpty() || !db.txns.isEmpty() || !db.settings.owner.isEmpty() || !db.settings.pinHash.isEmpty())) {
+            db.settings.setupDone = true; // existing user: no first-run wizard
+            save();
+        }
         sheets = new Sheets(this);
         screens = new Screens(this);
         tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
@@ -94,6 +100,143 @@ public class MainActivity extends Activity {
         });
         rebuild();
         if (!db.settings.pinHash.isEmpty()) showPin("unlock", null);
+    }
+
+    // ================= first-run setup =================
+    private void closeSetup() {
+        if (setupView != null) { root.removeView(setupView); setupView = null; }
+    }
+
+    private TextView setupHero(LinearLayout l, String title, String sub, final Runnable back) {
+        LinearLayout h = Ui.v(this);
+        h.setBackground(Ui.grad(Color.parseColor("#C79BFF"), Color.parseColor("#7B2FBE"), 28));
+        h.setGravity(Gravity.CENTER);
+        Ui.pad(h, 20, 30, 20, 30);
+        TextView t = Ui.t(this, title, 22, Color.WHITE, true);
+        t.setGravity(Gravity.CENTER);
+        h.addView(t);
+        TextView s = Ui.t(this, sub, 14, Color.parseColor("#EBDDFF"), false);
+        s.setGravity(Gravity.CENTER);
+        Ui.pad(s, 0, 6, 0, 0);
+        h.addView(s);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(Ui.dp(12), Ui.dp(36), Ui.dp(12), Ui.dp(18));
+        l.addView(h, lp);
+        return t;
+    }
+
+    private View setupOption(String title, String sub, boolean on, Runnable r) {
+        LinearLayout row = Ui.v(this);
+        row.setBackground(Ui.rr(on ? Ui.SOFT : Ui.SURFACE2, on ? Ui.ACCENT : Ui.LINE, 16));
+        Ui.pad(row, 16, 14, 16, 14);
+        row.addView(Ui.t(this, (on ? "◉  " : "○  ") + title, 17, Ui.TEXT, true));
+        if (sub != null) { TextView s = Ui.t(this, sub, 13, Ui.MUTED, false); Ui.pad(s, 26, 2, 0, 0); row.addView(s); }
+        Ui.tap(row, r);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(Ui.dp(14), Ui.dp(6), Ui.dp(14), Ui.dp(6));
+        row.setLayoutParams(lp);
+        return row;
+    }
+
+    /** First-run wizard: language, name, what you do, (service category), business name, PIN. */
+    void showSetup(final int step) {
+        closeSetup();
+        I18n.set(db.settings.lang);
+        final LinearLayout l = Ui.v(this);
+        l.setBackgroundColor(Ui.BG);
+        l.setClickable(true);
+        final Model.Settings st = db.settings;
+        if (step == 0) {
+            setupHero(l, "Mera Hisab", "ભાષા પસંદ કરો", null);
+            final String[][] langs = {{"gu-IN", "ગુજરાતી", "Gujarati"}, {"hi-IN", "हिन्दी", "Hindi"}, {"en-IN", "English", "English"}};
+            for (final String[] g : langs) {
+                l.addView(setupOption(g[1], g[2], g[0].equals(st.lang), new Runnable() { @Override public void run() { st.lang = g[0]; I18n.set(g[0]); showSetup(0); } }));
+            }
+            l.addView(Ui.btn(this, "આગળ વધો", "primary", new Runnable() { @Override public void run() { save(); showSetup(1); } }));
+        } else if (step == 1) {
+            setupHero(l, "તમારું નામ", "Mera Hisab માં સ્વાગત છે", null);
+            final EditText nm = Ui.fld(this, "તમારું નામ", st.owner, Ui.IN_PLAIN);
+            l.addView(nm);
+            l.addView(Ui.btn(this, "આગળ વધો", "primary", new Runnable() {
+                @Override public void run() {
+                    String n = nm.getText().toString().trim();
+                    if (n.isEmpty()) { toast("તમારું નામ લખો"); return; }
+                    st.owner = n; save(); showSetup(2);
+                }
+            }));
+            l.addView(Ui.btn(this, "← પાછા", "ghost", new Runnable() { @Override public void run() { showSetup(0); } }));
+        } else if (step == 2) {
+            setupHero(l, "તમે શું કરો છો?", "તમારા માટે સૌથી યોગ્ય પ્રોફાઇલ પસંદ કરો", null);
+            l.addView(setupOption("દુકાન / સ્ટોર", "દુકાન, ગ્રાહકો અને સ્ટોક મેનેજ કરો", st.biz.equals("store"), new Runnable() { @Override public void run() { st.biz = "store"; showSetup(2); } }));
+            l.addView(setupOption("સર્વિસ પ્રોવાઈડર", "કામ, સર્વિસ, પાર્ટ અને ઉધાર-રોકડ", st.biz.equals("service"), new Runnable() { @Override public void run() { st.biz = "service"; showSetup(2); } }));
+            l.addView(Ui.btn(this, "આગળ", "primary", new Runnable() {
+                @Override public void run() { save(); showSetup(st.biz.equals("service") ? 3 : 4); }
+            }));
+            l.addView(Ui.btn(this, "← પાછા", "ghost", new Runnable() { @Override public void run() { showSetup(1); } }));
+        } else if (step == 3) {
+            setupHero(l, "વ્યવસાય શ્રેણી પસંદ કરો", "તમારા કામની શ્રેણી ચૂંટો", null);
+            String[] cats = {"દૂધની સેવા", "ટિફિન સેવા", "લોન્ડ્રી / ધોલાઈ", "ચાની દુકાન", "છાપું / મેગેઝિન", "પાણીની સેવા", "અન્ય સેવા"};
+            for (final String c1 : cats) {
+                l.addView(setupOption(c1, null, c1.equals(st.bizCat), new Runnable() { @Override public void run() { st.bizCat = c1; showSetup(3); } }));
+            }
+            l.addView(Ui.btn(this, "આગળ", "primary", new Runnable() {
+                @Override public void run() {
+                    if (st.bizCat.isEmpty()) st.bizCat = "અન્ય સેવા";
+                    save(); showSetup(4);
+                }
+            }));
+            l.addView(Ui.btn(this, "← પાછા", "ghost", new Runnable() { @Override public void run() { showSetup(2); } }));
+        } else if (step == 4) {
+            setupHero(l, "દુકાન / ધંધાનું નામ", "શરૂ કરવા માટે તેને નામ આપો", null);
+            final EditText sh = Ui.fld(this, "દુકાન / ધંધાનું નામ", st.shop, Ui.IN_PLAIN);
+            l.addView(sh);
+            l.addView(Ui.btn(this, "શરૂ કરો", "primary", new Runnable() {
+                @Override public void run() {
+                    String n = sh.getText().toString().trim();
+                    if (n.isEmpty()) { toast("ધંધાનું નામ લખો"); return; }
+                    st.shop = n; save(); showSetup(5);
+                }
+            }));
+            l.addView(Ui.btn(this, "← પાછા", "ghost", new Runnable() { @Override public void run() { showSetup(st.biz.equals("service") ? 3 : 2); } }));
+        } else {
+            setupHero(l, "તમારી એપ સુરક્ષિત કરો", "4-અંકનો PIN સેટ કરો અથવા છોડો", null);
+            l.addView(Ui.btn(this, "PIN સેટ કરો", "primary", new Runnable() {
+                @Override public void run() {
+                    showPin("set1", new Runnable() { @Override public void run() { askBiometric(); } });
+                }
+            }));
+            l.addView(Ui.btn(this, "છોડો (Skip)", "ghost", new Runnable() { @Override public void run() { finishSetup(); } }));
+        }
+        ScrollView sv = new ScrollView(this);
+        sv.addView(l);
+        setupView = sv;
+        root.addView(sv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        if (lockView != null) { root.removeView(lockView); root.addView(lockView); }
+    }
+
+    private void askBiometric() {
+        if (!bioAvailable()) { finishSetup(); return; }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(I18n.tr("બાયોમેટ્રિક્સ સક્રિય કરો?"))
+                .setMessage(I18n.tr("શું તમે એપને ઝડપથી અનલોક કરવા માટે ફિંગરપ્રિન્ટ અથવા ફેસ આઈડી વાપરવા માંગો છો?"))
+                .setCancelable(false)
+                .setNegativeButton(I18n.tr("ના"), new android.content.DialogInterface.OnClickListener() {
+                    @Override public void onClick(android.content.DialogInterface d, int w) { finishSetup(); }
+                })
+                .setPositiveButton(I18n.tr("હા"), new android.content.DialogInterface.OnClickListener() {
+                    @Override public void onClick(android.content.DialogInterface d, int w) {
+                        bioAuth(I18n.tr("ફિંગરપ્રિન્ટ લૉક ચાલુ કરો"), new BoolCb() {
+                            @Override public void done(boolean ok) { if (ok) { db.settings.bio = "native"; save(); } finishSetup(); }
+                        });
+                    }
+                }).show();
+    }
+
+    private void finishSetup() {
+        db.settings.setupDone = true;
+        save();
+        closeSetup();
+        render();
     }
 
     // ================= data =================
@@ -184,7 +327,9 @@ public class MainActivity extends Activity {
         root.addView(main, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
         lockView = null;
+        setupView = null;
         render();
+        if (!db.settings.setupDone) showSetup(0);
         if (!db.settings.pinHash.isEmpty() && !unlocked) showPin("unlock", null);
     }
 
@@ -236,7 +381,7 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (lockView != null) return;
+        if (lockView != null || setupView != null) return;
         if (partyId != null) { partyId = null; render(); return; }
         if (sub != null) { sub = null; render(); return; }
         if (!tab.equals("home")) { go("home"); return; }

@@ -53,13 +53,14 @@ public final class Model {
         public String owner = "", shop = "", phone = "", addr = "", lang = "gu-IN", theme = "system", upiId = "", upiName = "",
                 pinHash = "", bio = "", lastBackup = "", deviceId = "";
         public double openCash, openBank;
-        public boolean productMode = false, speak = true;
+        public String biz = "store", bizCat = "";
+        public boolean productMode = false, speak = true, setupDone = false;
     }
 
     /** A spoken entry waiting in the "In-Review" list until the user confirms it. */
     public static final class Pending {
-        public String id = "", said = "", type = "gave", name = "", partyId = null, note = "", date = "", cat = "";
-        public double amount;
+        public String id = "", said = "", type = "gave", name = "", partyId = null, note = "", date = "", cat = "", svc = "", parts = "";
+        public double amount, paid;
         public long ts;
     }
 
@@ -268,14 +269,14 @@ public final class Model {
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("owner", settings.owner); s.put("shop", settings.shop); s.put("phone", settings.phone); s.put("addr", settings.addr);
             s.put("lang", settings.lang); s.put("theme", settings.theme); s.put("openCash", settings.openCash); s.put("openBank", settings.openBank);
-            s.put("upiId", settings.upiId); s.put("upiName", settings.upiName); s.put("productMode", settings.productMode);
+            s.put("upiId", settings.upiId); s.put("upiName", settings.upiName); s.put("productMode", settings.productMode); s.put("biz", settings.biz); s.put("bizCat", settings.bizCat); s.put("setupDone", settings.setupDone);
             s.put("speak", settings.speak); s.put("pinHash", settings.pinHash); s.put("bio", settings.bio);
             s.put("lastBackup", settings.lastBackup); s.put("deviceId", settings.deviceId);
             List<Object> rv = new ArrayList<>();
             for (Pending q : review) {
                 Map<String, Object> x = new LinkedHashMap<>();
                 x.put("id", q.id); x.put("said", q.said); x.put("type", q.type); x.put("name", q.name); x.put("partyId", q.partyId);
-                x.put("note", q.note); x.put("date", q.date); x.put("cat", q.cat); x.put("amount", q.amount); x.put("ts", (double) q.ts);
+                x.put("note", q.note); x.put("date", q.date); x.put("cat", q.cat); x.put("svc", q.svc); x.put("parts", q.parts); x.put("paid", q.paid); x.put("amount", q.amount); x.put("ts", (double) q.ts);
                 rv.add(x);
             }
             List<Object> rl = new ArrayList<>();
@@ -331,7 +332,7 @@ public final class Model {
                 Pending q = new Pending();
                 q.id = str(m, "id"); q.said = str(m, "said"); q.type = str(m, "type"); q.name = str(m, "name");
                 q.partyId = m.get("partyId") instanceof String ? (String) m.get("partyId") : null;
-                q.note = str(m, "note"); q.date = str(m, "date"); q.cat = str(m, "cat"); q.amount = num(m, "amount"); q.ts = (long) num(m, "ts");
+                q.note = str(m, "note"); q.date = str(m, "date"); q.cat = str(m, "cat"); q.svc = str(m, "svc"); q.parts = str(m, "parts"); q.paid = num(m, "paid"); q.amount = num(m, "amount"); q.ts = (long) num(m, "ts");
                 if (TYPES.containsKey(q.type)) review.add(q);
             }
             Object rlo = o.get("remlog");
@@ -377,6 +378,7 @@ public final class Model {
                 s.openCash = num(m, "openCash"); s.openBank = num(m, "openBank");
                 s.upiId = str(m, "upiId"); s.upiName = str(m, "upiName");
                 s.productMode = Boolean.TRUE.equals(m.get("productMode"));
+                s.biz = str(m, "biz").equals("service") ? "service" : "store"; s.bizCat = str(m, "bizCat"); s.setupDone = Boolean.TRUE.equals(m.get("setupDone"));
                 s.speak = !Boolean.FALSE.equals(m.get("speak"));
                 s.pinHash = str(m, "pinHash"); s.bio = str(m, "bio"); s.lastBackup = str(m, "lastBackup"); s.deviceId = str(m, "deviceId");
             }

@@ -287,6 +287,9 @@ final class Screens {
         // action tiles
         LinearLayout acts = Ui.h(c);
         Ui.pad(acts, 12, 4, 12, 4);
+        if (this.a.db.settings.biz.equals("service")) {
+            acts.addView(tile("🛠", "સેવા નોંધ", false, new Runnable() { @Override public void run() { Sheets.Form f = new Sheets.Form(); f.type = "gave"; a.sheets.openEntry(f); } }), tileLp());
+        }
         acts.addView(tile("＋", "આવક ઉમેરો", false, new Runnable() { @Override public void run() { a.sheets.askIncome(); } }), tileLp());
         acts.addView(tile("−", "ખર્ચ ઉમેરો", false, new Runnable() { @Override public void run() { a.sheets.askExpense(); } }), tileLp());
         acts.addView(tile("🎤", "અવાજ", true, new Runnable() { @Override public void run() { a.sheets.voiceSheet(null); } }), tileLp());

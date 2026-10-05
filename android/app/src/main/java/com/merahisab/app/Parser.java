@@ -115,6 +115,30 @@ public final class Parser {
         return text;
     }
 
+    /** Service voice: "500 ka kaam 300 ka part rokda" -> {service, part, cash(1/0)}. Digits only; part = number next to a part word. */
+    public static double[] serviceVoice(String text) {
+        String t = normText(text);
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\d+(?:\\.\\d+)?").matcher(t);
+        List<double[]> nums = new ArrayList<>(); // {value, position}
+        while (m.find()) nums.add(new double[]{Double.parseDouble(m.group()), m.start()});
+        String[] pw = {"part", "પાર્ટ", "पार्ट", "material", "મટીરીયલ", "मटेरियल", "માલ", "माल", "spare", "સ્પેર", "स्पेयर", "પુર્જા", "पुर्जा"};
+        int pi = -1;
+        for (String w : pw) { int i = t.indexOf(w); if (i >= 0 && (pi < 0 || i < pi)) pi = i; }
+        String[] cw = {"rokda", "rokad", "cash", "રોકડ", "रोकड", "नकद", "nakad"};
+        double cash = 0;
+        for (String w : cw) if (t.contains(w)) cash = 1;
+        double svc = nums.isEmpty() ? 0 : nums.get(0)[0], part = 0;
+        if (pi >= 0 && nums.size() >= 2) {
+            int pick = -1;
+            for (int i = 0; i < nums.size(); i++) if (nums.get(i)[1] < pi) pick = i;
+            if (pick < 0) pick = 1;
+            part = nums.get(pick)[0];
+            svc = 0;
+            for (int i = 0; i < nums.size(); i++) if (i != pick) { svc = nums.get(i)[0]; break; }
+        }
+        return new double[]{svc, part, cash};
+    }
+
     public static String normText(String s) {
         s = s == null ? "" : s.toLowerCase();
         s = Normalizer.normalize(s, Normalizer.Form.NFC);
