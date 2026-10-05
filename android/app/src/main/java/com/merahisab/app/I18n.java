@@ -12,7 +12,7 @@ public final class I18n {
         put("બધા", "सभी", "All");
         put("ઉધાર વેચાણ", "उधार बिक्री", "Credit Sales");
         put("ઉધાર ખરીદી", "उधार खरीद", "Credit Purchase");
-        put("આવક", "आमदनी", "Income");
+        put("આવક", "आय", "Income");
         put("ખર્ચ", "खर्च", "Expense");
         put("રોકડ", "नकद", "Cash");
         put("UPI / બેંક", "UPI / बैंक", "UPI / Bank");
@@ -55,7 +55,7 @@ public final class I18n {
         put("કુલ ", "कुल ", "Total ");
         put(" ખાતા", " खाते", " accounts");
         put("ગ્રાહક", "ग्राहक", "Customer");
-        put("લેણદાર", "लेनदार", "Vendor");
+        put("લેણદાર", "लेनदार", "Creditor");
         put("🔍 નામ અથવા ફોન શોધો", "🔍 नाम या फ़ोन खोजें", "🔍 Search name or phone");
         put("＋ નવું ખાતું", "＋ नया खाता", "＋ Add Account");
         put("લેણદારો મળ્યા નથી.", "कोई लेनदार नहीं मिला।", "No vendors found.");
@@ -95,16 +95,16 @@ public final class I18n {
         put(" લેવાના", " लेना है", " to collect");
         put(" દેવાના", " देना है", " to pay");
         put("રિપોર્ટ્સ", "रिपोर्ट", "Reports");
-        put("દૈનિક રિપોર્ટ્સ", "दैनिक रिपोर्ट", "Daily Reports");
-        put("દૈનિક સારાંશ", "दैनिक सारांश", "Daily Summary");
-        put("રોજની રોકડ અને આવક/જાવક ટ્રેક કરો", "रोज़ की नकद और आमद/ख़र्च देखें", "Track daily cash and income/expense");
-        put("ગ્રાહક અને લેણદાર", "ग्राहक और लेनदार", "Customer & Vendor");
-        put("માસિક સારાંશ અહેવાલ", "मासिक सारांश रिपोर्ट", "Monthly Summary Report");
-        put("ફિલ્ટર્સ સાથે ગ્રાહક અને લેણદાર માસિક સારાંશ", "फ़िल्टर के साथ ग्राहक और लेनदार का मासिक सारांश", "Customer and vendor monthly summary with filters");
+        put("દૈનિક રિપોર્ટ્સ", "दैनिक रिपोर्ट्स", "Daily reports");
+        put("દૈનિક સારાંશ", "दैनिक सारांश", "Daily summary");
+        put("રોજની રોકડ અને આવક/જાવક ટ્રેક કરો", "रोज़ की नकद और आय/व्यय ट्रैक करें", "Track daily cash and income/expense");
+        put("ગ્રાહક અને લેણદાર", "ग्राहक और लेनदार", "Customers and creditors");
+        put("માસિક સારાંશ અહેવાલ", "मासिक सारांश रिपोर्ट", "Monthly summary report");
+        put("ફિલ્ટર્સ સાથે ગ્રાહક અને લેણદાર માસિક સારાંશ", "फ़िल्टर के साथ ग्राहक और लेनदार मासिक सारांश", "Monthly customer and creditor summary with filters");
         put("રોકડ/બેંક આવક", "नकद/बैंक आमद", "Cash/Bank in");
         put("જાવક", "ख़र्च/जावक", "Out");
         put("આ તારીખે કોઈ નોંધ નથી.", "इस तारीख़ पर कोई प्रविष्टि नहीं।", "No entries on this date.");
-        put("માસિક સારાંશ", "मासिक सारांश", "Monthly Summary");
+        put("માસિક સારાંશ", "मासिक सारांश", "Monthly summary");
         put("ખાતા મુજબ", "खाते के अनुसार", "By account");
         put("નામ", "नाम", "Name");
         put("ઉધાર", "उधार", "Credit");
@@ -238,7 +238,7 @@ public final class I18n {
         put("ખાતું સેવ થયું", "खाता सेव हुआ", "Account saved");
         put("🗑 આ ખાતું કાઢી નાખો", "🗑 यह खाता हटाएँ", "🗑 Delete this account");
         put("ખાતું કાઢી નાખ્યું", "खाता हटा दिया", "Account deleted");
-        put("ફિલ્ટર", "फ़िल्टर", "Filter Options");
+        put("ફિલ્ટર", "फ़िल्टर", "Filter");
         put("સમય", "समय", "Period");
         put("દિવસ", "दिन", "Single Day");
         put("મહિનો", "महीना", "Month");
@@ -408,6 +408,21 @@ public final class I18n {
         put("શુભ સવાર", "शुभ प्रभात", "Good Morning");
         put("શુભ બપોર", "शुभ दोपहर", "Good Afternoon");
         put("શુભ સાંજ", "शुभ संध्या", "Good Evening");
+        put("સાથી", "साथी", "Saathi");
+        put("પ્રગતિ", "प्रगति", "Pragati");
+        put("બધા સંપર્કો", "सभी संपर्क", "All contacts");
+        put("ઉધાર આવક", "उधार आय", "Credit income");
+        put("ઉધાર જાવક", "उधार जावक", "Credit outgoing");
+        put("દૈનિક નોંધો", "दैनिક प्रविष्टियाँ", "Daily entries");
+        put("આ સમયગાળામાં કોઈ નોંધ નથી.", "इस अवधि में कोई प्रविष्टि नहीं।", "No entries in this period.");
+        put("ગયો મહિનો", "पिछला महीना", "Last month");
+        put("આ વર્ષ", "इस साल", "This year");
+        put("બધા સમય", "सभी समय", "All time");
+        put("વસૂલવાની બાકી રકમ", "वसूलने की बाकी रकम", "Amount to collect");
+        put("ચૂકવવા માટે કુલ", "चुकाने के लिए कुल", "Total to pay");
+        put("બધા ખાતાઓ", "सभी खाते", "All accounts");
+        put("સંપર્ક પસંદ કરો", "संपर्क चुनें", "Select contact");
+        put("મહિનો પસંદ કરો", "महीना चुनें", "Select month");
         put("સર્વિસ પ્રોવાઈડર (સેવા નોંધ ચાલુ)", "सर्विस प्रोवाइडर (सेवा प्रविष्टि चालू)", "Service provider (service entry on)");
         put("દુકાન / સ્ટોર · સર્વિસ માટે અહીં બદલો", "दुकान / स्टोर · सर्विस के लिए यहाँ बदलें", "Shop / Store · change here for service");
         put("સ્વાગત છે", "स्वागत है", "Welcome");
@@ -426,6 +441,8 @@ public final class I18n {
         put("દૂધની સેવા", "दूध सेवा", "Milk service");
         put("ટિફિન સેવા", "टिफिन सेवा", "Tiffin service");
         put("લોન્ડ્રી / ધોલાઈ", "लॉन्ड्री / धुलाई", "Laundry");
+    }
+    private static void init7() {
         put("ચાની દુકાન", "चाय की दुकान", "Tea shop");
         put("છાપું / મેગેઝિન", "अखबार / मैगज़ीन", "Newspaper / Magazine");
         put("પાણીની સેવા", "पानी सेवा", "Water service");
@@ -441,8 +458,6 @@ public final class I18n {
         put("બાયોમેટ્રિક્સ સક્રિય કરો?", "बायोमेट्रिक चालू करें?", "Enable biometrics?");
         put("શું તમે એપને ઝડપથી અનલોક કરવા માટે ફિંગરપ્રિન્ટ અથવા ફેસ આઈડી વાપરવા માંગો છો?", "क्या आप ऐप जल्दी अनलॉक करने के लिए फिंगरप्रिंट या फेस आईडी इस्तेमाल करना चाहते हैं?", "Do you want to use fingerprint or face ID to unlock the app quickly?");
         put("ના", "नहीं", "No");
-    }
-    private static void init7() {
         put("હા", "हाँ", "Yes");
         put("વ્યવસાયનો પ્રકાર", "व्यवसाय का प्रकार", "Business type");
         put("સેવા નોંધ", "सेवा प्रविष्टि", "Service entry");
@@ -488,6 +503,8 @@ public final class I18n {
         put("ચા-નાસ્તો", "चाय-नाश्ता", "Tea & snacks");
         put("વીજળી", "बिजली", "Electricity");
         put("રિપેરિંગ", "मरम्मत", "Repairs");
+    }
+    private static void init8() {
         put("પરિવહન", "परिवहन", "Transport");
         put("ઇન-રિવ્યુ વ્યવહારો (", "इन-रिव्यू लेन-देन (", "In-Review Transactions (");
         put("વૉઇસ ટ્રાન્ઝેક્શન", "वॉइस ट्रांज़ैक्शन", "Voice Transaction");
@@ -503,8 +520,6 @@ public final class I18n {
         put("ચાલુ રાખો", "जारी रखें", "Continue");
         put("WhatsApp ખોલો", "WhatsApp खोलें", "Open WhatsApp");
         put("છોડો", "छोड़ें", "Skip");
-    }
-    private static void init8() {
         put("કોઈ ઇતિહાસ નથી", "कोई इतिहास नहीं", "No history found");
         put("બાકી ચૂકવણી (Pending)", "बकाया भुगतान (Pending)", "Pending Payments");
         put("કોણ તમને આપશે અને કોને તમારે આપવાના, તાકીદ મુજબ", "कौन आपको देगा और किसे आपको देना है, तुरंत के क्रम में", "Who owes you & who you owe, sorted by urgency");

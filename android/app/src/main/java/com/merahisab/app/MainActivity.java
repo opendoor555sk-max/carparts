@@ -56,7 +56,7 @@ public class MainActivity extends Activity {
     Sheets sheets;
     Screens screens;
     String tab = "home", partyId = null, sub = null, period = "day", day, month, filter = "all", fparty = "";
-    String kq = "", kf = "all", sort = "bal", rday, rmonth, rkind = "all", balMode = "full", setOpen = "biz";
+    String kq = "", kf = "all", sort = "bal", rday, rmonth, rkind = "all", rparty = "", drange = "month", rhome = "a", balMode = "full", setOpen = "biz";
 
     private FrameLayout root;
     private ScrollView scroll;

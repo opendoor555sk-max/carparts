@@ -1663,6 +1663,50 @@ final class Sheets {
         s.show();
     }
 
+    void reportPartySheet() {
+        Ui.Sheet s = open("સંપર્ક પસંદ કરો");
+        LinearLayout box = Ui.v(c);
+        box.addView(rowItem("all", "બધા સંપર્કો", "", "", Ui.TEXT, null, new Runnable() { @Override public void run() { a.rparty = ""; close(); a.render(); } }));
+        for (final Model.Party p : a.db.parties) {
+            if (!a.rkind.equals("all") && !a.db.kindOf(p).equals(a.rkind)) continue;
+            box.addView(rowItem(p.name, p.name, a.db.kindOf(p).equals("creditor") ? "લેણદાર" : "ગ્રાહક", "", Ui.TEXT, null, new Runnable() { @Override public void run() { a.rparty = p.id; close(); a.render(); } }));
+        }
+        s.add(scrollBox(box, 380));
+        s.show();
+    }
+
+    void reportRangeSheet() {
+        Ui.Sheet s = open("ફિલ્ટર");
+        String[][] rs = {{"month", "આ મહિનો"}, {"last", "ગયો મહિનો"}, {"year", "આ વર્ષ"}, {"all", "બધા સમય"}};
+        for (final String[] r : rs) {
+            s.add(Ui.btn(c, r[1], a.drange.equals(r[0]) ? "primary" : "ghost", new Runnable() { @Override public void run() { a.drange = r[0]; close(); a.render(); } }));
+        }
+        s.show();
+    }
+
+    void monthPickSheet() {
+        Ui.Sheet s = open("મહિનો પસંદ કરો");
+        String m = Fmt.today().substring(0, 7);
+        for (int i = 0; i < 12; i++) {
+            final String key = Fmt.monthShift(m, -i);
+            s.add(Ui.btn(c, Fmt.monthLabel(key), key.equals(a.rmonth) ? "primary" : "ghost", new Runnable() { @Override public void run() { a.rmonth = key; close(); a.render(); } }));
+        }
+        s.show();
+    }
+
+    void dayDetailSheet(final String date) {
+        Ui.Sheet s = open(Fmt.fmtDate(date));
+        LinearLayout box = Ui.v(c);
+        for (final Model.Txn t : a.db.txns) {
+            if (!t.date.equals(date) || !a.screens.reportMatch(t)) continue;
+            Model.Party p = a.db.party(t.partyId);
+            box.addView(rowItem(t.id, (p != null ? p.name + " · " : "") + Model.type(t.type).label, t.note, Fmt.money(t.amount), Ui.tone(Ui.toneOf(t.type)), null,
+                    new Runnable() { @Override public void run() { txSheet(t.id); } }));
+        }
+        s.add(scrollBox(box, 380));
+        s.show();
+    }
+
     void bizSheet() {
         Ui.Sheet s = open("વ્યવસાયનો પ્રકાર");
         s.add(Ui.btn(c, "દુકાન / સ્ટોર", a.db.settings.biz.equals("store") ? "primary" : "ghost", new Runnable() { @Override public void run() { a.db.settings.biz = "store"; a.save(); close(); a.render(); } }));

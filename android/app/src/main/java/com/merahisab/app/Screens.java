@@ -732,58 +732,200 @@ final class Screens {
         LinearLayout root = Ui.v(c);
         TextView mic = ib("🎤", new Runnable() { @Override public void run() { a.sheets.voiceSheet(null); } });
         root.addView(top("રિપોર્ટ્સ", null, new Runnable() { @Override public void run() { a.go("home"); } }, mic));
-        root.addView(sectionHead("દૈનિક રિપોર્ટ્સ", null, null));
-        LinearLayout l1 = listBox();
-        l1.addView(row("▤", Ui.ACCENT, "દૈનિક સારાંશ", "રોજની રોકડ અને આવક/જાવક ટ્રેક કરો", null, 0, null,
-                new Runnable() { @Override public void run() { a.sub = "daily"; a.render(); } }));
-        root.addView(l1);
-        root.addView(sectionHead("ગ્રાહક અને લેણદાર", null, null));
-        LinearLayout l2 = listBox();
-        l2.addView(row("👥", Ui.ACCENT, "માસિક સારાંશ અહેવાલ", "ફિલ્ટર્સ સાથે ગ્રાહક અને લેણદાર માસિક સારાંશ", null, 0, null,
-                new Runnable() { @Override public void run() { a.sub = "monthly"; a.render(); } }));
-        l2.addView(divider());
-        l2.addView(row("⏳", Ui.ACCENT, "બાકી ચૂકવણી (Pending)", "કોણ તમને આપશે અને કોને તમારે આપવાના, તાકીદ મુજબ", null, 0, null,
-                new Runnable() { @Override public void run() { a.sheets.pendingSheet(); } }));
-        root.addView(l2);
-        root.addView(sectionHead("રોકડ અને નફો", null, null));
-        LinearLayout l3 = listBox();
-        l3.addView(row("₹", Ui.ACCENT, "રોકડ સારાંશ", "ફક્ત રોકડ નોંધ, શરૂઆત અને અંતના બેલેન્સ સાથે", null, 0, null,
-                new Runnable() { @Override public void run() { a.sheets.cashSheet(); } }));
-        l3.addView(divider());
-        l3.addView(row("◔", Ui.ACCENT, "નફો-નુકસાન (P&L)", "ચોખ્ખી આવક, ખર્ચ અને નફાનું વિશ્લેષણ", null, 0, null,
-                new Runnable() { @Override public void run() { a.sheets.pnlSheet(); } }));
-        l3.addView(divider());
-        l3.addView(row("▥", Ui.ACCENT, "વાર્ષિક રિપોર્ટ", "આખા વર્ષની મહિના મુજબ આવક અને ખર્ચ", null, 0, null,
-                new Runnable() { @Override public void run() { a.sheets.annualSheet(); } }));
-        root.addView(l3);
+        root.addView(chipsRow(new String[][]{{"a", "સાથી"}, {"b", "પ્રગતિ"}}, a.rhome, new java.util.function.Consumer<String>() {
+            @Override public void accept(String s) { a.rhome = s; a.render(); }
+        }));
+        if (a.rhome.equals("a")) {
+            root.addView(sectionHead("દૈનિક રિપોર્ટ્સ", null, null));
+            LinearLayout l1 = listBox();
+            l1.addView(row("▤", Ui.GREEN, "દૈનિક સારાંશ", "રોજની રોકડ અને આવક/જાવક ટ્રેક કરો", null, 0, null,
+                    new Runnable() { @Override public void run() { a.sub = "daily"; a.render(); } }));
+            root.addView(l1);
+            root.addView(sectionHead("ગ્રાહક અને લેણદાર", null, null));
+            LinearLayout l2 = listBox();
+            l2.addView(row("👥", Ui.RED, "માસિક સારાંશ અહેવાલ", "ફિલ્ટર્સ સાથે ગ્રાહક અને લેણદાર માસિક સારાંશ", null, 0, null,
+                    new Runnable() { @Override public void run() { a.sub = "monthly"; a.render(); } }));
+            root.addView(l2);
+        } else {
+            root.addView(sectionHead("ગ્રાહક અને લેણદાર", null, null));
+            LinearLayout l2 = listBox();
+            l2.addView(row("⏳", Ui.ACCENT, "બાકી ચૂકવણી (Pending)", "કોણ તમને આપશે અને કોને તમારે આપવાના, તાકીદ મુજબ", null, 0, null,
+                    new Runnable() { @Override public void run() { a.sheets.pendingSheet(); } }));
+            root.addView(l2);
+            root.addView(sectionHead("રોકડ અને નફો", null, null));
+            LinearLayout l3 = listBox();
+            l3.addView(row("₹", Ui.ACCENT, "રોકડ સારાંશ", "ફક્ત રોકડ નોંધ, શરૂઆત અને અંતના બેલેન્સ સાથે", null, 0, null,
+                    new Runnable() { @Override public void run() { a.sheets.cashSheet(); } }));
+            l3.addView(divider());
+            l3.addView(row("◔", Ui.ACCENT, "નફો-નુકસાન (P&L)", "ચોખ્ખી આવક, ખર્ચ અને નફાનું વિશ્લેષણ", null, 0, null,
+                    new Runnable() { @Override public void run() { a.sheets.pnlSheet(); } }));
+            l3.addView(divider());
+            l3.addView(row("▥", Ui.ACCENT, "વાર્ષિક રિપોર્ટ", "આખા વર્ષની મહિના મુજબ આવક અને ખર્ચ", null, 0, null,
+                    new Runnable() { @Override public void run() { a.sheets.annualSheet(); } }));
+            root.addView(l3);
+        }
         return root;
+    }
+
+    /** Does this transaction belong to the chosen tab (all / customer / creditor) and khata? */
+    boolean reportMatch(Model.Txn t) {
+        if (!a.rparty.isEmpty() && !a.rparty.equals(t.partyId)) return false;
+        if (a.rkind.equals("all")) return true;
+        Model.Party p = a.db.party(t.partyId);
+        return p != null && a.db.kindOf(p).equals(a.rkind);
+    }
+
+    private boolean inRange(String d) {
+        String today = Fmt.today(), m = today.substring(0, 7);
+        switch (a.drange) {
+            case "last": return d.startsWith(Fmt.monthShift(m, -1));
+            case "year": return d.startsWith(today.substring(0, 4));
+            case "all": return true;
+            default: return d.startsWith(m);
+        }
+    }
+
+    String rangeLabel() {
+        switch (a.drange) {
+            case "last": return "ગયો મહિનો";
+            case "year": return "આ વર્ષ";
+            case "all": return "બધા સમય";
+            default: return "આ મહિનો";
+        }
+    }
+
+    private View partyPill() {
+        Model.Party p = a.rparty.isEmpty() ? null : a.db.party(a.rparty);
+        LinearLayout l = Ui.h(c);
+        l.setGravity(Gravity.CENTER_VERTICAL);
+        l.setBackground(Ui.rr(Ui.SURFACE, Ui.LINE, 16));
+        Ui.pad(l, 14, 12, 14, 12);
+        l.addView(Ui.t(c, "👥  " + (p != null ? p.name : "બધા સંપર્કો"), 15, Ui.TEXT, true), Ui.weight(1));
+        l.addView(Ui.t(c, "⌄", 18, Ui.MUTED, true));
+        LinearLayout.LayoutParams lp = Ui.fillW();
+        lp.setMargins(Ui.dp(12), Ui.dp(6), Ui.dp(12), Ui.dp(6));
+        l.setLayoutParams(lp);
+        Ui.tap(l, new Runnable() { @Override public void run() { a.sheets.reportPartySheet(); } });
+        return l;
+    }
+
+    private View statCard(String label, double v, int col) {
+        LinearLayout l = Ui.v(c);
+        l.setBackground(Ui.rr(Ui.SURFACE, Ui.LINE, 16));
+        Ui.pad(l, 14, 12, 14, 12);
+        l.addView(Ui.t(c, "● " + label, 13, col, true));
+        l.addView(Ui.t(c, Fmt.money(v), 22, col, true));
+        LinearLayout.LayoutParams lp = Ui.weight(1);
+        lp.setMargins(Ui.dp(6), Ui.dp(6), Ui.dp(6), Ui.dp(6));
+        l.setLayoutParams(lp);
+        return l;
+    }
+
+    private View statRow(View x, View y) {
+        LinearLayout r = Ui.h(c);
+        Ui.pad(r, 6, 0, 6, 0);
+        r.addView(x);
+        r.addView(y);
+        return r;
+    }
+
+    /** {income, expense, udhar-income (gave), udhar-outgoing (took)} for one transaction list. */
+    private double[] sums(List<Model.Txn> items) {
+        double[] s = new double[4];
+        for (Model.Txn t : items) {
+            boolean wo = "writeoff".equals(t.mode);
+            switch (t.type) {
+                case "income": s[0] += t.amount; break;
+                case "got": if (!wo) s[0] += t.amount; break;
+                case "expense": s[1] += t.amount; break;
+                case "paid": if (!wo) s[1] += t.amount; break;
+                case "gave": s[2] += t.amount; break;
+                case "took": s[3] += t.amount; break;
+                default:
+            }
+        }
+        return s;
     }
 
     private LinearLayout dailyReport() {
         LinearLayout root = Ui.v(c);
         List<Model.Txn> items = new ArrayList<>();
-        for (Model.Txn t : a.db.txns) if (t.date.equals(a.rday)) items.add(t);
+        for (Model.Txn t : a.db.txns) if (inRange(t.date) && reportMatch(t)) items.add(t);
         Collections.sort(items, Model.SORT_NEWEST);
-        double cin = 0, cout = 0;
+        final double[] tot = sums(items);
+        TextView flt = Ui.t(c, "☰ " + rangeLabel(), 13, Ui.TEXT, true);
+        flt.setBackground(Ui.rr(Ui.SURFACE2, Ui.LINE, 18));
+        Ui.pad(flt, 12, 8, 12, 8);
+        Ui.tap(flt, new Runnable() { @Override public void run() { a.sheets.reportRangeSheet(); } });
+        TextView dl = ib("⬇", new Runnable() { @Override public void run() { a.shareText(dailyText(a.db.txns)); } });
+        root.addView(top("દૈનિક સારાંશ", null, new Runnable() { @Override public void run() { a.sub = null; a.render(); } }, flt, dl));
+        root.addView(chipsRow(new String[][]{{"all", "બધા"}, {"customer", "ગ્રાહક"}, {"creditor", "લેણદાર"}}, a.rkind, new java.util.function.Consumer<String>() {
+            @Override public void accept(String s) { a.rkind = s; a.rparty = ""; a.render(); }
+        }));
+        root.addView(partyPill());
+        root.addView(statRow(statCard("આવક", tot[0], Ui.GREEN), statCard("ખર્ચ", tot[1], Ui.RED)));
+        root.addView(statRow(statCard("ઉધાર આવક", tot[2], Ui.PURPLE), statCard("ઉધાર જાવક", tot[3], Ui.AMBER)));
+        root.addView(sectionHead("દૈનિક નોંધો", null, null));
+        if (items.isEmpty()) { root.addView(empty("આ સમયગાળામાં કોઈ નોંધ નથી.")); return root; }
+        Map<String, List<Model.Txn>> byDay = new LinkedHashMap<>();
         for (Model.Txn t : items) {
-            int cs = Model.type(t.type).cash;
-            if ("writeoff".equals(t.mode)) continue;
-            if (cs > 0) cin += t.amount; else if (cs < 0) cout += t.amount;
+            List<Model.Txn> l = byDay.get(t.date);
+            if (l == null) { l = new ArrayList<>(); byDay.put(t.date, l); }
+            l.add(t);
         }
-        root.addView(top("દૈનિક સારાંશ", null, new Runnable() { @Override public void run() { a.sub = null; a.render(); } }));
-        root.addView(periodBar(a.rday.equals(Fmt.today()) ? "આજ" : Fmt.weekday(a.rday), Fmt.shortDate(a.rday),
-                new Runnable() { @Override public void run() { a.rday = Fmt.addDays(a.rday, -1); a.render(); } },
-                new Runnable() { @Override public void run() { a.rday = Fmt.addDays(a.rday, 1); a.render(); } }, true));
-        root.addView(strip("રોકડ/બેંક આવક", cin, Ui.GREEN, "જાવક", cout, Ui.RED, "ચોખ્ખી રકમ", cin - cout, cin - cout >= 0 ? Ui.GREEN : Ui.RED));
-        root.addView(Ui.space(c, 10));
-        if (items.isEmpty()) root.addView(empty("આ તારીખે કોઈ નોંધ નથી."));
-        else {
-            LinearLayout lb = listBox();
-            boolean first = true;
-            for (Model.Txn t : items) { if (!first) lb.addView(divider()); first = false; lb.addView(txRow(t, false)); }
-            root.addView(lb);
+        List<String> days = new ArrayList<>(byDay.keySet());
+        Collections.sort(days, Collections.reverseOrder());
+        for (final String d : days) {
+            double[] x = sums(byDay.get(d));
+            LinearLayout card = Ui.h(c);
+            card.setBackground(Ui.rr(Ui.SURFACE, Ui.LINE, 16));
+            card.setGravity(Gravity.CENTER_VERTICAL);
+            Ui.pad(card, 12, 12, 12, 12);
+            LinearLayout box = Ui.v(c);
+            box.setGravity(Gravity.CENTER);
+            box.setBackground(Ui.rr(Ui.SURFACE2, Ui.LINE, 12));
+            Ui.pad(box, 10, 8, 10, 8);
+            box.addView(Ui.t(c, d.substring(8), 20, Ui.ACCENT, true));
+            box.addView(Ui.t(c, Fmt.monthLabel(d.substring(0, 7)).split(" ")[0], 11, Ui.MUTED, false));
+            card.addView(box);
+            LinearLayout grid = Ui.v(c);
+            Ui.pad(grid, 12, 0, 0, 0);
+            LinearLayout r1 = Ui.h(c), r2 = Ui.h(c);
+            r1.addView(mini("આવક", x[0], Ui.GREEN), Ui.weight(1));
+            r1.addView(mini("ખર્ચ", x[1], Ui.RED), Ui.weight(1));
+            r2.addView(mini("ઉધાર આવક", x[2], Ui.PURPLE), Ui.weight(1));
+            r2.addView(mini("ઉધાર જાવક", x[3], Ui.AMBER), Ui.weight(1));
+            grid.addView(r1);
+            grid.addView(r2);
+            card.addView(grid, Ui.weight(1));
+            card.addView(Ui.t(c, "›", 20, Ui.MUTED, true));
+            LinearLayout.LayoutParams lp = Ui.fillW();
+            lp.setMargins(Ui.dp(12), Ui.dp(5), Ui.dp(12), Ui.dp(5));
+            card.setLayoutParams(lp);
+            Ui.tap(card, new Runnable() { @Override public void run() { a.sheets.dayDetailSheet(d); } });
+            root.addView(card);
         }
         return root;
+    }
+
+    private View mini(String label, double v, int col) {
+        LinearLayout l = Ui.v(c);
+        Ui.pad(l, 0, 3, 0, 3);
+        l.addView(Ui.t(c, "● " + label, 11, col, false));
+        l.addView(Ui.t(c, Fmt.money(v), 15, col, true));
+        return l;
+    }
+
+    String dailyText(List<Model.Txn> all) {
+        List<Model.Txn> items = new ArrayList<>();
+        for (Model.Txn t : all) if (inRange(t.date) && reportMatch(t)) items.add(t);
+        double[] s = sums(items);
+        StringBuilder b = new StringBuilder("*" + I18n.tr("દૈનિક સારાંશ") + "* (" + I18n.tr(rangeLabel()) + ")\n");
+        b.append(I18n.tr("આવક")).append(": ").append(Fmt.money(s[0])).append("\n");
+        b.append(I18n.tr("ખર્ચ")).append(": ").append(Fmt.money(s[1])).append("\n");
+        b.append(I18n.tr("ઉધાર આવક")).append(": ").append(Fmt.money(s[2])).append("\n");
+        b.append(I18n.tr("ઉધાર જાવક")).append(": ").append(Fmt.money(s[3])).append("\n");
+        return b.toString();
     }
 
     private View tr(String a1, String a2, String a3, String a4, boolean head, int c4) {
@@ -802,17 +944,10 @@ final class Screens {
 
     private LinearLayout monthlyReport() {
         LinearLayout root = Ui.v(c);
-        String key = a.rmonth;
-        root.addView(top("માસિક સારાંશ", null, new Runnable() { @Override public void run() { a.sub = null; a.render(); } }));
-        root.addView(periodBar(Fmt.monthLabel(key), "",
-                new Runnable() { @Override public void run() { a.rmonth = Fmt.monthShift(a.rmonth, -1); a.render(); } },
-                new Runnable() { @Override public void run() { a.rmonth = Fmt.monthShift(a.rmonth, 1); a.render(); } }, true));
-        root.addView(chipsRow(new String[][]{{"all", "બધા"}, {"customer", "ગ્રાહક"}, {"creditor", "લેણદાર"}}, a.rkind, new java.util.function.Consumer<String>() {
-            @Override public void accept(String s) { a.rkind = s; a.render(); }
-        }));
-        Map<String, double[]> per = new LinkedHashMap<>(); // gave, got, took, paid
+        final String key = a.rmonth;
+        final Map<String, double[]> per = new LinkedHashMap<>(); // gave, got, took, paid
         for (Model.Txn t : a.db.txns) {
-            if (t.partyId == null || !t.date.startsWith(key)) continue;
+            if (t.partyId == null || !t.date.startsWith(key) || !reportMatch(t)) continue;
             double[] x = per.get(t.partyId);
             if (x == null) { x = new double[4]; per.put(t.partyId, x); }
             switch (t.type) {
@@ -823,51 +958,68 @@ final class Screens {
                 default:
             }
         }
-        root.addView(sectionHead("ખાતા મુજબ", null, null));
-        LinearLayout tbl = listBox();
+        double recv = 0, pay = 0;
+        for (Model.Party p : a.db.parties) {
+            if (!a.rparty.isEmpty() && !a.rparty.equals(p.id)) continue;
+            if (!a.rkind.equals("all") && !a.db.kindOf(p).equals(a.rkind)) continue;
+            double b = a.db.partyBal(p.id);
+            if (b > 0) recv += b; else pay += -b;
+        }
+        final double fr = recv, fp = pay;
+        TextView mp = Ui.t(c, "☰ " + Fmt.monthLabel(key) + " ⌄", 13, Ui.TEXT, true);
+        mp.setBackground(Ui.rr(Ui.SURFACE2, Ui.LINE, 18));
+        Ui.pad(mp, 12, 8, 12, 8);
+        Ui.tap(mp, new Runnable() { @Override public void run() { a.sheets.monthPickSheet(); } });
+        final Runnable share = new Runnable() { @Override public void run() { a.shareText(monthlyText(key, per, fr, fp)); } };
+        root.addView(top("માસિક સારાંશ", null, new Runnable() { @Override public void run() { a.sub = null; a.render(); } }, mp, ib("⬇", share), ib("▦", share), ib("⤴", share)));
+        root.addView(chipsRow(new String[][]{{"all", "બધા"}, {"customer", "ગ્રાહક"}, {"creditor", "લેણદાર"}}, a.rkind, new java.util.function.Consumer<String>() {
+            @Override public void accept(String s) { a.rkind = s; a.rparty = ""; a.render(); }
+        }));
+        root.addView(partyPill());
+        LinearLayout hero = Ui.h(c);
+        hero.setBackground(Ui.grad(Color.parseColor("#5B0F9E"), Color.parseColor("#7B2FBE"), 20));
+        Ui.pad(hero, 18, 16, 18, 16);
+        LinearLayout h1 = Ui.v(c), h2 = Ui.v(c);
+        h1.addView(Ui.t(c, "વસૂલવાની બાકી રકમ", 13, Color.parseColor("#EBDDFF"), false));
+        h1.addView(Ui.t(c, Fmt.money(recv), 24, Color.WHITE, true));
+        h2.addView(Ui.t(c, "ચૂકવવા માટે કુલ", 13, Color.parseColor("#EBDDFF"), false));
+        h2.addView(Ui.t(c, Fmt.money(pay), 24, Color.WHITE, true));
+        hero.addView(h1, Ui.weight(1));
+        hero.addView(h2, Ui.weight(1));
+        LinearLayout.LayoutParams hp = Ui.fillW();
+        hp.setMargins(Ui.dp(12), Ui.dp(8), Ui.dp(12), Ui.dp(8));
+        hero.setLayoutParams(hp);
+        root.addView(hero);
+        root.addView(sectionHead("બધા ખાતાઓ", null, null));
         int n = 0;
-        tbl.addView(tr("નામ", "ઉધાર", "જમા/ચૂકવણી", "કુલ બાકી", true, 0));
+        LinearLayout lb = listBox();
+        for (Map.Entry<String, double[]> e : per.entrySet()) {
+            final Model.Party p = a.db.party(e.getKey());
+            if (p == null) continue;
+            double bal = a.db.partyBal(p.id);
+            double[] x = e.getValue();
+            if (n > 0) lb.addView(divider());
+            lb.addView(row(p.name, Ui.ACCENT, p.name, I18n.tr("ઉધાર") + " " + Fmt.money(x[0] + x[2]) + " · " + I18n.tr("જમા") + " " + Fmt.money(x[1] + x[3]),
+                    Fmt.money(Math.abs(bal)), bal > 0 ? Ui.GREEN : (bal < 0 ? Ui.RED : Ui.MUTED), bal > 0 ? "લેવાના" : (bal < 0 ? "દેવાના" : "બરાબર"),
+                    new Runnable() { @Override public void run() { a.openParty(p.id); } }));
+            n++;
+        }
+        if (n == 0) root.addView(empty("આ મહિને કોઈ વ્યવહારો નથી")); else root.addView(lb);
+        return root;
+    }
+
+    String monthlyText(String key, Map<String, double[]> per, double recv, double pay) {
+        StringBuilder b = new StringBuilder("*" + I18n.tr("માસિક સારાંશ") + "* " + Fmt.monthLabel(key) + "\n");
+        b.append(I18n.tr("વસૂલવાની બાકી રકમ")).append(": ").append(Fmt.money(recv)).append("\n");
+        b.append(I18n.tr("ચૂકવવા માટે કુલ")).append(": ").append(Fmt.money(pay)).append("\n\n");
         for (Map.Entry<String, double[]> e : per.entrySet()) {
             Model.Party p = a.db.party(e.getKey());
             if (p == null) continue;
-            if (!a.rkind.equals("all") && !a.db.kindOf(p).equals(a.rkind)) continue;
-            double bal = a.db.partyBal(p.id);
             double[] x = e.getValue();
-            tbl.addView(tr(p.name, Fmt.plain(x[0] + x[2]), Fmt.plain(x[1] + x[3]), Fmt.plain(Math.abs(bal)), false, bal > 0 ? Ui.GREEN : (bal < 0 ? Ui.RED : Ui.TEXT)));
-            n++;
+            b.append(p.name).append(": ").append(I18n.tr("ઉધાર")).append(" ").append(Fmt.money(x[0] + x[2])).append(", ")
+                    .append(I18n.tr("જમા")).append(" ").append(Fmt.money(x[1] + x[3])).append(", ").append(I18n.tr("બાકી")).append(" ").append(Fmt.money(a.db.partyBal(p.id))).append("\n");
         }
-        if (n == 0) root.addView(empty("આ મહિને ખાતાઓમાં કોઈ નોંધ નથી.")); else root.addView(tbl);
-
-        List<Model.Txn> exp = new ArrayList<>();
-        double total = 0;
-        Map<String, Double> cats = new LinkedHashMap<>();
-        for (Model.Txn t : a.db.txns) {
-            if (!t.type.equals("expense") || !t.date.startsWith(key)) continue;
-            exp.add(t);
-            total += t.amount;
-            String cat = t.cat.isEmpty() ? "અન્ય" : t.cat;
-            Double cur = cats.get(cat);
-            cats.put(cat, (cur == null ? 0 : cur) + t.amount);
-        }
-        Collections.sort(exp, Model.SORT_NEWEST);
-        root.addView(sectionHead("ખર્ચ  " + Fmt.money(total), null, null));
-        if (!cats.isEmpty()) {
-            LinearLayout cb = listBox();
-            List<Map.Entry<String, Double>> es = new ArrayList<>(cats.entrySet());
-            Collections.sort(es, new Comparator<Map.Entry<String, Double>>() {
-                @Override public int compare(Map.Entry<String, Double> x, Map.Entry<String, Double> y) { return Double.compare(y.getValue(), x.getValue()); }
-            });
-            for (Map.Entry<String, Double> e : es) cb.addView(tr(e.getKey(), null, null, Fmt.money(e.getValue()), false, Ui.RED));
-            root.addView(cb);
-        }
-        if (exp.isEmpty()) root.addView(empty("આ મહિને કોઈ ખર્ચ નથી."));
-        else {
-            LinearLayout lb = listBox();
-            boolean first = true;
-            for (Model.Txn t : exp) { if (!first) lb.addView(divider()); first = false; lb.addView(txRow(t, true)); }
-            root.addView(lb);
-        }
-        return root;
+        return b.toString();
     }
 
     // ---------------- SETTINGS ----------------
