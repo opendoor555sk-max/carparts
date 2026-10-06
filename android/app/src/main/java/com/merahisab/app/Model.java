@@ -39,7 +39,7 @@ public final class Model {
     }
 
     public static final class Txn {
-        public String id = "", type = "income", partyId = null, note = "", mode = "", cat = "", said = "", due = "", date = "";
+        public String id = "", type = "income", partyId = null, note = "", mode = "", cat = "", said = "", due = "", date = "", by = "";
         public double amount;
         public long ts, upd;
     }
@@ -257,7 +257,7 @@ public final class Model {
                 Map<String, Object> x = new LinkedHashMap<>();
                 x.put("id", t.id); x.put("ts", (double) t.ts); x.put("upd", (double) t.upd); x.put("date", t.date);
                 x.put("type", t.type); x.put("partyId", t.partyId); x.put("amount", t.amount); x.put("note", t.note);
-                x.put("mode", t.mode); x.put("cat", t.cat); x.put("said", t.said); x.put("due", t.due);
+                x.put("mode", t.mode); x.put("cat", t.cat); x.put("said", t.said); x.put("due", t.due); x.put("by", t.by);
                 ts.add(x);
             }
             List<Object> pr = new ArrayList<>();
@@ -357,7 +357,7 @@ public final class Model {
                 t.id = str(m, "id"); t.ts = (long) num(m, "ts"); t.upd = (long) num(m, "upd"); t.date = str(m, "date");
                 t.type = str(m, "type"); t.partyId = m.get("partyId") instanceof String ? (String) m.get("partyId") : null;
                 t.amount = num(m, "amount"); t.note = str(m, "note"); t.mode = str(m, "mode"); t.cat = str(m, "cat");
-                t.said = str(m, "said"); t.due = str(m, "due");
+                t.said = str(m, "said"); t.due = str(m, "due"); t.by = str(m, "by");
                 if (!TYPES.containsKey(t.type)) continue;
                 txns.add(t);
             }

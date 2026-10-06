@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 /** Every bottom-sheet / dialog in the app. */
 final class Sheets {
@@ -643,6 +644,7 @@ final class Sheets {
         }
         Model.Txn rec = new Model.Txn();
         rec.id = f.id != null ? f.id : a.uid();
+        rec.by = a.who();
         rec.ts = System.currentTimeMillis();
         rec.upd = rec.ts;
         rec.date = f.date;
@@ -657,7 +659,7 @@ final class Sheets {
         boolean replaced = false;
         if (f.id != null) {
             for (int i = 0; i < a.db.txns.size(); i++) {
-                if (a.db.txns.get(i).id.equals(f.id)) { rec.ts = a.db.txns.get(i).ts; a.db.txns.set(i, rec); replaced = true; break; }
+                if (a.db.txns.get(i).id.equals(f.id)) { rec.ts = a.db.txns.get(i).ts; if (!a.db.txns.get(i).by.isEmpty()) rec.by = a.db.txns.get(i).by; a.db.txns.set(i, rec); replaced = true; break; }
             }
         }
         if (!replaced) a.db.txns.add(rec);
@@ -665,7 +667,7 @@ final class Sheets {
         if (paidNow > 0 && pid != null) {
             Model.Txn pr = new Model.Txn();
             pr.id = a.uid();
-            pr.ts = rec.ts + 1; pr.upd = pr.ts;
+            pr.ts = rec.ts + 1; pr.upd = pr.ts; pr.by = rec.by;
             pr.date = f.date;
             pr.type = f.type.equals("took") ? "paid" : "got";
             pr.partyId = pid;
@@ -742,6 +744,7 @@ final class Sheets {
         if (!t.cat.isEmpty() && !t.cat.equals("અન્ય")) { TextView d = Ui.t(c, t.cat, 13, Ui.MUTED, false); d.setGravity(Gravity.CENTER); card.addView(d); }
         if (!t.note.isEmpty()) { TextView d = Ui.t(c, t.note, 15, Ui.TEXT, false); d.setGravity(Gravity.CENTER); Ui.pad(d, 0, 8, 0, 0); card.addView(d); }
         if (!t.said.isEmpty()) { TextView d = Ui.t(c, "બોલ્યા હતા: “" + t.said + "”", 12, Ui.MUTED, false); d.setGravity(Gravity.CENTER); Ui.pad(d, 0, 6, 0, 0); card.addView(d); }
+        if (!t.by.isEmpty()) { TextView d = Ui.t(c, "નોંધ કરનાર: " + t.by, 12, Ui.MUTED, false); d.setGravity(Gravity.CENTER); Ui.pad(d, 0, 6, 0, 0); card.addView(d); }
         s.add(card);
         s.add(Ui.btn(c, "✎ ફેરફાર કરો", "primary", new Runnable() {
             @Override public void run() {
@@ -753,7 +756,7 @@ final class Sheets {
                 openEntry(f);
             }
         }));
-        s.add(Ui.btn(c, "🗑 કાઢી નાખો", "danger", new Runnable() {
+        if (!a.isStaff()) s.add(Ui.btn(c, "🗑 કાઢી નાખો", "danger", new Runnable() {
             @Override public void run() {
                 confirm("આ નોંધ કાઢી નાખવી છે?", "હા, કાઢી નાખો", new Runnable() {
                     @Override public void run() {
@@ -799,7 +802,7 @@ final class Sheets {
                 a.save(); close(); a.render(); a.toast("ખાતું સેવ થયું");
             }
         }));
-        if (p != null) {
+        if (p != null && !a.isStaff()) {
             s.add(Ui.btn(c, "🗑 આ ખાતું કાઢી નાખો", "danger", new Runnable() {
                 @Override public void run() {
                     int n = 0;
@@ -1346,9 +1349,11 @@ final class Sheets {
                 mid.addView(Ui.t(c, p.name, 15, Ui.TEXT, true));
                 mid.addView(Ui.t(c, Fmt.money(p.rate) + " / " + p.unit, 12, Ui.MUTED, false));
                 row.addView(mid, Ui.weight(1));
-                TextView del = Ui.t(c, "🗑", 20, Ui.RED, true);
-                Ui.tap(del, new Runnable() { @Override public void run() { a.db.products.remove(p); a.save(); prodSheet(); a.render(); } });
-                row.addView(del);
+                if (!a.isStaff()) {
+                    TextView del = Ui.t(c, "🗑", 20, Ui.RED, true);
+                    Ui.tap(del, new Runnable() { @Override public void run() { a.db.products.remove(p); a.save(); prodSheet(); a.render(); } });
+                    row.addView(del);
+                }
                 list.addView(row);
             }
             s.add(scrollBox(list, 200));
@@ -1867,5 +1872,285 @@ final class Sheets {
         s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
         s.show();
         a.speak(say);
+    }
+
+    // ================= update / server / staff / admin =================
+    void updatePrompt(long remote) {
+        Ui.Sheet s = open("નવું વર્ઝન મળ્યું છે");
+        TextView t = Ui.t(c, "એક બટન દબાવો — બાકી બધું એપ પોતે કરશે (ડાઉનલોડ અને ઇન્સ્ટોલ).", 15, Ui.TEXT, false);
+        t.setGravity(Gravity.CENTER);
+        Ui.pad(t, 6, 6, 6, 10);
+        s.add(t);
+        s.add(Ui.btn(c, "⬇  અપડેટ કરો", "primary", new Runnable() { @Override public void run() { Updater.install(a); } }));
+        s.add(Ui.btn(c, "પછી", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    void serverSheet() {
+        Ui.Sheet s = open("સર્વર સેટઅપ");
+        TextView t = Ui.t(c, Api.configured() ? "સર્વર જોડાયેલ છે ✔" : "સર્વર જોડાયેલ નથી. એડમિને આપેલો સર્વર કોડ (URL અને કી) અહીં પેસ્ટ કરો.", 14, Api.configured() ? Ui.GREEN : Ui.MUTED, true);
+        t.setGravity(Gravity.CENTER);
+        Ui.pad(t, 6, 4, 6, 6);
+        s.add(t);
+        final EditText code = Ui.fld(c, "https://....supabase.co  sb_publishable_...", "", Ui.IN_PLAIN);
+        s.add(code);
+        s.add(Ui.btn(c, "સેવ કરો", "primary", new Runnable() {
+            @Override public void run() {
+                String v = code.getText().toString();
+                if (!Api.parse(v)) { a.toast("કોડ સાચો નથી"); return; }
+                Api.save(c, v);
+                a.toast("સર્વર જોડાયું");
+                close();
+                a.rebuild();
+            }
+        }));
+        if (Api.configured()) s.add(Ui.btn(c, "સર્વર કાઢી નાખો", "danger", new Runnable() {
+            @Override public void run() { Api.save(c, ""); close(); a.rebuild(); }
+        }));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    private void callAsync(final String fn, final Map<String, Object> args, final java.util.function.Consumer<Map<String, Object>> cb) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final Map<String, Object> r = Api.call(fn, args);
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if ("auth".equals(Api.s(r, "err"))) { a.onSessionExpired(); return; }
+                        cb.accept(r);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private String srvErr(Map<String, Object> r) {
+        switch (Api.s(r, "err")) {
+            case "net": return "ઇન્ટરનેટ ચાલુ કરો";
+            case "exists": return "આ નંબર પહેલેથી નોંધાયેલ છે";
+            case "phone": return "૧૦ અંકનો સાચો નંબર લખો";
+            case "name": return "નામ લખો";
+            case "forbidden": return "આ તમારા માટે નથી";
+            default: return "કંઈક ગડબડ થઈ, ફરી પ્રયત્ન કરો";
+        }
+    }
+
+    /** Shows a freshly made OTP so the owner/admin can pass it on (WhatsApp button). */
+    void showOtp(String name, final String phone, final String otp) {
+        Ui.Sheet s = open("OTP તૈયાર છે");
+        TextView n = Ui.t(c, name + " · " + phone, 14, Ui.MUTED, false);
+        n.setGravity(Gravity.CENTER);
+        s.add(n);
+        TextView o = Ui.t(c, otp, 40, Ui.ACCENT, true);
+        o.setGravity(Gravity.CENTER);
+        o.setLetterSpacing(0.2f);
+        Ui.pad(o, 0, 12, 0, 12);
+        s.add(o);
+        TextView h = Ui.t(c, "આ OTP ૪૮ કલાક ચાલશે અને એક જ વાર વપરાશે.", 12, Ui.MUTED, false);
+        h.setGravity(Gravity.CENTER);
+        s.add(h);
+        final String msg = "Mera Hisab login OTP: " + otp + "\nNumber: " + phone;
+        s.add(Ui.btn(c, "WhatsApp પર મોકલો", "green", new Runnable() { @Override public void run() { a.openUrl(a.waLink(phone, msg)); } }));
+        s.add(Ui.btn(c, "શેર કરો", "ghost", new Runnable() { @Override public void run() { a.shareText(msg); } }));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    private View pill(String text, int color) {
+        TextView t = Ui.t(c, text, 11, color, true);
+        Ui.pad(t, 8, 2, 8, 2);
+        t.setBackground(Ui.rr((color & 0x00FFFFFF) | 0x24000000, 0, 10));
+        return t;
+    }
+
+    private View miniBtn(String text, String style, Runnable r) {
+        TextView b = Ui.btn(c, text, style, r);
+        b.setTextSize(13);
+        b.setMinHeight(Ui.dp(40));
+        Ui.pad(b, 8, 6, 8, 6);
+        LinearLayout.LayoutParams p = Ui.weight(1);
+        p.setMargins(Ui.dp(3), Ui.dp(8), Ui.dp(3), 0);
+        b.setLayoutParams(p);
+        return b;
+    }
+
+    @SuppressWarnings("unchecked")
+    void staffSheet() {
+        Ui.Sheet s0 = open("કર્મચારીઓ (સ્ટાફ)");
+        s0.add(Ui.t(c, "લોડ થઈ રહ્યું છે...", 15, Ui.MUTED, false));
+        s0.show();
+        callAsync("mh_staff_list", Api.args("p_tok", a.sync.token), new java.util.function.Consumer<Map<String, Object>>() {
+            @Override public void accept(Map<String, Object> r) {
+                if (!Api.ok(r)) { close(); a.toast(srvErr(r)); return; }
+                renderStaff((List<Object>) r.get("rows"));
+            }
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private void renderStaff(List<Object> rows) {
+        Ui.Sheet s = open("કર્મચારીઓ (સ્ટાફ)");
+        TextView info = Ui.t(c, "કર્મચારી પોતાના નંબર અને તમે આપેલા OTP થી લૉગિન કરશે અને તમારા જ ખાતામાં નોંધ કરશે. કર્મચારી નોંધ કાઢી શકશે નહીં.", 12, Ui.MUTED, false);
+        Ui.pad(info, 4, 0, 4, 8);
+        s.add(info);
+        LinearLayout list = Ui.v(c);
+        if (rows.isEmpty()) {
+            TextView e = Ui.t(c, "હજી કોઈ કર્મચારી નથી.", 14, Ui.MUTED, false);
+            e.setGravity(Gravity.CENTER);
+            Ui.pad(e, 10, 10, 10, 10);
+            list.addView(e);
+        }
+        for (Object ro : rows) {
+            final Map<String, Object> m = (Map<String, Object>) ro;
+            final String id = Api.s(m, "id"), nm = Api.s(m, "name"), ph = Api.s(m, "phone");
+            final boolean blocked = Api.s(m, "status").equals("blocked");
+            LinearLayout box = Ui.v(c);
+            box.setBackground(Ui.rr(Ui.SURFACE2, 0, 14));
+            Ui.pad(box, 12, 10, 12, 10);
+            LinearLayout.LayoutParams bp = Ui.fillW();
+            bp.setMargins(0, Ui.dp(4), 0, Ui.dp(4));
+            box.setLayoutParams(bp);
+            LinearLayout top = Ui.h(c);
+            top.addView(Ui.t(c, nm, 16, Ui.TEXT, true), Ui.weight(1));
+            if (blocked) top.addView(pill("બ્લોક", Ui.RED));
+            else if (Boolean.TRUE.equals(m.get("otp_req"))) top.addView(pill("OTP માંગ્યો", Ui.AMBER));
+            box.addView(top);
+            box.addView(Ui.t(c, ph, 12, Ui.MUTED, false));
+            LinearLayout br = Ui.h(c);
+            br.addView(miniBtn("OTP બનાવો", "primary", new Runnable() {
+                @Override public void run() {
+                    callAsync("mh_staff_otp", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
+                        @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(nm, ph, Api.s(r, "otp")); else a.toast(srvErr(r)); }
+                    });
+                }
+            }));
+            br.addView(miniBtn(blocked ? "ચાલુ કરો" : "બ્લોક", "ghost", new Runnable() {
+                @Override public void run() {
+                    callAsync("mh_staff_set", Api.args("p_tok", a.sync.token, "p_id", id, "p_action", blocked ? "unblock" : "block"), new java.util.function.Consumer<Map<String, Object>>() {
+                        @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) staffSheet(); else a.toast(srvErr(r)); }
+                    });
+                }
+            }));
+            br.addView(miniBtn("કાઢો", "danger", new Runnable() {
+                @Override public void run() {
+                    confirm(nm + " ને કાઢી નાખવા છે?", "હા, કાઢો", new Runnable() {
+                        @Override public void run() {
+                            callAsync("mh_staff_set", Api.args("p_tok", a.sync.token, "p_id", id, "p_action", "remove"), new java.util.function.Consumer<Map<String, Object>>() {
+                                @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) staffSheet(); else a.toast(srvErr(r)); }
+                            });
+                        }
+                    });
+                }
+            }));
+            box.addView(br);
+            list.addView(box);
+        }
+        s.add(scrollBox(list, 260));
+        s.add(Ui.label(c, "નવો કર્મચારી ઉમેરો"));
+        final EditText nm = Ui.fld(c, "કર્મચારીનું નામ", "", Ui.IN_TEXT);
+        final EditText ph = Ui.fld(c, "મોબાઇલ નંબર", "", Ui.IN_PHONE);
+        s.add(nm);
+        s.add(ph);
+        s.add(Ui.btn(c, "ઉમેરો અને OTP બનાવો", "primary", new Runnable() {
+            @Override public void run() {
+                final String n = nm.getText().toString().trim(), p = ph.getText().toString().trim();
+                callAsync("mh_staff_add", Api.args("p_tok", a.sync.token, "p_name", n, "p_phone", p), new java.util.function.Consumer<Map<String, Object>>() {
+                    @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(n, Api.s(r, "phone"), Api.s(r, "otp")); else a.toast(srvErr(r)); }
+                });
+            }
+        }));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    private String adminTab = "req";
+
+    @SuppressWarnings("unchecked")
+    void adminSheet() {
+        Ui.Sheet s0 = open("એડમિન પેનલ");
+        s0.add(Ui.t(c, "લોડ થઈ રહ્યું છે...", 15, Ui.MUTED, false));
+        s0.show();
+        final boolean req = adminTab.equals("req");
+        callAsync(req ? "mh_admin_requests" : "mh_admin_owners", Api.args("p_tok", a.sync.token), new java.util.function.Consumer<Map<String, Object>>() {
+            @Override public void accept(Map<String, Object> r) {
+                if (!Api.ok(r)) { close(); a.toast(srvErr(r)); return; }
+                renderAdmin((List<Object>) r.get("rows"));
+            }
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private void renderAdmin(List<Object> rows) {
+        Ui.Sheet s = open("એડમિન પેનલ");
+        s.add(seg(new String[][]{{"req", "નવી વિનંતિઓ"}, {"own", "માલિકો"}}, adminTab, new java.util.function.Consumer<String>() {
+            @Override public void accept(String v) { adminTab = v; adminSheet(); }
+        }));
+        LinearLayout list = Ui.v(c);
+        if (rows.isEmpty()) {
+            TextView e = Ui.t(c, adminTab.equals("req") ? "કોઈ નવી વિનંતિ નથી." : "હજી કોઈ માલિક નથી.", 14, Ui.MUTED, false);
+            e.setGravity(Gravity.CENTER);
+            Ui.pad(e, 10, 14, 10, 14);
+            list.addView(e);
+        }
+        for (Object ro : rows) {
+            final Map<String, Object> m = (Map<String, Object>) ro;
+            final String id = Api.s(m, "id"), nm = Api.s(m, "name"), ph = Api.s(m, "phone");
+            LinearLayout box = Ui.v(c);
+            box.setBackground(Ui.rr(Ui.SURFACE2, 0, 14));
+            Ui.pad(box, 12, 10, 12, 10);
+            LinearLayout.LayoutParams bp = Ui.fillW();
+            bp.setMargins(0, Ui.dp(4), 0, Ui.dp(4));
+            box.setLayoutParams(bp);
+            LinearLayout top = Ui.h(c);
+            top.addView(Ui.t(c, nm, 16, Ui.TEXT, true), Ui.weight(1));
+            LinearLayout br = Ui.h(c);
+            if (adminTab.equals("req")) {
+                box.addView(top);
+                box.addView(Ui.t(c, ph + (Api.s(m, "shop").isEmpty() ? "" : " · " + Api.s(m, "shop")), 12, Ui.MUTED, false));
+                br.addView(miniBtn("મંજૂર + OTP", "primary", new Runnable() {
+                    @Override public void run() {
+                        callAsync("mh_admin_approve", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
+                            @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(nm, ph, Api.s(r, "otp")); else a.toast(srvErr(r)); }
+                        });
+                    }
+                }));
+                br.addView(miniBtn("નામંજૂર", "danger", new Runnable() {
+                    @Override public void run() {
+                        callAsync("mh_admin_reject", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
+                            @Override public void accept(Map<String, Object> r) { adminSheet(); }
+                        });
+                    }
+                }));
+            } else {
+                final boolean blocked = Api.s(m, "status").equals("blocked");
+                final boolean self = Boolean.TRUE.equals(m.get("is_admin"));
+                if (blocked) top.addView(pill("બ્લોક", Ui.RED));
+                else if (Boolean.TRUE.equals(m.get("otp_req"))) top.addView(pill("OTP માંગ્યો", Ui.AMBER));
+                else if (self) top.addView(pill("એડમિન", Ui.GREEN));
+                box.addView(top);
+                box.addView(Ui.t(c, ph + " · " + Api.s(m, "biz"), 12, Ui.MUTED, false));
+                box.addView(Ui.t(c, "કર્મચારી: " + Api.s(m, "staff") + " · નોંધ: " + Api.s(m, "records"), 12, Ui.MUTED, false));
+                br.addView(miniBtn("OTP બનાવો", "primary", new Runnable() {
+                    @Override public void run() {
+                        callAsync("mh_admin_otp", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
+                            @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(nm, ph, Api.s(r, "otp")); else a.toast(srvErr(r)); }
+                        });
+                    }
+                }));
+                if (!self) br.addView(miniBtn(blocked ? "ચાલુ કરો" : "બ્લોક", blocked ? "ghost" : "danger", new Runnable() {
+                    @Override public void run() {
+                        callAsync("mh_admin_block", Api.args("p_tok", a.sync.token, "p_id", id, "p_block", !blocked), new java.util.function.Consumer<Map<String, Object>>() {
+                            @Override public void accept(Map<String, Object> r) { adminSheet(); }
+                        });
+                    }
+                }));
+            }
+            box.addView(br);
+            list.addView(box);
+        }
+        s.add(scrollBox(list, 340));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
     }
 }

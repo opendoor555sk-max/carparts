@@ -11,7 +11,10 @@ import android.graphics.Color;
 import android.hardware.biometrics.BiometricManager;
 import android.hardware.biometrics.BiometricPrompt;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.CancellationSignal;
 import android.provider.MediaStore;
 import android.speech.RecognitionListener;
@@ -43,6 +46,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 
 public class MainActivity extends Activity {
@@ -57,6 +61,15 @@ public class MainActivity extends Activity {
     Screens screens;
     String tab = "home", partyId = null, sub = null, period = "day", day, month, filter = "all", fparty = "";
     String kq = "", kf = "all", sort = "bal", rday, rmonth, rkind = "all", rparty = "", drange = "month", rhome = "a", balMode = "full", setOpen = "";
+
+    Sync sync;
+    private View loginView;
+    private String lgName = "", lgPhone = "", lgShop = "", lgMsg = "", lgWa = "", lgOtp = "";
+    private final Handler pollH = new Handler(Looper.getMainLooper());
+    private final Runnable poll = new Runnable() {
+        @Override public void run() { sync.run(null); pollH.postDelayed(this, 30000); }
+    };
+    private long lastUpdCheck = 0;
 
     private FrameLayout root;
     private ScrollView scroll;
@@ -89,6 +102,8 @@ public class MainActivity extends Activity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         day = Fmt.today(); month = day.substring(0, 7); rday = day; rmonth = month;
         loadData();
+        Api.load(this);
+        sync = new Sync(this);
         if (!db.settings.setupDone && (!db.parties.isEmpty() || !db.txns.isEmpty() || !db.settings.owner.isEmpty() || !db.settings.pinHash.isEmpty())) {
             db.settings.setupDone = true; // existing user: no first-run wizard
             save();
@@ -256,6 +271,11 @@ public class MainActivity extends Activity {
     }
 
     void save() {
+        saveLocalOnly();
+        if (sync != null) sync.kick();
+    }
+
+    void saveLocalOnly() {
         db.saved = System.currentTimeMillis();
         try {
             File t = new File(getFilesDir(), "data.json.tmp");
@@ -329,7 +349,8 @@ public class MainActivity extends Activity {
         lockView = null;
         setupView = null;
         render();
-        if (!db.settings.setupDone) showSetup(0);
+        loginView = null;
+        if (needLogin()) showLogin(); else if (!db.settings.setupDone) showSetup(0);
         if (!db.settings.pinHash.isEmpty() && !unlocked) showPin("unlock", null);
     }
 
@@ -392,12 +413,18 @@ public class MainActivity extends Activity {
     protected void onStop() {
         stoppedAt = System.currentTimeMillis();
         stopListen();
+        pollH.removeCallbacks(poll);
         super.onStop();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
+        if (sync != null && sync.loggedIn()) { pollH.removeCallbacks(poll); pollH.postDelayed(poll, 1200); }
+        if (System.currentTimeMillis() - lastUpdCheck > 6L * 3600000L && loginView == null && lockView == null) {
+            lastUpdCheck = System.currentTimeMillis();
+            Updater.check(this, true);
+        }
         if (stoppedAt > 0 && !db.settings.pinHash.isEmpty() && lockView == null && System.currentTimeMillis() - stoppedAt > 30000) {
             sheets.close();
             unlocked = false;
@@ -589,37 +616,8 @@ public class MainActivity extends Activity {
         super.onActivityResult(req, res, data);
     }
 
-    // ================= update check (via GitHub) =================
-    void checkUpdate() {
-        toast("તપાસી રહ્યા છીએ...");
-        new Thread(new Runnable() {
-            @Override public void run() {
-                try {
-                    final String repo = new String(readAll(getAssets().open("repo.txt")), StandardCharsets.UTF_8).trim();
-                    if (repo.isEmpty() || repo.equals("placeholder")) throw new Exception("no repo");
-                    final String base = "https://github.com/" + repo + "/releases/download/mera-latest/";
-                    HttpURLConnection c = (HttpURLConnection) new URL(base + "version.txt?t=" + System.currentTimeMillis()).openConnection();
-                    c.setConnectTimeout(10000);
-                    c.setReadTimeout(15000);
-                    c.setUseCaches(false);
-                    c.setInstanceFollowRedirects(true);
-                    if (c.getResponseCode() != 200) throw new Exception("http");
-                    String s = new String(readAll(c.getInputStream()), StandardCharsets.UTF_8).trim();
-                    c.disconnect();
-                    final long remote = Long.parseLong(s);
-                    runOnUiThread(new Runnable() {
-                        @Override public void run() {
-                            if (remote > versionCode()) {
-                                sheets.confirm("નવું વર્ઝન મળ્યું છે. હમણાં ડાઉનલોડ કરવું છે?", "હા, ડાઉનલોડ કરો", new Runnable() { @Override public void run() { openUrl(base + "Mera-Hisab.apk"); } });
-                            } else toast("તમારી એપ નવીનતમ છે");
-                        }
-                    });
-                } catch (Exception e) {
-                    runOnUiThread(new Runnable() { @Override public void run() { toast("અપડેટ ચકાસી શકાયું નહીં, ઇન્ટરનેટ તપાસો"); } });
-                }
-            }
-        }).start();
-    }
+    // ================= update (download + install inside the app) =================
+    void checkUpdate() { Updater.check(this, false); }
 
     // ================= text to speech =================
     void speak(String text) {
@@ -925,5 +923,194 @@ public class MainActivity extends Activity {
         unlocked = true;
         toast("પિન સેટ થઈ ગયો");
         if (d != null) d.run(); else render();
+    }
+
+    // ================= login / logout =================
+    boolean needLogin() { return Api.configured() && !sync.loggedIn(); }
+    boolean isStaff() { return sync != null && sync.isStaff(); }
+    String who() { return sync != null && sync.loggedIn() ? sync.name : db.settings.owner; }
+
+    private void closeLogin() {
+        if (loginView != null) { root.removeView(loginView); loginView = null; }
+    }
+
+    void wipeLocal() {
+        db.parties = new ArrayList<>(); db.txns = new ArrayList<>(); db.products = new ArrayList<>(); db.review = new ArrayList<>();
+        db.remLog = new ArrayList<>(); db.vlog = new ArrayList<>(); db.learn = new ArrayList<>();
+        Model.Settings o = db.settings, n = new Model.Settings();
+        n.lang = o.lang; n.theme = o.theme; n.pinHash = o.pinHash; n.bio = o.bio; n.deviceId = o.deviceId; n.speak = o.speak;
+        db.settings = n;
+        saveLocalOnly();
+    }
+
+    private String loginErr(String e) {
+        switch (e) {
+            case "phone": return "૧૦ અંકનો સાચો મોબાઇલ નંબર લખો";
+            case "name": return "તમારું નામ લખો";
+            case "blocked": return "તમારો એક્સેસ બંધ છે. એડમિનનો સંપર્ક કરો";
+            case "wrong": return "OTP ખોટો છે, ફરી લખો";
+            case "nootp": return "હજી OTP બન્યો નથી. પહેલાં “OTP માંગો” દબાવો";
+            case "locked": return "ઘણી ખોટી કોશિશ થઈ. નવો OTP માંગો";
+            case "noaccess": return "આ નંબરને એક્સેસ નથી. પહેલાં “OTP માંગો” દબાવો";
+            case "net": return "ઇન્ટરનેટ ચાલુ કરો";
+            default: return "કંઈક ગડબડ થઈ, ફરી પ્રયત્ન કરો";
+        }
+    }
+
+    void showLogin() {
+        closeLogin();
+        I18n.set(db.settings.lang);
+        final LinearLayout l = Ui.v(this);
+        l.setBackgroundColor(Ui.BG);
+        l.setClickable(true);
+        setupHero(l, "Mera Hisab", "લૉગિન કરો", null);
+        LinearLayout lr = Ui.h(this);
+        Ui.pad(lr, 14, 0, 14, 4);
+        final String[][] langs = {{"gu-IN", "ગુજરાતી"}, {"hi-IN", "हिन्दी"}, {"en-IN", "English"}};
+        for (final String[] g : langs) {
+            lr.addView(Ui.chip(this, g[1], g[0].equals(db.settings.lang), new Runnable() {
+                @Override public void run() { db.settings.lang = g[0]; I18n.set(g[0]); saveLocalOnly(); showLogin(); }
+            }));
+        }
+        l.addView(lr);
+        final EditText nm = Ui.fld(this, "તમારું નામ", lgName, Ui.IN_TEXT);
+        final EditText ph = Ui.fld(this, "મોબાઇલ નંબર", lgPhone, Ui.IN_PHONE);
+        final EditText sh = Ui.fld(this, "દુકાન / ધંધાનું નામ (નવા ખાતા માટે)", lgShop, Ui.IN_TEXT);
+        final EditText otp = Ui.fld(this, "OTP", lgOtp, Ui.IN_NUM);
+        for (EditText e : new EditText[]{nm, ph, sh, otp}) {
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) e.getLayoutParams();
+            lp.setMargins(Ui.dp(14), Ui.dp(6), Ui.dp(14), 0);
+        }
+        l.addView(nm); l.addView(ph); l.addView(sh);
+        l.addView(Ui.btn(this, "OTP માંગો", "primary", new Runnable() {
+            @Override public void run() {
+                lgName = nm.getText().toString().trim(); lgPhone = ph.getText().toString().trim(); lgShop = sh.getText().toString().trim();
+                lgOtp = otp.getText().toString().trim();
+                lgMsg = "મોકલી રહ્યા છીએ..."; showLogin();
+                final Map<String, Object> q = Api.args("p_name", lgName, "p_phone", lgPhone, "p_shop", lgShop);
+                new Thread(new Runnable() {
+                    @Override public void run() {
+                        final Map<String, Object> r = Api.call("mh_request", q);
+                        runOnUiThread(new Runnable() {
+                            @Override public void run() {
+                                if (!Api.ok(r)) { lgMsg = loginErr(Api.s(r, "err")); lgWa = ""; showLogin(); return; }
+                                String to;
+                                if (Api.s(r, "status").equals("pending")) {
+                                    lgMsg = "તમારી વિનંતિ એડમિનને મોકલાઈ. એડમિન OTP આપે ત્યારે નીચે લખીને લૉગિન કરો.";
+                                    to = Api.s(r, "admin_phone");
+                                } else if (Api.s(r, "role").equals("staff")) {
+                                    lgMsg = "તમારા માલિક પાસેથી OTP લો અને નીચે લખીને લૉગિન કરો.";
+                                    to = Api.s(r, "owner_phone");
+                                } else {
+                                    lgMsg = "એડમિન પાસેથી OTP લો અને નીચે લખીને લૉગિન કરો.";
+                                    to = Api.s(r, "admin_phone");
+                                }
+                                lgWa = to.isEmpty() ? "" : waLink(to, "Mera Hisab login OTP joiye che.\nNaam: " + lgName + "\nNumber: " + lgPhone);
+                                showLogin();
+                            }
+                        });
+                    }
+                }).start();
+            }
+        }));
+        if (!lgMsg.isEmpty()) {
+            TextView m = Ui.t(this, lgMsg, 14, Ui.TEXT, false);
+            m.setBackground(Ui.rr(Ui.SOFT, Ui.LILAC, 14));
+            Ui.pad(m, 14, 10, 14, 10);
+            LinearLayout.LayoutParams mp = Ui.fillW();
+            mp.setMargins(Ui.dp(14), Ui.dp(10), Ui.dp(14), 0);
+            l.addView(m, mp);
+        }
+        if (!lgWa.isEmpty()) {
+            l.addView(Ui.btn(this, "WhatsApp પર OTP માટે મેસેજ કરો", "green", new Runnable() { @Override public void run() { openUrl(lgWa); } }));
+        }
+        l.addView(Ui.label(this, "OTP"));
+        l.addView(otp);
+        l.addView(Ui.btn(this, "લૉગિન કરો", "primary", new Runnable() {
+            @Override public void run() {
+                lgName = nm.getText().toString().trim(); lgPhone = ph.getText().toString().trim(); lgShop = sh.getText().toString().trim();
+                lgOtp = otp.getText().toString().trim();
+                if (lgPhone.isEmpty() || lgOtp.isEmpty()) { toast("નંબર અને OTP લખો"); return; }
+                lgMsg = "લૉગિન થઈ રહ્યું છે..."; showLogin();
+                final Map<String, Object> q = Api.args("p_phone", lgPhone, "p_otp", lgOtp, "p_device", Build.MODEL == null ? "" : Build.MODEL);
+                new Thread(new Runnable() {
+                    @Override public void run() {
+                        final Map<String, Object> r = Api.call("mh_login", q);
+                        runOnUiThread(new Runnable() {
+                            @Override public void run() {
+                                if (!Api.ok(r)) { lgMsg = loginErr(Api.s(r, "err")); showLogin(); return; }
+                                String prev = sync.bizId;
+                                sync.setSession(r);
+                                if (sync.isStaff() || (!prev.isEmpty() && !prev.equals(sync.bizId))) wipeLocal();
+                                lgOtp = ""; lgMsg = ""; lgWa = "";
+                                afterLogin();
+                            }
+                        });
+                    }
+                }).start();
+            }
+        }));
+        TextView sv = Ui.t(this, "⚙  સર્વર સેટઅપ", 13, Ui.MUTED, true);
+        sv.setGravity(Gravity.CENTER);
+        Ui.pad(sv, 10, 18, 10, 18);
+        Ui.tap(sv, new Runnable() { @Override public void run() { sheets.serverSheet(); } });
+        l.addView(sv);
+        ScrollView scv = new ScrollView(this);
+        scv.addView(l);
+        loginView = scv;
+        root.addView(scv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        if (lockView != null) { root.removeView(lockView); root.addView(lockView); }
+    }
+
+    /** After a good login: bring the business data down (and push this phone's old data if it is the owner's), then continue. */
+    void afterLogin() {
+        toast("ડેટા સિંક થઈ રહ્યો છે...");
+        sync.run(new Sync.Done() {
+            @Override public void done(boolean ok, String err) {
+                Model.Settings st = db.settings;
+                if (!st.setupDone) {
+                    if (sync.isStaff()) { st.setupDone = true; st.owner = sync.name; }
+                    else if (!db.parties.isEmpty() || !db.txns.isEmpty() || !st.shop.isEmpty()) st.setupDone = true;
+                    else { st.owner = sync.name; if (!sync.bizName.endsWith(" ni dukan")) st.shop = sync.bizName; }
+                }
+                if (st.owner.isEmpty()) st.owner = sync.name;
+                save();
+                rebuild();
+                if (!ok) toast("સિંક ન થયું, ઇન્ટરનેટ તપાસો");
+            }
+        });
+    }
+
+    void onSessionExpired() {
+        sync.clear();
+        wipeLocal();
+        lgMsg = "તમારું સેશન પૂરું થયું અથવા એક્સેસ બંધ છે. ફરી લૉગિન કરો";
+        rebuild();
+    }
+
+    void logout() {
+        sheets.confirm("લૉગઆઉટ કરવું છે? આ ફોનમાંથી ડેટા દૂર થશે (સર્વર પર સુરક્ષિત રહેશે).", "હા, લૉગઆઉટ", new Runnable() {
+            @Override public void run() {
+                toast("સિંક થઈ રહ્યું છે...");
+                sync.run(new Sync.Done() {
+                    @Override public void done(boolean ok, String err) {
+                        if (!ok && !"auth".equals(err)) {
+                            sheets.confirm("ઇન્ટરનેટ નથી. છેલ્લા ફેરફારો સર્વર પર નથી પહોંચ્યા. તો પણ લૉગઆઉટ કરવું છે?", "હા, તો પણ", new Runnable() { @Override public void run() { finishLogout(); } });
+                            return;
+                        }
+                        if (ok) finishLogout();
+                    }
+                });
+            }
+        });
+    }
+
+    private void finishLogout() {
+        final String tok = sync.token;
+        new Thread(new Runnable() { @Override public void run() { Api.call("mh_logout", Api.args("p_tok", tok)); } }).start();
+        sync.clear();
+        wipeLocal();
+        lgMsg = ""; lgWa = "";
+        rebuild();
     }
 }

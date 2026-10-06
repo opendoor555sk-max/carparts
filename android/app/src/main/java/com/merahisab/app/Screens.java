@@ -1132,15 +1132,34 @@ final class Screens {
 
         List<View> bk = new ArrayList<>();
         bk.add(srowT("☁", Color.parseColor("#2196F3"), "ડેટા બેકઅપ", a.backupTimeText(), a.backupFresh() ? "✔" : null, null, new Runnable() { @Override public void run() { sh.backupSheet(); } }));
-        bk.add(srowT("⬆", GREEN, "બેકઅપ પાછું લાવો", "પહેલાં સેવ કરેલી ફાઇલ પસંદ કરો", null, null, new Runnable() { @Override public void run() { a.pickRestoreFile(); } }));
+        if (!a.isStaff()) bk.add(srowT("⬆", GREEN, "બેકઅપ પાછું લાવો", "પહેલાં સેવ કરેલી ફાઇલ પસંદ કરો", null, null, new Runnable() { @Override public void run() { a.pickRestoreFile(); } }));
         bk.add(srowT("⬇", ORANGE, "એપ અપડેટ ચકાસો", "નવા વર્ઝન માટે તપાસો", null, null, new Runnable() { @Override public void run() { a.checkUpdate(); } }));
+
+        List<View> accn = new ArrayList<>();
+        final boolean on = a.sync.loggedIn();
+        if (on) {
+            accn.add(srowT("👤", BLUE, a.sync.name, (a.sync.isAdmin() ? "એડમિન · " : (a.sync.isStaff() ? "કર્મચારી · " : "માલિક · ")) + a.sync.bizName + " · " + a.sync.phone, null, null, new Runnable() { @Override public void run() { } }));
+            accn.add(srowT("⟳", GREEN, "હમણાં સિંક કરો", a.sync.lastOk == 0 ? "હજી સિંક થયું નથી" : "છેલ્લું સિંક: " + a.sync.lastText(), null, null, new Runnable() {
+                @Override public void run() {
+                    a.toast("સિંક થઈ રહ્યું છે...");
+                    a.sync.run(new Sync.Done() { @Override public void done(boolean ok, String err) { a.toast(ok ? "સિંક થઈ ગયું" : "સિંક ન થયું, ઇન્ટરનેટ તપાસો"); a.render(); } });
+                }
+            }));
+            if (!a.sync.isStaff()) accn.add(srowT("👥", ORANGE, "કર્મચારીઓ (સ્ટાફ)", "ઉમેરો, OTP આપો, બ્લોક કરો", null, null, new Runnable() { @Override public void run() { sh.staffSheet(); } }));
+            if (a.sync.isAdmin()) accn.add(srowT("🛠", PINK, "એડમિન પેનલ", "નવી વિનંતિઓ, માલિકો અને OTP", null, null, new Runnable() { @Override public void run() { sh.adminSheet(); } }));
+            accn.add(srowT("⏻", Color.parseColor("#E11D48"), "લૉગઆઉટ", "આ ફોનમાંથી બહાર નીકળો", null, null, new Runnable() { @Override public void run() { a.logout(); } }));
+        } else {
+            accn.add(srowT("☁", BLUE, "સર્વર સેટઅપ", Api.configured() ? "સર્વર જોડાયેલ ✔" : "સ્ટાફ લૉગિન માટે સર્વર જોડો", null, null, new Runnable() { @Override public void run() { sh.serverSheet(); } }));
+            if (Api.configured()) accn.add(srowT("→", GREEN, "લૉગિન કરો", "સર્વર સાથે જોડાઓ", null, null, new Runnable() { @Override public void run() { a.rebuild(); } }));
+        }
 
         List<View> sup = new ArrayList<>();
         sup.add(srowT("?", PURP, "FAQs", "વારંવાર પૂછાતા પ્રશ્નો", null, null, new Runnable() { @Override public void run() { sh.faqSheet(); } }));
         sup.add(srowT("!", ORANGE, "એપ પ્રતિસાદ", "તમારા સૂચનો શેર કરો અથવા ભૂલ અહેવાલ કરો", null, null, new Runnable() { @Override public void run() { sh.feedbackSheet(); } }));
         sup.add(srowT("🛡", GREY, "પ્રાઈવસી પોલીસી", "ડેટા વપરાશ અને સુરક્ષા માર્ગદર્શિકા", null, null, new Runnable() { @Override public void run() { sh.privacySheet(); } }));
 
-        root.addView(acc("biz", "▣", "વ્યવસાય વ્યવસ્થાપન", "દુકાન, પ્રોફાઇલ અને સેટઅપ", biz, BLUE));
+        root.addView(acc("acct", "👤", "એકાઉન્ટ અને સ્ટાફ", on ? a.sync.name + " · " + a.sync.bizName : "લૉગિન, સ્ટાફ અને સર્વર", accn, Color.parseColor("#E11D48")));
+        if (!a.isStaff()) root.addView(acc("biz", "▣", "વ્યવસાય વ્યવસ્થાપન", "દુકાન, પ્રોફાઇલ અને સેટઅપ", biz, BLUE));
         root.addView(acc("app", "⚙", "એપ્લિકેશન", "ભાષા, થીમ અને એન્ટ્રી ઓપ્શન્સ", app, PURP));
         root.addView(acc("svc", "🧾", "સર્વિસિસ અને બિલિંગ", "વૉઇસ સેટિંગ્સ, ટેસ્ટ અને શીખેલું", svc, Color.parseColor("#16A34A")));
         root.addView(acc("sec", "🛡", "સુરક્ષા", "એપ PIN અને બાયોમેટ્રિક સિક્યુરિટી", sec, Color.parseColor("#D97706")));
@@ -1164,8 +1183,8 @@ final class Screens {
                 });
             }
         });
-        root.addView(wipe);
-        TextView n1 = Ui.t(c, "ડેટા ફક્ત આ ફોનમાં સેવ થાય છે. ફોન બદલતા પહેલાં બેકઅપ લઈ લો.", 12, Ui.MUTED, false);
+        if (!a.isStaff()) root.addView(wipe);
+        TextView n1 = Ui.t(c, on ? "ડેટા સર્વર પર પણ સુરક્ષિત સેવ થાય છે. સ્ટાફની નોંધ પણ આ જ ખાતામાં આવે છે." : "ડેટા ફક્ત આ ફોનમાં સેવ થાય છે. ફોન બદલતા પહેલાં બેકઅપ લઈ લો.", 12, Ui.MUTED, false);
         n1.setGravity(Gravity.CENTER);
         Ui.pad(n1, 24, 10, 24, 2);
         root.addView(n1);
