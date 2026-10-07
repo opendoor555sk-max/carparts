@@ -356,3 +356,6 @@ begin
   end if;
 end $$;
 notify pgrst, 'reload schema';
+
+-- ===== LAST STEP: makes YOUR admin login. The result below shows your OTP =====
+select mh.make_admin('9773041676','AbdulSalam') as your_otp;
