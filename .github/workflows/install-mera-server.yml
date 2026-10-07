@@ -1,0 +1,27 @@
+name: Install Mera Hisab server
+on:
+  workflow_dispatch:
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: mera-hisab
+      - name: Run SQL on Supabase
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -e
+          [ -n "$TOKEN" ] || { echo "SECRET MISSING: SUPABASE_ACCESS_TOKEN"; exit 1; }
+          sed '/^select mh.make_admin(/d' server/mera-hisab-server.sql > /tmp/s.sql
+          python3 -c "import json;print(json.dumps({'query':open('/tmp/s.sql').read()}))" > /tmp/body.json
+          code=$(curl -s -o /tmp/out.txt -w '%{http_code}' -X POST \
+            "https://api.supabase.com/v1/projects/tizxwghqcxsqfohtgwlx/database/query" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            --data @/tmp/body.json)
+          echo "HTTP $code"; head -c 600 /tmp/out.txt; echo
+          [ "$code" = "200" ] || [ "$code" = "201" ] || exit 1
+          python3 -c "import json;print(json.dumps({'query':\"select count(*) as functions from pg_proc where proname like 'mh_%'\"}))" > /tmp/b2.json
+          curl -s -X POST "https://api.supabase.com/v1/projects/tizxwghqcxsqfohtgwlx/database/query" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data @/tmp/b2.json; echo
