@@ -83,9 +83,20 @@ final class Api {
             ByteArrayOutputStream bo = new ByteArrayOutputStream();
             byte[] b = new byte[8192]; int n;
             while (in != null && (n = in.read(b)) > 0) bo.write(b, 0, n);
-            Object r = Json.parse(new String(bo.toByteArray(), StandardCharsets.UTF_8));
+            Object r;
+            try { r = Json.parse(new String(bo.toByteArray(), StandardCharsets.UTF_8)); } catch (Exception pe) { r = null; }
             if (code < 400 && r instanceof Map) return (Map<String, Object>) r;
             bad.put("err", "server");
+            String d = "HTTP " + code;
+            if (r instanceof Map) {
+                Map<String, Object> em = (Map<String, Object>) r;
+                String m = s(em, "message");
+                if (m.isEmpty()) m = s(em, "error_description");
+                if (m.isEmpty()) m = s(em, "error");
+                if (m.length() > 120) m = m.substring(0, 120);
+                if (!m.isEmpty()) d += ": " + m;
+            }
+            bad.put("detail", d);
             return bad;
         } catch (Exception e) {
             return bad;

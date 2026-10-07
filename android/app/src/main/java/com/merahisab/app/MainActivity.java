@@ -998,7 +998,7 @@ public class MainActivity extends Activity {
                         runOnUiThread(new Runnable() {
                             @Override public void run() {
                                 lgBusy = "";
-                                if (!Api.ok(r)) { lgMsg = loginErr(Api.s(r, "err")); lgWa = ""; showLogin(); return; }
+                                if (!Api.ok(r)) { lgMsg = loginErr(Api.s(r, "err")) + (Api.s(r, "detail").isEmpty() ? "" : "\n(" + Api.s(r, "detail") + ")"); lgWa = ""; showLogin(); return; }
                                 lgReqDone = true;
                                 String to;
                                 if (Api.s(r, "status").equals("pending")) {
@@ -1047,7 +1047,7 @@ public class MainActivity extends Activity {
                         runOnUiThread(new Runnable() {
                             @Override public void run() {
                                 lgBusy = "";
-                                if (!Api.ok(r)) { lgMsg = loginErr(Api.s(r, "err")); showLogin(); return; }
+                                if (!Api.ok(r)) { lgMsg = loginErr(Api.s(r, "err")) + (Api.s(r, "detail").isEmpty() ? "" : "\n(" + Api.s(r, "detail") + ")"); showLogin(); return; }
                                 lgReqDone = false;
                                 String prev = sync.bizId;
                                 sync.setSession(r);
@@ -1066,6 +1066,8 @@ public class MainActivity extends Activity {
         Ui.tap(sv, new Runnable() { @Override public void run() { sheets.serverSheet(); } });
         l.addView(sv);
         ScrollView scv = new ScrollView(this);
+        scv.setBackgroundColor(Ui.BG);
+        scv.setFillViewport(true);
         scv.addView(l);
         loginView = scv;
         root.addView(scv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
