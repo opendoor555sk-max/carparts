@@ -928,7 +928,9 @@ public class MainActivity extends Activity {
     }
 
     // ================= login / logout =================
-    boolean needLogin() { return Api.configured() && !sync.loggedIn(); }
+    boolean skipLogin() { return getSharedPreferences("mh", MODE_PRIVATE).getBoolean("skipLogin", false); }
+    void setSkipLogin(boolean v) { getSharedPreferences("mh", MODE_PRIVATE).edit().putBoolean("skipLogin", v).apply(); }
+    boolean needLogin() { return Api.configured() && !sync.loggedIn() && !skipLogin(); }
     boolean isStaff() { return sync != null && sync.isStaff(); }
     String who() { return sync != null && sync.loggedIn() ? sync.name : db.settings.owner; }
 
@@ -1060,6 +1062,7 @@ public class MainActivity extends Activity {
                 }).start();
             }
         }));
+        l.addView(Ui.btn(this, "હમણાં લૉગિન વગર વાપરો", "ghost", new Runnable() { @Override public void run() { setSkipLogin(true); rebuild(); } }));
         TextView sv = Ui.t(this, "⚙  સર્વર સેટઅપ", 13, Ui.MUTED, true);
         sv.setGravity(Gravity.CENTER);
         Ui.pad(sv, 10, 18, 10, 18);

@@ -1150,7 +1150,7 @@ final class Screens {
             accn.add(srowT("⏻", Color.parseColor("#E11D48"), "લૉગઆઉટ", "આ ફોનમાંથી બહાર નીકળો", null, null, new Runnable() { @Override public void run() { a.logout(); } }));
         } else {
             accn.add(srowT("☁", BLUE, "સર્વર સેટઅપ", Api.configured() ? "સર્વર જોડાયેલ ✔" : "સ્ટાફ લૉગિન માટે સર્વર જોડો", null, null, new Runnable() { @Override public void run() { sh.serverSheet(); } }));
-            if (Api.configured()) accn.add(srowT("→", GREEN, "લૉગિન કરો", "સર્વર સાથે જોડાઓ", null, null, new Runnable() { @Override public void run() { a.rebuild(); } }));
+            if (Api.configured()) accn.add(srowT("→", GREEN, "લૉગિન કરો", "સર્વર સાથે જોડાઓ", null, null, new Runnable() { @Override public void run() { a.setSkipLogin(false); a.rebuild(); } }));
         }
 
         List<View> sup = new ArrayList<>();
