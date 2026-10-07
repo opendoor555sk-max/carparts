@@ -33,7 +33,7 @@ final class Sync {
     private boolean running = false, again = false;
     private final List<Done> waiting = new ArrayList<>();
     String lastErr = "";
-    private final Runnable tick = new Runnable() { @Override public void run() { run(null); } };
+    private final Runnable tick = new Runnable() { @Override public void run() { Sync.this.run(null); } };
 
     Sync(MainActivity a) {
         this.a = a;
