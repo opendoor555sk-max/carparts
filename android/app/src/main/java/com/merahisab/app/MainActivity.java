@@ -83,7 +83,7 @@ public class MainActivity extends Activity {
     private long lastUpdCheck = 0;
 
     private FrameLayout root;
-    private ScrollView scroll;
+    ScrollView scroll;
     private LinearLayout navBar;
     private View lockView, setupView;
     private String setupCat = "";

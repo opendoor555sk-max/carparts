@@ -30,7 +30,7 @@ public final class Ui {
 
     public static void init(Context c) { density = c.getResources().getDisplayMetrics().density; }
 
-    public static final int T1 = Color.parseColor("#14B8A6"), T2 = Color.parseColor("#0F766E");
+    public static final int T1 = Color.parseColor("#14B8A6"), T2 = Color.parseColor("#0F766E"), T3 = Color.parseColor("#0D9488");
 
     public static void setDark(boolean d) {
         dark = d;
