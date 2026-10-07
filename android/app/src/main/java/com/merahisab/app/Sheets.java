@@ -383,7 +383,7 @@ final class Sheets {
         boolean okMode = false;
         for (String m : modes) if (m.equals(f.mode)) okMode = true;
         if (!okMode) f.mode = "cash";
-        final Ui.Sheet s = open(f.pendingId != null ? "રિવ્યુ: વૉઇસ નોંધ" : (f.id != null ? "નોંધમાં ફેરફાર" : "નોંધ ઉમેરો"));
+        final Ui.Sheet s = open(f.pendingId != null ? "રિવ્યુ: અવાજની નોંધ" : (f.id != null ? "નોંધમાં ફેરફાર" : "નોંધ ઉમેરો"));
         fName = null; fNote = null; fQty = null; suggBox = null; fSvc = null; fPaid = null; tvTot = null;
         partNames.clear(); partAmts.clear();
         svcOn = a.db.settings.biz.equals("service") && f.type.equals("gave") && f.id == null;
@@ -718,7 +718,7 @@ final class Sheets {
         a.save();
         close();
         a.render();
-        a.toast("ઇન-રિવ્યુ રદ કર્યું");
+        a.toast("ચકાસવાની યાદી રદ કર્યું");
         if (!a.db.review.isEmpty()) openReview(a.db.review.get(0));
     }
 
@@ -876,7 +876,7 @@ final class Sheets {
         Ui.Sheet s = open(null);
         s.add(srow("રિમાઇન્ડર મોકલો", "ગ્રાહકને બાકી રકમની યાદ અપાવો", null, new Runnable() { @Override public void run() { remSel.clear(); reminderSheet(); } }));
         s.add(srow("રિમાઇન્ડર ઇતિહાસ", "કોને કોને મોકલ્યું", null, new Runnable() { @Override public void run() { reminderHistorySheet(); } }));
-        s.add(srow("વૉઇસ ટેસ્ટ લૉગ", "શું બોલ્યા, એપ શું સમજ્યું", null, new Runnable() { @Override public void run() { voiceLogSheet(); } }));
+        s.add(srow("અવાજ ટેસ્ટ લૉગ", "શું બોલ્યા, એપ શું સમજ્યું", null, new Runnable() { @Override public void run() { voiceLogSheet(); } }));
         s.add(srow("એપે શીખેલું", a.db.learn.size() + " નામ શીખ્યા", null, new Runnable() { @Override public void run() { learnedSheet(); } }));
         s.add(srow("વ્યવસાયનો પ્રકાર", a.db.settings.biz.equals("service") ? "સર્વિસ પ્રોવાઈડર" : "દુકાન / સ્ટોર", null, new Runnable() { @Override public void run() { bizSheet(); } }));
         s.add(srow("સેટિંગ્સ", "થીમ, પિન, બેકઅપ", null, new Runnable() { @Override public void run() { close(); a.go("more"); } }));
@@ -1486,7 +1486,7 @@ final class Sheets {
         }));
         micBtn = Ui.t(c, "🎤", 34, Color.WHITE, true);
         micBtn.setGravity(Gravity.CENTER);
-        micBtn.setBackground(Ui.grad(Color.parseColor("#8B3FE0"), Ui.PURPLE, 44));
+        micBtn.setBackground(Ui.grad(Color.parseColor("#14B8A6"), Ui.PURPLE, 44));
         LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(Ui.dp(88), Ui.dp(88));
         mp.gravity = Gravity.CENTER_HORIZONTAL;
         mp.setMargins(0, Ui.dp(16), 0, Ui.dp(8));
@@ -1524,7 +1524,7 @@ final class Sheets {
     private void micState(boolean on) {
         if (micBtn == null) return;
         micBtn.setText(on ? "■" : "🎤");
-        micBtn.setBackground(on ? Ui.grad(Color.parseColor("#F05252"), Color.parseColor("#C81E1E"), 44) : Ui.grad(Color.parseColor("#8B3FE0"), Ui.PURPLE, 44));
+        micBtn.setBackground(on ? Ui.grad(Color.parseColor("#F05252"), Color.parseColor("#C81E1E"), 44) : Ui.grad(Color.parseColor("#14B8A6"), Ui.PURPLE, 44));
         micBtn.setAlpha(1f);
     }
 
@@ -1581,7 +1581,7 @@ final class Sheets {
             a.save();
             close();
             a.go("home");
-            a.toast("ઇન-રિવ્યુમાં ઉમેર્યું" + (q.amount > 0 ? " · " + Fmt.money(q.amount) : ""));
+            a.toast("ચકાસવાની યાદીમાં ઉમેર્યું" + (q.amount > 0 ? " · " + Fmt.money(q.amount) : ""));
             return;
         }
         if ("query".equals(r.kind)) {
@@ -1652,7 +1652,7 @@ final class Sheets {
         TextView h = Ui.t(c, "તમારા સુધારા પરથી એપ આ નામ શીખ્યું. ખોટું હોય તો ✕ દબાવી કાઢી નાખો.", 13, Ui.MUTED, false);
         Ui.pad(h, 8, 4, 8, 8); s.add(h);
         if (a.db.learn.isEmpty()) {
-            TextView e = Ui.t(c, "હજી કંઈ શીખ્યું નથી. વૉઇસ ટેસ્ટ લૉગમાં ✗ દબાવી સાચું લખો.", 14, Ui.MUTED, false);
+            TextView e = Ui.t(c, "હજી કંઈ શીખ્યું નથી. અવાજ ટેસ્ટ લૉગમાં ✗ દબાવી સાચું લખો.", 14, Ui.MUTED, false);
             e.setGravity(Gravity.CENTER); Ui.pad(e, 10, 24, 10, 24); s.add(e);
         } else {
             LinearLayout box = Ui.v(c);
@@ -1738,11 +1738,11 @@ final class Sheets {
     }
 
     void voiceLogSheet() {
-        Ui.Sheet s = open("વૉઇસ ટેસ્ટ લૉગ");
+        Ui.Sheet s = open("અવાજ ટેસ્ટ લૉગ");
         TextView h = Ui.t(c, "બોલેલું વાક્ય, એપ શું સમજ્યું, અને તમારો ચુકાદો. ખોટું હોય તો ✗ દબાવી સાચું લખો.", 13, Ui.MUTED, false);
         Ui.pad(h, 8, 4, 8, 8); s.add(h);
         if (a.db.vlog.isEmpty()) {
-            TextView e = Ui.t(c, "હજી કોઈ વૉઇસ ટેસ્ટ નથી", 14, Ui.MUTED, false);
+            TextView e = Ui.t(c, "હજી કોઈ અવાજ ટેસ્ટ નથી", 14, Ui.MUTED, false);
             e.setGravity(Gravity.CENTER); Ui.pad(e, 10, 24, 10, 24); s.add(e);
         } else {
             int good = 0, bad = 0;

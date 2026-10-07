@@ -32,7 +32,7 @@ final class Screens {
     TextView ib(String glyph, final Runnable r) {
         TextView b = Ui.t(c, glyph, 20, Ui.TEXT, true);
         b.setGravity(Gravity.CENTER);
-        b.setBackground(Ui.rr(Ui.SURFACE2, 0, 22));
+        b.setBackground(Ui.rr(Ui.SURFACE2, 0, 14));
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(Ui.dp(44), Ui.dp(44));
         p.setMargins(Ui.dp(4), 0, 0, 0);
         b.setLayoutParams(p);
@@ -42,16 +42,23 @@ final class Screens {
 
     View top(String title, String sub, Runnable back, View... right) {
         LinearLayout l = Ui.h(c);
-        l.setBackgroundColor(Ui.TOP);
-        Ui.pad(l, 10, 10, 10, 10);
-        if (back != null) l.addView(ib("←", back));
+        l.setBackground(Ui.tealBarBottom(22));
+        Ui.pad(l, 12, 14, 12, 16);
+        if (back != null) {
+            TextView bb = ib("←", back);
+            bb.setBackground(Ui.rr(Color.parseColor("#33FFFFFF"), 0, 14)); bb.setTextColor(Color.WHITE);
+            l.addView(bb);
+        }
         LinearLayout mid = Ui.v(c);
-        mid.addView(Ui.t(c, title, 19, Ui.TEXT, true));
-        if (sub != null && !sub.isEmpty()) mid.addView(Ui.t(c, sub, 12, Ui.MUTED, false));
+        mid.addView(Ui.t(c, title, 20, Color.WHITE, true));
+        if (sub != null && !sub.isEmpty()) mid.addView(Ui.t(c, sub, 12, Color.parseColor("#D1FAF5"), false));
         LinearLayout.LayoutParams mp = Ui.weight(1);
         mp.setMargins(Ui.dp(10), 0, 0, 0);
         l.addView(mid, mp);
-        for (View v : right) l.addView(v);
+        for (View v : right) {
+            if (v instanceof TextView) { v.setBackground(Ui.rr(Color.parseColor("#33FFFFFF"), 0, 14)); ((TextView) v).setTextColor(Color.WHITE); }
+            l.addView(v);
+        }
         return l;
     }
 
@@ -71,7 +78,8 @@ final class Screens {
     View empty(String msg) {
         TextView t = Ui.t(c, msg, 14, Ui.MUTED, false);
         t.setGravity(Gravity.CENTER);
-        t.setBackground(Ui.rr(Ui.SURFACE, Ui.LINE, 16));
+        t.setBackground(Ui.rr(Ui.SURFACE, Ui.dark ? Ui.LINE : 0, 20));
+        t.setElevation(Ui.dp(Ui.dark ? 0 : 2));
         Ui.pad(t, 16, 22, 16, 22);
         LinearLayout.LayoutParams p = Ui.fillW();
         p.setMargins(Ui.dp(16), Ui.dp(6), Ui.dp(16), Ui.dp(6));
@@ -81,7 +89,8 @@ final class Screens {
 
     LinearLayout listBox() {
         LinearLayout l = Ui.v(c);
-        l.setBackground(Ui.rr(Ui.SURFACE, Ui.LINE, 16));
+        l.setBackground(Ui.rr(Ui.SURFACE, Ui.dark ? Ui.LINE : 0, 20));
+        l.setElevation(Ui.dp(Ui.dark ? 0 : 2));
         LinearLayout.LayoutParams p = Ui.fillW();
         p.setMargins(Ui.dp(16), Ui.dp(4), Ui.dp(16), Ui.dp(4));
         l.setLayoutParams(p);
@@ -229,96 +238,69 @@ final class Screens {
         String chip = bm.equals("cash") ? "રોકડ" : (bm.equals("bank") ? "બેંક" : "ફુલ");
         boolean hasAlert = od.recv > 0 || od.pay > 0;
 
-        LinearLayout hero = Ui.v(c);
-        hero.setBackground(Ui.grad(Color.parseColor("#8B3FE0"), Color.parseColor("#4B1D8F"), 24));
-        Ui.pad(hero, 18, 16, 18, 16);
-        LinearLayout.LayoutParams hp = Ui.fillW();
-        hp.setMargins(Ui.dp(12), Ui.dp(12), Ui.dp(12), Ui.dp(8));
-        hero.setLayoutParams(hp);
-
+        // ---- header band (teal) ----
+        LinearLayout head = Ui.v(c);
+        head.setBackground(Ui.tealBarBottom(30));
+        Ui.pad(head, 16, 14, 16, 40);
         LinearLayout htop = Ui.h(c);
+        TextView logo = Ui.t(c, "M", 22, Ui.T2, true);
+        logo.setGravity(Gravity.CENTER);
+        logo.setBackground(Ui.rr(Color.WHITE, 0, 14));
+        LinearLayout.LayoutParams lgp = new LinearLayout.LayoutParams(Ui.dp(46), Ui.dp(46));
+        lgp.setMargins(0, 0, Ui.dp(12), 0);
+        htop.addView(logo, lgp);
         LinearLayout hl = Ui.v(c);
-        hl.addView(Ui.t(c, Fmt.greeting(java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)), 13, Color.parseColor("#E5D4FF"), false));
-        hl.addView(Ui.t(c, db.settings.owner.isEmpty() ? "Mera Hisab" : db.settings.owner, 22, Color.WHITE, true));
-        hl.addView(Ui.t(c, Fmt.longDate(Fmt.today()), 12, Color.parseColor("#E5D4FF"), false));
+        hl.addView(Ui.t(c, db.settings.owner.isEmpty() ? "Mera Hisab" : db.settings.owner, 20, Color.WHITE, true));
+        hl.addView(Ui.t(c, Fmt.greeting(java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) + " · " + Fmt.longDate(Fmt.today()), 12, Color.parseColor("#D1FAF5"), false));
         htop.addView(hl, Ui.weight(1));
         TextView bell = ib(hasAlert ? "🔔•" : "🔔", new Runnable() { @Override public void run() { a.sheets.bellSheet(); } });
-        bell.setBackground(Ui.rr(Color.parseColor("#33FFFFFF"), 0, 22)); bell.setTextColor(Color.WHITE);
+        bell.setBackground(Ui.rr(Color.parseColor("#33FFFFFF"), 0, 14)); bell.setTextColor(Color.WHITE);
         TextView gear = ib("⚙", new Runnable() { @Override public void run() { a.go("more"); } });
-        gear.setBackground(Ui.rr(Color.parseColor("#33FFFFFF"), 0, 22)); gear.setTextColor(Color.WHITE);
+        gear.setBackground(Ui.rr(Color.parseColor("#33FFFFFF"), 0, 14)); gear.setTextColor(Color.WHITE);
         TextView dots = ib("⋮", new Runnable() { @Override public void run() { a.sheets.homeMenuSheet(); } });
-        dots.setBackground(Ui.rr(Color.parseColor("#33FFFFFF"), 0, 22)); dots.setTextColor(Color.WHITE);
+        dots.setBackground(Ui.rr(Color.parseColor("#33FFFFFF"), 0, 14)); dots.setTextColor(Color.WHITE);
         htop.addView(bell); htop.addView(gear); htop.addView(dots);
-        hero.addView(htop);
+        head.addView(htop);
+        root.addView(head);
 
-        LinearLayout lr = Ui.h(c);
-        lr.setPadding(0, Ui.dp(14), 0, 0);
-        lr.addView(Ui.t(c, lbl + "  ", 14, Color.parseColor("#E5D4FF"), false));
-        TextView ch = Ui.t(c, chip, 12, Color.WHITE, true);
-        ch.setBackground(Ui.rr(Color.parseColor("#44FFFFFF"), 0, 12));
-        Ui.pad(ch, 10, 2, 10, 2);
-        Ui.tap(ch, new Runnable() { @Override public void run() { a.balMode = a.balMode.equals("full") ? "cash" : (a.balMode.equals("cash") ? "bank" : "full"); a.render(); } });
-        lr.addView(ch);
-        hero.addView(lr);
-        hero.addView(Ui.t(c, Fmt.money(bal), 38, Color.WHITE, true));
-        TextView mh = Ui.t(c, "આ મહિને", 12, Color.WHITE, true);
-        mh.setBackground(Ui.rr(Color.parseColor("#44FFFFFF"), 0, 12));
-        Ui.pad(mh, 10, 2, 10, 2);
-        LinearLayout.LayoutParams mhp = Ui.lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        mhp.gravity = Gravity.END;
-        mhp.setMargins(0, Ui.dp(8), 0, Ui.dp(6));
-        mh.setLayoutParams(mhp);
-        hero.addView(mh);
+        // ---- 4 money cards (overlap the header a little) ----
+        LinearLayout cards1 = Ui.h(c), cards2 = Ui.h(c);
+        cards1.setGravity(Gravity.TOP); cards2.setGravity(Gravity.TOP);
+        Ui.pad(cards1, 12, 0, 12, 0); Ui.pad(cards2, 12, 0, 12, 0);
+        LinearLayout.LayoutParams up = Ui.fillW();
+        up.setMargins(0, -Ui.dp(26), 0, 0);
+        cards1.setLayoutParams(up);
+        View cBal = moneyCard("💰", Ui.GREEN, lbl + " ▾", Fmt.money(bal), "આ મહિને આવક: " + Fmt.money(mt.inc), Ui.GREEN, new Runnable() { @Override public void run() { a.balMode = a.balMode.equals("full") ? "cash" : (a.balMode.equals("cash") ? "bank" : "full"); a.render(); } });
+        View cRecv = moneyCard("📥", Ui.AMBER, "લેવાના બાકી", Fmt.money(due.recv), od.recv > 0 ? "મુદત વીતી: " + Fmt.money(od.recv) : "જમા આ મહિને: " + Fmt.money(mt.got), od.recv > 0 ? Ui.RED : Ui.MUTED, new Runnable() { @Override public void run() { a.kf = "customer"; a.kq = ""; a.go("khata"); } });
+        View cPay = moneyCard("📤", Ui.RED, "દેવાના બાકી", Fmt.money(due.pay), od.pay > 0 ? "મુદત વીતી: " + Fmt.money(od.pay) : "બધું સમયસર", od.pay > 0 ? Ui.RED : Ui.MUTED, new Runnable() { @Override public void run() { a.kf = "creditor"; a.kq = ""; a.go("khata"); } });
+        View cExp = moneyCard("📈", Ui.BLUE, "આ મહિને ખર્ચ", Fmt.money(mt.exp), "ઉધાર ખરીદી: " + Fmt.money(mt.took), Ui.MUTED, new Runnable() { @Override public void run() { a.go("rep"); } });
+        cards1.addView(cBal, cardLp()); cards1.addView(cRecv, cardLp());
+        cards2.addView(cPay, cardLp()); cards2.addView(cExp, cardLp());
+        root.addView(cards1);
+        LinearLayout.LayoutParams c2p = Ui.fillW();
+        c2p.setMargins(0, Ui.dp(8), 0, 0);
+        cards2.setLayoutParams(c2p);
+        root.addView(cards2);
 
-        LinearLayout mrow = Ui.h(c);
-        mrow.setGravity(Gravity.TOP);
-        String[] tags = {"+ ઉધાર વેચાણ", "− ઉધાર ખરીદી", "↓ આવક", "↑ ખર્ચ"};
-        String[] vals = {"+" + Fmt.money(mt.gave), "−" + Fmt.money(mt.took), "+" + Fmt.money(mt.inc), "−" + Fmt.money(mt.exp)};
-        int[] cols = {Color.parseColor("#9FF0C0"), Color.parseColor("#FFC9A0"), Color.parseColor("#9FF0C0"), Color.parseColor("#FFC9A0")};
-        for (int i = 0; i < 4; i++) {
-            LinearLayout col = Ui.v(c);
-            col.addView(Ui.t(c, tags[i], 11, cols[i], true));
-            col.addView(Ui.t(c, vals[i], 14, cols[i], true));
-            mrow.addView(col, Ui.weight(1));
-        }
-        hero.addView(mrow);
-        root.addView(hero);
-
-        // action tiles
-        LinearLayout acts = Ui.h(c);
-        Ui.pad(acts, 12, 4, 12, 4);
+        // ---- big colour buttons ----
+        LinearLayout acts1 = Ui.h(c), acts2 = Ui.h(c);
+        Ui.pad(acts1, 12, 12, 12, 0); Ui.pad(acts2, 12, 8, 12, 0);
         if (this.a.db.settings.biz.equals("service")) {
-            acts.addView(tile("🛠", "સેવા નોંધ", false, new Runnable() { @Override public void run() { Sheets.Form f = new Sheets.Form(); f.type = "gave"; a.sheets.openEntry(f); } }), tileLp());
+            LinearLayout sv = Ui.h(c);
+            Ui.pad(sv, 12, 12, 12, 0);
+            sv.addView(bigBtn("🛠", "સેવા નોંધ", "કામની એન્ટ્રી", "#F59E0B", "#B45309", new Runnable() { @Override public void run() { Sheets.Form f = new Sheets.Form(); f.type = "gave"; a.sheets.openEntry(f); } }), Ui.weight(1));
+            root.addView(sv);
         }
-        acts.addView(tile("＋", "આવક ઉમેરો", false, new Runnable() { @Override public void run() { a.sheets.askIncome(); } }), tileLp());
-        acts.addView(tile("−", "ખર્ચ ઉમેરો", false, new Runnable() { @Override public void run() { a.sheets.askExpense(); } }), tileLp());
-        acts.addView(tile("🎤", "અવાજ", true, new Runnable() { @Override public void run() { a.sheets.voiceSheet(null); } }), tileLp());
-        root.addView(acts);
-
-        // two cards
-        LinearLayout two = Ui.h(c);
-        Ui.pad(two, 12, 4, 12, 4);
-        two.setGravity(Gravity.TOP);
-        LinearLayout c1 = Ui.card(c);
-        c1.addView(Ui.t(c, "👥 ઉધાર આપ્યો", 13, Ui.MUTED, true));
-        c1.addView(Ui.t(c, Fmt.money(due.recv), 22, Ui.GREEN, true));
-        String s1 = "જમા: " + Fmt.money(mt.got) + (od.recv > 0 ? "\nમુદતવીતી: " + Fmt.money(od.recv) : "");
-        c1.addView(Ui.t(c, s1, 12, od.recv > 0 ? Ui.RED : Ui.MUTED, false));
-        LinearLayout c2 = Ui.card(c);
-        c2.addView(Ui.t(c, "🏪 લેણદાર બાકી", 13, Ui.MUTED, true));
-        c2.addView(Ui.t(c, Fmt.money(due.pay), 22, Ui.RED, true));
-        c2.addView(Ui.t(c, "મુદતવીતી: " + Fmt.money(od.pay), 12, od.pay > 0 ? Ui.RED : Ui.MUTED, false));
-        LinearLayout.LayoutParams l1 = Ui.weight(1); l1.setMargins(Ui.dp(4), 0, Ui.dp(4), 0);
-        LinearLayout.LayoutParams l2 = Ui.weight(1); l2.setMargins(Ui.dp(4), 0, Ui.dp(4), 0);
-        two.addView(c1, l1);
-        two.addView(c2, l2);
-        Ui.tap(c1, new Runnable() { @Override public void run() { a.kf = "customer"; a.kq = ""; a.go("khata"); } });
-        Ui.tap(c2, new Runnable() { @Override public void run() { a.kf = "creditor"; a.kq = ""; a.go("khata"); } });
-        root.addView(two);
+        acts1.addView(bigBtn("＋", "આવક", "પૈસા આવ્યા", "#22C55E", "#15803D", new Runnable() { @Override public void run() { a.sheets.askIncome(); } }), btnLp(true));
+        acts1.addView(bigBtn("−", "ખર્ચ", "પૈસા ગયા", "#EF4444", "#B91C1C", new Runnable() { @Override public void run() { a.sheets.askExpense(); } }), btnLp(false));
+        acts2.addView(bigBtn("🎤", "બોલીને લખો", "અવાજથી એન્ટ્રી", "#3B82F6", "#1D4ED8", new Runnable() { @Override public void run() { a.sheets.voiceSheet(null); } }), btnLp(true));
+        acts2.addView(bigBtn("₹", "ઉઘરાણી", "ઝડપી ઉઘરાણી", "#14B8A6", "#0F766E", new Runnable() { @Override public void run() { a.sheets.quickSheet(""); } }), btnLp(false));
+        root.addView(acts1);
+        root.addView(acts2);
 
         // In-Review: spoken entries waiting for confirmation
         if (!db.review.isEmpty()) {
-            root.addView(sectionHead("✦ ઇન-રિવ્યુ વ્યવહારો (" + db.review.size() + ")", null, null));
+            root.addView(sectionHead("✦ ચકાસવાની એન્ટ્રીઓ (" + db.review.size() + ")", null, null));
             for (final Model.Pending q : db.review) {
                 LinearLayout card = Ui.card(c);
                 LinearLayout line = Ui.h(c);
@@ -329,7 +311,7 @@ final class Screens {
                 mp.setMargins(0, 0, Ui.dp(10), 0);
                 line.addView(mic, mp);
                 LinearLayout mid = Ui.v(c);
-                mid.addView(Ui.t(c, "વૉઇસ ટ્રાન્ઝેક્શન", 15, Ui.TEXT, true));
+                mid.addView(Ui.t(c, "બોલેલી એન્ટ્રી", 15, Ui.TEXT, true));
                 mid.addView(Ui.t(c, q.said, 13, Ui.MUTED, false));
                 line.addView(mid, Ui.weight(1));
                 LinearLayout rt = Ui.v(c);
@@ -352,9 +334,9 @@ final class Screens {
             }
         }
 
-        root.addView(sectionHead("તાજેતરના વ્યવહારો", "બધા જુઓ ›", new Runnable() { @Override public void run() { a.go("txn"); } }));
+        root.addView(sectionHead("તાજેતરના એન્ટ્રીઓ", "બધા જુઓ ›", new Runnable() { @Override public void run() { a.go("txn"); } }));
         if (recent.isEmpty()) {
-            root.addView(empty("હજી કોઈ ટ્રાન્ઝેક્શન નથી.\nમાઇક દબાવીને બોલો, જેમ કે “હનીફ ભાઈને 5000 નો માલ ઉધાર આપ્યો”."));
+            root.addView(empty("હજી કોઈ એન્ટ્રી નથી.\nમાઇક દબાવીને બોલો, જેમ કે “હનીફ ભાઈને 5000 નો માલ ઉધાર આપ્યો”."));
         } else {
             LinearLayout lb = listBox();
             for (int i = 0; i < recent.size(); i++) {
@@ -363,40 +345,59 @@ final class Screens {
             }
             root.addView(lb);
         }
-        // quick collection
-        TextView q = Ui.t(c, "₹  ઝડપી ઉઘરાણી", 16, Color.WHITE, true);
-        q.setGravity(Gravity.CENTER);
-        q.setBackground(Ui.grad(Color.parseColor("#9A57D6"), Color.parseColor("#6D28B8"), 28));
-        Ui.pad(q, 22, 12, 22, 12);
-        LinearLayout.LayoutParams qp = Ui.lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        qp.gravity = Gravity.CENTER_HORIZONTAL;
-        qp.setMargins(0, Ui.dp(16), 0, Ui.dp(8));
-        q.setLayoutParams(qp);
-        Ui.tap(q, new Runnable() { @Override public void run() { a.sheets.quickSheet(""); } });
-        root.addView(q);
         return root;
     }
 
-    private LinearLayout.LayoutParams tileLp() {
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, Ui.dp(112), 1f);
+    private LinearLayout.LayoutParams cardLp() {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
         p.setMargins(Ui.dp(4), 0, Ui.dp(4), 0);
         return p;
     }
 
-    private View tile(String glyph, String label, boolean voice, Runnable r) {
+    private LinearLayout.LayoutParams btnLp(boolean left) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        p.setMargins(Ui.dp(4), 0, Ui.dp(4), 0);
+        return p;
+    }
+
+    private View moneyCard(String glyph, int tint, String label, String amount, String sub, int subColor, Runnable r) {
+        LinearLayout k = Ui.card(c);
+        TextView g = Ui.t(c, glyph, 16, tint, true);
+        g.setGravity(Gravity.CENTER);
+        g.setBackground(Ui.rr(Ui.SOFT, 0, 12));
+        k.addView(g, new LinearLayout.LayoutParams(Ui.dp(34), Ui.dp(34)));
+        TextView l = Ui.t(c, label, 11, Ui.MUTED, true);
+        l.setPadding(0, Ui.dp(8), 0, 0);
+        l.setMaxLines(1);
+        k.addView(l);
+        TextView am = Ui.t(c, amount, 19, Ui.TEXT, true);
+        am.setMaxLines(1);
+        k.addView(am);
+        TextView sb = Ui.t(c, sub, 11, subColor, false);
+        sb.setMaxLines(2);
+        k.addView(sb);
+        Ui.tap(k, r);
+        return k;
+    }
+
+    private View bigBtn(String glyph, String title, String sub, String c1, String c2, Runnable r) {
         LinearLayout t = Ui.v(c);
         t.setGravity(Gravity.CENTER);
-        t.setBackground(Ui.rr(Ui.SURFACE, voice ? Ui.BLUE : Ui.LILAC, 18));
-        TextView g = Ui.t(c, glyph, 22, voice ? Ui.BLUE : Ui.ACCENT, true);
+        t.setBackground(Ui.grad(Color.parseColor(c1), Color.parseColor(c2), 18));
+        t.setElevation(Ui.dp(3));
+        Ui.pad(t, 8, 14, 8, 14);
+        TextView g = Ui.t(c, glyph, 22, Color.WHITE, true);
         g.setGravity(Gravity.CENTER);
-        g.setBackground(Ui.rr(Ui.SOFT, 0, 14));
-        g.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(48), Ui.dp(48)));
-        t.addView(g);
-        TextView l = Ui.t(c, label, 14, Ui.TEXT, true);
+        g.setBackground(Ui.rr(Color.parseColor("#33FFFFFF"), 0, 22));
+        t.addView(g, new LinearLayout.LayoutParams(Ui.dp(44), Ui.dp(44)));
+        TextView l = Ui.t(c, title, 16, Color.WHITE, true);
         l.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams lp = Ui.fillW();
-        lp.setMargins(0, Ui.dp(8), 0, 0);
+        lp.setMargins(0, Ui.dp(6), 0, 0);
         t.addView(l, lp);
+        TextView sb = Ui.t(c, sub, 11, Color.parseColor("#E6FFFA"), false);
+        sb.setGravity(Gravity.CENTER);
+        t.addView(sb);
         Ui.tap(t, r);
         return t;
     }
@@ -447,13 +448,13 @@ final class Screens {
             navLabel = Fmt.monthLabel(a.month);
             navSub = a.month.equals(t0.substring(0, 7)) ? "આ મહિનો" : "";
         } else navLabel = "બધા સમયના";
-        String none = a.period.equals("day") ? "આ તારીખે કોઈ વ્યવહારો નથી" : (a.period.equals("month") ? "આ મહિને કોઈ વ્યવહારો નથી" : "કોઈ વ્યવહારો નથી");
+        String none = a.period.equals("day") ? "આ તારીખે કોઈ એન્ટ્રીઓ નથી" : (a.period.equals("month") ? "આ મહિને કોઈ એન્ટ્રીઓ નથી" : "કોઈ એન્ટ્રીઓ નથી");
 
         TextView fb = Ui.t(c, "⏷ ફિલ્ટર" + (extra > 0 ? " " + extra : ""), 14, Ui.ACCENT, true);
         fb.setBackground(Ui.rr(Ui.SOFT, 0, 18));
         Ui.pad(fb, 12, 8, 12, 8);
         Ui.tap(fb, new Runnable() { @Override public void run() { a.sheets.filterSheet(); } });
-        root.addView(top("વ્યવહારો (" + items.size() + ")", a.db.settings.shop.isEmpty() ? (a.db.settings.owner.isEmpty() ? "Mera Hisab" : a.db.settings.owner) : a.db.settings.shop,
+        root.addView(top("એન્ટ્રીઓ (" + items.size() + ")", a.db.settings.shop.isEmpty() ? (a.db.settings.owner.isEmpty() ? "Mera Hisab" : a.db.settings.owner) : a.db.settings.shop,
                 new Runnable() { @Override public void run() { a.go("home"); } }, fb));
         final boolean arrows = !a.period.equals("all");
         root.addView(periodBar(navLabel, navSub,
@@ -596,7 +597,7 @@ final class Screens {
                 new Runnable() { @Override public void run() { a.partyId = null; a.render(); } }, ed));
 
         LinearLayout pb = Ui.v(c);
-        pb.setBackground(Ui.grad(Ui.dark ? Color.parseColor("#2C1F52") : Color.parseColor("#EFE4FF"), Ui.dark ? Color.parseColor("#1B1530") : Color.parseColor("#E4D6FB"), 20));
+        pb.setBackground(Ui.grad(Ui.dark ? Color.parseColor("#173A37") : Color.parseColor("#CCFBF1"), Ui.dark ? Color.parseColor("#12201F") : Color.parseColor("#E6FFFA"), 20));
         Ui.pad(pb, 16, 14, 16, 14);
         LinearLayout.LayoutParams pp = Ui.fillW();
         pp.setMargins(Ui.dp(12), Ui.dp(12), Ui.dp(12), Ui.dp(8));
@@ -720,7 +721,7 @@ final class Screens {
         b.setGravity(Gravity.CENTER);
         b.setMinHeight(Ui.dp(48));
         Ui.pad(b, 8, 8, 8, 8);
-        b.setBackground(primary ? Ui.grad(Color.parseColor("#8B3FE0"), Ui.PURPLE, 14) : Ui.rr(Ui.SURFACE, Ui.LINE, 14));
+        b.setBackground(primary ? Ui.grad(Color.parseColor("#14B8A6"), Ui.PURPLE, 14) : Ui.rr(Ui.SURFACE, Ui.LINE, 14));
         Ui.tap(b, r);
         return b;
     }
@@ -977,12 +978,12 @@ final class Screens {
         }));
         root.addView(partyPill());
         LinearLayout hero = Ui.h(c);
-        hero.setBackground(Ui.grad(Color.parseColor("#5B0F9E"), Color.parseColor("#7B2FBE"), 20));
+        hero.setBackground(Ui.grad(Color.parseColor("#0F766E"), Color.parseColor("#0F766E"), 20));
         Ui.pad(hero, 18, 16, 18, 16);
         LinearLayout h1 = Ui.v(c), h2 = Ui.v(c);
-        h1.addView(Ui.t(c, "વસૂલવાની બાકી રકમ", 13, Color.parseColor("#EBDDFF"), false));
+        h1.addView(Ui.t(c, "વસૂલવાની બાકી રકમ", 13, Color.parseColor("#D1FAF5"), false));
         h1.addView(Ui.t(c, Fmt.money(recv), 24, Color.WHITE, true));
-        h2.addView(Ui.t(c, "ચૂકવવા માટે કુલ", 13, Color.parseColor("#EBDDFF"), false));
+        h2.addView(Ui.t(c, "ચૂકવવા માટે કુલ", 13, Color.parseColor("#D1FAF5"), false));
         h2.addView(Ui.t(c, Fmt.money(pay), 24, Color.WHITE, true));
         hero.addView(h1, Ui.weight(1));
         hero.addView(h2, Ui.weight(1));
@@ -1004,7 +1005,7 @@ final class Screens {
                     new Runnable() { @Override public void run() { a.openParty(p.id); } }));
             n++;
         }
-        if (n == 0) root.addView(empty("આ મહિને કોઈ વ્યવહારો નથી")); else root.addView(lb);
+        if (n == 0) root.addView(empty("આ મહિને કોઈ એન્ટ્રીઓ નથી")); else root.addView(lb);
         return root;
     }
 
@@ -1122,8 +1123,8 @@ final class Screens {
         app.add(srowT("☰", TEAL, "પ્રોડક્ટ માસ્ટર", "બનાવેલ પ્રોડક્ટ્સ જુઓ", null, null, new Runnable() { @Override public void run() { sh.prodSheet(); } }));
 
         List<View> svc = new ArrayList<>();
-        svc.add(srowT("🎤", PURP, "વૉઇસ સેટિંગ્સ", "ભાષા અને બોલીને જવાબ", null, null, new Runnable() { @Override public void run() { sh.voiceSetSheet(); } }));
-        svc.add(srowT("☑", GREEN, "વૉઇસ ટેસ્ટ લૉગ", "શું બોલ્યા, એપ શું સમજ્યું", null, null, new Runnable() { @Override public void run() { sh.voiceLogSheet(); } }));
+        svc.add(srowT("🎤", PURP, "અવાજ સેટિંગ", "ભાષા અને બોલીને જવાબ", null, null, new Runnable() { @Override public void run() { sh.voiceSetSheet(); } }));
+        svc.add(srowT("☑", GREEN, "અવાજ ટેસ્ટ લૉગ", "શું બોલ્યા, એપ શું સમજ્યું", null, null, new Runnable() { @Override public void run() { sh.voiceLogSheet(); } }));
         svc.add(srowT("🧠", PINK, "એપે શીખેલું", a.db.learn.size() + " નામ શીખ્યા", null, null, new Runnable() { @Override public void run() { sh.learnedSheet(); } }));
 
         List<View> sec = new ArrayList<>();
@@ -1161,7 +1162,7 @@ final class Screens {
         root.addView(acc("acct", "👤", "એકાઉન્ટ અને સ્ટાફ", on ? a.sync.name + " · " + a.sync.bizName : "લૉગિન, સ્ટાફ અને સર્વર", accn, Color.parseColor("#E11D48")));
         if (!a.isStaff()) root.addView(acc("biz", "▣", "વ્યવસાય વ્યવસ્થાપન", "દુકાન, પ્રોફાઇલ અને સેટઅપ", biz, BLUE));
         root.addView(acc("app", "⚙", "એપ્લિકેશન", "ભાષા, થીમ અને એન્ટ્રી ઓપ્શન્સ", app, PURP));
-        root.addView(acc("svc", "🧾", "સર્વિસિસ અને બિલિંગ", "વૉઇસ સેટિંગ્સ, ટેસ્ટ અને શીખેલું", svc, Color.parseColor("#16A34A")));
+        root.addView(acc("svc", "🧾", "સર્વિસિસ અને બિલિંગ", "અવાજ સેટિંગ, ટેસ્ટ અને શીખેલું", svc, Color.parseColor("#16A34A")));
         root.addView(acc("sec", "🛡", "સુરક્ષા", "એપ PIN અને બાયોમેટ્રિક સિક્યુરિટી", sec, Color.parseColor("#D97706")));
         root.addView(acc("bk", "☁", "બેકઅપ અને એપ અપડેટ્સ", "બેકઅપ, રીસ્ટોર અને એપ અપડેટ", bk, Color.parseColor("#0EA5E9")));
         root.addView(acc("sup", "🎧", "સપોર્ટ અને લીગલ", "મદદ, FAQs, ફીડબેક અને નીતિઓ", sup, PINK));

@@ -30,24 +30,27 @@ public final class Ui {
 
     public static void init(Context c) { density = c.getResources().getDisplayMetrics().density; }
 
+    public static final int T1 = Color.parseColor("#14B8A6"), T2 = Color.parseColor("#0F766E");
+
     public static void setDark(boolean d) {
         dark = d;
-        PURPLE = Color.parseColor("#6D28B8");
-        ONLILAC = Color.parseColor("#26104A");
+        PURPLE = T2;
         if (d) {
-            BG = Color.parseColor("#0D0B14"); SURFACE = Color.parseColor("#1B1829"); SURFACE2 = Color.parseColor("#242038");
-            LINE = Color.parseColor("#38324F"); TEXT = Color.parseColor("#F3EEFB"); MUTED = Color.parseColor("#9D96B5");
-            ACCENT = Color.parseColor("#CFA9FF"); LILAC = Color.parseColor("#CFA9FF"); GREEN = Color.parseColor("#3DDC84");
-            RED = Color.parseColor("#FF6B6B"); AMBER = Color.parseColor("#FFB066"); BLUE = Color.parseColor("#6EC1FF");
-            FLD = Color.parseColor("#211D33"); SOFT = Color.parseColor("#2A1D49"); TOP = Color.parseColor("#17122A");
+            ONLILAC = Color.parseColor("#04302B");
+            BG = Color.parseColor("#0A1415"); SURFACE = Color.parseColor("#12201F"); SURFACE2 = Color.parseColor("#1A2D2C");
+            LINE = Color.parseColor("#25403D"); TEXT = Color.parseColor("#EAF6F4"); MUTED = Color.parseColor("#8FAAA6");
+            ACCENT = Color.parseColor("#5EEAD4"); LILAC = Color.parseColor("#5EEAD4"); GREEN = Color.parseColor("#34D399");
+            RED = Color.parseColor("#FB7185"); AMBER = Color.parseColor("#FBBF24"); BLUE = Color.parseColor("#60A5FA");
+            FLD = Color.parseColor("#15282A"); SOFT = Color.parseColor("#173A37"); TOP = Color.parseColor("#0B4F49");
             DNGBG = Color.parseColor("#3A1620"); OV = Color.parseColor("#99000000");
         } else {
-            BG = Color.parseColor("#F6F3FC"); SURFACE = Color.parseColor("#FFFFFF"); SURFACE2 = Color.parseColor("#F0EAFB");
-            LINE = Color.parseColor("#DDD3EE"); TEXT = Color.parseColor("#1D1632"); MUTED = Color.parseColor("#6A6188");
-            ACCENT = Color.parseColor("#6D28B8"); LILAC = Color.parseColor("#C9A2FF"); GREEN = Color.parseColor("#12874A");
-            RED = Color.parseColor("#D3304A"); AMBER = Color.parseColor("#B5640A"); BLUE = Color.parseColor("#1673B8");
-            FLD = Color.parseColor("#F6F2FD"); SOFT = Color.parseColor("#ECE1FC"); TOP = Color.parseColor("#EBE0FB");
-            DNGBG = Color.parseColor("#FDE8EC"); OV = Color.parseColor("#731E143C");
+            ONLILAC = Color.parseColor("#04302B");
+            BG = Color.parseColor("#F1F5F9"); SURFACE = Color.parseColor("#FFFFFF"); SURFACE2 = Color.parseColor("#EEF2F6");
+            LINE = Color.parseColor("#E2E8F0"); TEXT = Color.parseColor("#0F172A"); MUTED = Color.parseColor("#64748B");
+            ACCENT = Color.parseColor("#0D9488"); LILAC = Color.parseColor("#99F6E4"); GREEN = Color.parseColor("#16A34A");
+            RED = Color.parseColor("#DC2626"); AMBER = Color.parseColor("#D97706"); BLUE = Color.parseColor("#2563EB");
+            FLD = Color.parseColor("#F8FAFC"); SOFT = Color.parseColor("#CCFBF1"); TOP = Color.parseColor("#0F766E");
+            DNGBG = Color.parseColor("#FEE2E2"); OV = Color.parseColor("#731E293B");
         }
     }
 
@@ -64,6 +67,20 @@ public final class Ui {
     public static GradientDrawable grad(int a, int b, float radiusDp) {
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{a, b});
         g.setCornerRadius(dp(radiusDp));
+        return g;
+    }
+
+    /** Teal header / hero gradient (left-right). */
+    public static GradientDrawable tealBar(float radiusDp) {
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{T2, Color.parseColor("#0D9488"), T1});
+        g.setCornerRadius(dp(radiusDp));
+        return g;
+    }
+
+    public static GradientDrawable tealBarBottom(float rDp) {
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{T2, Color.parseColor("#0D9488"), T1});
+        float r = dp(rDp);
+        g.setCornerRadii(new float[]{0, 0, 0, 0, r, r, r, r});
         return g;
     }
 
@@ -131,7 +148,7 @@ public final class Ui {
             case "ghost": b.setTextColor(ACCENT); b.setBackground(rr(0, LINE, 14)); break;
             case "danger": b.setTextColor(RED); b.setBackground(rr(DNGBG, RED, 14)); break;
             case "green": b.setTextColor(Color.WHITE); b.setBackground(rr(GREEN, 0, 14)); if (!dark) b.setTextColor(Color.WHITE); break;
-            default: b.setTextColor(Color.WHITE); b.setBackground(grad(Color.parseColor("#8B3FE0"), PURPLE, 14));
+            default: b.setTextColor(Color.WHITE); b.setBackground(grad(T1, T2, 16));
         }
         LinearLayout.LayoutParams p = fillW();
         p.setMargins(0, dp(10), 0, 0);
@@ -192,7 +209,8 @@ public final class Ui {
 
     public static LinearLayout card(Context c) {
         LinearLayout l = v(c);
-        l.setBackground(rr(SURFACE, LINE, 16));
+        l.setBackground(rr(SURFACE, dark ? LINE : 0, 20));
+        l.setElevation(dp(dark ? 0 : 2));
         pad(l, 14, 12, 14, 12);
         return l;
     }

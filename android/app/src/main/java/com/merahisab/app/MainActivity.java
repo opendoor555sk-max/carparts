@@ -135,13 +135,13 @@ public class MainActivity extends Activity {
 
     private TextView setupHero(LinearLayout l, String title, String sub, final Runnable back) {
         LinearLayout h = Ui.v(this);
-        h.setBackground(Ui.grad(Color.parseColor("#C79BFF"), Color.parseColor("#7B2FBE"), 28));
+        h.setBackground(Ui.grad(Color.parseColor("#2DD4BF"), Color.parseColor("#0F766E"), 28));
         h.setGravity(Gravity.CENTER);
         Ui.pad(h, 20, 30, 20, 30);
         TextView t = Ui.t(this, title, 22, Color.WHITE, true);
         t.setGravity(Gravity.CENTER);
         h.addView(t);
-        TextView s = Ui.t(this, sub, 14, Color.parseColor("#EBDDFF"), false);
+        TextView s = Ui.t(this, sub, 14, Color.parseColor("#D1FAF5"), false);
         s.setGravity(Gravity.CENTER);
         Ui.pad(s, 0, 6, 0, 0);
         h.addView(s);
@@ -338,9 +338,9 @@ public class MainActivity extends Activity {
         else if (t.equals("light")) dark = false;
         else dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         Ui.setDark(dark);
-        getWindow().setStatusBarColor(Ui.TOP);
+        getWindow().setStatusBarColor(Ui.T2);
         View dv = getWindow().getDecorView();
-        dv.setSystemUiVisibility(dark ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        dv.setSystemUiVisibility(0);
     }
 
     /** Rebuild frame + nav (used at start and after a theme change). */
@@ -353,7 +353,7 @@ public class MainActivity extends Activity {
         scroll.setFillViewport(true);
         main.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         navBar = Ui.h(this);
-        navBar.setBackgroundColor(Ui.BG);
+        navBar.setBackgroundColor(Ui.SURFACE);
         main.addView(navBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(62)));
         root.addView(main, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
@@ -393,15 +393,16 @@ public class MainActivity extends Activity {
 
     private void drawNav() {
         navBar.removeAllViews();
-        navBar.setBackgroundColor(Ui.BG);
-        String[][] items = {{"home", "હોમ", "⌂"}, {"txn", "વ્યવહારો", "▤"}, {"rep", "રિપોર્ટ્સ", "▥"}, {"khata", "ખાતા", "👥"}, {"more", "વધુ", "⋯"}};
+        navBar.setBackgroundColor(Ui.SURFACE);
+        navBar.setElevation(Ui.dp(8));
+        String[][] items = {{"home", "હોમ", "⌂"}, {"txn", "એન્ટ્રીઓ", "▤"}, {"rep", "રિપોર્ટ", "▥"}, {"khata", "ખાતા", "👥"}, {"more", "વધુ", "⋯"}};
         for (final String[] it : items) {
             boolean on = it[0].equals(tab) && partyId == null || (it[0].equals("khata") && partyId != null);
             LinearLayout col = Ui.v(this);
             col.setGravity(Gravity.CENTER);
             TextView g = Ui.t(this, it[2], 20, on ? Ui.ACCENT : Ui.MUTED, true);
             g.setGravity(Gravity.CENTER);
-            if (on) { g.setBackground(Ui.rr(Ui.SOFT, 0, 14)); Ui.pad(g, 16, 1, 16, 1); }
+            if (on) { g.setBackground(Ui.rr(Ui.SOFT, 0, 16)); Ui.pad(g, 18, 2, 18, 2); }
             col.addView(g);
             TextView l = Ui.t(this, it[1], 11, on ? Ui.ACCENT : Ui.MUTED, on);
             l.setGravity(Gravity.CENTER);
@@ -803,7 +804,7 @@ public class MainActivity extends Activity {
         Ui.pad(l, 24, 60, 24, 24);
         TextView ic = Ui.t(this, "🔒", 34, Color.WHITE, true);
         ic.setGravity(Gravity.CENTER);
-        ic.setBackground(Ui.grad(Color.parseColor("#8B3FE0"), Ui.PURPLE, 36));
+        ic.setBackground(Ui.grad(Color.parseColor("#14B8A6"), Ui.PURPLE, 36));
         l.addView(ic, new LinearLayout.LayoutParams(Ui.dp(72), Ui.dp(72)));
         TextView ttl = Ui.t(this, "Mera Hisab", 24, Ui.TEXT, true);
         ttl.setGravity(Gravity.CENTER);
