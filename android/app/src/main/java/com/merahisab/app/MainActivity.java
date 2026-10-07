@@ -66,6 +66,7 @@ public class MainActivity extends Activity {
     private View loginView;
     private boolean lgReqDone = false;
     private String lgBusy = "";
+    private TextView fab;
     private String lgName = "", lgPhone = "", lgShop = "", lgMsg = "", lgWa = "", lgOtp = "";
     private final Handler pollH = new Handler(Looper.getMainLooper());
     private final Runnable poll = new Runnable() {
@@ -356,6 +357,14 @@ public class MainActivity extends Activity {
         navBar.setBackgroundColor(Ui.SURFACE);
         main.addView(navBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(62)));
         root.addView(main, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        fab = Ui.t(this, "🎤", 24, Color.WHITE, true);
+        fab.setGravity(Gravity.CENTER);
+        fab.setBackground(Ui.grad(Ui.T1, Ui.T2, 30));
+        fab.setElevation(Ui.dp(8));
+        Ui.tap(fab, new Runnable() { @Override public void run() { sheets.voiceSheet(null); } });
+        FrameLayout.LayoutParams fp = new FrameLayout.LayoutParams(Ui.dp(58), Ui.dp(58), Gravity.BOTTOM | Gravity.END);
+        fp.setMargins(0, 0, Ui.dp(16), Ui.dp(76));
+        root.addView(fab, fp);
         setContentView(root);
         lockView = null;
         setupView = null;
@@ -389,6 +398,7 @@ public class MainActivity extends Activity {
         v.setPadding(0, 0, 0, Ui.dp(24));
         scroll.addView(v);
         drawNav();
+        if (fab != null) fab.setVisibility(tab.equals("home") && partyId == null ? View.VISIBLE : View.GONE);
     }
 
     private void drawNav() {

@@ -874,6 +874,7 @@ final class Sheets {
 
     void homeMenuSheet() {
         Ui.Sheet s = open(null);
+        s.add(srow("ઝડપી ઉઘરાણી", "ગ્રાહકને ચૂકવણી Link મોકલો", null, new Runnable() { @Override public void run() { quickSheet(""); } }));
         s.add(srow("રિમાઇન્ડર મોકલો", "ગ્રાહકને બાકી રકમની યાદ અપાવો", null, new Runnable() { @Override public void run() { remSel.clear(); reminderSheet(); } }));
         s.add(srow("રિમાઇન્ડર ઇતિહાસ", "કોને કોને મોકલ્યું", null, new Runnable() { @Override public void run() { reminderHistorySheet(); } }));
         s.add(srow("અવાજ ટેસ્ટ લૉગ", "શું બોલ્યા, એપ શું સમજ્યું", null, new Runnable() { @Override public void run() { voiceLogSheet(); } }));

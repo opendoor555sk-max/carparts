@@ -577,6 +577,43 @@ public final class I18n {
     }
     private static void put(String g, String h, String e) { M.put(g, new String[]{h, e}); }
     private static void init10() {
+        put("+ આવક / વેચાણ", "+ आमदनी / बिक्री", "+ Income / Sale");
+        put("વેચાણ કે આવક નોંધો", "बिक्री या आमदनी लिखें", "Record a sale or income");
+        put("+ ખર્ચ / ખરીદી", "+ खर्च / खरीद", "+ Expense / Purchase");
+        put("ખરીદી કે ખર્ચ નોંધો", "खरीद या खर्च लिखें", "Record a purchase or expense");
+        put("+ ચૂકવણી", "+ भुगतान", "+ Payment");
+        put("લેણદારને પૈસા આપ્યા", "लेनदार को पैसे दिए", "Paid to a supplier");
+        put("+ જમા (રસીદ)", "+ जमा (रसीद)", "+ Receipt");
+        put("ગ્રાહક પાસેથી પૈસા મળ્યા", "ग्राहक से पैसे मिले", "Money from a customer");
+        put("+ સેવા નોંધ", "+ सेवा एंट्री", "+ Service entry");
+        put("કામની એન્ટ્રી કરો", "काम की एंट्री करें", "Add a job entry");
+        put("સરવૈયું", "बैलेंस शीट", "Balance Sheet");
+        put("નફો-નુકસાન", "नफ़ा-नुकसान", "Profit & Loss");
+        put("રોકડ પ્રવાહ", "नकद प्रवाह", "Cash Flow");
+        put("ખાતાવાર બાકી", "खाते-वार बाकी", "Party Balances");
+        put("રોકડ + બેંક", "नकद + बैंक", "Cash + Bank");
+        put("લેવાના", "लेने", "To receive");
+        put("દેવાના", "देने", "To pay");
+        put("આજની આવક", "आज की आमदनी", "Today's income");
+        put("ગયા મહિને", "पिछले महीने", "vs last month");
+        put("ગઈકાલ", "कल", "vs yesterday");
+        put("નાણાકીય વર્ષ ", "वित्तीय वर्ष ", "Financial Year ");
+        put("માસિક નફાનો ટ્રેન્ડ", "मासिक नफ़ा ट्रेंड", "Monthly Profit Trend");
+        put("ખર્ચની વહેંચણી", "खर्च का बँटवारा", "Expense Breakdown");
+        put("આ વર્ષ ▾", "इस साल ▾", "This Year ▾");
+        put("આ મહિને ▾", "इस महीने ▾", "This Month ▾");
+        put("કુલ ખર્ચ", "कुल खर्च", "Total expenses");
+        put("લેણદાર ચૂકવણી", "लेनदार भुगतान", "Supplier payments");
+        put("આ મહિને ખર્ચ નથી", "इस महीने खर्च नहीं", "No expenses this month");
+        put("તાજેતરની એન્ટ્રીઓ", "हाल की एंट्रियाँ", "Recent entries");
+        put("વેચાણ", "बिक्री", "Sale");
+        put("જમા", "जमा", "Receipt");
+        put("ખરીદી", "खरीद", "Purchase");
+        put("ચૂકવણી", "भुगतान", "Payment");
+        put("લેણદાર: ", "लेनदार: ", "Supplier: ");
+        put("ગ્રાહક: ", "ग्राहक: ", "Customer: ");
+        put("આજે", "आज", "Today");
+        put("ગઈકાલે", "कल", "Yesterday");
         put("બોલીને લખો", "बोलकर लिखें", "Speak to add");
         put("અવાજથી એન્ટ્રી", "आवाज़ से एंट्री", "Entry by voice");
         put("પૈસા આવ્યા", "पैसे आए", "Money in");
