@@ -577,6 +577,19 @@ public final class I18n {
     }
     private static void put(String g, String h, String e) { M.put(g, new String[]{h, e}); }
     private static void init10() {
+        put("એડમિન સપોર્ટ માટે તમારો હિસાબ જોઈ શકે છે.", "एडमिन सपोर्ट के लिए आपका हिसाब देख सकता है।", "Admin can view your accounts for support.");
+        put("હિસાબ જુઓ", "हिसाब देखें", "View accounts");
+        put("ઑનલાઇન", "ऑनलाइन", "Online");
+        put("ઑફલાઇન", "ऑफलाइन", "Offline");
+        put("છેલ્લું લૉગિન: ", "आखिरी लॉगिन: ", "Last login: ");
+        put("છેલ્લું લૉગઆઉટ: ", "आखिरी लॉगआउट: ", "Last logout: ");
+        put("છેલ્લે જોયું: ", "आखिरी बार देखा: ", "Last seen: ");
+        put("વર્ઝન: ", "वर्ज़न: ", "Version: ");
+        put("કર્મચારી", "कर्मचारी", "Staff");
+        put("માલિક", "मालिक", "Owner");
+        put("ખાતાં: ", "खाते: ", "Khata: ");
+        put("હમણાં કોઈ એન્ટ્રી નથી.", "अभी कोई एंट्री नहीं है।", "No entries yet.");
+        put("(ફક્ત જોવા માટે)", "(सिर्फ देखने के लिए)", "(view only)");
         put("⏳  OTP માંગી રહ્યા છીએ...", "⏳  OTP मांग रहे हैं...", "⏳  Requesting OTP...");
         put("✔  OTP માંગ્યો (ફરી માંગો)", "✔  OTP मांगा (फिर मांगें)", "✔  OTP requested (ask again)");
         put("⏳  લૉગિન થઈ રહ્યું છે...", "⏳  लॉगिन हो रहा है...", "⏳  Logging in...");

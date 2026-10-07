@@ -46,6 +46,11 @@ create table if not exists mh.records (
 );
 create index if not exists records_seq_idx on mh.records (biz_id, seq);
 
+alter table mh.users add column if not exists last_login timestamptz;
+alter table mh.users add column if not exists last_logout timestamptz;
+alter table mh.users add column if not exists last_seen timestamptz;
+alter table mh.users add column if not exists app_ver text not null default '';
+
 alter table mh.biz enable row level security;
 alter table mh.users enable row level security;
 alter table mh.sessions enable row level security;
@@ -134,7 +139,8 @@ begin
   return jsonb_build_object('ok', true, 'status', 'pending', 'admin_phone', coalesce(adm,''));
 end $$;
 
-create or replace function public.mh_login(p_phone text, p_otp text, p_device text default '') returns jsonb
+drop function if exists public.mh_login(text, text, text);
+create or replace function public.mh_login(p_phone text, p_otp text, p_device text default '', p_ver text default '') returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare u mh.users; tok text; bn text;
 begin
@@ -146,7 +152,7 @@ begin
     update mh.users set otp_fails = otp_fails + 1 where id = u.id;
     return jsonb_build_object('ok', false, 'err', 'wrong');
   end if;
-  update mh.users set otp_hash = null, otp_exp = null, otp_fails = 0, otp_req = null where id = u.id;
+  update mh.users set otp_hash = null, otp_exp = null, otp_fails = 0, otp_req = null, last_login = now(), last_seen = now(), app_ver = left(coalesce(p_ver,''), 20) where id = u.id;
   tok := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
   insert into mh.sessions(token_hash, user_id, device) values (mh.hash(tok), u.id, left(coalesce(p_device,''), 60));
   select name into bn from mh.biz where id = u.biz_id;
@@ -155,7 +161,11 @@ begin
 end $$;
 
 create or replace function public.mh_logout(p_tok text) returns jsonb language plpgsql security definer set search_path = '' as $$
-begin delete from mh.sessions where token_hash = mh.hash(coalesce(p_tok,'')); return jsonb_build_object('ok', true); end $$;
+begin
+  update mh.users set last_logout = now() where id = (select user_id from mh.sessions where token_hash = mh.hash(coalesce(p_tok,'')));
+  delete from mh.sessions where token_hash = mh.hash(coalesce(p_tok,''));
+  return jsonb_build_object('ok', true);
+end $$;
 
 create or replace function public.mh_whoami(p_tok text) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare u mh.users; bn text;
@@ -169,7 +179,8 @@ exception when others then
 end $$;
 
 -- sync: push changed records, then pull everything newer than p_since
-create or replace function public.mh_sync(p_tok text, p_since bigint, p_push jsonb default '[]'::jsonb) returns jsonb
+drop function if exists public.mh_sync(text, bigint, jsonb);
+create or replace function public.mh_sync(p_tok text, p_since bigint, p_push jsonb default '[]'::jsonb, p_ver text default '') returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare u mh.users; x jsonb; k text; i text; isdel boolean; n int := 0; rows jsonb; mx bigint; more boolean;
 begin
@@ -177,6 +188,8 @@ begin
   exception when others then
     if sqlerrm = 'auth' then return jsonb_build_object('ok', false, 'err', 'auth'); end if; raise;
   end;
+  update mh.users set last_seen = now(), app_ver = case when coalesce(p_ver,'') = '' then app_ver else left(p_ver, 20) end
+   where id = u.id and (last_seen is null or last_seen < now() - interval '1 minute' or app_ver <> coalesce(nullif(p_ver,''), app_ver));
   perform pg_advisory_xact_lock(hashtextextended(u.biz_id::text, 7));
   for x in select * from jsonb_array_elements(coalesce(p_push, '[]'::jsonb)) loop
     k := x->>'kind'; i := x->>'id'; isdel := coalesce((x->>'del')::boolean, false);
@@ -308,10 +321,29 @@ begin
   u := mh.me(p_tok);
   if not u.is_admin then return jsonb_build_object('ok', false, 'err', 'forbidden'); end if;
   return jsonb_build_object('ok', true, 'rows', coalesce((select jsonb_agg(jsonb_build_object('id', o.id, 'name', o.name, 'phone', o.phone, 'biz', b.name,
-      'status', o.status, 'otp_req', o.otp_req is not null, 'is_admin', o.is_admin,
+      'role', o.role, 'status', o.status, 'otp_req', o.otp_req is not null, 'is_admin', o.is_admin,
+      'online', exists (select 1 from mh.sessions x where x.user_id = o.id),
+      'last_login', o.last_login, 'last_logout', o.last_logout, 'last_seen', o.last_seen, 'ver', o.app_ver,
       'staff', (select count(*) from mh.users s where s.biz_id = o.biz_id and s.role = 'staff'),
-      'records', (select count(*) from mh.records r where r.biz_id = o.biz_id and not r.del)) order by o.created)
-      from mh.users o join mh.biz b on b.id = o.biz_id where o.role = 'owner'), '[]'::jsonb));
+      'records', (select count(*) from mh.records r where r.biz_id = o.biz_id and not r.del and r.kind = 'txn')) 
+      order by (o.role <> 'owner'), o.created)
+      from mh.users o join mh.biz b on b.id = o.biz_id), '[]'::jsonb));
+exception when others then
+  if sqlerrm = 'auth' then return jsonb_build_object('ok', false, 'err', 'auth'); end if;
+  raise;
+end $$;
+
+-- admin: read-only look at one user's business (last entries + khata names)
+create or replace function public.mh_admin_data(p_tok text, p_id uuid) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare u mh.users; t mh.users;
+begin
+  u := mh.me(p_tok);
+  if not u.is_admin then return jsonb_build_object('ok', false, 'err', 'forbidden'); end if;
+  select * into t from mh.users where id = p_id;
+  if t.id is null then return jsonb_build_object('ok', false, 'err', 'nouser'); end if;
+  return jsonb_build_object('ok', true, 'name', t.name,
+    'parties', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'name', data->>'name')) from mh.records where biz_id = t.biz_id and kind = 'party' and not del), '[]'::jsonb),
+    'txns', coalesce((select jsonb_agg(data order by upd desc) from (select data, upd from mh.records where biz_id = t.biz_id and kind = 'txn' and not del order by upd desc limit 60) q), '[]'::jsonb));
 exception when others then
   if sqlerrm = 'auth' then return jsonb_build_object('ok', false, 'err', 'auth'); end if;
   raise;

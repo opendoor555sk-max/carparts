@@ -57,6 +57,7 @@ final class Api {
         if (parse(text)) c.getSharedPreferences("mh", Context.MODE_PRIVATE).edit().putString("srvUrl", url).putString("srvKey", key).apply();
     }
 
+    static String ver = "";
     static boolean configured() { return !url.isEmpty() && !key.isEmpty(); }
 
     /** Calls a server function. Never throws: returns {ok:false, err:"net"} when offline. */

@@ -196,14 +196,14 @@ final class Sync {
             long mx = startSince;
             for (int i = 0; i < push.size() && err == null; i += 150) {
                 List<Object> chunk = new ArrayList<>(push.subList(i, Math.min(push.size(), i + 150)));
-                Map<String, Object> r = Api.call("mh_sync", Api.args("p_tok", tok, "p_since", (double) startSince, "p_push", chunk));
+                Map<String, Object> r = Api.call("mh_sync", Api.args("p_tok", tok, "p_since", (double) startSince, "p_push", chunk, "p_ver", Api.ver));
                 if (!Api.ok(r)) err = Api.s(r, "err");
             }
             if (err == null) {
                 long cur = startSince;
                 boolean more;
                 do {
-                    Map<String, Object> r = Api.call("mh_sync", Api.args("p_tok", tok, "p_since", (double) cur, "p_push", new ArrayList<Object>()));
+                    Map<String, Object> r = Api.call("mh_sync", Api.args("p_tok", tok, "p_since", (double) cur, "p_push", new ArrayList<Object>(), "p_ver", Api.ver));
                     if (!Api.ok(r)) { err = Api.s(r, "err"); break; }
                     Object ro = r.get("rows");
                     if (ro instanceof List) rows.addAll((List<Object>) ro);

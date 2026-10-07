@@ -100,6 +100,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        Api.ver = versionName();
         Ui.init(this);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         day = Fmt.today(); month = day.substring(0, 7); rday = day; rmonth = month;
@@ -1042,7 +1043,7 @@ public class MainActivity extends Activity {
                 lgOtp = otp.getText().toString().trim();
                 if (lgPhone.isEmpty() || lgOtp.isEmpty()) { toast("નંબર અને OTP લખો"); return; }
                 lgBusy = "login"; lgMsg = ""; showLogin();
-                final Map<String, Object> q = Api.args("p_phone", lgPhone, "p_otp", lgOtp, "p_device", Build.MODEL == null ? "" : Build.MODEL);
+                final Map<String, Object> q = Api.args("p_phone", lgPhone, "p_otp", lgOtp, "p_device", Build.MODEL == null ? "" : Build.MODEL, "p_ver", versionName());
                 new Thread(new Runnable() {
                     @Override public void run() {
                         final Map<String, Object> r = Api.call("mh_login", q);
@@ -1062,6 +1063,10 @@ public class MainActivity extends Activity {
                 }).start();
             }
         }));
+        TextView pv = Ui.t(this, "એડમિન સપોર્ટ માટે તમારો હિસાબ જોઈ શકે છે.", 12, Ui.MUTED, false);
+        pv.setGravity(Gravity.CENTER);
+        Ui.pad(pv, 14, 8, 14, 4);
+        l.addView(pv);
         l.addView(Ui.btn(this, "હમણાં લૉગિન વગર વાપરો", "ghost", new Runnable() { @Override public void run() { setSkipLogin(true); rebuild(); } }));
         TextView sv = Ui.t(this, "⚙  સર્વર સેટઅપ", 13, Ui.MUTED, true);
         sv.setGravity(Gravity.CENTER);

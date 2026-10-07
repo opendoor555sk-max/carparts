@@ -2129,8 +2129,12 @@ final class Sheets {
                 else if (Boolean.TRUE.equals(m.get("otp_req"))) top.addView(pill("OTP માંગ્યો", Ui.AMBER));
                 else if (self) top.addView(pill("એડમિન", Ui.GREEN));
                 box.addView(top);
-                box.addView(Ui.t(c, ph + " · " + Api.s(m, "biz"), 12, Ui.MUTED, false));
-                box.addView(Ui.t(c, "કર્મચારી: " + Api.s(m, "staff") + " · નોંધ: " + Api.s(m, "records"), 12, Ui.MUTED, false));
+                boolean onl = Boolean.TRUE.equals(m.get("online"));
+                top.addView(pill(onl ? "ઑનલાઇન" : "ઑફલાઇન", onl ? Ui.GREEN : Ui.MUTED), 0);
+                box.addView(Ui.t(c, ph + " · " + Api.s(m, "biz") + " · " + (Api.s(m, "role").equals("staff") ? "કર્મચારી" : "માલિક"), 12, Ui.MUTED, false));
+                box.addView(Ui.t(c, "કર્મચારી: " + Api.s(m, "staff") + " · નોંધ: " + Api.s(m, "records") + (Api.s(m, "ver").isEmpty() ? "" : " · " + "વર્ઝન: " + Api.s(m, "ver")), 12, Ui.MUTED, false));
+                box.addView(Ui.t(c, "છેલ્લું લૉગિન: " + localTime(Api.s(m, "last_login")) + "\n" + "છેલ્લે જોયું: " + localTime(Api.s(m, "last_seen")) + "\n" + "છેલ્લું લૉગઆઉટ: " + localTime(Api.s(m, "last_logout")), 12, Ui.MUTED, false));
+                br.addView(miniBtn("હિસાબ જુઓ", "ghost", new Runnable() { @Override public void run() { adminDataSheet(id, nm); } }));
                 br.addView(miniBtn("OTP બનાવો", "primary", new Runnable() {
                     @Override public void run() {
                         callAsync("mh_admin_otp", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
@@ -2152,5 +2156,47 @@ final class Sheets {
         s.add(scrollBox(list, 340));
         s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
         s.show();
+    }
+
+    private static String localTime(String iso) {
+        if (iso == null || iso.length() < 19 || iso.equals("null")) return "-";
+        try {
+            java.text.SimpleDateFormat in = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US);
+            in.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            java.util.Date d = in.parse(iso.substring(0, 19));
+            return new java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.US).format(d);
+        } catch (Exception e) { return "-"; }
+    }
+
+    @SuppressWarnings("unchecked")
+    void adminDataSheet(final String id, final String nm) {
+        Ui.Sheet s0 = open(nm);
+        s0.add(Ui.t(c, "લોડ થઈ રહ્યું છે...", 15, Ui.MUTED, false));
+        s0.show();
+        callAsync("mh_admin_data", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
+            @Override public void accept(Map<String, Object> r) {
+                if (!Api.ok(r)) { close(); a.toast(srvErr(r)); return; }
+                Map<String, String> names = new java.util.HashMap<>();
+                List<Object> ps = (List<Object>) r.get("parties");
+                if (ps != null) for (Object o : ps) { Map<String, Object> pm = (Map<String, Object>) o; names.put(Api.s(pm, "id"), Api.s(pm, "name")); }
+                List<Object> ts = (List<Object>) r.get("txns");
+                Ui.Sheet s = open(nm + " " + "(ફક્ત જોવા માટે)");
+                s.add(Ui.t(c, "ખાતાં: " + (ps == null ? 0 : ps.size()), 13, Ui.MUTED, true));
+                LinearLayout list = Ui.v(c);
+                if (ts == null || ts.isEmpty()) list.addView(Ui.t(c, "હમણાં કોઈ એન્ટ્રી નથી.", 14, Ui.MUTED, false));
+                else for (Object o : ts) {
+                    Map<String, Object> t = (Map<String, Object>) o;
+                    String pn = names.get(Api.s(t, "partyId"));
+                    String line = Api.s(t, "date") + " · " + (pn == null ? "-" : pn) + " · " + Api.s(t, "type") + " · " + (t.get("amount") instanceof Number ? Fmt.money(((Number) t.get("amount")).doubleValue()) : "")
+                            + (Api.s(t, "note").isEmpty() ? "" : " · " + Api.s(t, "note")) + (Api.s(t, "by").isEmpty() ? "" : " · " + Api.s(t, "by"));
+                    TextView tv = Ui.t(c, line, 13, Ui.TEXT, false);
+                    Ui.pad(tv, 4, 6, 4, 6);
+                    list.addView(tv);
+                }
+                s.add(scrollBox(list, 380));
+                s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { adminSheet(); } }));
+                s.show();
+            }
+        });
     }
 }
