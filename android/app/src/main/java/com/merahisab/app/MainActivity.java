@@ -64,6 +64,8 @@ public class MainActivity extends Activity {
 
     Sync sync;
     private View loginView;
+    private boolean lgReqDone = false;
+    private String lgBusy = "";
     private String lgName = "", lgPhone = "", lgShop = "", lgMsg = "", lgWa = "", lgOtp = "";
     private final Handler pollH = new Handler(Looper.getMainLooper());
     private final Runnable poll = new Runnable() {
@@ -982,18 +984,22 @@ public class MainActivity extends Activity {
             lp.setMargins(Ui.dp(14), Ui.dp(6), Ui.dp(14), 0);
         }
         l.addView(nm); l.addView(ph); l.addView(sh);
-        l.addView(Ui.btn(this, "OTP માંગો", "primary", new Runnable() {
+        boolean reqBusy = lgBusy.equals("req");
+        l.addView(Ui.btn(this, reqBusy ? "⏳  OTP માંગી રહ્યા છીએ..." : (lgReqDone ? "✔  OTP માંગ્યો (ફરી માંગો)" : "OTP માંગો"), reqBusy ? "ghost" : (lgReqDone ? "green" : "primary"), new Runnable() {
             @Override public void run() {
+                if (!lgBusy.isEmpty()) return;
                 lgName = nm.getText().toString().trim(); lgPhone = ph.getText().toString().trim(); lgShop = sh.getText().toString().trim();
                 lgOtp = otp.getText().toString().trim();
-                lgMsg = "મોકલી રહ્યા છીએ..."; showLogin();
+                lgBusy = "req"; lgReqDone = false; lgMsg = ""; lgWa = ""; showLogin();
                 final Map<String, Object> q = Api.args("p_name", lgName, "p_phone", lgPhone, "p_shop", lgShop);
                 new Thread(new Runnable() {
                     @Override public void run() {
                         final Map<String, Object> r = Api.call("mh_request", q);
                         runOnUiThread(new Runnable() {
                             @Override public void run() {
+                                lgBusy = "";
                                 if (!Api.ok(r)) { lgMsg = loginErr(Api.s(r, "err")); lgWa = ""; showLogin(); return; }
+                                lgReqDone = true;
                                 String to;
                                 if (Api.s(r, "status").equals("pending")) {
                                     lgMsg = "તમારી વિનંતિ એડમિનને મોકલાઈ. એડમિન OTP આપે ત્યારે નીચે લખીને લૉગિન કરો.";
@@ -1026,19 +1032,23 @@ public class MainActivity extends Activity {
         }
         l.addView(Ui.label(this, "OTP"));
         l.addView(otp);
-        l.addView(Ui.btn(this, "લૉગિન કરો", "primary", new Runnable() {
+        boolean loginBusy = lgBusy.equals("login");
+        l.addView(Ui.btn(this, loginBusy ? "⏳  લૉગિન થઈ રહ્યું છે..." : "લૉગિન કરો", loginBusy ? "ghost" : "primary", new Runnable() {
             @Override public void run() {
+                if (!lgBusy.isEmpty()) return;
                 lgName = nm.getText().toString().trim(); lgPhone = ph.getText().toString().trim(); lgShop = sh.getText().toString().trim();
                 lgOtp = otp.getText().toString().trim();
                 if (lgPhone.isEmpty() || lgOtp.isEmpty()) { toast("નંબર અને OTP લખો"); return; }
-                lgMsg = "લૉગિન થઈ રહ્યું છે..."; showLogin();
+                lgBusy = "login"; lgMsg = ""; showLogin();
                 final Map<String, Object> q = Api.args("p_phone", lgPhone, "p_otp", lgOtp, "p_device", Build.MODEL == null ? "" : Build.MODEL);
                 new Thread(new Runnable() {
                     @Override public void run() {
                         final Map<String, Object> r = Api.call("mh_login", q);
                         runOnUiThread(new Runnable() {
                             @Override public void run() {
+                                lgBusy = "";
                                 if (!Api.ok(r)) { lgMsg = loginErr(Api.s(r, "err")); showLogin(); return; }
+                                lgReqDone = false;
                                 String prev = sync.bizId;
                                 sync.setSession(r);
                                 if (sync.isStaff() || (!prev.isEmpty() && !prev.equals(sync.bizId))) wipeLocal();

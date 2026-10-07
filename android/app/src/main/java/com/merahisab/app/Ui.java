@@ -136,6 +136,14 @@ public final class Ui {
         LinearLayout.LayoutParams p = fillW();
         p.setMargins(0, dp(10), 0, 0);
         b.setLayoutParams(p);
+        b.setOnTouchListener(new View.OnTouchListener() {
+            @Override public boolean onTouch(View v, android.view.MotionEvent e) {
+                int a = e.getAction();
+                if (a == android.view.MotionEvent.ACTION_DOWN) v.setAlpha(0.45f);
+                else if (a == android.view.MotionEvent.ACTION_UP || a == android.view.MotionEvent.ACTION_CANCEL) v.setAlpha(1f);
+                return false;
+            }
+        });
         tap(b, r);
         return b;
     }

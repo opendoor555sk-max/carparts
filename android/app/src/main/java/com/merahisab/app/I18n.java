@@ -577,6 +577,9 @@ public final class I18n {
     }
     private static void put(String g, String h, String e) { M.put(g, new String[]{h, e}); }
     private static void init10() {
+        put("⏳  OTP માંગી રહ્યા છીએ...", "⏳  OTP मांग रहे हैं...", "⏳  Requesting OTP...");
+        put("✔  OTP માંગ્યો (ફરી માંગો)", "✔  OTP मांगा (फिर मांगें)", "✔  OTP requested (ask again)");
+        put("⏳  લૉગિન થઈ રહ્યું છે...", "⏳  लॉगिन हो रहा है...", "⏳  Logging in...");
         put("લૉગિન કરો", "लॉगिन करें", "Log in");
         put("તમારું નામ", "आपका नाम", "Your name");
         put("મોબાઇલ નંબર", "मोबाइल नंबर", "Mobile number");
