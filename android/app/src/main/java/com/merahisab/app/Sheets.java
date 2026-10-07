@@ -2108,14 +2108,15 @@ final class Sheets {
             if (adminTab.equals("req")) {
                 box.addView(top);
                 box.addView(Ui.t(c, ph + (Api.s(m, "shop").isEmpty() ? "" : " · " + Api.s(m, "shop")), 12, Ui.MUTED, false));
-                br.addView(miniBtn("મંજૂર + OTP", "primary", new Runnable() {
+                final boolean known = Api.s(m, "kind").equals("known");
+                br.addView(miniBtn(known ? "OTP બનાવો" : "મંજૂર + OTP", "primary", new Runnable() {
                     @Override public void run() {
-                        callAsync("mh_admin_approve", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
+                        callAsync(known ? "mh_admin_otp" : "mh_admin_approve", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
                             @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(nm, ph, Api.s(r, "otp")); else a.toast(srvErr(r)); }
                         });
                     }
                 }));
-                br.addView(miniBtn("નામંજૂર", "danger", new Runnable() {
+                if (!known) br.addView(miniBtn("નામંજૂર", "danger", new Runnable() {
                     @Override public void run() {
                         callAsync("mh_admin_reject", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
                             @Override public void accept(Map<String, Object> r) { adminSheet(); }

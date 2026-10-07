@@ -69,7 +69,15 @@ public class MainActivity extends Activity {
     private String lgName = "", lgPhone = "", lgShop = "", lgMsg = "", lgWa = "", lgOtp = "";
     private final Handler pollH = new Handler(Looper.getMainLooper());
     private final Runnable poll = new Runnable() {
-        @Override public void run() { sync.run(null); pollH.postDelayed(this, 30000); }
+        @Override public void run() {
+            sync.run(null);
+            if (sync.isAdmin()) new Thread(new Runnable() { @Override public void run() {
+                final int before = Notifier.pending;
+                final int n = Notifier.check(MainActivity.this, true);
+                if (n > before) runOnUiThread(new Runnable() { @Override public void run() { toast("નવી OTP વિનંતિ: " + n + " (સેટિંગ્સ → એડમિન પેનલ)"); } });
+            } }).start();
+            pollH.postDelayed(this, 30000);
+        }
     };
     private long lastUpdCheck = 0;
 

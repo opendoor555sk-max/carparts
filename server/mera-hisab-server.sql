@@ -275,8 +275,26 @@ declare u mh.users;
 begin
   u := mh.me(p_tok);
   if not u.is_admin then return jsonb_build_object('ok', false, 'err', 'forbidden'); end if;
-  return jsonb_build_object('ok', true, 'rows', coalesce((select jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name, 'phone', r.phone, 'shop', r.shop, 'at', r.created) order by r.created)
-      from mh.requests r where r.status = 'pending'), '[]'::jsonb));
+  return jsonb_build_object('ok', true, 'rows', coalesce((select jsonb_agg(x.j order by x.at) from (
+      select r.created as at, jsonb_build_object('kind', 'new', 'id', r.id, 'name', r.name, 'phone', r.phone, 'shop', r.shop, 'at', r.created) as j
+        from mh.requests r where r.status = 'pending'
+      union all
+      select o.otp_req, jsonb_build_object('kind', 'known', 'id', o.id, 'name', o.name, 'phone', o.phone, 'shop', b.name, 'at', o.otp_req)
+        from mh.users o join mh.biz b on b.id = o.biz_id where o.otp_req is not null and o.status = 'active') x), '[]'::jsonb));
+exception when others then
+  if sqlerrm = 'auth' then return jsonb_build_object('ok', false, 'err', 'auth'); end if;
+  raise;
+end $$;
+
+create or replace function public.mh_admin_pending(p_tok text) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare u mh.users; n int; nm text;
+begin
+  u := mh.me(p_tok);
+  if not u.is_admin then return jsonb_build_object('ok', false, 'err', 'forbidden'); end if;
+  select count(*), string_agg(x.name, ', ') into n, nm from (
+    select name from mh.requests where status = 'pending'
+    union all select name from mh.users where otp_req is not null and role = 'owner') x;
+  return jsonb_build_object('ok', true, 'n', coalesce(n, 0), 'names', coalesce(left(nm, 120), ''));
 exception when others then
   if sqlerrm = 'auth' then return jsonb_build_object('ok', false, 'err', 'auth'); end if;
   raise;
