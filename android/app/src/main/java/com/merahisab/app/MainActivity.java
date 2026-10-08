@@ -321,7 +321,7 @@ public class MainActivity extends Activity {
         return p;
     }
 
-    void toast(String m) { Toast.makeText(this, I18n.tr(m), Toast.LENGTH_SHORT).show(); }
+    void toast(String m) { Toast.makeText(this, I18n.tr(m), m.length() > 30 ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT).show(); }
 
     String versionName() {
         try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception e) { return "1.0"; }

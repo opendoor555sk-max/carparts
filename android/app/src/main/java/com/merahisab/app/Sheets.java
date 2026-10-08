@@ -2276,7 +2276,7 @@ final class Sheets {
             case "phone": return "૧૦ અંકનો સાચો નંબર લખો";
             case "name": return "નામ લખો";
             case "forbidden": return "આ તમારા માટે નથી";
-            default: return "કંઈક ગડબડ થઈ, ફરી પ્રયત્ન કરો";
+            default: { String d = Api.s(r, "detail"); return "કંઈક ગડબડ થઈ, ફરી પ્રયત્ન કરો" + (d.isEmpty() ? (Api.s(r, "err").isEmpty() ? "" : " (" + Api.s(r, "err") + ")") : "\n(" + d + ")"); }
         }
     }
 
