@@ -2269,6 +2269,17 @@ final class Sheets {
         }).start();
     }
 
+    /** Shows a server error on screen (stays until closed) so it can be read / screenshotted. */
+    private void errSheet(Map<String, Object> r) {
+        Ui.Sheet s = open("કંઈક ગડબડ થઈ");
+        TextView m = Ui.t(c, srvErr(r), 15, Ui.TEXT, false);
+        m.setTextIsSelectable(true);
+        Ui.pad(m, 6, 8, 6, 12);
+        s.add(m);
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
     private String srvErr(Map<String, Object> r) {
         switch (Api.s(r, "err")) {
             case "net": return "ઇન્ટરનેટ ચાલુ કરો";
@@ -2326,7 +2337,7 @@ final class Sheets {
         s0.show();
         callAsync("mh_staff_list", Api.args("p_tok", a.sync.token), new java.util.function.Consumer<Map<String, Object>>() {
             @Override public void accept(Map<String, Object> r) {
-                if (!Api.ok(r)) { close(); a.toast(srvErr(r)); return; }
+                if (!Api.ok(r)) { errSheet(r); return; }
                 renderStaff((List<Object>) r.get("rows"));
             }
         });
@@ -2365,14 +2376,14 @@ final class Sheets {
             br.addView(miniBtn("OTP બનાવો", "primary", new Runnable() {
                 @Override public void run() {
                     callAsync("mh_staff_otp", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
-                        @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(nm, ph, Api.s(r, "otp")); else a.toast(srvErr(r)); }
+                        @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(nm, ph, Api.s(r, "otp")); else errSheet(r); }
                     });
                 }
             }));
             br.addView(miniBtn(blocked ? "ચાલુ કરો" : "બ્લોક", "ghost", new Runnable() {
                 @Override public void run() {
                     callAsync("mh_staff_set", Api.args("p_tok", a.sync.token, "p_id", id, "p_action", blocked ? "unblock" : "block"), new java.util.function.Consumer<Map<String, Object>>() {
-                        @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) staffSheet(); else a.toast(srvErr(r)); }
+                        @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) staffSheet(); else errSheet(r); }
                     });
                 }
             }));
@@ -2381,7 +2392,7 @@ final class Sheets {
                     confirm(nm + " ને કાઢી નાખવા છે?", "હા, કાઢો", new Runnable() {
                         @Override public void run() {
                             callAsync("mh_staff_set", Api.args("p_tok", a.sync.token, "p_id", id, "p_action", "remove"), new java.util.function.Consumer<Map<String, Object>>() {
-                                @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) staffSheet(); else a.toast(srvErr(r)); }
+                                @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) staffSheet(); else errSheet(r); }
                             });
                         }
                     });
@@ -2400,7 +2411,7 @@ final class Sheets {
             @Override public void run() {
                 final String n = nm.getText().toString().trim(), p = ph.getText().toString().trim();
                 callAsync("mh_staff_add", Api.args("p_tok", a.sync.token, "p_name", n, "p_phone", p), new java.util.function.Consumer<Map<String, Object>>() {
-                    @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(n, Api.s(r, "phone"), Api.s(r, "otp")); else a.toast(srvErr(r)); }
+                    @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(n, Api.s(r, "phone"), Api.s(r, "otp")); else errSheet(r); }
                 });
             }
         }));
@@ -2418,7 +2429,7 @@ final class Sheets {
         final boolean req = adminTab.equals("req");
         callAsync(req ? "mh_admin_requests" : "mh_admin_owners", Api.args("p_tok", a.sync.token), new java.util.function.Consumer<Map<String, Object>>() {
             @Override public void accept(Map<String, Object> r) {
-                if (!Api.ok(r)) { close(); a.toast(srvErr(r)); return; }
+                if (!Api.ok(r)) { errSheet(r); return; }
                 renderAdmin((List<Object>) r.get("rows"));
             }
         });
@@ -2456,7 +2467,7 @@ final class Sheets {
                 br.addView(miniBtn(known ? "OTP બનાવો" : "મંજૂર + OTP", "primary", new Runnable() {
                     @Override public void run() {
                         callAsync(known ? "mh_admin_otp" : "mh_admin_approve", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
-                            @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(nm, ph, Api.s(r, "otp")); else a.toast(srvErr(r)); }
+                            @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(nm, ph, Api.s(r, "otp")); else errSheet(r); }
                         });
                     }
                 }));
@@ -2483,7 +2494,7 @@ final class Sheets {
                 br.addView(miniBtn("OTP બનાવો", "primary", new Runnable() {
                     @Override public void run() {
                         callAsync("mh_admin_otp", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
-                            @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(nm, ph, Api.s(r, "otp")); else a.toast(srvErr(r)); }
+                            @Override public void accept(Map<String, Object> r) { if (Api.ok(r)) showOtp(nm, ph, Api.s(r, "otp")); else errSheet(r); }
                         });
                     }
                 }));
@@ -2520,7 +2531,7 @@ final class Sheets {
         s0.show();
         callAsync("mh_admin_data", Api.args("p_tok", a.sync.token, "p_id", id), new java.util.function.Consumer<Map<String, Object>>() {
             @Override public void accept(Map<String, Object> r) {
-                if (!Api.ok(r)) { close(); a.toast(srvErr(r)); return; }
+                if (!Api.ok(r)) { errSheet(r); return; }
                 Map<String, String> names = new java.util.HashMap<>();
                 List<Object> ps = (List<Object>) r.get("parties");
                 if (ps != null) for (Object o : ps) { Map<String, Object> pm = (Map<String, Object>) o; names.put(Api.s(pm, "id"), Api.s(pm, "name")); }
