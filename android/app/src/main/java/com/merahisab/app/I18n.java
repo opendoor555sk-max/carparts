@@ -577,6 +577,29 @@ public final class I18n {
     }
     private static void put(String g, String h, String e) { M.put(g, new String[]{h, e}); }
     private static void init10() {
+        put("માલ રિપોર્ટ", "माल रिपोर्ट", "Inventory reports");
+        put("સ્ટોક અને માલની ગતિ", "स्टॉक और माल की आवाजाही", "Stock and movement");
+        put("સ્ટોક સારાંશ", "स्टॉक सारांश", "Stock summary");
+        put("હાલનો સ્ટોક, કિંમત અને આવ-જા", "मौजूदा स्टॉक, कीमत और आवक-जावक", "Current stock, value and movement");
+        put("GST રિપોર્ટ", "GST रिपोर्ट", "GST reports");
+        put("વેચાણ પર GST", "बिक्री पर GST", "GST on sales");
+        put("GSTR-1 (વેચાણ)", "GSTR-1 (बिक्री)", "GSTR-1 (Outward supplies)");
+        put("દર મુજબ ટેક્સેબલ વેલ્યુ અને GST", "दर के अनुसार टैक्सेबल वैल्यू और GST", "Taxable value and GST by rate");
+        put("કુલ સ્ટોક કિંમત", "कुल स्टॉक कीमत", "Total stock value");
+        put("માલ (હાલનો સ્ટોક × રેટ)", "माल (मौजूदा स्टॉक × रेट)", "Items (stock × rate)");
+        put("GST સેટિંગ", "GST सेटिंग", "GST settings");
+        put("ઇમ્પોર્ટ / એક્સપોર્ટ", "इम्पोर्ट / एक्सपोर्ट", "Import / Export");
+        put("ચાલુ", "चालू", "On");
+        put("બંધ", "बंद", "Off");
+        put("માલ વર્ગ", "माल वर्ग", "Item groups");
+        put("એકમ", "इकाई", "Units");
+        put("ગોડાઉન", "गोदाम", "Godowns");
+        put("ખર્ચ કેન્દ્ર", "खर्च केंद्र", "Cost centres");
+        put("ખર્ચ કેન્દ્ર (જરૂરી નથી)", "खर्च केंद्र (ज़रूरी नहीं)", "Cost centre (optional)");
+        put("કોઈ નહીં", "कोई नहीं", "None");
+        put("GST નથી", "GST नहीं", "No GST");
+        put("＋ નવી પ્રોડક્ટ", "＋ नया प्रोडक्ट", "＋ New product");
+        put("શરૂઆતનો સ્ટોક (જથ્થો)", "शुरुआती स्टॉक (मात्रा)", "Opening stock (qty)");
         put("માસ્ટર", "मास्टर", "Masters");
         put("ખાતા, માલ અને સેટઅપ", "खाते, माल और सेटअप", "Accounts, items and setup");
         put("ખાતાવહી", "खाता-बही", "Ledgers");

@@ -39,22 +39,23 @@ public final class Model {
     }
 
     public static final class Txn {
-        public String id = "", type = "income", partyId = null, note = "", mode = "", cat = "", said = "", due = "", date = "", by = "";
-        public double amount;
+        public String id = "", type = "income", partyId = null, note = "", mode = "", cat = "", said = "", due = "", date = "", by = "", prodId = "", centre = "";
+        public double amount, qty, gst = -1;
         public long ts, upd;
     }
 
     public static final class Product {
-        public String id = "", name = "", unit = "";
-        public double rate;
+        public String id = "", name = "", unit = "", group = "", godown = "";
+        public double rate, openQty;
     }
 
     public static final class Settings {
         public String owner = "", shop = "", phone = "", addr = "", lang = "gu-IN", theme = "system", upiId = "", upiName = "",
-                pinHash = "", bio = "", lastBackup = "", deviceId = "", budgets = "";
+                pinHash = "", bio = "", lastBackup = "", deviceId = "", budgets = "", units = "", groups = "", godowns = "", centres = "", gstin = "";
         public double openCash, openBank;
         public String biz = "store", bizCat = "";
-        public boolean productMode = false, speak = true, setupDone = false;
+        public boolean productMode = false, speak = true, setupDone = false, gstOn = false;
+        public double gstRate = 18;
     }
 
     /** A spoken entry waiting in the "In-Review" list until the user confirms it. */
@@ -143,6 +144,18 @@ public final class Model {
                 if ("upi".equals(t.mode)) c.bank += e; else c.cash += e;
             }
             return c;
+        }
+
+        /** Stock on hand: opening qty + bought (took/expense) - sold (gave/income), for entries that carry a product. */
+        public double stockOf(String prodId) {
+            Product p = product(prodId);
+            double q = p == null ? 0 : p.openQty;
+            for (Txn t : txns) {
+                if (!prodId.equals(t.prodId) || t.qty <= 0) continue;
+                if (t.type.equals("took") || t.type.equals("expense")) q += t.qty;
+                else if (t.type.equals("gave") || t.type.equals("income")) q -= t.qty;
+            }
+            return q;
         }
 
         public Totals monthTotals(String key) {
@@ -258,18 +271,26 @@ public final class Model {
                 x.put("id", t.id); x.put("ts", (double) t.ts); x.put("upd", (double) t.upd); x.put("date", t.date);
                 x.put("type", t.type); x.put("partyId", t.partyId); x.put("amount", t.amount); x.put("note", t.note);
                 x.put("mode", t.mode); x.put("cat", t.cat); x.put("said", t.said); x.put("due", t.due); x.put("by", t.by);
+                if (!t.prodId.isEmpty()) { x.put("prodId", t.prodId); x.put("qty", t.qty); }
+                if (!t.centre.isEmpty()) x.put("centre", t.centre);
+                if (t.gst >= 0) x.put("gst", t.gst);
                 ts.add(x);
             }
             List<Object> pr = new ArrayList<>();
             for (Product p : products) {
                 Map<String, Object> x = new LinkedHashMap<>();
                 x.put("id", p.id); x.put("name", p.name); x.put("rate", p.rate); x.put("unit", p.unit);
+                if (!p.group.isEmpty()) x.put("group", p.group);
+                if (!p.godown.isEmpty()) x.put("godown", p.godown);
+                if (p.openQty != 0) x.put("openQty", p.openQty);
                 pr.add(x);
             }
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("owner", settings.owner); s.put("shop", settings.shop); s.put("phone", settings.phone); s.put("addr", settings.addr);
             s.put("lang", settings.lang); s.put("theme", settings.theme); s.put("openCash", settings.openCash); s.put("openBank", settings.openBank);
             s.put("upiId", settings.upiId); s.put("upiName", settings.upiName); s.put("productMode", settings.productMode); s.put("biz", settings.biz); s.put("bizCat", settings.bizCat); s.put("setupDone", settings.setupDone); s.put("budgets", settings.budgets);
+            s.put("units", settings.units); s.put("groups", settings.groups); s.put("godowns", settings.godowns); s.put("centres", settings.centres);
+            s.put("gstin", settings.gstin); s.put("gstOn", settings.gstOn); s.put("gstRate", settings.gstRate);
             s.put("speak", settings.speak); s.put("pinHash", settings.pinHash); s.put("bio", settings.bio);
             s.put("lastBackup", settings.lastBackup); s.put("deviceId", settings.deviceId);
             List<Object> rv = new ArrayList<>();
@@ -358,6 +379,8 @@ public final class Model {
                 t.type = str(m, "type"); t.partyId = m.get("partyId") instanceof String ? (String) m.get("partyId") : null;
                 t.amount = num(m, "amount"); t.note = str(m, "note"); t.mode = str(m, "mode"); t.cat = str(m, "cat");
                 t.said = str(m, "said"); t.due = str(m, "due"); t.by = str(m, "by");
+                t.prodId = str(m, "prodId"); t.qty = num(m, "qty"); t.centre = str(m, "centre");
+                t.gst = m.get("gst") instanceof Number ? ((Number) m.get("gst")).doubleValue() : -1;
                 if (!TYPES.containsKey(t.type)) continue;
                 txns.add(t);
             }
@@ -366,6 +389,7 @@ public final class Model {
                 Map<String, Object> m = (Map<String, Object>) x;
                 Product p = new Product();
                 p.id = str(m, "id"); p.name = str(m, "name"); p.rate = num(m, "rate"); p.unit = str(m, "unit");
+                p.group = str(m, "group"); p.godown = str(m, "godown"); p.openQty = num(m, "openQty");
                 products.add(p);
             }
             Object so = o.get("settings");
@@ -378,7 +402,9 @@ public final class Model {
                 s.openCash = num(m, "openCash"); s.openBank = num(m, "openBank");
                 s.upiId = str(m, "upiId"); s.upiName = str(m, "upiName");
                 s.productMode = Boolean.TRUE.equals(m.get("productMode"));
-                s.biz = str(m, "biz").equals("service") ? "service" : "store"; s.bizCat = str(m, "bizCat"); s.budgets = str(m, "budgets"); s.setupDone = Boolean.TRUE.equals(m.get("setupDone"));
+                s.biz = str(m, "biz").equals("service") ? "service" : "store"; s.bizCat = str(m, "bizCat"); s.budgets = str(m, "budgets");
+                s.units = str(m, "units"); s.groups = str(m, "groups"); s.godowns = str(m, "godowns"); s.centres = str(m, "centres"); s.gstin = str(m, "gstin");
+                s.gstOn = Boolean.TRUE.equals(m.get("gstOn")); s.gstRate = m.get("gstRate") instanceof Number ? ((Number) m.get("gstRate")).doubleValue() : 18; s.setupDone = Boolean.TRUE.equals(m.get("setupDone"));
                 s.speak = !Boolean.FALSE.equals(m.get("speak"));
                 s.pinHash = str(m, "pinHash"); s.bio = str(m, "bio"); s.lastBackup = str(m, "lastBackup"); s.deviceId = str(m, "deviceId");
             }

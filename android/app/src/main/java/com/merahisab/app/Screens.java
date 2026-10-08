@@ -1144,6 +1144,73 @@ final class Screens {
         return reportPage("રોકડ પ્રવાહ", rpLabel(), true, rows);
     }
 
+    private LinearLayout stockSummaryPage() {
+        String[] r = rpRange();
+        List<RRow> rows = new ArrayList<>();
+        double total = 0;
+        rows.add(rh("માલ (હાલનો સ્ટોક × રેટ)"));
+        if (a.db.products.isEmpty()) {
+            rows.add(rn("હજી કોઈ પ્રોડક્ટ નથી. માસ્ટર → પ્રોડક્ટ / માલ માં ઉમેરો."));
+        }
+        for (Model.Product p : a.db.products) {
+            double q = a.db.stockOf(p.id), in = 0, out = 0;
+            for (Model.Txn t : a.db.txns) {
+                if (!p.id.equals(t.prodId) || t.qty <= 0 || t.date.compareTo(r[0]) < 0 || t.date.compareTo(r[1]) > 0) continue;
+                if (t.type.equals("took") || t.type.equals("expense")) in += t.qty; else if (t.type.equals("gave") || t.type.equals("income")) out += t.qty;
+            }
+            double val = q * p.rate;
+            total += val;
+            rows.add(rl(p.name + " · " + Fmt.plain(q) + " " + p.unit, val, q < 0 ? Ui.RED : Ui.TEXT));
+            rows.add(rn("   આ સમયમાં આવ્યું " + Fmt.plain(in) + " · ગયું " + Fmt.plain(out) + (p.godown.isEmpty() ? "" : " · " + p.godown)));
+        }
+        rows.add(rt("કુલ સ્ટોક કિંમત", total, Ui.TEXT));
+        if (!a.db.settings.productMode) rows.add(rn("સ્ટોક ગણવા માટે સેટિંગ્સમાં “પ્રોડક્ટ પ્રમાણે એન્ટ્રી” ચાલુ કરો અને એન્ટ્રીમાં પ્રોડક્ટ પસંદ કરો."));
+        return reportPage("સ્ટોક સારાંશ", rpLabel(), true, rows);
+    }
+
+    private LinearLayout gstr1Page() {
+        String[] r = rpRange();
+        Model.Settings st = a.db.settings;
+        Map<Double, double[]> by = new java.util.TreeMap<>();
+        List<Model.Txn> inv = new ArrayList<>();
+        for (Model.Txn t : a.db.txns) {
+            if (t.gst < 0 || !(t.type.equals("gave") || t.type.equals("income")) || t.date.compareTo(r[0]) < 0 || t.date.compareTo(r[1]) > 0) continue;
+            double taxable = t.amount / (1 + t.gst / 100.0), tax = t.amount - taxable;
+            double[] v = by.get(t.gst);
+            if (v == null) { v = new double[3]; by.put(t.gst, v); }
+            v[0] += taxable; v[1] += tax; v[2] += t.amount;
+            inv.add(t);
+        }
+        List<RRow> rows = new ArrayList<>();
+        if (!st.gstOn) rows.add(rn("GST ચાલુ નથી. વધુ → GST સેટિંગ માં ચાલુ કરો."));
+        if (!st.gstin.isEmpty()) rows.add(rn("GSTIN: " + st.gstin));
+        double tt = 0, tx = 0, tg = 0;
+        for (Map.Entry<Double, double[]> e : by.entrySet()) {
+            double[] v = e.getValue();
+            rows.add(rh("GST દર " + Fmt.plain(e.getKey()) + "%"));
+            rows.add(rl("ટેક્સેબલ વેલ્યુ", v[0], Ui.TEXT));
+            rows.add(rl("CGST", v[1] / 2, Ui.TEXT));
+            rows.add(rl("SGST", v[1] / 2, Ui.TEXT));
+            rows.add(rl("કુલ બિલ રકમ", v[2], Ui.TEXT));
+            tt += v[0]; tx += v[1]; tg += v[2];
+        }
+        if (by.isEmpty()) rows.add(rn("આ સમયમાં GST વાળું કોઈ વેચાણ નથી."));
+        else {
+            rows.add(rh("કુલ"));
+            rows.add(rl("કુલ ટેક્સેબલ વેલ્યુ", tt, Ui.TEXT));
+            rows.add(rl("કુલ GST", tx, Ui.AMBER));
+            rows.add(rt("કુલ બિલ રકમ", tg, Ui.TEXT));
+            rows.add(rh("બિલ યાદી"));
+            Collections.sort(inv, Model.SORT_NEWEST);
+            for (Model.Txn t : inv) {
+                Model.Party p = a.db.party(t.partyId);
+                rows.add(rl(Fmt.fmtDate(t.date) + " · " + (p != null ? p.name : (t.note.isEmpty() ? "સીધું વેચાણ" : t.note)) + " · " + Fmt.plain(t.gst) + "%", t.amount, Ui.TEXT));
+            }
+        }
+        rows.add(rn("નોંધ: રકમમાં GST શામેલ ગણાયો છે. આ અંદાજિત હિસાબ છે, GST ફાઇલિંગ પહેલાં CA ની સલાહ લો."));
+        return reportPage("GSTR-1 (વેચાણ)", rpLabel(), true, rows);
+    }
+
     private LinearLayout balanceSheetPage() {
         Model.Cash cb = a.db.cashBank();
         Model.Due d = a.db.totalsDue();
@@ -1251,6 +1318,8 @@ final class Screens {
         if ("cf".equals(a.sub)) return cashFlowPage();
         if ("bs".equals(a.sub)) return balanceSheetPage();
         if ("tb".equals(a.sub)) return trialBalancePage();
+        if ("stock".equals(a.sub)) return stockSummaryPage();
+        if ("gstr1".equals(a.sub)) return gstr1Page();
         LinearLayout root = Ui.v(c);
         TextView mic = ib("🎤", new Runnable() { @Override public void run() { a.sheets.voiceSheet(null); } });
         root.addView(top("રિપોર્ટ", null, new Runnable() { @Override public void run() { a.go("home"); } }, mic));
@@ -1279,6 +1348,20 @@ final class Screens {
             r2.addView(repTile("💧", Color.parseColor("#F59E0B"), "રોકડ પ્રવાહ", "રોકડ અને બેંકની આવક-જાવક", new Runnable() { @Override public void run() { openRep("cf"); } }), cardLp());
             r2.addView(repTile("📋", Color.parseColor("#A855F7"), "ખાતાવાર બાકી", "બધા ખાતાના બેલેન્સ", new Runnable() { @Override public void run() { openRep("tb"); } }), cardLp());
             list.addView(r1); list.addView(r2);
+        }
+        if (repShow("માલ રિપોર્ટ", "સ્ટોક સારાંશ", "Inventory", "Stock")) {
+            any = true;
+            list.addView(repGroup("📦", "માલ રિપોર્ટ", "સ્ટોક અને માલની ગતિ"));
+            LinearLayout b = listBox();
+            b.addView(row("📦", Ui.ACCENT, "સ્ટોક સારાંશ", "હાલનો સ્ટોક, કિંમત અને આવ-જા", null, 0, null, new Runnable() { @Override public void run() { openRep("stock"); } }));
+            list.addView(b);
+        }
+        if (repShow("GST રિપોર્ટ", "GSTR-1", "GST")) {
+            any = true;
+            list.addView(repGroup("🧾", "GST રિપોર્ટ", "વેચાણ પર GST"));
+            LinearLayout b = listBox();
+            b.addView(row("🧾", Ui.BLUE, "GSTR-1 (વેચાણ)", "દર મુજબ ટેક્સેબલ વેલ્યુ અને GST", null, 0, null, new Runnable() { @Override public void run() { openRep("gstr1"); } }));
+            list.addView(b);
         }
         if (repShow("દૈનિક સારાંશ", "માસિક સારાંશ", "વાર્ષિક રિપોર્ટ", "રોકડ સારાંશ", "Daily", "Monthly", "Annual")) {
             any = true;
@@ -1667,9 +1750,13 @@ final class Screens {
         tiles.add(masterTile("👥", "ગ્રાહકો", "જેમની પાસેથી લેવાના", new Runnable() { @Override public void run() { a.kf = "customer"; a.kq = ""; a.go("khata"); } }));
         tiles.add(masterTile("🏪", "લેણદારો", "જેમને આપવાના", new Runnable() { @Override public void run() { a.kf = "creditor"; a.kq = ""; a.go("khata"); } }));
         tiles.add(masterTile("📦", "પ્રોડક્ટ / માલ", a.db.products.size() + " પ્રોડક્ટ", new Runnable() { @Override public void run() { sh.prodSheet(); } }));
+        tiles.add(masterTile("🗂", "માલ વર્ગ", Sheets.listOf(a.db.settings.groups).size() + " વર્ગ", new Runnable() { @Override public void run() { sh.listSheet("groups"); } }));
+        tiles.add(masterTile("📏", "એકમ", "નંગ, કિલો...", new Runnable() { @Override public void run() { sh.listSheet("units"); } }));
+        tiles.add(masterTile("🏭", "ગોડાઉન", Sheets.listOf(a.db.settings.godowns).size() + " ગોડાઉન", new Runnable() { @Override public void run() { sh.listSheet("godowns"); } }));
+        tiles.add(masterTile("🎯", "ખર્ચ કેન્દ્ર", Sheets.listOf(a.db.settings.centres).size() + " કેન્દ્ર", new Runnable() { @Override public void run() { sh.listSheet("centres"); } }));
         tiles.add(masterTile("🧾", "ખર્ચ વર્ગ", "વર્ગ મુજબ ખર્ચ", new Runnable() { @Override public void run() { sh.expCatSheet(); } }));
         if (!a.isStaff()) {
-            tiles.add(masterTile("🎯", "બજેટ", "મહિનાના ખર્ચની હદ", new Runnable() { @Override public void run() { sh.budgetSheet(); } }));
+            tiles.add(masterTile("📋", "બજેટ", "મહિનાના ખર્ચની હદ", new Runnable() { @Override public void run() { sh.budgetSheet(); } }));
             tiles.add(masterTile("👤", "સ્ટાફ", a.sync.loggedIn() ? "કર્મચારીઓ અને OTP" : "લૉગિન / સર્વર", new Runnable() { @Override public void run() { if (a.sync.loggedIn()) sh.staffSheet(); else sh.serverSheet(); } }));
             tiles.add(masterTile("👛", "ઓપનિંગ બેલેન્સ", "શરૂઆતના પૈસા", new Runnable() { @Override public void run() { sh.openBalSheet(); } }));
         }
@@ -1736,7 +1823,9 @@ final class Screens {
         root.addView(moreRow("🏢", Ui.ACCENT, "કંપની માહિતી", null, false, new Runnable() { @Override public void run() { sh.profileSheet(); } }));
         if (!a.isStaff()) root.addView(moreRow("👥", Ui.ACCENT, "સ્ટાફ અને યુઝર", null, false, new Runnable() { @Override public void run() { if (signed) sh.staffSheet(); else sh.serverSheet(); } }));
         if (a.sync.isAdmin()) root.addView(moreRow("🛠", Ui.ACCENT, "એડમિન પેનલ", null, false, new Runnable() { @Override public void run() { sh.adminSheet(); } }));
+        if (!a.isStaff()) root.addView(moreRow("🧾", Ui.ACCENT, "GST સેટિંગ", s.gstOn ? "ચાલુ" : "બંધ", false, new Runnable() { @Override public void run() { sh.gstSheet(); } }));
         root.addView(moreRow("☁", Ui.ACCENT, "બેકઅપ અને રીસ્ટોર", null, false, new Runnable() { @Override public void run() { sh.backupSheet(); } }));
+        if (!a.isStaff()) root.addView(moreRow("⇅", Ui.ACCENT, "ઇમ્પોર્ટ / એક્સપોર્ટ", null, false, new Runnable() { @Override public void run() { sh.exportSheet(); } }));
         root.addView(moreRow("⬇", Ui.ACCENT, "એપ અપડેટ", "v" + a.versionName(), false, new Runnable() { @Override public void run() { a.checkUpdate(); } }));
         root.addView(moreRow("🎨", Ui.ACCENT, "થીમ", themeName, false, new Runnable() { @Override public void run() { sh.themeSheet(); } }));
         root.addView(moreRow("🔔", Ui.ACCENT, "સૂચનાઓ", null, false, new Runnable() { @Override public void run() { sh.bellSheet(); } }));
@@ -1747,17 +1836,13 @@ final class Screens {
 
         List<View> biz = new ArrayList<>();
         biz.add(srowT("🏪", Color.parseColor("#2196F3"), "વ્યવસાયનો પ્રકાર", s.biz.equals("service") ? "સર્વિસ પ્રોવાઈડર (સેવા નોંધ ચાલુ)" : "દુકાન / સ્ટોર · સર્વિસ માટે અહીં બદલો", null, null, new Runnable() { @Override public void run() { sh.bizSheet(); } }));
-        biz.add(srowT("◉", TEAL, "બિઝનેસ પ્રોફાઇલ", s.shop.isEmpty() ? "તમારા બિઝનેસની માહિતી અપડેટ કરો" : s.shop, null, null, new Runnable() { @Override public void run() { sh.profileSheet(); } }));
-        biz.add(srowT("👛", GREEN, "ઓપનિંગ બેલેન્સ", "ઓપનિંગ કેશ બેલેન્સ સેટ કરો", null, null, new Runnable() { @Override public void run() { sh.openBalSheet(); } }));
         biz.add(srowT("▦", PURP, "બિઝનેસ સેટઅપ", "UPI અને QR વિગતો", null, null, new Runnable() { @Override public void run() { sh.bizSetupSheet(); } }));
 
         List<View> app = new ArrayList<>();
         app.add(srowT("文", BLUE2, "ભાષા", s.lang.equals("hi-IN") ? "હિન્દી" : (s.lang.equals("en-IN") ? "English" : "ગુજરાતી"), null, null, new Runnable() { @Override public void run() { sh.voiceSetSheet(); } }));
-        app.add(srowT("◐", PURP, "એપ થીમ", themeName, null, null, new Runnable() { @Override public void run() { sh.themeSheet(); } }));
         app.add(srowSw("▤", PURP, "પ્રોડક્ટ પ્રમાણે એન્ટ્રી ચાલુ કરો", "એન્ટ્રીમાં પ્રોડક્ટ સિલેક્શન અને રેટ ચાલુ કરો", s.productMode, new Runnable() {
             @Override public void run() { s.productMode = !s.productMode; a.save(); a.render(); if (s.productMode && a.db.products.isEmpty()) sh.prodSheet(); }
         }));
-        app.add(srowT("☰", TEAL, "પ્રોડક્ટ માસ્ટર", "બનાવેલ પ્રોડક્ટ્સ જુઓ", null, null, new Runnable() { @Override public void run() { sh.prodSheet(); } }));
 
         List<View> svc = new ArrayList<>();
         svc.add(srowT("🎤", PURP, "અવાજ સેટિંગ", "ભાષા અને બોલીને જવાબ", null, null, new Runnable() { @Override public void run() { sh.voiceSetSheet(); } }));
@@ -1769,9 +1854,6 @@ final class Screens {
         sec.add(srowSw("☝", Color.parseColor("#2196F3"), "ફિંગરપ્રિન્ટ લૉક", "અનલૉક કરવા માટે બાયોમેટ્રિક્સ વાપરો", !s.bio.isEmpty(), new Runnable() { @Override public void run() { sh.bioToggle(); } }));
 
         List<View> bk = new ArrayList<>();
-        bk.add(srowT("☁", Color.parseColor("#2196F3"), "ડેટા બેકઅપ", a.backupTimeText(), a.backupFresh() ? "✔" : null, null, new Runnable() { @Override public void run() { sh.backupSheet(); } }));
-        if (!a.isStaff()) bk.add(srowT("⬆", GREEN, "બેકઅપ પાછું લાવો", "પહેલાં સેવ કરેલી ફાઇલ પસંદ કરો", null, null, new Runnable() { @Override public void run() { a.pickRestoreFile(); } }));
-        bk.add(srowT("⬇", ORANGE, "એપ અપડેટ ચકાસો", "નવા વર્ઝન માટે તપાસો", null, null, new Runnable() { @Override public void run() { a.checkUpdate(); } }));
 
         List<View> accn = new ArrayList<>();
         final boolean on = a.sync.loggedIn();
@@ -1783,16 +1865,12 @@ final class Screens {
                     a.sync.run(new Sync.Done() { @Override public void done(boolean ok, String err) { a.toast(ok ? "સિંક થઈ ગયું" : "સિંક ન થયું, ઇન્ટરનેટ તપાસો"); a.render(); } });
                 }
             }));
-            if (!a.sync.isStaff()) accn.add(srowT("👥", ORANGE, "કર્મચારીઓ (સ્ટાફ)", "ઉમેરો, OTP આપો, બ્લોક કરો", null, null, new Runnable() { @Override public void run() { sh.staffSheet(); } }));
-            if (a.sync.isAdmin()) accn.add(srowT("🛠", PINK, "એડમિન પેનલ", "નવી વિનંતિઓ, માલિકો અને OTP", null, null, new Runnable() { @Override public void run() { sh.adminSheet(); } }));
-            accn.add(srowT("⏻", Color.parseColor("#E11D48"), "લૉગઆઉટ", "આ ફોનમાંથી બહાર નીકળો", null, null, new Runnable() { @Override public void run() { a.logout(); } }));
         } else {
             accn.add(srowT("☁", BLUE, "સર્વર સેટઅપ", Api.configured() ? "સર્વર જોડાયેલ ✔" : "સ્ટાફ લૉગિન માટે સર્વર જોડો", null, null, new Runnable() { @Override public void run() { sh.serverSheet(); } }));
             if (Api.configured()) accn.add(srowT("→", GREEN, "લૉગિન કરો", "સર્વર સાથે જોડાઓ", null, null, new Runnable() { @Override public void run() { a.setSkipLogin(false); a.rebuild(); } }));
         }
 
         List<View> sup = new ArrayList<>();
-        sup.add(srowT("?", PURP, "FAQs", "વારંવાર પૂછાતા પ્રશ્નો", null, null, new Runnable() { @Override public void run() { sh.faqSheet(); } }));
         sup.add(srowT("!", ORANGE, "એપ પ્રતિસાદ", "તમારા સૂચનો શેર કરો અથવા ભૂલ અહેવાલ કરો", null, null, new Runnable() { @Override public void run() { sh.feedbackSheet(); } }));
         sup.add(srowT("🛡", GREY, "પ્રાઈવસી પોલીસી", "ડેટા વપરાશ અને સુરક્ષા માર્ગદર્શિકા", null, null, new Runnable() { @Override public void run() { sh.privacySheet(); } }));
 
@@ -1801,7 +1879,6 @@ final class Screens {
         root.addView(acc("app", "⚙", "એપ્લિકેશન", "ભાષા, થીમ અને એન્ટ્રી ઓપ્શન્સ", app, PURP));
         root.addView(acc("svc", "🧾", "સર્વિસિસ અને બિલિંગ", "અવાજ સેટિંગ, ટેસ્ટ અને શીખેલું", svc, Color.parseColor("#16A34A")));
         root.addView(acc("sec", "🛡", "સુરક્ષા", "એપ PIN અને બાયોમેટ્રિક સિક્યુરિટી", sec, Color.parseColor("#D97706")));
-        root.addView(acc("bk", "☁", "બેકઅપ અને એપ અપડેટ્સ", "બેકઅપ, રીસ્ટોર અને એપ અપડેટ", bk, Color.parseColor("#0EA5E9")));
         root.addView(acc("sup", "🎧", "સપોર્ટ અને લીગલ", "મદદ, FAQs, ફીડબેક અને નીતિઓ", sup, PINK));
 
         TextView wipe = Ui.t(c, "🗑  એકાઉન્ટ કાઢી નાખો", 15, Ui.RED, true);

@@ -29,7 +29,8 @@ final class Sheets {
     /** Entry form state. */
     static final class Form {
         String id = null, type = "income", partyId = null, name = "", amount = "", note = "", date = Fmt.today(), mode = "cash",
-                cat = "અન્ય", said = "", due = "", prodId = "", qty = "", pendingId = null, svc = "", paid = "";
+                cat = "અન્ય", said = "", due = "", prodId = "", qty = "", pendingId = null, svc = "", paid = "", centre = "";
+        double gst = -2;
         List<String[]> parts = new ArrayList<>();
         boolean lock = false;
     }
@@ -266,7 +267,11 @@ final class Sheets {
     }
 
     // ---------- entry form ----------
-    void openEntry(Form f) { form = f; renderForm(); }
+    void openEntry(Form f) {
+        if (f.gst == -2) f.gst = (a.db.settings.gstOn && f.id == null && (f.type.equals("gave") || f.type.equals("income"))) ? a.db.settings.gstRate : -1;
+        form = f;
+        renderForm();
+    }
 
     private void syncForm() {
         if (form == null) return;
@@ -503,6 +508,32 @@ final class Sheets {
                 }
             });
         }
+        if (!a.db.settings.centres.isEmpty() && (f.type.equals("expense") || f.type.equals("income"))) {
+            s.add(Ui.label(c, "ખર્ચ કેન્દ્ર (જરૂરી નથી)"));
+            android.widget.HorizontalScrollView hc = new android.widget.HorizontalScrollView(c);
+            hc.setHorizontalScrollBarEnabled(false);
+            LinearLayout cc = Ui.h(c);
+            Ui.pad(cc, 0, 6, 0, 0);
+            cc.addView(Ui.chip(c, "કોઈ નહીં", f.centre.isEmpty(), new Runnable() { @Override public void run() { syncForm(); form.centre = ""; renderForm(); } }));
+            for (final String ctr : listOf(a.db.settings.centres)) {
+                cc.addView(Ui.chip(c, ctr, ctr.equals(f.centre), new Runnable() { @Override public void run() { syncForm(); form.centre = ctr; renderForm(); } }));
+            }
+            hc.addView(cc);
+            s.add(hc);
+        }
+        if (a.db.settings.gstOn && (f.type.equals("gave") || f.type.equals("income"))) {
+            s.add(Ui.label(c, "GST % (રકમમાં GST શામેલ છે)"));
+            android.widget.HorizontalScrollView hg = new android.widget.HorizontalScrollView(c);
+            hg.setHorizontalScrollBarEnabled(false);
+            LinearLayout gl = Ui.h(c);
+            Ui.pad(gl, 0, 6, 0, 0);
+            double[] rates = {-1, 0, 5, 12, 18, 28};
+            for (final double r : rates) {
+                gl.addView(Ui.chip(c, r < 0 ? "GST નથી" : Fmt.plain(r) + "%", Math.abs(f.gst - r) < 0.001, new Runnable() { @Override public void run() { syncForm(); form.gst = r; renderForm(); } }));
+            }
+            hg.addView(gl);
+            s.add(hg);
+        }
         if (svcOn) {
             s.add(Ui.label(c, "સેવા / કામનું નામ"));
             fSvc = Ui.fld(c, "જેમ કે મશીન રિપેર", f.svc, Ui.IN_PLAIN);
@@ -655,6 +686,11 @@ final class Sheets {
         rec.mode = (f.type.equals("gave") || f.type.equals("took")) ? "" : f.mode;
         rec.cat = f.type.equals("expense") ? f.cat : "";
         rec.said = f.said;
+        Model.Product pdt = a.db.product(f.prodId);
+        double qv = parseD(f.qty);
+        if (pdt != null && qv > 0 && (f.type.equals("gave") || f.type.equals("took") || f.type.equals("income") || f.type.equals("expense"))) { rec.prodId = pdt.id; rec.qty = qv; }
+        rec.centre = (f.type.equals("expense") || f.type.equals("income")) ? f.centre : "";
+        rec.gst = (a.db.settings.gstOn && (f.type.equals("gave") || f.type.equals("income")) && f.gst >= 0) ? f.gst : -1;
         rec.due = ((f.type.equals("gave") || f.type.equals("took")) && Fmt.validIso(f.due)) ? f.due : "";
         boolean replaced = false;
         if (f.id != null) {
@@ -753,6 +789,7 @@ final class Sheets {
                 f.id = tx.id; f.type = tx.type; f.partyId = tx.partyId; f.name = pp != null ? pp.name : "";
                 f.amount = Fmt.plain(tx.amount).replace(",", ""); f.note = tx.note; f.date = tx.date;
                 f.mode = tx.mode.isEmpty() ? "cash" : tx.mode; f.cat = tx.cat.isEmpty() ? "અન્ય" : tx.cat; f.due = tx.due; f.lock = true;
+                f.prodId = tx.prodId; f.qty = tx.qty > 0 ? Fmt.plain(tx.qty).replace(",", "") : ""; f.centre = tx.centre; f.gst = tx.gst >= 0 ? tx.gst : -1;
                 openEntry(f);
             }
         }));
@@ -1327,10 +1364,22 @@ final class Sheets {
         s.show();
     }
 
-    private static final String[] UNITS = {"નંગ", "કિલો", "દિવસ", "ટન", "ક્વિન્ટલ"};
-    private String prodUnit = UNITS[0];
 
     // ---------- budget / expense categories / about ----------
+    /** Items of a simple ";"-separated list kept in settings. */
+    static List<String> listOf(String raw) {
+        List<String> out = new ArrayList<>();
+        if (raw == null) return out;
+        for (String x : raw.split(";")) { x = x.trim(); if (!x.isEmpty()) out.add(x); }
+        return out;
+    }
+
+    static String joinList(List<String> l) {
+        StringBuilder sb = new StringBuilder();
+        for (String x : l) sb.append(sb.length() > 0 ? ";" : "").append(x);
+        return sb.toString();
+    }
+
     static double budgetOf(String budgets, String cat) {
         if (budgets == null) return 0;
         for (String part : budgets.split(";")) {
@@ -1429,6 +1478,75 @@ final class Sheets {
         s.show();
     }
 
+    void gstSheet() {
+        final Model.Settings st = a.db.settings;
+        Ui.Sheet s = open("GST સેટિંગ");
+        s.add(said("ચાલુ કરશો તો વેચાણની નોંધમાં GST % પસંદ કરી શકાશે અને GSTR-1 રિપોર્ટ બનશે. રકમમાં GST શામેલ ગણાય છે."));
+        s.add(srow("GST", st.gstOn ? "ચાલુ છે · બંધ કરવા દબાવો" : "બંધ છે · ચાલુ કરવા દબાવો", null, new Runnable() {
+            @Override public void run() { st.gstOn = !st.gstOn; a.save(); a.render(); gstSheet(); }
+        }));
+        s.add(Ui.label(c, "GSTIN (જરૂરી નથી)"));
+        final EditText gn = Ui.fld(c, "24ABCDE1234F1Z5", st.gstin, Ui.IN_PLAIN);
+        s.add(gn);
+        s.add(Ui.label(c, "સામાન્ય GST દર"));
+        double[] rates = {0, 5, 12, 18, 28};
+        android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(c);
+        hs.setHorizontalScrollBarEnabled(false);
+        LinearLayout row = Ui.h(c);
+        Ui.pad(row, 0, 6, 0, 0);
+        for (final double r : rates) {
+            row.addView(Ui.chip(c, Fmt.plain(r) + "%", Math.abs(st.gstRate - r) < 0.001, new Runnable() {
+                @Override public void run() { st.gstin = gn.getText().toString().trim().toUpperCase(); st.gstRate = r; a.save(); gstSheet(); }
+            }));
+        }
+        hs.addView(row);
+        s.add(hs);
+        s.add(Ui.btn(c, "સેવ કરો", "primary", new Runnable() {
+            @Override public void run() {
+                String g = gn.getText().toString().trim().toUpperCase();
+                if (!g.isEmpty() && g.length() != 15) { a.toast("GSTIN 15 અક્ષરનો હોય છે"); return; }
+                st.gstin = g; a.save(); close(); a.render(); a.toast("GST સેટિંગ સેવ થયું");
+            }
+        }));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    private static String csv(String x) {
+        if (x == null) return "";
+        String y = x.replace("\"", "\"\"");
+        return (y.contains(",") || y.contains("\n") || y.contains("\"")) ? "\"" + y + "\"" : y;
+    }
+
+    void exportSheet() {
+        Ui.Sheet s = open("ઇમ્પોર્ટ / એક્સપોર્ટ");
+        s.add(said("એન્ટ્રી અને ખાતાની યાદી CSV માં શેર કરો (Excel, WhatsApp, ઇમેઇલમાં ખુલે). ફોન બદલવા માટે બેકઅપ ફાઇલ વાપરો."));
+        s.add(srow("બધી એન્ટ્રી (CSV)", a.db.txns.size() + " એન્ટ્રી શેર કરો", null, new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder("તારીખ,પ્રકાર,ખાતું,રકમ,નોંધ,મોડ,વર્ગ,કેન્દ્ર,GST%,કોણે\n");
+                for (Model.Txn t : a.db.sorted()) {
+                    Model.Party p = a.db.party(t.partyId);
+                    sb.append(csv(t.date)).append(',').append(csv(Model.type(t.type).label)).append(',').append(csv(p == null ? "" : p.name)).append(',')
+                      .append(Fmt.round2(t.amount)).append(',').append(csv(t.note)).append(',').append(csv(t.mode)).append(',').append(csv(t.cat)).append(',')
+                      .append(csv(t.centre)).append(',').append(t.gst >= 0 ? Fmt.plain(t.gst) : "").append(',').append(csv(t.by)).append('\n');
+                }
+                a.shareText(sb.toString());
+            }
+        }));
+        s.add(srow("ખાતાની યાદી (CSV)", a.db.parties.size() + " ખાતા શેર કરો", null, new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder("નામ,ફોન,પ્રકાર,બાકી\n");
+                for (Model.Party p : a.db.parties) {
+                    sb.append(csv(p.name)).append(',').append(csv(p.phone)).append(',').append(csv(a.db.kindOf(p).equals("creditor") ? "લેણદાર" : "ગ્રાહક")).append(',').append(Fmt.round2(a.db.partyBal(p.id))).append('\n');
+                }
+                a.shareText(sb.toString());
+            }
+        }));
+        s.add(srow("બેકઅપ ફાઇલથી પાછું લાવો", "પહેલાં સેવ કરેલી ફાઇલ પસંદ કરો", null, new Runnable() { @Override public void run() { close(); a.pickRestoreFile(); } }));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
     void aboutSheet() {
         Ui.Sheet s = open("એપ વિશે");
         TextView t = Ui.t(c, "Mera Hisab", 24, Ui.ACCENT, true);
@@ -1443,8 +1561,17 @@ final class Sheets {
         s.show();
     }
 
+    // ---------- products (stock items) ----------
+    private static final String[] DEFAULT_UNITS = {"નંગ", "કિલો", "દિવસ", "ટન", "ક્વિન્ટલ"};
+
+    List<String> unitList() {
+        List<String> l = listOf(a.db.settings.units);
+        if (l.isEmpty()) for (String u : DEFAULT_UNITS) l.add(u);
+        return l;
+    }
+
     void prodSheet() {
-        Ui.Sheet s = open("પ્રોડક્ટ યાદી");
+        Ui.Sheet s = open("પ્રોડક્ટ / માલ");
         if (a.db.products.isEmpty()) {
             TextView e = Ui.t(c, "હજી કોઈ પ્રોડક્ટ નથી.", 14, Ui.MUTED, false);
             e.setGravity(Gravity.CENTER);
@@ -1461,48 +1588,151 @@ final class Sheets {
                 row.setLayoutParams(rp);
                 LinearLayout mid = Ui.v(c);
                 mid.addView(Ui.t(c, p.name, 15, Ui.TEXT, true));
-                mid.addView(Ui.t(c, Fmt.money(p.rate) + " / " + p.unit, 12, Ui.MUTED, false));
+                mid.addView(Ui.t(c, Fmt.money(p.rate) + " / " + p.unit + " · સ્ટોક " + Fmt.plain(a.db.stockOf(p.id)), 12, Ui.MUTED, false));
+                String extra = (p.group.isEmpty() ? "" : p.group) + (p.godown.isEmpty() ? "" : (p.group.isEmpty() ? "" : " · ") + p.godown);
+                if (!extra.isEmpty()) mid.addView(Ui.t(c, extra, 11, Ui.ACCENT, false));
                 row.addView(mid, Ui.weight(1));
                 if (!a.isStaff()) {
                     TextView del = Ui.t(c, "🗑", 20, Ui.RED, true);
                     Ui.tap(del, new Runnable() { @Override public void run() { a.db.products.remove(p); a.save(); prodSheet(); a.render(); } });
                     row.addView(del);
+                    Ui.tap(mid, new Runnable() { @Override public void run() { prodForm(p); } });
                 }
                 list.addView(row);
             }
-            s.add(scrollBox(list, 200));
+            s.add(scrollBox(list, 320));
         }
-        s.add(Ui.label(c, "નવી પ્રોડક્ટ"));
-        final EditText nm = Ui.fld(c, "નામ, જેમ કે પેડલ", "", Ui.IN_TEXT); s.add(nm);
-        final EditText rate = Ui.fld(c, "રેટ ₹", "", Ui.IN_NUM); s.add(rate);
-        LinearLayout ur = Ui.h(c);
-        Ui.pad(ur, 0, 8, 0, 0);
-        for (final String u : UNITS) ur.addView(Ui.chip(c, u, u.equals(prodUnit), new Runnable() { @Override public void run() { prodUnit = u; prodSheetKeep(nm.getText().toString(), rate.getText().toString()); } }));
-        android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(c);
-        hs.addView(ur);
-        s.add(hs);
-        s.add(Ui.btn(c, "ઉમેરો", "primary", new Runnable() {
-            @Override public void run() {
-                String n = nm.getText().toString().trim();
-                String rv = rate.getText().toString().trim();
-                if (n.isEmpty() || rv.isEmpty()) { a.toast("નામ અને રેટ લખો"); return; }
-                Model.Product p = new Model.Product();
-                p.id = a.uid(); p.name = n; p.rate = parseD(rv); p.unit = prodUnit;
-                a.db.products.add(p);
-                a.save(); prodSheet(); a.render();
-            }
-        }));
+        if (!a.isStaff()) s.add(Ui.btn(c, "＋ નવી પ્રોડક્ટ", "primary", new Runnable() { @Override public void run() { prodForm(null); } }));
         s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
         s.show();
     }
 
-    private void prodSheetKeep(String name, String rate) {
-        prodSheet();
-        // refill typed values into the freshly built sheet
-        if (cur == null) return;
-        List<EditText> edits = new ArrayList<>();
-        collectEdits(cur.body, edits);
-        if (edits.size() >= 2) { edits.get(edits.size() - 2).setText(name); edits.get(edits.size() - 1).setText(rate); }
+    private String pfName = "", pfRate = "", pfQty = "", pfUnit = "", pfGroup = "", pfGodown = "";
+
+    void prodForm(Model.Product ex) {
+        if (ex != null) { pfName = ex.name; pfRate = ex.rate == 0 ? "" : Fmt.plain(ex.rate).replace(",", ""); pfQty = ex.openQty == 0 ? "" : Fmt.plain(ex.openQty).replace(",", ""); pfUnit = ex.unit; pfGroup = ex.group; pfGodown = ex.godown; }
+        else { pfName = ""; pfRate = ""; pfQty = ""; pfUnit = unitList().get(0); pfGroup = ""; pfGodown = ""; }
+        renderProdForm(ex);
+    }
+
+    private void renderProdForm(final Model.Product ex) {
+        Ui.Sheet s = open(ex == null ? "નવી પ્રોડક્ટ" : "પ્રોડક્ટ સુધારો");
+        s.add(Ui.label(c, "નામ"));
+        final EditText nm = Ui.fld(c, "નામ, જેમ કે પેડલ", pfName, Ui.IN_TEXT); s.add(nm);
+        s.add(Ui.label(c, "રેટ ₹"));
+        final EditText rate = Ui.fld(c, "0", pfRate, Ui.IN_NUM); s.add(rate);
+        s.add(Ui.label(c, "શરૂઆતનો સ્ટોક (જથ્થો)"));
+        final EditText qty = Ui.fld(c, "0", pfQty, Ui.IN_NUM); s.add(qty);
+        final Runnable keep = new Runnable() { @Override public void run() { pfName = nm.getText().toString(); pfRate = rate.getText().toString(); pfQty = qty.getText().toString(); } };
+        s.add(Ui.label(c, "એકમ"));
+        s.add(chipScroll(unitList(), pfUnit, false, new java.util.function.Consumer<String>() { @Override public void accept(String v) { keep.run(); pfUnit = v; renderProdForm(ex); } }));
+        if (!listOf(a.db.settings.groups).isEmpty()) {
+            s.add(Ui.label(c, "માલ વર્ગ"));
+            s.add(chipScroll(listOf(a.db.settings.groups), pfGroup, true, new java.util.function.Consumer<String>() { @Override public void accept(String v) { keep.run(); pfGroup = v; renderProdForm(ex); } }));
+        }
+        if (!listOf(a.db.settings.godowns).isEmpty()) {
+            s.add(Ui.label(c, "ગોડાઉન"));
+            s.add(chipScroll(listOf(a.db.settings.godowns), pfGodown, true, new java.util.function.Consumer<String>() { @Override public void accept(String v) { keep.run(); pfGodown = v; renderProdForm(ex); } }));
+        }
+        s.add(Ui.btn(c, "સેવ કરો", "primary", new Runnable() {
+            @Override public void run() {
+                keep.run();
+                String n = pfName.trim();
+                if (n.isEmpty() || pfRate.trim().isEmpty()) { a.toast("નામ અને રેટ લખો"); return; }
+                Model.Product p = ex != null ? ex : new Model.Product();
+                if (ex == null) { p.id = a.uid(); a.db.products.add(p); }
+                p.name = n; p.rate = parseD(pfRate); p.unit = pfUnit; p.openQty = parseD(pfQty); p.group = pfGroup; p.godown = pfGodown;
+                a.save(); prodSheet(); a.render();
+            }
+        }));
+        s.add(Ui.btn(c, "રદ કરો", "ghost", new Runnable() { @Override public void run() { prodSheet(); } }));
+        s.show();
+    }
+
+    /** Horizontal chips; with allowNone the first chip clears the choice. */
+    private View chipScroll(List<String> items, String cur, boolean allowNone, final java.util.function.Consumer<String> pick) {
+        android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(c);
+        hs.setHorizontalScrollBarEnabled(false);
+        LinearLayout l = Ui.h(c);
+        Ui.pad(l, 0, 6, 0, 0);
+        if (allowNone) l.addView(Ui.chip(c, "કોઈ નહીં", cur.isEmpty(), new Runnable() { @Override public void run() { pick.accept(""); } }));
+        for (final String it : items) l.addView(Ui.chip(c, it, it.equals(cur), new Runnable() { @Override public void run() { pick.accept(it); } }));
+        hs.addView(l);
+        return hs;
+    }
+
+    // ---------- simple master lists: units / groups / godowns / cost centres ----------
+    void listSheet(final String kind) {
+        final Model.Settings st = a.db.settings;
+        String title = kind.equals("units") ? "એકમ (Units)" : kind.equals("groups") ? "માલ વર્ગ" : kind.equals("godowns") ? "ગોડાઉન" : "ખર્ચ કેન્દ્ર";
+        String hint = kind.equals("units") ? "જેમ કે નંગ, કિલો" : kind.equals("groups") ? "જેમ કે એન્જિન પાર્ટ્સ" : kind.equals("godowns") ? "જેમ કે મુખ્ય ગોડાઉન" : "જેમ કે દુકાન, ઘર, ગાડી";
+        String raw = kind.equals("units") ? st.units : kind.equals("groups") ? st.groups : kind.equals("godowns") ? st.godowns : st.centres;
+        List<String> items = listOf(raw);
+        if (kind.equals("units") && items.isEmpty()) { for (String u : DEFAULT_UNITS) items.add(u); st.units = joinList(items); a.save(); }
+        Ui.Sheet s = open(title);
+        if (kind.equals("centres")) s.add(said("દરેક ખર્ચ કે આવક કોના ખાતે છે તે નક્કી કરવા કેન્દ્ર બનાવો. નોંધ કરતી વખતે પસંદ કરી શકાશે."));
+        LinearLayout list = Ui.v(c);
+        String month = Fmt.today().substring(0, 7);
+        for (final String it : items) {
+            LinearLayout row = Ui.h(c);
+            row.setBackground(Ui.rr(Ui.SURFACE2, 0, 14));
+            Ui.pad(row, 12, 10, 12, 10);
+            LinearLayout.LayoutParams rp = Ui.fillW();
+            rp.setMargins(0, Ui.dp(3), 0, Ui.dp(3));
+            row.setLayoutParams(rp);
+            LinearLayout mid = Ui.v(c);
+            mid.addView(Ui.t(c, it, 15, Ui.TEXT, true));
+            String sub = "";
+            if (kind.equals("groups") || kind.equals("godowns") || kind.equals("units")) {
+                int n = 0;
+                for (Model.Product p : a.db.products) if ((kind.equals("groups") ? p.group : kind.equals("godowns") ? p.godown : p.unit).equals(it)) n++;
+                sub = n + " પ્રોડક્ટ";
+            } else {
+                double ex = 0, in = 0;
+                for (Model.Txn t : a.db.txns) {
+                    if (!it.equals(t.centre) || t.date.length() < 7 || !t.date.substring(0, 7).equals(month)) continue;
+                    if (t.type.equals("expense")) ex += t.amount; else if (t.type.equals("income")) in += t.amount;
+                }
+                sub = "આ મહિને ખર્ચ " + Fmt.money(ex) + " · આવક " + Fmt.money(in);
+            }
+            mid.addView(Ui.t(c, sub, 12, Ui.MUTED, false));
+            row.addView(mid, Ui.weight(1));
+            TextView del = Ui.t(c, "🗑", 20, Ui.RED, true);
+            Ui.tap(del, new Runnable() {
+                @Override public void run() {
+                    List<String> l2 = listOf(kind.equals("units") ? st.units : kind.equals("groups") ? st.groups : kind.equals("godowns") ? st.godowns : st.centres);
+                    l2.remove(it);
+                    String j = joinList(l2);
+                    if (kind.equals("units")) st.units = j; else if (kind.equals("groups")) st.groups = j; else if (kind.equals("godowns")) st.godowns = j; else st.centres = j;
+                    a.save(); listSheet(kind);
+                }
+            });
+            row.addView(del);
+            list.addView(row);
+        }
+        if (items.isEmpty()) {
+            TextView e = Ui.t(c, "હજી કશું ઉમેર્યું નથી.", 14, Ui.MUTED, false);
+            e.setGravity(Gravity.CENTER);
+            Ui.pad(e, 10, 12, 10, 12);
+            list.addView(e);
+        }
+        s.add(scrollBox(list, 300));
+        final EditText nm = Ui.fld(c, hint, "", Ui.IN_TEXT);
+        s.add(nm);
+        s.add(Ui.btn(c, "ઉમેરો", "primary", new Runnable() {
+            @Override public void run() {
+                String v = nm.getText().toString().trim().replace(";", " ").replace("=", " ");
+                if (v.isEmpty()) { a.toast("નામ લખો"); return; }
+                List<String> l2 = listOf(kind.equals("units") ? st.units : kind.equals("groups") ? st.groups : kind.equals("godowns") ? st.godowns : st.centres);
+                if (l2.contains(v)) { a.toast("આ પહેલેથી છે"); return; }
+                l2.add(v);
+                String j = joinList(l2);
+                if (kind.equals("units")) st.units = j; else if (kind.equals("groups")) st.groups = j; else if (kind.equals("godowns")) st.godowns = j; else st.centres = j;
+                a.save(); listSheet(kind);
+            }
+        }));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
     }
 
     private void collectEdits(View v, List<EditText> out) {
