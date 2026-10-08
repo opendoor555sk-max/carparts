@@ -577,6 +577,42 @@ public final class I18n {
     }
     private static void put(String g, String h, String e) { M.put(g, new String[]{h, e}); }
     private static void init10() {
+        put("માસ્ટર", "मास्टर", "Masters");
+        put("ખાતા, માલ અને સેટઅપ", "खाते, माल और सेटअप", "Accounts, items and setup");
+        put("ખાતાવહી", "खाता-बही", "Ledgers");
+        put("બધા ખાતા અને બાકી", "सभी खाते और बाकी", "All accounts and dues");
+        put("ગ્રાહકો", "ग्राहक", "Customers");
+        put("જેમની પાસેથી લેવાના", "जिनसे लेना है", "Who owe you");
+        put("લેણદારો", "लेनदार", "Suppliers");
+        put("જેમને આપવાના", "जिन्हें देना है", "Whom you owe");
+        put("પ્રોડક્ટ / માલ", "प्रोडक्ट / माल", "Products / Items");
+        put("ખર્ચ વર્ગ", "खर्च वर्ग", "Expense categories");
+        put("વર્ગ મુજબ ખર્ચ", "वर्ग के अनुसार खर्च", "Spending by category");
+        put("બજેટ", "बजट", "Budget");
+        put("મહિનાના ખર્ચની હદ", "महीने के खर्च की सीमा", "Monthly spending limit");
+        put("સ્ટાફ", "स्टाफ", "Staff");
+        put("કર્મચારીઓ અને OTP", "कर्मचारी और OTP", "Staff and OTP");
+        put("લૉગિન / સર્વર", "लॉगिन / सर्वर", "Login / server");
+        put("ઓપનિંગ બેલેન્સ", "ओपनिंग बैलेंस", "Opening balance");
+        put("શરૂઆતના પૈસા", "शुरुआती पैसे", "Starting money");
+        put("વધુ", "और", "More");
+        put("કંપની માહિતી", "कंपनी की जानकारी", "Company info");
+        put("સ્ટાફ અને યુઝર", "स्टाफ और यूज़र", "Staff & users");
+        put("બેકઅપ અને રીસ્ટોર", "बैकअप और रीस्टोर", "Backup & restore");
+        put("એપ અપડેટ", "ऐप अपडेट", "App update");
+        put("થીમ", "थीम", "Theme");
+        put("સૂચનાઓ", "सूचनाएँ", "Notifications");
+        put("મદદ અને સપોર્ટ", "मदद और सपोर्ट", "Help & support");
+        put("એપ વિશે", "ऐप के बारे में", "About app");
+        put("લૉગઆઉટ", "लॉगआउट", "Log out");
+        put("બધા સેટિંગ", "सभी सेटिंग", "All settings");
+        put("ખર્ચ વર્ગ · ", "खर्च वर्ग · ", "Expense categories · ");
+        put("કુલ ખર્ચ: ", "कुल खर्च: ", "Total expenses: ");
+        put("દરેક ખર્ચ વર્ગ માટે મહિનાની હદ લખો. ખાલી એટલે બજેટ નહીં.", "हर खर्च वर्ग के लिए महीने की सीमा लिखें। खाली यानी बजट नहीं।", "Enter a monthly limit for each category. Empty means no budget.");
+        put("બજેટ (₹)", "बजट (₹)", "Budget (₹)");
+        put("ખર્ચ ", "खर्च ", "Spent ");
+        put("બજેટ સેવ થયું", "बजट सेव हुआ", "Budget saved");
+        put("બોલીને હિસાબ લખો: ખાતા, ઉધાર, જમા, આવક અને ખર્ચ. ડેટા તમારા ફોનમાં સુરક્ષિત રહે છે.", "बोलकर हिसाब लिखें: खाते, उधार, जमा, आमदनी और खर्च। डेटा आपके फ़ोन में सुरक्षित रहता है।", "Speak to record accounts: credit, receipts, income and expenses. Your data stays safe on your phone.");
         put("નાણાકીય રિપોર્ટ", "वित्तीय रिपोर्ट", "Financial Reports");
         put("મુખ્ય હિસાબ અને સારાંશ", "मुख्य हिसाब और सारांश", "Key statements and summaries");
         put("સંપત્તિ, દેવું અને મૂડી", "संपत्ति, देनदारी और पूँजी", "Assets, Liabilities & Equity");

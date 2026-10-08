@@ -51,7 +51,7 @@ public final class Model {
 
     public static final class Settings {
         public String owner = "", shop = "", phone = "", addr = "", lang = "gu-IN", theme = "system", upiId = "", upiName = "",
-                pinHash = "", bio = "", lastBackup = "", deviceId = "";
+                pinHash = "", bio = "", lastBackup = "", deviceId = "", budgets = "";
         public double openCash, openBank;
         public String biz = "store", bizCat = "";
         public boolean productMode = false, speak = true, setupDone = false;
@@ -269,7 +269,7 @@ public final class Model {
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("owner", settings.owner); s.put("shop", settings.shop); s.put("phone", settings.phone); s.put("addr", settings.addr);
             s.put("lang", settings.lang); s.put("theme", settings.theme); s.put("openCash", settings.openCash); s.put("openBank", settings.openBank);
-            s.put("upiId", settings.upiId); s.put("upiName", settings.upiName); s.put("productMode", settings.productMode); s.put("biz", settings.biz); s.put("bizCat", settings.bizCat); s.put("setupDone", settings.setupDone);
+            s.put("upiId", settings.upiId); s.put("upiName", settings.upiName); s.put("productMode", settings.productMode); s.put("biz", settings.biz); s.put("bizCat", settings.bizCat); s.put("setupDone", settings.setupDone); s.put("budgets", settings.budgets);
             s.put("speak", settings.speak); s.put("pinHash", settings.pinHash); s.put("bio", settings.bio);
             s.put("lastBackup", settings.lastBackup); s.put("deviceId", settings.deviceId);
             List<Object> rv = new ArrayList<>();
@@ -378,7 +378,7 @@ public final class Model {
                 s.openCash = num(m, "openCash"); s.openBank = num(m, "openBank");
                 s.upiId = str(m, "upiId"); s.upiName = str(m, "upiName");
                 s.productMode = Boolean.TRUE.equals(m.get("productMode"));
-                s.biz = str(m, "biz").equals("service") ? "service" : "store"; s.bizCat = str(m, "bizCat"); s.setupDone = Boolean.TRUE.equals(m.get("setupDone"));
+                s.biz = str(m, "biz").equals("service") ? "service" : "store"; s.bizCat = str(m, "bizCat"); s.budgets = str(m, "budgets"); s.setupDone = Boolean.TRUE.equals(m.get("setupDone"));
                 s.speak = !Boolean.FALSE.equals(m.get("speak"));
                 s.pinHash = str(m, "pinHash"); s.bio = str(m, "bio"); s.lastBackup = str(m, "lastBackup"); s.deviceId = str(m, "deviceId");
             }

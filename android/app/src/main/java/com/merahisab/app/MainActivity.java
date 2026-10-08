@@ -393,6 +393,7 @@ public class MainActivity extends Activity {
         else if (tab.equals("txn")) v = screens.txn();
         else if (tab.equals("rep")) v = screens.reports();
         else if (tab.equals("khata")) v = screens.khata();
+        else if (tab.equals("masters")) v = screens.masters();
         else v = screens.more();
         scroll.removeAllViews();
         v.setPadding(0, 0, 0, Ui.dp(24));
@@ -405,9 +406,9 @@ public class MainActivity extends Activity {
         navBar.removeAllViews();
         navBar.setBackgroundColor(Ui.SURFACE);
         navBar.setElevation(Ui.dp(8));
-        String[][] items = {{"home", "હોમ", "⌂"}, {"txn", "એન્ટ્રીઓ", "▤"}, {"rep", "રિપોર્ટ", "▥"}, {"khata", "ખાતા", "👥"}, {"more", "વધુ", "⋯"}};
+        String[][] items = {{"home", "હોમ", "⌂"}, {"txn", "એન્ટ્રીઓ", "▤"}, {"rep", "રિપોર્ટ", "▥"}, {"masters", "માસ્ટર", "▦"}, {"more", "વધુ", "⋯"}};
         for (final String[] it : items) {
-            boolean on = it[0].equals(tab) && partyId == null || (it[0].equals("khata") && partyId != null);
+            boolean on = it[0].equals(tab) && partyId == null || (it[0].equals("masters") && (partyId != null || tab.equals("khata")));
             LinearLayout col = Ui.v(this);
             col.setGravity(Gravity.CENTER);
             TextView g = Ui.t(this, it[2], 20, on ? Ui.ACCENT : Ui.MUTED, true);

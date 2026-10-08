@@ -1330,6 +1330,119 @@ final class Sheets {
     private static final String[] UNITS = {"નંગ", "કિલો", "દિવસ", "ટન", "ક્વિન્ટલ"};
     private String prodUnit = UNITS[0];
 
+    // ---------- budget / expense categories / about ----------
+    static double budgetOf(String budgets, String cat) {
+        if (budgets == null) return 0;
+        for (String part : budgets.split(";")) {
+            int i = part.lastIndexOf('=');
+            if (i > 0 && part.substring(0, i).equals(cat)) { try { return Double.parseDouble(part.substring(i + 1)); } catch (Exception e) { return 0; } }
+        }
+        return 0;
+    }
+
+    private Map<String, Double> monthExpenseByCat() {
+        Map<String, Double> m = new java.util.LinkedHashMap<>();
+        String month = Fmt.today().substring(0, 7);
+        for (Model.Txn t : a.db.txns) {
+            if (!t.type.equals("expense") || t.date.length() < 7 || !t.date.substring(0, 7).equals(month) || "writeoff".equals(t.mode)) continue;
+            String k = (t.cat == null || t.cat.isEmpty()) ? "અન્ય" : t.cat;
+            Double o = m.get(k);
+            m.put(k, (o == null ? 0 : o) + t.amount);
+        }
+        return m;
+    }
+
+    private View meter(double frac) {
+        LinearLayout bar = Ui.h(c);
+        bar.setBackground(Ui.rr(Ui.SURFACE2, 0, 4));
+        double f = Math.max(0, Math.min(1, frac));
+        View fill = new View(c);
+        fill.setBackground(Ui.rr(frac > 1 ? Ui.RED : (frac > 0.8 ? Ui.AMBER : Ui.GREEN), 0, 4));
+        bar.addView(fill, new LinearLayout.LayoutParams(0, Ui.dp(7), (float) Math.max(f, 0.001)));
+        bar.addView(new View(c), new LinearLayout.LayoutParams(0, Ui.dp(7), (float) Math.max(1 - f, 0.001)));
+        LinearLayout.LayoutParams p = Ui.fillW();
+        p.setMargins(0, Ui.dp(4), 0, Ui.dp(2));
+        bar.setLayoutParams(p);
+        return bar;
+    }
+
+    void expCatSheet() {
+        Ui.Sheet s = open("ખર્ચ વર્ગ · " + Fmt.monthLabel(Fmt.today().substring(0, 7)));
+        Map<String, Double> m = monthExpenseByCat();
+        double tot = 0;
+        for (double v : m.values()) tot += v;
+        LinearLayout list = Ui.v(c);
+        for (String cat : Fmt.CATS) {
+            Double v = m.get(cat);
+            double x = v == null ? 0 : v;
+            LinearLayout r = Ui.v(c);
+            Ui.pad(r, 4, 8, 4, 8);
+            LinearLayout line = Ui.h(c);
+            line.addView(Ui.t(c, cat, 15, Ui.TEXT, true), Ui.weight(1));
+            line.addView(Ui.t(c, Fmt.money(x), 15, x > 0 ? Ui.RED : Ui.MUTED, true));
+            r.addView(line);
+            r.addView(meter(tot > 0 ? x / tot : 0));
+            list.addView(r);
+        }
+        s.add(scrollBox(list, 380));
+        s.add(Ui.t(c, "કુલ ખર્ચ: " + Fmt.money(tot), 15, Ui.TEXT, true));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    void budgetSheet() {
+        final Model.Settings st = a.db.settings;
+        Ui.Sheet s = open("બજેટ");
+        s.add(said("દરેક ખર્ચ વર્ગ માટે મહિનાની હદ લખો. ખાલી એટલે બજેટ નહીં."));
+        Map<String, Double> spent = monthExpenseByCat();
+        LinearLayout list = Ui.v(c);
+        final List<EditText> fields = new ArrayList<>();
+        for (String cat : Fmt.CATS) {
+            double b = budgetOf(st.budgets, cat);
+            Double v = spent.get(cat);
+            double x = v == null ? 0 : v;
+            LinearLayout r = Ui.v(c);
+            Ui.pad(r, 2, 6, 2, 6);
+            LinearLayout line = Ui.h(c);
+            line.addView(Ui.t(c, cat, 15, Ui.TEXT, true), Ui.weight(1));
+            line.addView(Ui.t(c, "ખર્ચ " + Fmt.money(x), 12, x > b && b > 0 ? Ui.RED : Ui.MUTED, true));
+            r.addView(line);
+            EditText e = Ui.fld(c, "બજેટ (₹)", b > 0 ? Fmt.plain(b).replace(",", "") : "", Ui.IN_NUM);
+            fields.add(e);
+            r.addView(e);
+            if (b > 0) r.addView(meter(x / b));
+            list.addView(r);
+        }
+        s.add(scrollBox(list, 380));
+        s.add(Ui.btn(c, "સેવ કરો", "primary", new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < Fmt.CATS.length; i++) {
+                    double v = parseD(fields.get(i).getText().toString());
+                    if (v > 0) sb.append(sb.length() > 0 ? ";" : "").append(Fmt.CATS[i]).append("=").append(v);
+                }
+                st.budgets = sb.toString();
+                a.save(); close(); a.render(); a.toast("બજેટ સેવ થયું");
+            }
+        }));
+        s.add(Ui.btn(c, "રદ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
+    void aboutSheet() {
+        Ui.Sheet s = open("એપ વિશે");
+        TextView t = Ui.t(c, "Mera Hisab", 24, Ui.ACCENT, true);
+        t.setGravity(Gravity.CENTER);
+        s.add(t);
+        TextView v = Ui.t(c, "Version " + a.versionName(), 13, Ui.MUTED, false);
+        v.setGravity(Gravity.CENTER);
+        s.add(v);
+        s.add(said("બોલીને હિસાબ લખો: ખાતા, ઉધાર, જમા, આવક અને ખર્ચ. ડેટા તમારા ફોનમાં સુરક્ષિત રહે છે."));
+        s.add(srow("પ્રાઈવસી પોલીસી", "ડેટા વપરાશ અને સુરક્ષા", null, new Runnable() { @Override public void run() { privacySheet(); } }));
+        s.add(Ui.btn(c, "બંધ કરો", "ghost", new Runnable() { @Override public void run() { close(); } }));
+        s.show();
+    }
+
     void prodSheet() {
         Ui.Sheet s = open("પ્રોડક્ટ યાદી");
         if (a.db.products.isEmpty()) {
