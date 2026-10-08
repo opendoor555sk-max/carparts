@@ -577,6 +577,24 @@ public final class I18n {
     }
     private static void put(String g, String h, String e) { M.put(g, new String[]{h, e}); }
     private static void init10() {
+        put("લાઇન", "लाइन", "Line");
+        put("બાર", "बार", "Bar");
+        put("આવક વિ ખર્ચ", "आय बनाम खर्च", "Income vs expense");
+        put("કુલ સરવાળો", "कुल जोड़", "Running total");
+        put("યાદી", "सूची", "List");
+        put("ડોનટ", "डोनट", "Donut");
+        put("પાઇ", "पाई", "Pie");
+        put("પટ્ટી", "पट्टी", "Stacked bar");
+        put("છેલ્લા ૬ મહિના", "पिछले 6 महीने", "Last 6 months");
+        put("ગયા વર્ષ", "पिछला साल", "Last year");
+        put("ગયા મહિને", "पिछले महीने", "Last month");
+        put("આ વર્ષ", "इस साल", "This year");
+        put("આ મહિને", "इस महीने", "This month");
+        put("નફાનો ગ્રાફ", "मुनाफे का ग्राफ", "Profit graph");
+        put("ખર્ચનો ગ્રાફ", "खर्च का ग्राफ", "Expense graph");
+        put("ગ્રાફનો પ્રકાર", "ग्राफ का प्रकार", "Graph type");
+        put("સમયગાળો", "अवधि", "Period");
+        put("આ સમયગાળામાં ખર્ચ નથી", "इस अवधि में खर्च नहीं है", "No expenses in this period");
         put("માલ રિપોર્ટ", "माल रिपोर्ट", "Inventory reports");
         put("સ્ટોક અને માલની ગતિ", "स्टॉक और माल की आवाजाही", "Stock and movement");
         put("સ્ટોક સારાંશ", "स्टॉक सारांश", "Stock summary");

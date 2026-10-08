@@ -286,10 +286,18 @@ final class Screens {
         LinearLayout stats = Ui.h(c);
         stats.setGravity(Gravity.TOP);
         Ui.pad(stats, 10, 0, 10, 0);
-        stats.addView(statCard("💰", Ui.GREEN, "રોકડ + બેંક", cashNow, pct(cashNow, cashPrev), true, "ગયા મહિને"), cardLp());
-        stats.addView(statCard("👥", Ui.AMBER, "લેવાના", due.recv, pct(due.recv, duePrev[0]), true, "ગયા મહિને"), cardLp());
-        stats.addView(statCard("🏪", Ui.RED, "દેવાના", due.pay, pct(due.pay, duePrev[1]), false, "ગયા મહિને"), cardLp());
-        stats.addView(statCard("📈", Ui.BLUE, "આજની આવક", td.sales(), pct(td.sales(), yd.sales()), true, "ગઈકાલ"), cardLp());
+        View sc1 = statCard("💰", Ui.GREEN, "રોકડ + બેંક", cashNow, pct(cashNow, cashPrev), true, "ગયા મહિને");
+        View sc2 = statCard("👥", Ui.AMBER, "લેવાના", due.recv, pct(due.recv, duePrev[0]), true, "ગયા મહિને");
+        View sc3 = statCard("🏪", Ui.RED, "દેવાના", due.pay, pct(due.pay, duePrev[1]), false, "ગયા મહિને");
+        View sc4 = statCard("📈", Ui.BLUE, "આજની આવક", td.sales(), pct(td.sales(), yd.sales()), true, "ગઈકાલ");
+        Ui.tap(sc1, new Runnable() { @Override public void run() { a.go("rep"); openRep("cf"); } });
+        Ui.tap(sc2, new Runnable() { @Override public void run() { a.kf = "customer"; a.kq = ""; a.go("khata"); } });
+        Ui.tap(sc3, new Runnable() { @Override public void run() { a.kf = "creditor"; a.kq = ""; a.go("khata"); } });
+        Ui.tap(sc4, new Runnable() { @Override public void run() { a.period = "day"; a.day = Fmt.today(); a.filter = "all"; a.fparty = ""; a.go("txn"); } });
+        stats.addView(sc1, cardLp());
+        stats.addView(sc2, cardLp());
+        stats.addView(sc3, cardLp());
+        stats.addView(sc4, cardLp());
         root.addView(stats);
 
         // ---- 4 big colour buttons ----
@@ -505,80 +513,250 @@ final class Screens {
         return t;
     }
 
-    private View profitCard(Model.Db db, java.time.LocalDate now) {
-        LinearLayout k = Ui.card(c);
-        Ui.pad(k, 10, 10, 10, 8);
-        LinearLayout h = Ui.h(c);
-        TextView t = Ui.t(c, "માસિક નફાનો ટ્રેન્ડ", 12, Ui.TEXT, true);
-        h.addView(t, Ui.weight(1));
-        k.addView(h);
-        k.addView(pillTag("આ વર્ષ ▾"));
+    // ---------------- graphs (5 types each, shared by Home cards and full pages) ----------------
+    int pType = 0, pPer = 0, eType = 0, ePer = 0;
+    static final String[] P_TYPES = {"લાઇન", "બાર", "આવક વિ ખર્ચ", "કુલ સરવાળો", "યાદી"};
+    static final String[] P_PERS = {"આ વર્ષ", "છેલ્લા ૬ મહિના", "ગયા વર્ષ"};
+    static final String[] E_TYPES = {"ડોનટ", "પાઇ", "બાર", "પટ્ટી", "યાદી"};
+    static final String[] E_PERS = {"આ મહિને", "ગયા મહિને", "આ વર્ષ"};
+
+    private static final class Series { String[] lab; double[] inc, exp, profit; }
+
+    private Series monthly(int per) {
+        java.time.LocalDate now = java.time.LocalDate.now();
         int fy = now.getMonthValue() >= 4 ? now.getYear() : now.getYear() - 1;
-        List<Double> vals = new ArrayList<>();
+        java.time.LocalDate m, end;
+        if (per == 1) { end = now.withDayOfMonth(1); m = end.minusMonths(5); }
+        else if (per == 2) { m = java.time.LocalDate.of(fy - 1, 4, 1); end = java.time.LocalDate.of(fy, 3, 1); }
+        else { m = java.time.LocalDate.of(fy, 4, 1); end = now.withDayOfMonth(1); }
+        List<double[]> rows = new ArrayList<>();
         List<String> labs = new ArrayList<>();
-        java.time.LocalDate m = java.time.LocalDate.of(fy, 4, 1);
-        while (!m.isAfter(now.withDayOfMonth(1))) {
+        while (!m.isAfter(end)) {
             String key = String.format(java.util.Locale.US, "%04d-%02d", m.getYear(), m.getMonthValue());
             Fin fm = fin(key + "-01", key + "-31");
-            vals.add(fm.profit());
+            rows.add(new double[]{fm.revenue(), fm.costs(), fm.profit()});
             String mn = I18n.month(m.getMonthValue() - 1);
             labs.add(mn.length() > 4 ? mn.substring(0, 4) : mn);
             m = m.plusMonths(1);
         }
-        double[] dv = new double[vals.size()];
-        for (int i = 0; i < dv.length; i++) dv[i] = vals.get(i);
-        k.addView(new ChartViews.Line(c, dv, labs.toArray(new String[0])), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(130)));
+        Series sr = new Series();
+        int n = rows.size();
+        sr.lab = labs.toArray(new String[0]);
+        sr.inc = new double[n]; sr.exp = new double[n]; sr.profit = new double[n];
+        for (int i = 0; i < n; i++) { sr.inc[i] = rows.get(i)[0]; sr.exp[i] = rows.get(i)[1]; sr.profit[i] = rows.get(i)[2]; }
+        return sr;
+    }
+
+    private View profitChart(int type, Series sr, int heightDp) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(heightDp));
+        int n = sr.lab.length;
+        if (type == 1) return wrapLp(new ChartViews.Bars(c, sr.profit, null, sr.lab, Ui.T1, Ui.T1), lp);
+        if (type == 2) return wrapLp(new ChartViews.Bars(c, sr.inc, sr.exp, sr.lab, Ui.GREEN, Ui.RED), lp);
+        if (type == 3) {
+            double[] cum = new double[n];
+            double t = 0;
+            for (int i = 0; i < n; i++) { t += sr.profit[i]; cum[i] = t; }
+            return wrapLp(new ChartViews.Line(c, cum, sr.lab), lp);
+        }
+        if (type == 4) {
+            LinearLayout l = Ui.v(c);
+            for (int i = n - 1; i >= 0; i--) {
+                LinearLayout r = Ui.h(c);
+                Ui.pad(r, 2, 4, 2, 4);
+                r.addView(Ui.t(c, sr.lab[i], 12, Ui.TEXT, false), Ui.weight(1));
+                r.addView(Ui.t(c, ChartViews.shortMoney(sr.profit[i]), 12, sr.profit[i] >= 0 ? Ui.GREEN : Ui.RED, true));
+                l.addView(r);
+            }
+            return l;
+        }
+        return wrapLp(new ChartViews.Line(c, sr.profit, sr.lab), lp);
+    }
+
+    private View wrapLp(View v, LinearLayout.LayoutParams lp) { v.setLayoutParams(lp); return v; }
+
+    private View dropPill(final String[] opts, int cur, final java.util.function.IntConsumer pick) {
+        final TextView t = (TextView) pillTag(I18n.tr(opts[cur]) + " ▾");
+        Ui.tap(t, new Runnable() {
+            @Override public void run() {
+                android.widget.PopupMenu pm = new android.widget.PopupMenu(c, t);
+                for (int i = 0; i < opts.length; i++) pm.getMenu().add(0, i, i, I18n.tr(opts[i]));
+                pm.setOnMenuItemClickListener(new android.widget.PopupMenu.OnMenuItemClickListener() {
+                    @Override public boolean onMenuItemClick(android.view.MenuItem it) { pick.accept(it.getItemId()); return true; }
+                });
+                pm.show();
+            }
+        });
+        return t;
+    }
+
+    private View profitCard(Model.Db db, java.time.LocalDate now) {
+        LinearLayout k = Ui.card(c);
+        Ui.pad(k, 10, 10, 10, 8);
+        k.addView(Ui.t(c, "માસિક નફાનો ટ્રેન્ડ", 12, Ui.TEXT, true));
+        k.addView(dropPill(P_PERS, pPer, new java.util.function.IntConsumer() {
+            @Override public void accept(int i) { pPer = i; a.render(); }
+        }));
+        Series sr = monthly(pPer);
+        View ch = profitChart(pType, sr, 130);
+        k.addView(ch);
+        Ui.tap(k, new Runnable() { @Override public void run() { a.go("rep"); openRep("chart_profit"); } });
         return k;
     }
 
-    private View expenseCard(Model.Db db, String month, Model.Totals mt) {
-        LinearLayout k = Ui.card(c);
-        Ui.pad(k, 10, 10, 10, 8);
-        k.addView(Ui.t(c, "ખર્ચની વહેંચણી", 12, Ui.TEXT, true));
-        k.addView(pillTag("આ મહિને ▾"));
-        Fin fe = fin(month + "-01", month + "-31");
-        Map<String, Double> cat = new java.util.LinkedHashMap<>(fe.cats);
+    private static final class ExpData { String[] names; double[] v; int[] cols; double tot; }
+
+    private ExpData expData(int per, int maxItems) {
+        java.time.LocalDate now = java.time.LocalDate.now();
+        String from, to;
+        if (per == 1) { java.time.LocalDate lm = now.withDayOfMonth(1).minusMonths(1); from = lm.toString(); to = lm.withDayOfMonth(lm.lengthOfMonth()).toString(); }
+        else if (per == 2) { int fy = now.getMonthValue() >= 4 ? now.getYear() : now.getYear() - 1; from = fy + "-04-01"; to = "9999-12-31"; }
+        else { from = now.withDayOfMonth(1).toString(); to = "9999-12-31"; }
+        Fin fe = fin(from, to);
+        Map<String, Double> cat = new LinkedHashMap<>(fe.cats);
         if (fe.took > 0) cat.put("ઉધાર ખરીદી", fe.took);
         if (fe.badDebt > 0) cat.put("ડૂબેલી રકમ", fe.badDebt);
         List<Map.Entry<String, Double>> es = new ArrayList<>(cat.entrySet());
         java.util.Collections.sort(es, new java.util.Comparator<Map.Entry<String, Double>>() {
             @Override public int compare(Map.Entry<String, Double> x, Map.Entry<String, Double> y) { return Double.compare(y.getValue(), x.getValue()); }
         });
-        int[] pal = {Color.parseColor("#3B82F6"), Color.parseColor("#14B8A6"), Color.parseColor("#F59E0B"), Color.parseColor("#A855F7"), Color.parseColor("#94A3B8")};
+        int[] pal = {Color.parseColor("#3B82F6"), Color.parseColor("#14B8A6"), Color.parseColor("#F59E0B"), Color.parseColor("#A855F7"), Color.parseColor("#EF4444"), Color.parseColor("#22C55E"), Color.parseColor("#EC4899"), Color.parseColor("#94A3B8")};
         List<String> names = new ArrayList<>();
         List<Double> amts = new ArrayList<>();
         double other = 0, tot = 0;
         for (int i = 0; i < es.size(); i++) {
             tot += es.get(i).getValue();
-            if (i < 4) { names.add(es.get(i).getKey()); amts.add(es.get(i).getValue()); } else other += es.get(i).getValue();
+            if (i < maxItems) { names.add(es.get(i).getKey()); amts.add(es.get(i).getValue()); } else other += es.get(i).getValue();
         }
         if (other > 0) { names.add("અન્ય"); amts.add(other); }
-        double[] dv = new double[amts.size()];
-        int[] cols = new int[amts.size()];
-        for (int i = 0; i < dv.length; i++) { dv[i] = amts.get(i); cols[i] = pal[i]; }
-        View donut = new ChartViews.Donut(c, dv, cols, ChartViews.shortMoney(tot), I18n.tr("કુલ ખર્ચ"));
-        LinearLayout.LayoutParams dp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(96));
-        dp.setMargins(0, Ui.dp(6), 0, Ui.dp(4));
-        k.addView(donut, dp);
-        for (int i = 0; i < names.size(); i++) {
+        ExpData d = new ExpData();
+        d.names = new String[names.size()];
+        d.v = new double[names.size()];
+        d.cols = new int[names.size()];
+        for (int i = 0; i < d.v.length; i++) { d.names[i] = I18n.tr(names.get(i)); d.v[i] = amts.get(i); d.cols[i] = pal[Math.min(i, pal.length - 1)]; }
+        d.tot = tot;
+        return d;
+    }
+
+    private View expChart(int type, ExpData d, int heightDp) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(heightDp));
+        lp.setMargins(0, Ui.dp(6), 0, Ui.dp(4));
+        if (type == 1) return wrapLp(new ChartViews.Donut(c, d.v, d.cols, "", "").asPie(), lp);
+        if (type == 2) {
+            lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(Math.max(60, d.v.length * 26)));
+            lp.setMargins(0, Ui.dp(6), 0, Ui.dp(4));
+            return wrapLp(new ChartViews.HBars(c, d.names, d.v, d.cols), lp);
+        }
+        if (type == 3) return wrapLp(new ChartViews.Stack(c, d.v, d.cols), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(50)));
+        if (type == 4) return new LinearLayout(c);
+        return wrapLp(new ChartViews.Donut(c, d.v, d.cols, ChartViews.shortMoney(d.tot), I18n.tr("કુલ ખર્ચ")), lp);
+    }
+
+    private void expLegend(LinearLayout k, ExpData d) {
+        for (int i = 0; i < d.names.length; i++) {
             LinearLayout r = Ui.h(c);
+            Ui.pad(r, 0, 2, 0, 2);
             View dot = new View(c);
-            dot.setBackground(Ui.rr(cols[i], 0, 5));
+            dot.setBackground(Ui.rr(d.cols[i], 0, 5));
             LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(Ui.dp(8), Ui.dp(8));
             dl.setMargins(0, 0, Ui.dp(5), 0);
             r.addView(dot, dl);
-            TextView n = Ui.t(c, names.get(i), 10, Ui.TEXT, false);
+            TextView n = Ui.t(c, d.names[i], 10, Ui.TEXT, false);
             n.setSingleLine(true);
             r.addView(n, Ui.weight(1));
-            r.addView(Ui.t(c, Math.round(dv[i] / tot * 100) + "%", 10, Ui.MUTED, true));
+            r.addView(Ui.t(c, Math.round(d.v[i] / d.tot * 100) + "%", 10, Ui.MUTED, true));
             k.addView(r);
         }
-        if (names.isEmpty()) {
+    }
+
+    private View expenseCard(Model.Db db, String month, Model.Totals mt) {
+        LinearLayout k = Ui.card(c);
+        Ui.pad(k, 10, 10, 10, 8);
+        k.addView(Ui.t(c, "ખર્ચની વહેંચણી", 12, Ui.TEXT, true));
+        k.addView(dropPill(E_PERS, ePer, new java.util.function.IntConsumer() {
+            @Override public void accept(int i) { ePer = i; a.render(); }
+        }));
+        ExpData d = expData(ePer, 4);
+        if (d.names.length == 0) {
             TextView e = Ui.t(c, "આ મહિને ખર્ચ નથી", 10, Ui.MUTED, false);
             e.setGravity(Gravity.CENTER);
+            Ui.pad(e, 0, 30, 0, 30);
             k.addView(e);
+        } else {
+            k.addView(expChart(eType == 4 ? 0 : eType, d, 96));
+            expLegend(k, d);
         }
+        Ui.tap(k, new Runnable() { @Override public void run() { a.go("rep"); openRep("chart_exp"); } });
         return k;
+    }
+
+    /** Full-screen graph: pick one of 5 graph types and a period. */
+    private LinearLayout chartPage(final boolean profit) {
+        LinearLayout root = Ui.v(c);
+        root.addView(top(profit ? "નફાનો ગ્રાફ" : "ખર્ચનો ગ્રાફ", null, new Runnable() { @Override public void run() { a.go("home"); } }));
+        String[] types = profit ? P_TYPES : E_TYPES, pers = profit ? P_PERS : E_PERS;
+        String[][] tk = new String[types.length][2], pk = new String[pers.length][2];
+        for (int i = 0; i < types.length; i++) tk[i] = new String[]{"" + i, types[i]};
+        for (int i = 0; i < pers.length; i++) pk[i] = new String[]{"" + i, pers[i]};
+        root.addView(sectionHead("ગ્રાફનો પ્રકાર", null, null));
+        root.addView(chipsRow(tk, "" + (profit ? pType : eType), new java.util.function.Consumer<String>() {
+            @Override public void accept(String v) { if (profit) pType = Integer.parseInt(v); else eType = Integer.parseInt(v); a.render(); }
+        }));
+        root.addView(sectionHead("સમયગાળો", null, null));
+        root.addView(chipsRow(pk, "" + (profit ? pPer : ePer), new java.util.function.Consumer<String>() {
+            @Override public void accept(String v) { if (profit) pPer = Integer.parseInt(v); else ePer = Integer.parseInt(v); a.render(); }
+        }));
+        LinearLayout card = Ui.card(c);
+        Ui.pad(card, 12, 12, 12, 12);
+        LinearLayout.LayoutParams cp = Ui.fillW();
+        cp.setMargins(Ui.dp(14), Ui.dp(8), Ui.dp(14), 0);
+        card.setLayoutParams(cp);
+        if (profit) {
+            Series sr = monthly(pPer);
+            card.addView(profitChart(pType, sr, 240));
+            double ti = 0, te = 0, tp = 0;
+            for (int i = 0; i < sr.lab.length; i++) { ti += sr.inc[i]; te += sr.exp[i]; tp += sr.profit[i]; }
+            root.addView(card);
+            root.addView(strip("આવક", ti, Ui.GREEN, "ખર્ચ", te, Ui.RED, "નફો", tp, tp >= 0 ? Ui.GREEN : Ui.RED));
+            if (pType != 4) {
+                LinearLayout l = Ui.card(c);
+                Ui.pad(l, 12, 10, 12, 10);
+                LinearLayout.LayoutParams lp2 = Ui.fillW();
+                lp2.setMargins(Ui.dp(14), Ui.dp(8), Ui.dp(14), 0);
+                l.setLayoutParams(lp2);
+                l.addView(profitChart(4, sr, 0));
+                root.addView(l);
+            }
+        } else {
+            ExpData d = expData(ePer, 7);
+            if (d.names.length == 0) {
+                root.addView(empty("આ સમયગાળામાં ખર્ચ નથી"));
+                return root;
+            }
+            if (eType != 4) card.addView(expChart(eType, d, 220));
+            expLegendFull(card, d);
+            root.addView(card);
+        }
+        return root;
+    }
+
+    private void expLegendFull(LinearLayout k, ExpData d) {
+        for (int i = 0; i < d.names.length; i++) {
+            LinearLayout r = Ui.h(c);
+            Ui.pad(r, 0, 5, 0, 5);
+            View dot = new View(c);
+            dot.setBackground(Ui.rr(d.cols[i], 0, 6));
+            LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(Ui.dp(10), Ui.dp(10));
+            dl.setMargins(0, 0, Ui.dp(8), 0);
+            r.addView(dot, dl);
+            r.addView(Ui.t(c, d.names[i], 13, Ui.TEXT, false), Ui.weight(1));
+            r.addView(Ui.t(c, Fmt.money(d.v[i]) + "  ·  " + Math.round(d.v[i] / d.tot * 100) + "%", 13, Ui.TEXT, true));
+            k.addView(r);
+        }
+        LinearLayout r = Ui.h(c);
+        Ui.pad(r, 0, 8, 0, 0);
+        r.addView(Ui.t(c, "કુલ ખર્ચ", 14, Ui.TEXT, true), Ui.weight(1));
+        r.addView(Ui.t(c, Fmt.money(d.tot), 14, Ui.RED, true));
+        k.addView(r);
     }
 
     private View homeTxRow(final Model.Txn t) {
@@ -1312,6 +1490,8 @@ final class Screens {
     }
 
     LinearLayout reports() {
+        if ("chart_profit".equals(a.sub)) return chartPage(true);
+        if ("chart_exp".equals(a.sub)) return chartPage(false);
         if ("daily".equals(a.sub)) return dailyReport();
         if ("monthly".equals(a.sub)) return monthlyReport();
         if ("pnl".equals(a.sub)) return profitLossPage();
